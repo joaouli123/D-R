@@ -22,6 +22,7 @@ import {
   type ConteudoQuesitos,
   CRITERIO,
   GRAU,
+  MARCA,
   MODALIDADE_LABEL,
   ORIGEM_PONTO,
   PAPEL,
@@ -46,11 +47,15 @@ const FONTE = 'Times New Roman'
 const CORPO = 23 // meio-pontos → 11,5pt
 const RECUO_PRIMEIRA_LINHA = 709 // 1,25cm em twips
 
-const texto = (t: string, opcoes: { negrito?: boolean; italico?: boolean; tamanho?: number } = {}) =>
+const texto = (
+  t: string,
+  opcoes: { negrito?: boolean; italico?: boolean; tamanho?: number; cor?: string } = {},
+) =>
   new TextRun({
     text: t,
     bold: opcoes.negrito,
     italics: opcoes.italico,
+    color: opcoes.cor,
     font: FONTE,
     size: opcoes.tamanho ?? CORPO,
   })
@@ -106,13 +111,13 @@ const blocos = (t?: string | null): Paragraph[] => {
   return partes.map(p)
 }
 
-const borda = { style: BorderStyle.SINGLE, size: 4, color: '8B8677' }
+const borda = { style: BorderStyle.SINGLE, size: 4, color: MARCA.tinta400 }
 const BORDAS = { top: borda, bottom: borda, left: borda, right: borda }
 
 function celula(conteudo: string, opcoes: { cabecalho?: boolean; largura?: number } = {}) {
   return new TableCell({
     borders: BORDAS,
-    shading: opcoes.cabecalho ? { fill: 'EFEBE2' } : undefined,
+    shading: opcoes.cabecalho ? { fill: MARCA.tinta100 } : undefined,
     width: opcoes.largura ? { size: opcoes.largura, type: WidthType.PERCENTAGE } : undefined,
     margins: { top: 60, bottom: 60, left: 120, right: 120 },
     children: [
@@ -136,17 +141,27 @@ function cabecalhoMarca(perito: Usuario | null): Paragraph[] {
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: 40 },
-      children: [texto('D&R', { negrito: true, tamanho: 56 })],
+      children: [
+        texto('D', { negrito: true, tamanho: 56, cor: MARCA.primaria }),
+        texto('&', { negrito: true, tamanho: 56, cor: MARCA.tinta900 }),
+        texto('R', { negrito: true, tamanho: 56, cor: MARCA.primaria }),
+      ],
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: 60 },
-      children: [texto('— P E R Í C I A —', { negrito: true, tamanho: 18 })],
+      children: [texto('— P E R Í C I A —', { negrito: true, tamanho: 18, cor: MARCA.primaria })],
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: 60 },
-      children: [texto('PLATAFORMA INTELIGENTE DE PERÍCIA TRABALHISTA', { negrito: true, tamanho: 16 })],
+      children: [
+        texto('PLATAFORMA INTELIGENTE DE PERÍCIA TRABALHISTA', {
+          negrito: true,
+          tamanho: 16,
+          cor: MARCA.credencial,
+        }),
+      ],
     }),
   ]
 
@@ -157,9 +172,9 @@ function cabecalhoMarca(perito: Usuario | null): Paragraph[] {
     linhas.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: '0A4A2D' } },
+        border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: MARCA.primaria } },
         spacing: { after: 360 },
-        children: [texto(credencial, { tamanho: 17 })],
+        children: [texto(credencial, { tamanho: 17, cor: MARCA.tinta500 })],
       }),
     )
   }
@@ -176,7 +191,7 @@ function assinatura(perito: Usuario | null, comarca?: string | null): Paragraph[
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      border: { top: { style: BorderStyle.SINGLE, size: 6, color: '26241F' } },
+      border: { top: { style: BorderStyle.SINGLE, size: 6, color: MARCA.tinta800 } },
       spacing: { after: 0 },
       children: [texto(perito?.nome ?? '—', { negrito: true })],
     }),

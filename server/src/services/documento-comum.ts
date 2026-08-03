@@ -4,6 +4,29 @@
 // de um grau de insalubridade divirja entre os dois formatos.
 // ============================================================
 
+/**
+ * Identidade visual, espelhando tailwind.config.js do frontend.
+ * O documento gerado tem de sair com a mesma marca da tela, então
+ * uma troca de identidade se resolve aqui e não espalhada pelos
+ * geradores de PDF e DOCX.
+ */
+export const MARCA = {
+  /** brand-700 — azul principal do logotipo */
+  primaria: '173F9B',
+  /** navy-600 — azul das credenciais */
+  credencial: '1B3A6B',
+  tinta900: '161A21',
+  tinta800: '262C37',
+  tinta600: '4D5668',
+  tinta500: '69748A',
+  tinta400: '94A0B2',
+  tinta300: 'C3CBD6',
+  tinta100: 'EEF1F5',
+} as const
+
+/** A mesma paleta com o "#", para uso em CSS. */
+export const css = (cor: string): string => `#${cor}`
+
 export const PAPEL: Record<string, string> = {
   perito_judicial: 'Perito Judicial',
   assistente_reclamante: 'Assistente Técnico do Reclamante',

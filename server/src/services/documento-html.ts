@@ -8,12 +8,14 @@ import {
   type ConteudoQuesitos,
   CRITERIO,
   GRAU,
+  MARCA,
   MODALIDADE_LABEL,
   ORIGEM_PONTO,
   PAPEL,
   SECAO_FOTO,
   type TecnicoJson,
   VAZIO,
+  css,
   data,
   emParagrafos,
   extenso,
@@ -64,45 +66,45 @@ const CSS = `
     font-family: "Liberation Serif", Georgia, "Times New Roman", serif;
     font-size: 11.5pt;
     line-height: 1.6;
-    color: #171512;
+    color: ${css(MARCA.tinta900)};
     text-align: justify;
   }
   header.marca {
     text-align: center;
-    border-bottom: 2px solid #0A4A2D;
+    border-bottom: 2px solid ${css(MARCA.primaria)};
     padding-bottom: 14px;
     margin-bottom: 32px;
   }
   .logo { font-family: Inter, Arial, sans-serif; font-weight: 800; font-size: 32pt; letter-spacing: -1px; line-height: 1; }
-  .logo .verde { color: #0A4A2D; }
-  .logo .escuro { color: #171512; }
+  .logo .primaria { color: ${css(MARCA.primaria)}; }
+  .logo .neutra { color: ${css(MARCA.tinta900)}; }
   .regua {
     font-family: Inter, Arial, sans-serif;
     font-size: 8pt; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.42em; color: #0A4A2D; margin-top: 2px;
+    letter-spacing: 0.42em; color: ${css(MARCA.primaria)}; margin-top: 2px;
   }
   .tagline {
     font-family: Inter, Arial, sans-serif;
     font-size: 8pt; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.2em; color: #1B3A6B; margin-top: 10px;
+    letter-spacing: 0.2em; color: ${css(MARCA.credencial)}; margin-top: 10px;
   }
-  .perito-cabecalho { font-size: 8.5pt; color: #656155; margin-top: 6px; }
+  .perito-cabecalho { font-size: 8.5pt; color: ${css(MARCA.tinta500)}; margin-top: 6px; }
   h1 { font-size: 14pt; font-weight: 700; text-align: center; text-transform: uppercase; margin: 0 0 18px; }
   h2 { font-size: 12pt; font-weight: 700; text-transform: uppercase; text-align: left; margin: 22px 0 8px; page-break-after: avoid; }
   h3 { font-size: 11.5pt; font-weight: 700; text-align: left; margin: 14px 0 4px; page-break-after: avoid; }
   p { margin: 0 0 10px; text-indent: 1.25cm; }
   p.sem-recuo { text-indent: 0; }
-  p.vazio { font-style: italic; color: #8B8677; text-indent: 0; }
+  p.vazio { font-style: italic; color: ${css(MARCA.tinta400)}; text-indent: 0; }
   table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 10pt; page-break-inside: avoid; }
-  th, td { border: 1px solid #8B8677; padding: 4px 8px; vertical-align: top; text-align: left; text-indent: 0; }
-  th { background: #EFEBE2; font-weight: 700; }
+  th, td { border: 1px solid ${css(MARCA.tinta400)}; padding: 4px 8px; vertical-align: top; text-align: left; text-indent: 0; }
+  th { background: ${css(MARCA.tinta100)}; font-weight: 700; }
   .fotos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
   figure { margin: 0; text-align: center; page-break-inside: avoid; }
-  figure img { width: 100%; height: 180px; object-fit: cover; border: 1px solid #BFB9A8; display: block; }
-  figcaption { font-size: 9pt; font-style: italic; color: #4A4740; margin-top: 4px; }
+  figure img { width: 100%; height: 180px; object-fit: cover; border: 1px solid ${css(MARCA.tinta300)}; display: block; }
+  figcaption { font-size: 9pt; font-style: italic; color: ${css(MARCA.tinta600)}; margin-top: 4px; }
   .local-data { text-align: center; text-indent: 0; margin-top: 36px; }
   .assinatura { margin-top: 56px; text-align: center; page-break-inside: avoid; }
-  .assinatura .traco { width: 280px; margin: 0 auto; border-top: 1px solid #26241F; padding-top: 6px; }
+  .assinatura .traco { width: 280px; margin: 0 auto; border-top: 1px solid ${css(MARCA.tinta800)}; padding-top: 6px; }
   .assinatura p { text-indent: 0; margin: 0; }
   .assinatura .nome { font-weight: 700; }
   .assinatura .dado { font-size: 10pt; }
@@ -119,7 +121,7 @@ function moldura(titulo: string, perito: Usuario | null, corpo: string): string 
 <html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>${CSS}</style></head>
 <body>
   <header class="marca">
-    <div class="logo"><span class="verde">D</span><span class="escuro">&amp;</span><span class="verde">R</span></div>
+    <div class="logo"><span class="primaria">D</span><span class="neutra">&amp;</span><span class="primaria">R</span></div>
     <div class="regua">— Perícia —</div>
     <div class="tagline">Plataforma Inteligente de Perícia Trabalhista</div>
     ${credencial}
@@ -238,7 +240,7 @@ export async function htmlDoParecer(
           const uri = await comoDataUri(f.arquivo)
           const img = uri
             ? `<img src="${uri}" alt="${esc(f.legenda)}">`
-            : `<div style="height:180px;border:1px solid #BFB9A8;display:flex;align-items:center;justify-content:center;font-size:9pt;color:#8B8677">imagem indisponível</div>`
+            : `<div style="height:180px;border:1px solid ${css(MARCA.tinta300)};display:flex;align-items:center;justify-content:center;font-size:9pt;color:${css(MARCA.tinta400)}">imagem indisponível</div>`
           return `<figure>${img}<figcaption>Figura ${i + 1} — ${esc(f.legenda || 'sem legenda')}</figcaption></figure>`
         }),
       )
