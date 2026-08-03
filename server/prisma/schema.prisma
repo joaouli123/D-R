@@ -1,0 +1,356 @@
+// ============================================================
+// D&R Perícia Elite — Modelo de dados (PostgreSQL)
+//
+// Espelha src/types/index.ts do frontend. Regra geral:
+//   · datas do domínio (admissão, vistoria) são String "YYYY-MM-DD",
+//     como vêm dos <input type="date"> — evita bugs de fuso;
+//   · timestamps do sistema são DateTime e o mapper os recorta
+//     para "YYYY-MM-DD" na resposta;
+//   · o preenchimento técnico do parecer é um documento redacional,
+//     não uma entidade consultável — fica em Json.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------- Módulo A — Acesso ----------------
+
+enum Perfil {
+  admin
+  perito
+  assistente
+}
+
+model Usuario {
+  id                   String    @id @default(uuid())
+  nome                 String
+  email                String    @unique
+  senhaHash            String
+  perfil               Perfil    @default(assistente)
+  registroProfissional String?
+  titulo               String?
+  telefone             String?
+  ativo                Boolean   @default(true)
+  ultimoAcesso         DateTime?
+  criadoEm             DateTime  @default(now())
+  atualizadoEm         DateTime  @updatedAt
+
+  pericias     Pericia[]
+  textos       TextoBiblioteca[]
+  quesitos     Quesito[]
+  documentos   DocumentoGerado[]
+  compromissos Compromisso[]
+
+  @@map("usuarios")
+}
+
+// ---------------- Módulo B — Empresas ----------------
+
+model Empresa {
+  id              String   @id @default(uuid())
+  razaoSocial     String
+  nomeFantasia    String?
+  cnpj            String   @unique
+  cnae            String?
+  grauRisco       String?
+  endereco        String   @default("")
+  numero          String?
+  complemento     String?
+  bairro          String?
+  cidade          String   @default("")
+  uf              String   @default("SP")
+  cep             String?
+  contatoNome     String?
+  contatoEmail    String?
+  contatoTelefone String?
+  ramoAtividade   String?
+  criadoEm        DateTime @default(now())
+  atualizadoEm    DateTime @updatedAt
+
+  reclamadas Reclamada[]
+
+  @@map("empresas")
+}
+
+// ---------------- Módulos C/D/E — Perícias ----------------
+
+enum Modalidade {
+  insalubridade
+  periculosidade
+  ambas
+}
+
+enum StatusPericia {
+  rascunho
+  em_andamento
+  concluida
+  entregue
+}
+
+model Pericia {
+  id               String        @id @default(uuid())
+  numeroProcesso   String        @default("")
+  vara             String        @default("")
+  comarca          String        @default("")
+  reclamante       String        @default("")
+  cpfReclamante    String?
+  funcaoReclamante String?
+  admissao         String?
+  demissao         String?
+  dataVistoria     String?
+  horaVistoria     String?
+  localVistoria    String?
+  modalidade       Modalidade    @default(insalubridade)
+  status           StatusPericia @default(rascunho)
+
+  /// PreenchimentoTecnico completo (12 campos de texto + periodos[] + agentes[]).
+  tecnico Json
+
+  responsavelId String
+  responsavel   Usuario @relation(fields: [responsavelId], references: [id], onDelete: Restrict)
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  reclamadas    Reclamada[]
+  participantes Participante[]
+  fotos         Foto[]
+  documentos    DocumentoGerado[]
+
+  @@index([responsavelId])
+  @@index([numeroProcesso])
+  @@map("pericias")
+}
+
+model Reclamada {
+  id        String  @id @default(uuid())
+  periciaId String
+  empresaId String
+  principal Boolean @default(false)
+
+  pericia Pericia @relation(fields: [periciaId], references: [id], onDelete: Cascade)
+  // Restrict: uma empresa já citada como reclamada não pode sumir do histórico.
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+
+  @@index([periciaId])
+  @@index([empresaId])
+  @@map("reclamadas")
+}
+
+enum PapelParticipante {
+  perito_judicial
+  assistente_reclamante
+  assistente_reclamada
+  advogado_reclamante
+  advogado_reclamada
+  preposto
+  acompanhante
+}
+
+model Participante {
+  id        String            @id @default(uuid())
+  periciaId String
+  nome      String            @default("")
+  papel     PapelParticipante
+  registro  String?
+  contato   String?
+
+  pericia Pericia @relation(fields: [periciaId], references: [id], onDelete: Cascade)
+
+  @@index([periciaId])
+  @@map("participantes")
+}
+
+enum SecaoFoto {
+  ambiente
+  atividades
+  equipamentos
+  epi
+  produtos
+  documentos
+}
+
+model Foto {
+  id        String    @id @default(uuid())
+  periciaId String
+  secao     SecaoFoto
+  /// Nome do arquivo no volume de uploads — a URL pública é montada no mapper.
+  arquivo   String
+  legenda   String    @default("")
+  ordem     Int       @default(0)
+  criadoEm  DateTime  @default(now())
+
+  pericia Pericia @relation(fields: [periciaId], references: [id], onDelete: Cascade)
+
+  @@index([periciaId])
+  @@map("fotos")
+}
+
+// ---------------- Módulo F — Biblioteca de textos ----------------
+
+enum SecaoTexto {
+  apresentacao
+  objetivo
+  empresa
+  ambiente
+  atividades
+  analise
+  conclusao
+  manifestacao
+  impugnacao
+  esclarecimento
+  generico
+}
+
+model TextoBiblioteca {
+  id           String     @id @default(uuid())
+  usuarioId    String
+  titulo       String
+  secao        SecaoTexto @default(generico)
+  tags         String[]   @default([])
+  conteudo     String
+  favorito     Boolean    @default(false)
+  usos         Int        @default(0)
+  criadoEm     DateTime   @default(now())
+  atualizadoEm DateTime   @updatedAt
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("textos_biblioteca")
+}
+
+// ---------------- Módulo K — Quesitos ----------------
+
+enum TemaQuesito {
+  gerais
+  insalubridade
+  periculosidade
+  ruido
+  calor
+  quimicos
+  biologicos
+  epi
+  ergonomia
+  eletricidade
+  inflamaveis
+}
+
+enum OrigemQuesito {
+  juizo
+  reclamante
+  reclamada
+  proprio
+}
+
+model Quesito {
+  id             String        @id @default(uuid())
+  /// null = quesito do banco global (os 39 pré-cadastrados).
+  usuarioId      String?
+  codigo         String
+  tema           TemaQuesito
+  origem         OrigemQuesito
+  pergunta       String
+  respostaPadrao String?
+  favorito       Boolean       @default(false)
+  usos           Int           @default(0)
+  personalizado  Boolean       @default(false)
+  criadoEm       DateTime      @default(now())
+  atualizadoEm   DateTime      @updatedAt
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("quesitos")
+}
+
+// ---------------- Módulos G/H/I/J — Documentos ----------------
+
+enum TipoDocumento {
+  parecer
+  laudo
+  quesitos
+  manifestacao
+  impugnacao
+  esclarecimento
+}
+
+enum StatusDocumento {
+  rascunho
+  finalizado
+  enviado
+}
+
+model DocumentoGerado {
+  id               String          @id @default(uuid())
+  tipo             TipoDocumento
+  titulo           String
+  /// null quando o documento é emitido sem vínculo com processo.
+  periciaId        String?
+  numeroProcesso   String          @default("—")
+  reclamante       String          @default("—")
+  empresaPrincipal String          @default("—")
+  status           StatusDocumento @default(rascunho)
+
+  /// Estado editável do documento: quesitos respondidos, blocos da
+  /// manifestação, pontos do esclarecimento. É o que permite reabrir.
+  conteudo Json?
+
+  anexoExternoNome    String?
+  anexoExternoArquivo String?
+  enviadoPara         String?
+  enviadoEm           DateTime?
+
+  criadoPorId String
+  criadoPor   Usuario  @relation(fields: [criadoPorId], references: [id], onDelete: Restrict)
+  pericia     Pericia? @relation(fields: [periciaId], references: [id], onDelete: SetNull)
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@index([periciaId])
+  @@index([criadoPorId])
+  @@map("documentos")
+}
+
+// ---------------- Agenda e modelos ----------------
+
+enum TipoCompromisso {
+  vistoria
+  prazo
+  audiencia
+}
+
+model Compromisso {
+  id        String          @id @default(uuid())
+  usuarioId String
+  data      String
+  hora      String          @default("")
+  titulo    String
+  local     String          @default("")
+  processo  String?
+  tipo      TipoCompromisso @default(vistoria)
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@index([data])
+  @@map("compromissos")
+}
+
+model ModeloDocumento {
+  id           String        @id @default(uuid())
+  nome         String
+  tipo         TipoDocumento
+  secoes       Int           @default(0)
+  criadoEm     DateTime      @default(now())
+  atualizadoEm DateTime      @updatedAt
+
+  @@map("modelos")
+}

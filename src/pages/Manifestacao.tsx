@@ -26,6 +26,7 @@ import {
 import { PageHeader } from '@/components/layout/AppLayout'
 import { Logo } from '@/components/Logo'
 import { useApp } from '@/store/AppStore'
+import * as api from '@/services/api'
 import {
   AGENTES_MANIFESTACAO,
   ENCERRAMENTO_PADRAO,
@@ -66,6 +67,9 @@ export default function Manifestacao() {
   const [modelo, setModelo] = useState<ModeloManifestacao | null>(null)
   const [encerramento, setEncerramento] = useState('')
   const [montado, setMontado] = useState(false)
+  const [gerandoPdf, setGerandoPdf] = useState(false)
+  /** Salvar de novo atualiza o mesmo documento em vez de duplicar. */
+  const [documentoId, setDocumentoId] = useState<string | null>(null)
 
   useEffect(() => {
     if (posParam) setPosicionamento(posParam as PosicionamentoManifestacao)
@@ -99,20 +103,63 @@ export default function Manifestacao() {
     [modelo],
   )
 
-  function salvar() {
-    salvarDocumento({
-      id: uid('doc'),
-      tipo: posicionamento === 'concordancia' ? 'manifestacao' : 'impugnacao',
-      titulo: modelo?.titulo ?? 'Manifestação ao Laudo',
-      periciaId: periciaId || '—',
-      numeroProcesso: pericia?.numeroProcesso ?? '—',
-      reclamante: pericia?.reclamante ?? '—',
-      empresaPrincipal: empresa?.nomeFantasia ?? empresa?.razaoSocial ?? '—',
-      status: 'finalizado',
-      criadoEm: new Date().toISOString().slice(0, 10),
-      atualizadoEm: new Date().toISOString().slice(0, 10),
-    })
-    toast('Documento salvo no histórico.')
+  /**
+   * Grava o documento com os argumentos selecionados dentro — é o
+   * que permite reabrir a impugnação e continuar de onde parou.
+   */
+  async function salvar(silencioso = false): Promise<string | null> {
+    if (!modelo || !agente) return null
+
+    const hoje = new Date().toISOString().slice(0, 10)
+    try {
+      const doc = await salvarDocumento({
+        id: documentoId ?? uid('doc'),
+        tipo: posicionamento === 'concordancia' ? 'manifestacao' : 'impugnacao',
+        titulo: modelo.titulo,
+        periciaId: periciaId || '—',
+        numeroProcesso: pericia?.numeroProcesso ?? '—',
+        reclamante: pericia?.reclamante ?? '—',
+        empresaPrincipal: empresa?.nomeFantasia ?? empresa?.razaoSocial ?? '—',
+        status: 'finalizado',
+        conteudo: {
+          agente,
+          posicionamento,
+          fundamentacao: modelo.fundamentacao,
+          blocos: blocosAtivos.map((b) => ({ titulo: b.titulo, conteudo: b.conteudo })),
+          encerramento,
+        },
+        criadoEm: hoje,
+        atualizadoEm: hoje,
+      })
+
+      setDocumentoId(doc.id)
+      if (!silencioso) toast('Documento salvo no histórico.')
+      return doc.id
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Não foi possível salvar o documento.', 'error')
+      return null
+    }
+  }
+
+  /** Módulo H — PDF montado no servidor. */
+  async function gerarPdf() {
+    if (api.API_MODE !== 'rest') {
+      window.print()
+      return
+    }
+
+    setGerandoPdf(true)
+    try {
+      const docId = await salvar(true)
+      if (!docId) return
+      const { blob, nome } = await api.documentos.gerarPdf(docId)
+      api.salvarArquivo(blob, nome)
+      toast('PDF gerado.')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Falha ao gerar o PDF.', 'error')
+    } finally {
+      setGerandoPdf(false)
+    }
   }
 
   return (
@@ -127,10 +174,10 @@ export default function Manifestacao() {
               <Button variant="ghost" icon={<RotateCcw size={16} />} onClick={() => setMontado(false)}>
                 Refazer
               </Button>
-              <Button variant="outline" icon={<Save size={16} />} onClick={salvar}>
+              <Button variant="outline" icon={<Save size={16} />} onClick={() => void salvar()}>
                 Salvar
               </Button>
-              <Button icon={<Printer size={16} />} onClick={() => window.print()}>
+              <Button icon={<Printer size={16} />} loading={gerandoPdf} onClick={() => void gerarPdf()}>
                 Gerar PDF
               </Button>
             </>
@@ -311,10 +358,20 @@ export default function Manifestacao() {
             </Card>
 
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" icon={<FileDown size={15} />} onClick={salvar}>
+              <Button
+                variant="outline"
+                className="flex-1"
+                icon={<FileDown size={15} />}
+                onClick={() => void salvar()}
+              >
                 Salvar
               </Button>
-              <Button className="flex-1" icon={<Printer size={15} />} onClick={() => window.print()}>
+              <Button
+                className="flex-1"
+                icon={<Printer size={15} />}
+                loading={gerandoPdf}
+                onClick={() => void gerarPdf()}
+              >
                 Gerar PDF
               </Button>
             </div>

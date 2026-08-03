@@ -1,0 +1,68 @@
+# ============================================================
+# D&R Perícia Elite — API + PostgreSQL
+#
+# Desenvolvimento:  docker compose up -d
+# Coolify: aponte o recurso para este arquivo e defina as
+# variáveis de ambiente no painel (nunca no repositório).
+# ============================================================
+
+services:
+  banco:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-dr_pericia}
+      # Ordenação correta para acentos em nomes e razões sociais.
+      LANG: pt_BR.utf8
+    volumes:
+      - dados-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-dr} -d ${POSTGRES_DB:-dr_pericia}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      banco:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3333
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dr}:${POSTGRES_PASSWORD}@banco:5432/${POSTGRES_DB:-dr_pericia}?schema=public
+
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET com 32+ caracteres}
+      JWT_EXPIRACAO: ${JWT_EXPIRACAO:-8h}
+
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      API_PUBLIC_URL: ${API_PUBLIC_URL:-http://localhost:3333}
+
+      UPLOAD_DIR: /app/uploads
+      UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-15}
+
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_REMETENTE: ${EMAIL_REMETENTE:-D&R Perícia <nao-responda@drpericiaelite.com.br>}
+
+      # Carga inicial — idempotente, roda a cada subida.
+      ADMIN_NOME: ${ADMIN_NOME:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_SENHA: ${ADMIN_SENHA:-}
+      ADMIN_REGISTRO: ${ADMIN_REGISTRO:-}
+      SEED_DEMO: ${SEED_DEMO:-false}
+    ports:
+      - '${API_PORTA:-3333}:3333'
+    volumes:
+      # Fotos das vistorias e anexos em PDF. Perder este volume
+      # significa perder o relatório fotográfico dos laudos.
+      - uploads:/app/uploads
+
+volumes:
+  dados-postgres:
+  uploads:

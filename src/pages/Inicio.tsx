@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
@@ -16,7 +17,8 @@ import {
 import { Badge, Button, Card, CardHeader } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { useApp } from '@/store/AppStore'
-import { AGENDA } from '@/mocks/db'
+import * as api from '@/services/api'
+import type { Compromisso } from '@/services/api'
 import { formatDate } from '@/lib/utils'
 
 // ============================================================
@@ -84,7 +86,25 @@ export default function Inicio() {
     { label: 'Empresas cadastradas', valor: empresas.length, icon: FileCheck2, tone: 'text-ink-700 bg-ink-100' },
   ]
 
-  const proximos = AGENDA.slice(0, 4)
+  const [proximos, setProximos] = useState<Compromisso[]>([])
+
+  useEffect(() => {
+    let vivo = true
+    api.agenda
+      .listar()
+      .then((lista) => {
+        if (!vivo) return
+        const limite = new Date().toISOString().slice(0, 10)
+        setProximos(lista.filter((c) => c.data >= limite).slice(0, 4))
+      })
+      // O painel não deve quebrar por causa da agenda: sem ela o
+      // cartão apenas fica vazio.
+      .catch(() => undefined)
+    return () => {
+      vivo = false
+    }
+  }, [])
+
   const recentes = [...documentos]
     .sort((a, b) => b.atualizadoEm.localeCompare(a.atualizadoEm))
     .slice(0, 5)
@@ -199,6 +219,11 @@ export default function Inicio() {
             }
           />
           <div className="divide-y divide-ink-100">
+            {proximos.length === 0 && (
+              <p className="px-5 py-4 text-[13px] text-ink-400">
+                Nenhum compromisso agendado.
+              </p>
+            )}
             {proximos.map((a) => (
               <div key={a.id} className="flex gap-3 px-5 py-3">
                 <div className="w-11 shrink-0 rounded-lg border border-ink-200 py-1 text-center">

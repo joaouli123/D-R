@@ -1,0 +1,10 @@
+node_modules
+dist
+uploads
+saida-teste
+scripts
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store

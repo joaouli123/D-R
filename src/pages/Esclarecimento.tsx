@@ -4,6 +4,7 @@ import { Badge, Button, Card, CardHeader, Input, Select, Textarea, useToast } fr
 import { PageHeader } from '@/components/layout/AppLayout'
 import { Logo } from '@/components/Logo'
 import { useApp } from '@/store/AppStore'
+import * as api from '@/services/api'
 import { AGENTES_MANIFESTACAO } from '@/content/manifestacao'
 import type { AgenteManifestacao } from '@/types'
 import { extenso, uid } from '@/lib/utils'
@@ -48,6 +49,9 @@ export default function Esclarecimento() {
   const [conclusao, setConclusao] = useState(
     'Ante o exposto, o signatário RATIFICA integralmente as conclusões constantes do laudo pericial, esclarecendo os pontos suscitados na forma acima, e coloca-se novamente à disposição deste MM. Juízo para eventuais complementações.',
   )
+  const [gerandoPdf, setGerandoPdf] = useState(false)
+  /** Salvar de novo atualiza o mesmo documento em vez de duplicar. */
+  const [documentoId, setDocumentoId] = useState<string | null>(null)
 
   const pericia = pericias.find((p) => p.id === periciaId)
   const empresa = pericia
@@ -61,20 +65,61 @@ export default function Esclarecimento() {
     toast('Respostas padrão carregadas para os pontos em branco.')
   }
 
-  function salvar() {
-    salvarDocumento({
-      id: uid('doc'),
-      tipo: 'esclarecimento',
-      titulo: `Esclarecimentos Técnicos — ${AGENTES_MANIFESTACAO.find((a) => a.value === agente)?.label}`,
-      periciaId: periciaId || '—',
-      numeroProcesso: pericia?.numeroProcesso ?? '—',
-      reclamante: pericia?.reclamante ?? '—',
-      empresaPrincipal: empresa?.nomeFantasia ?? empresa?.razaoSocial ?? '—',
-      status: 'finalizado',
-      criadoEm: new Date().toISOString().slice(0, 10),
-      atualizadoEm: new Date().toISOString().slice(0, 10),
-    })
-    toast('Esclarecimentos salvos no histórico.')
+  async function salvar(silencioso = false): Promise<string | null> {
+    const hoje = new Date().toISOString().slice(0, 10)
+    try {
+      const doc = await salvarDocumento({
+        id: documentoId ?? uid('doc'),
+        tipo: 'esclarecimento',
+        titulo: `Esclarecimentos Técnicos — ${AGENTES_MANIFESTACAO.find((a) => a.value === agente)?.label}`,
+        periciaId: periciaId || '—',
+        numeroProcesso: pericia?.numeroProcesso ?? '—',
+        reclamante: pericia?.reclamante ?? '—',
+        empresaPrincipal: empresa?.nomeFantasia ?? empresa?.razaoSocial ?? '—',
+        status: 'finalizado',
+        conteudo: {
+          agente,
+          referencia,
+          introducao,
+          pontos: pontos.map((p) => ({
+            origem: p.origem,
+            questionamento: p.questionamento,
+            resposta: p.resposta,
+          })),
+          conclusao,
+        },
+        criadoEm: hoje,
+        atualizadoEm: hoje,
+      })
+
+      setDocumentoId(doc.id)
+      if (!silencioso) toast('Esclarecimentos salvos no histórico.')
+      return doc.id
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Não foi possível salvar.', 'error')
+      return null
+    }
+  }
+
+  /** Módulo H — PDF montado no servidor. */
+  async function gerarPdf() {
+    if (api.API_MODE !== 'rest') {
+      window.print()
+      return
+    }
+
+    setGerandoPdf(true)
+    try {
+      const docId = await salvar(true)
+      if (!docId) return
+      const { blob, nome } = await api.documentos.gerarPdf(docId)
+      api.salvarArquivo(blob, nome)
+      toast('PDF gerado.')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Falha ao gerar o PDF.', 'error')
+    } finally {
+      setGerandoPdf(false)
+    }
   }
 
   const ORIGEM_LABEL = {
@@ -91,10 +136,10 @@ export default function Esclarecimento() {
         description="Extensão do Parecer Técnico — responde pontualmente aos questionamentos do Juízo e das partes, mantendo os dados do mesmo caso."
         action={
           <>
-            <Button variant="outline" icon={<FileDown size={16} />} onClick={salvar}>
+            <Button variant="outline" icon={<FileDown size={16} />} onClick={() => void salvar()}>
               Salvar
             </Button>
-            <Button icon={<Printer size={16} />} onClick={() => window.print()}>
+            <Button icon={<Printer size={16} />} loading={gerandoPdf} onClick={() => void gerarPdf()}>
               Gerar PDF
             </Button>
           </>

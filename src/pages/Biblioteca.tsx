@@ -57,6 +57,7 @@ export default function Biblioteca() {
   const [secao, setSecao] = useState<'todas' | SecaoTexto>('todas')
   const [editando, setEditando] = useState<TextoBiblioteca | null>(null)
   const [tagsInput, setTagsInput] = useState('')
+  const [salvando, setSalvando] = useState(false)
 
   const lista = useMemo(() => {
     const q = busca.toLowerCase().trim()
@@ -66,21 +67,38 @@ export default function Biblioteca() {
       .sort((a, b) => Number(b.favorito) - Number(a.favorito) || b.usos - a.usos)
   }, [textos, busca, secao])
 
-  function salvar() {
+  async function salvar() {
     if (!editando) return
     if (!editando.titulo.trim() || !editando.conteudo.trim()) {
       toast('Título e conteúdo são obrigatórios.', 'error')
       return
     }
-    salvarTexto({
-      ...editando,
-      tags: tagsInput
-        .split(',')
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean),
-    })
-    toast('Texto salvo na sua biblioteca.')
-    setEditando(null)
+
+    setSalvando(true)
+    try {
+      await salvarTexto({
+        ...editando,
+        tags: tagsInput
+          .split(',')
+          .map((t) => t.trim().toLowerCase())
+          .filter(Boolean),
+      })
+      toast('Texto salvo na sua biblioteca.')
+      setEditando(null)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Não foi possível salvar o texto.', 'error')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  async function excluir(id: string) {
+    try {
+      await removerTexto(id)
+      toast('Texto removido.', 'info')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Não foi possível remover.', 'error')
+    }
   }
 
   function abrir(t: TextoBiblioteca) {
@@ -159,7 +177,7 @@ export default function Biblioteca() {
                 <div className="mb-2 flex items-start justify-between gap-2">
                   <h3 className="font-semibold leading-tight text-ink-900">{t.titulo}</h3>
                   <button
-                    onClick={() => salvarTexto({ ...t, favorito: !t.favorito })}
+                    onClick={() => void salvarTexto({ ...t, favorito: !t.favorito })}
                     aria-label="Favoritar"
                   >
                     <Star
@@ -205,10 +223,7 @@ export default function Biblioteca() {
                     size="sm"
                     className="text-red-600 hover:bg-red-50"
                     icon={<Trash2 size={14} />}
-                    onClick={() => {
-                      removerTexto(t.id)
-                      toast('Texto removido.', 'info')
-                    }}
+                    onClick={() => void excluir(t.id)}
                     aria-label="Excluir"
                   />
                 </div>
@@ -383,10 +398,12 @@ export default function Biblioteca() {
         size="lg"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setEditando(null)}>
+            <Button variant="ghost" onClick={() => setEditando(null)} disabled={salvando}>
               Cancelar
             </Button>
-            <Button onClick={salvar}>Salvar</Button>
+            <Button loading={salvando} onClick={() => void salvar()}>
+              Salvar
+            </Button>
           </>
         }
       >

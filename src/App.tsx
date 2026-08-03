@@ -1,7 +1,9 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { AlertTriangle, RotateCcw } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useApp } from '@/store/AppStore'
-import { PageLoader } from '@/components/ui'
+import { Button, PageLoader } from '@/components/ui'
+import { Logo } from '@/components/Logo'
 
 import Login from '@/pages/Login'
 import Inicio from '@/pages/Inicio'
@@ -21,10 +23,31 @@ import Quesitos from '@/pages/Quesitos'
 import Manifestacao from '@/pages/Manifestacao'
 import Esclarecimento from '@/pages/Esclarecimento'
 
+/**
+ * A API não respondeu. Sem isto a tela ficaria travada em
+ * "carregando" para sempre quando o backend estivesse fora.
+ */
+function FalhaAoCarregar({ erro, tentarDeNovo }: { erro: string; tentarDeNovo: () => void }) {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-ink-50 px-6 text-center">
+      <Logo size="lg" />
+      <div className="mt-8 flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
+        <AlertTriangle size={22} />
+      </div>
+      <h1 className="mt-4 text-xl font-bold text-ink-900">Não foi possível carregar os dados</h1>
+      <p className="mt-2 max-w-md text-sm text-ink-500">{erro}</p>
+      <Button className="mt-6" icon={<RotateCcw size={16} />} onClick={tentarDeNovo}>
+        Tentar novamente
+      </Button>
+    </div>
+  )
+}
+
 export default function App() {
-  const { usuario, carregando } = useApp()
+  const { usuario, carregando, erroCarregamento, recarregar } = useApp()
 
   if (carregando) return <PageLoader />
+  if (erroCarregamento) return <FalhaAoCarregar erro={erroCarregamento} tentarDeNovo={recarregar} />
   if (!usuario) return <Login />
 
   return (

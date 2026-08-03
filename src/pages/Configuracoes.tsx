@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Mail, Plus, Server, ShieldCheck, User, UserCog } from 'lucide-react'
+import { KeyRound, Mail, Plus, Server, ShieldCheck, User, UserCog } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -14,6 +14,7 @@ import {
 import { PageHeader } from '@/components/layout/AppLayout'
 import { Logo, SeloCredenciado } from '@/components/Logo'
 import { useApp } from '@/store/AppStore'
+import * as api from '@/services/api'
 import { API_MODE } from '@/services/api'
 import type { PerfilUsuario, Usuario } from '@/types'
 import { formatDateTime, uid } from '@/lib/utils'
@@ -32,8 +33,55 @@ export default function Configuracoes() {
   const { usuario, usuarios, salvarUsuario } = useApp()
   const toast = useToast()
   const [aba, setAba] = useState<'perfil' | 'usuarios' | 'documento' | 'sistema'>('perfil')
-  const [novo, setNovo] = useState<Usuario | null>(null)
+  const [novo, setNovo] = useState<(Usuario & { senha?: string }) | null>(null)
   const [perfilLocal, setPerfilLocal] = useState<Usuario>(usuario!)
+  const [salvando, setSalvando] = useState(false)
+  const [senhaAberta, setSenhaAberta] = useState(false)
+
+  const ehAdmin = usuario?.perfil === 'admin'
+
+  async function salvarPerfil() {
+    setSalvando(true)
+    try {
+      await salvarUsuario(perfilLocal)
+      toast('Perfil atualizado.')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Não foi possível salvar o perfil.', 'error')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  async function cadastrarUsuario() {
+    if (!novo?.nome.trim() || !novo.email.trim()) {
+      toast('Nome e e-mail são obrigatórios.', 'error')
+      return
+    }
+    if (!novo.senha || novo.senha.length < 8) {
+      toast('Defina uma senha inicial com pelo menos 8 caracteres.', 'error')
+      return
+    }
+
+    setSalvando(true)
+    try {
+      await salvarUsuario(novo)
+      toast('Usuário cadastrado.')
+      setNovo(null)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Não foi possível cadastrar o usuário.', 'error')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  async function alternarAtivo(u: Usuario) {
+    try {
+      await salvarUsuario({ ...u, ativo: !u.ativo })
+      toast(u.ativo ? 'Usuário desativado.' : 'Usuário ativado.')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Não foi possível alterar o status.', 'error')
+    }
+  }
 
   return (
     <>
@@ -95,13 +143,11 @@ export default function Configuracoes() {
                 value={perfilLocal.telefone ?? ''}
                 onChange={(e) => setPerfilLocal({ ...perfilLocal, telefone: e.target.value })}
               />
-              <div className="sm:col-span-2 flex justify-end border-t border-ink-100 pt-4">
-                <Button
-                  onClick={() => {
-                    salvarUsuario(perfilLocal)
-                    toast('Perfil atualizado.')
-                  }}
-                >
+              <div className="sm:col-span-2 flex justify-between gap-2 border-t border-ink-100 pt-4">
+                <Button variant="outline" icon={<KeyRound size={15} />} onClick={() => setSenhaAberta(true)}>
+                  Trocar minha senha
+                </Button>
+                <Button loading={salvando} onClick={() => void salvarPerfil()}>
                   Salvar alterações
                 </Button>
               </div>
@@ -128,6 +174,8 @@ export default function Configuracoes() {
               <Button
                 size="sm"
                 icon={<Plus size={14} />}
+                disabled={!ehAdmin}
+                title={ehAdmin ? undefined : 'Somente o administrador cadastra usuários.'}
                 onClick={() =>
                   setNovo({
                     id: uid('usr'),
@@ -135,6 +183,7 @@ export default function Configuracoes() {
                     email: '',
                     perfil: 'assistente',
                     ativo: true,
+                    senha: '',
                   })
                 }
               >
@@ -178,11 +227,16 @@ export default function Configuracoes() {
                     </td>
                     <td className="px-5 py-3 text-right">
                       <button
-                        onClick={() => {
-                          salvarUsuario({ ...u, ativo: !u.ativo })
-                          toast(u.ativo ? 'Usuário desativado.' : 'Usuário ativado.')
-                        }}
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                        onClick={() => void alternarAtivo(u)}
+                        disabled={!ehAdmin || u.id === usuario?.id}
+                        title={
+                          u.id === usuario?.id
+                            ? 'Você não pode desativar o próprio acesso.'
+                            : !ehAdmin
+                              ? 'Somente o administrador altera o status.'
+                              : undefined
+                        }
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${
                           u.ativo ? 'bg-brand-50 text-brand-700' : 'bg-ink-100 text-ink-500'
                         }`}
                       >
@@ -288,20 +342,10 @@ export default function Configuracoes() {
         subtitle="Cadastro e gerenciamento dos usuários autorizados a utilizar o sistema."
         footer={
           <>
-            <Button variant="ghost" onClick={() => setNovo(null)}>
+            <Button variant="ghost" onClick={() => setNovo(null)} disabled={salvando}>
               Cancelar
             </Button>
-            <Button
-              onClick={() => {
-                if (!novo?.nome.trim() || !novo.email.trim()) {
-                  toast('Nome e e-mail são obrigatórios.', 'error')
-                  return
-                }
-                salvarUsuario(novo)
-                toast('Usuário cadastrado.')
-                setNovo(null)
-              }}
-            >
+            <Button loading={salvando} onClick={() => void cadastrarUsuario()}>
               Cadastrar
             </Button>
           </>
@@ -333,6 +377,15 @@ export default function Configuracoes() {
               <option value="assistente">Assistente</option>
             </Select>
             <Input
+              label="Senha inicial"
+              type="password"
+              required
+              className="sm:col-span-2"
+              value={novo.senha ?? ''}
+              onChange={(e) => setNovo({ ...novo, senha: e.target.value })}
+              hint="Mínimo 8 caracteres. O usuário pode trocá-la depois em Meu perfil."
+            />
+            <Input
               label="Titulação"
               className="sm:col-span-2"
               value={novo.titulo ?? ''}
@@ -347,6 +400,90 @@ export default function Configuracoes() {
           </div>
         )}
       </Modal>
+
+      <TrocaDeSenha aberto={senhaAberta} onFechar={() => setSenhaAberta(false)} />
     </>
+  )
+}
+
+/** Troca da própria senha — o backend valida a senha atual. */
+function TrocaDeSenha({ aberto, onFechar }: { aberto: boolean; onFechar: () => void }) {
+  const toast = useToast()
+  const [atual, setAtual] = useState('')
+  const [nova, setNova] = useState('')
+  const [confirmacao, setConfirmacao] = useState('')
+  const [salvando, setSalvando] = useState(false)
+
+  function fechar() {
+    setAtual('')
+    setNova('')
+    setConfirmacao('')
+    onFechar()
+  }
+
+  async function trocar() {
+    if (nova.length < 8) {
+      toast('A nova senha precisa ter pelo menos 8 caracteres.', 'error')
+      return
+    }
+    if (nova !== confirmacao) {
+      toast('A confirmação não confere com a nova senha.', 'error')
+      return
+    }
+
+    setSalvando(true)
+    try {
+      await api.auth.trocarSenha(atual, nova)
+      toast('Senha alterada.')
+      fechar()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Não foi possível trocar a senha.', 'error')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <Modal
+      open={aberto}
+      onClose={fechar}
+      title="Trocar senha"
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={fechar} disabled={salvando}>
+            Cancelar
+          </Button>
+          <Button loading={salvando} onClick={() => void trocar()}>
+            Trocar
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <Input
+          label="Senha atual"
+          type="password"
+          required
+          value={atual}
+          onChange={(e) => setAtual(e.target.value)}
+        />
+        <Input
+          label="Nova senha"
+          type="password"
+          required
+          value={nova}
+          onChange={(e) => setNova(e.target.value)}
+          hint="Mínimo 8 caracteres."
+        />
+        <Input
+          label="Confirmar nova senha"
+          type="password"
+          required
+          value={confirmacao}
+          onChange={(e) => setConfirmacao(e.target.value)}
+        />
+      </div>
+    </Modal>
   )
 }

@@ -37,6 +37,7 @@ export default function Clientes() {
   const [busca, setBusca] = useState('')
   const [editando, setEditando] = useState<Empresa | null>(null)
   const [confirmar, setConfirmar] = useState<Empresa | null>(null)
+  const [salvando, setSalvando] = useState(false)
 
   const filtradas = useMemo(() => {
     const q = busca.toLowerCase().trim()
@@ -49,15 +50,37 @@ export default function Clientes() {
   const usosDe = (id: string) =>
     pericias.filter((p) => p.reclamadas.some((r) => r.empresaId === id)).length
 
-  function salvar() {
+  async function salvar() {
     if (!editando) return
     if (!editando.razaoSocial.trim() || !editando.cnpj.trim()) {
       toast('Razão social e CNPJ são obrigatórios.', 'error')
       return
     }
-    salvarEmpresa(editando)
-    toast('Empresa salva. Já pode ser reutilizada em qualquer processo.')
-    setEditando(null)
+
+    setSalvando(true)
+    try {
+      await salvarEmpresa(editando)
+      toast('Empresa salva. Já pode ser reutilizada em qualquer processo.')
+      setEditando(null)
+    } catch (e) {
+      // Ex.: CNPJ já cadastrado — a mensagem vem do servidor.
+      toast(e instanceof Error ? e.message : 'Não foi possível salvar a empresa.', 'error')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  async function excluir() {
+    if (!confirmar) return
+    try {
+      await removerEmpresa(confirmar.id)
+      toast('Empresa excluída.', 'info')
+      setConfirmar(null)
+    } catch (e) {
+      // O servidor recusa excluir empresa citada como reclamada.
+      toast(e instanceof Error ? e.message : 'Não foi possível excluir.', 'error')
+      setConfirmar(null)
+    }
   }
 
   const set = (patch: Partial<Empresa>) => setEditando((e) => (e ? { ...e, ...patch } : e))
@@ -177,10 +200,12 @@ export default function Clientes() {
         size="lg"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setEditando(null)}>
+            <Button variant="ghost" onClick={() => setEditando(null)} disabled={salvando}>
               Cancelar
             </Button>
-            <Button onClick={salvar}>Salvar empresa</Button>
+            <Button loading={salvando} onClick={() => void salvar()}>
+              Salvar empresa
+            </Button>
           </>
         }
       >
@@ -304,23 +329,22 @@ export default function Clientes() {
             <Button variant="ghost" onClick={() => setConfirmar(null)}>
               Cancelar
             </Button>
-            <Button
-              variant="danger"
-              onClick={() => {
-                if (confirmar) removerEmpresa(confirmar.id)
-                toast('Empresa excluída.', 'info')
-                setConfirmar(null)
-              }}
-            >
+            <Button variant="danger" onClick={() => void excluir()}>
               Excluir
             </Button>
           </>
         }
       >
         <p className="text-sm text-ink-600">
-          Deseja realmente excluir <strong>{confirmar?.razaoSocial}</strong>? Os processos já
-          vinculados manterão o histórico.
+          Deseja realmente excluir <strong>{confirmar?.razaoSocial}</strong>?
         </p>
+        {confirmar && usosDe(confirmar.id) > 0 && (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-[13px] text-amber-800">
+            Esta empresa é reclamada em {usosDe(confirmar.id)}{' '}
+            {usosDe(confirmar.id) === 1 ? 'processo' : 'processos'} e não poderá ser excluída — um
+            parecer já emitido não pode perder a identificação da parte.
+          </p>
+        )}
       </Modal>
     </>
   )

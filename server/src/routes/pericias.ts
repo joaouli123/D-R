@@ -1,0 +1,259 @@
+import { Router } from 'express'
+import { z } from 'zod'
+import { exigirSessao, sessaoDe } from '../auth.js'
+import { naoEncontrado, parametro, rota } from '../erros.js'
+import { periciaParaApi } from '../mappers.js'
+import { prisma } from '../prisma.js'
+import { apagarUpload } from '../services/armazenamento.js'
+
+export const periciasRouter = Router()
+periciasRouter.use(exigirSessao)
+
+const incluirTudo = {
+  reclamadas: true,
+  participantes: true,
+  fotos: { orderBy: { ordem: 'asc' } },
+} as const
+
+const texto = z.string().default('')
+
+const periodoSchema = z.object({
+  id: z.string(),
+  funcao: texto,
+  inicio: texto,
+  fim: texto.optional(),
+  setor: texto.optional(),
+  descricaoAtividades: texto.optional(),
+})
+
+const agenteSchema = z.object({
+  id: z.string(),
+  nome: texto,
+  tipo: z.enum(['quimico', 'fisico', 'biologico', 'periculosidade']),
+  cas: texto.optional(),
+  anexoNr15: texto.optional(),
+  limiteTolerancia: texto.optional(),
+  medido: texto.optional(),
+  criterio: z.enum(['qualitativo', 'quantitativo', 'nao_aplicavel']),
+  grau: z.enum(['minimo', 'medio', 'maximo', 'nao_caracterizado']).optional(),
+  epiEficaz: z.boolean().optional(),
+  observacao: texto.optional(),
+})
+
+const tecnicoSchema = z.object({
+  apresentacao: texto,
+  enderecamento: texto,
+  objetivoPericia: texto,
+  descricaoEmpresa: texto,
+  descricaoAmbiente: texto,
+  atividadesFuncoes: texto,
+  periodos: z.array(periodoSchema).default([]),
+  agentes: z.array(agenteSchema).default([]),
+  normasReferencias: texto,
+  equipamentosAnalisados: texto,
+  informacoesLevantadas: texto,
+  analiseTecnica: texto,
+  conclusao: texto,
+  observacoesAdicionais: texto,
+})
+
+const corpo = z.object({
+  id: z.string().optional(),
+  numeroProcesso: texto,
+  vara: texto,
+  comarca: texto,
+  reclamante: texto,
+  cpfReclamante: texto.optional(),
+  funcaoReclamante: texto.optional(),
+  admissao: texto.optional(),
+  demissao: texto.optional(),
+  dataVistoria: texto.optional(),
+  horaVistoria: texto.optional(),
+  localVistoria: texto.optional(),
+  modalidade: z.enum(['insalubridade', 'periculosidade', 'ambas']).default('insalubridade'),
+  status: z.enum(['rascunho', 'em_andamento', 'concluida', 'entregue']).default('rascunho'),
+  responsavelId: z.string().optional(),
+  tecnico: tecnicoSchema,
+  reclamadas: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        empresaId: z.string(),
+        principal: z.boolean().default(false),
+      }),
+    )
+    .default([]),
+  participantes: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        nome: texto,
+        papel: z.enum([
+          'perito_judicial',
+          'assistente_reclamante',
+          'assistente_reclamada',
+          'advogado_reclamante',
+          'advogado_reclamada',
+          'preposto',
+          'acompanhante',
+        ]),
+        registro: texto.optional(),
+        contato: texto.optional(),
+      }),
+    )
+    .default([]),
+  /// As fotos são criadas em POST /pericias/:id/fotos. Aqui só
+  /// chegam as edições de legenda/ordem e as remoções.
+  fotos: z
+    .array(z.object({ id: z.string(), legenda: texto, ordem: z.number().int().default(0) }))
+    .default([]),
+})
+
+const nulo = (v?: string) => (v?.trim() ? v.trim() : null)
+
+/** GET /pericias */
+periciasRouter.get(
+  '/',
+  rota(async (_req, res) => {
+    const pericias = await prisma.pericia.findMany({
+      include: incluirTudo,
+      orderBy: { atualizadoEm: 'desc' },
+    })
+    res.json(pericias.map(periciaParaApi))
+  }),
+)
+
+/** GET /pericias/:id */
+periciasRouter.get(
+  '/:id',
+  rota(async (req, res) => {
+    const pericia = await prisma.pericia.findUnique({
+      where: { id: parametro(req, 'id') },
+      include: incluirTudo,
+    })
+    if (!pericia) throw naoEncontrado('Perícia')
+    res.json(periciaParaApi(pericia))
+  }),
+)
+
+/**
+ * POST /pericias — upsert com filhos.
+ *
+ * Reclamadas e participantes são substituídos por inteiro: o
+ * frontend sempre envia a lista completa, e essa é a única forma
+ * de refletir remoções feitas na tela.
+ */
+periciasRouter.post(
+  '/',
+  rota(async (req, res) => {
+    const d = corpo.parse(req.body)
+    const sessao = sessaoDe(req)
+
+    // Uma única reclamada pode ser a principal; se o cliente não
+    // marcou nenhuma, a primeira assume.
+    const reclamadasValidas = d.reclamadas.filter((r) => r.empresaId)
+    const indicePrincipal = Math.max(
+      0,
+      reclamadasValidas.findIndex((r) => r.principal),
+    )
+
+    const escalares = {
+      numeroProcesso: d.numeroProcesso,
+      vara: d.vara,
+      comarca: d.comarca,
+      reclamante: d.reclamante,
+      cpfReclamante: nulo(d.cpfReclamante),
+      funcaoReclamante: nulo(d.funcaoReclamante),
+      admissao: nulo(d.admissao),
+      demissao: nulo(d.demissao),
+      dataVistoria: nulo(d.dataVistoria),
+      horaVistoria: nulo(d.horaVistoria),
+      localVistoria: nulo(d.localVistoria),
+      modalidade: d.modalidade,
+      status: d.status,
+      tecnico: d.tecnico,
+    }
+
+    const filhos = {
+      reclamadas: {
+        create: reclamadasValidas.map((r, i) => ({
+          empresaId: r.empresaId,
+          principal: i === indicePrincipal,
+        })),
+      },
+      participantes: {
+        create: d.participantes.map((p) => ({
+          nome: p.nome,
+          papel: p.papel,
+          registro: nulo(p.registro),
+          contato: nulo(p.contato),
+        })),
+      },
+    }
+
+    const existente = d.id ? await prisma.pericia.findUnique({ where: { id: d.id } }) : null
+
+    const pericia = await prisma.$transaction(async (tx) => {
+      if (!existente) {
+        return tx.pericia.create({
+          data: {
+            ...(d.id ? { id: d.id } : {}),
+            ...escalares,
+            responsavelId: d.responsavelId || sessao.id,
+            ...filhos,
+          },
+          include: incluirTudo,
+        })
+      }
+
+      await tx.reclamada.deleteMany({ where: { periciaId: existente.id } })
+      await tx.participante.deleteMany({ where: { periciaId: existente.id } })
+
+      // Fotos ausentes na lista enviada foram removidas na tela.
+      const idsMantidos = d.fotos.map((f) => f.id)
+      const removidas = await tx.foto.findMany({
+        where: { periciaId: existente.id, id: { notIn: idsMantidos.length ? idsMantidos : [''] } },
+      })
+      if (removidas.length) {
+        await tx.foto.deleteMany({ where: { id: { in: removidas.map((f) => f.id) } } })
+      }
+
+      for (const f of d.fotos) {
+        await tx.foto.updateMany({
+          where: { id: f.id, periciaId: existente.id },
+          data: { legenda: f.legenda, ordem: f.ordem },
+        })
+      }
+
+      const atualizada = await tx.pericia.update({
+        where: { id: existente.id },
+        data: {
+          ...escalares,
+          ...(d.responsavelId ? { responsavelId: d.responsavelId } : {}),
+          ...filhos,
+        },
+        include: incluirTudo,
+      })
+
+      // Os arquivos só saem do disco depois do commit lógico.
+      await Promise.all(removidas.map((f) => apagarUpload(f.arquivo)))
+
+      return atualizada
+    })
+
+    res.status(existente ? 200 : 201).json(periciaParaApi(pericia))
+  }),
+)
+
+/** DELETE /pericias/:id — leva junto fotos, reclamadas e participantes. */
+periciasRouter.delete(
+  '/:id',
+  rota(async (req, res) => {
+    const fotos = await prisma.foto.findMany({ where: { periciaId: parametro(req, 'id') } })
+
+    await prisma.pericia.delete({ where: { id: parametro(req, 'id') } })
+    await Promise.all(fotos.map((f) => apagarUpload(f.arquivo)))
+
+    res.status(204).end()
+  }),
+)

@@ -15,10 +15,11 @@ import {
   ShieldAlert,
   Trash2,
 } from 'lucide-react'
-import { Badge, Button, Card, EmptyState, Modal, Select, Tabs, useToast } from '@/components/ui'
+import { Badge, Button, Card, EmptyState, Input, Modal, Select, Tabs, useToast } from '@/components/ui'
 import type { BadgeTone } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { useApp } from '@/store/AppStore'
+import * as api from '@/services/api'
 import type { DocumentoGerado, TipoDocumento } from '@/types'
 import { formatDate } from '@/lib/utils'
 
@@ -36,7 +37,7 @@ const TIPOS: Record<TipoDocumento, { label: string; icon: typeof FileText; tone:
 }
 
 export default function Documentos() {
-  const { documentos, removerDocumento } = useApp()
+  const { documentos, removerDocumento, usuario } = useApp()
   const navigate = useNavigate()
   const toast = useToast()
   const [aba, setAba] = useState<'todos' | TipoDocumento>('todos')
@@ -44,6 +45,68 @@ export default function Documentos() {
   const [status, setStatus] = useState<'todos' | DocumentoGerado['status']>('todos')
   const [confirmar, setConfirmar] = useState<DocumentoGerado | null>(null)
   const [enviar, setEnviar] = useState<DocumentoGerado | null>(null)
+  const [baixando, setBaixando] = useState<string | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  const [destinatario, setDestinatario] = useState('')
+
+  /**
+   * Módulo H — o PDF é remontado no servidor a partir do que está
+   * no banco, então funciona para qualquer documento do histórico.
+   */
+  async function baixarPdf(d: DocumentoGerado) {
+    if (api.API_MODE !== 'rest') {
+      toast('A geração de PDF exige o backend ativo.', 'info')
+      return
+    }
+    setBaixando(d.id)
+    try {
+      const { blob, nome } = await api.documentos.gerarPdf(d.id)
+      api.salvarArquivo(blob, nome)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Falha ao gerar o PDF.', 'error')
+    } finally {
+      setBaixando(null)
+    }
+  }
+
+  async function reenviar() {
+    if (!enviar) return
+    if (!destinatario.trim()) {
+      toast('Informe o destinatário.', 'error')
+      return
+    }
+
+    setEnviando(true)
+    try {
+      await api.documentos.enviarEmail(enviar.id, {
+        para: destinatario,
+        assunto: `${enviar.titulo} — Processo ${enviar.numeroProcesso}`,
+        mensagem:
+          `Excelentíssimo(a) Senhor(a) Juiz(a),\n\n` +
+          `Segue anexo o documento "${enviar.titulo}" referente ao processo nº ` +
+          `${enviar.numeroProcesso}, reclamante ${enviar.reclamante}.\n\n` +
+          `Respeitosamente,\n${usuario?.nome ?? ''}\n${usuario?.registroProfissional ?? ''}`,
+      })
+      toast(`Documento enviado para ${destinatario}.`)
+      setEnviar(null)
+      setDestinatario('')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Falha ao enviar o documento.', 'error')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  async function excluir() {
+    if (!confirmar) return
+    try {
+      await removerDocumento(confirmar.id)
+      toast('Documento excluído.', 'info')
+      setConfirmar(null)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Falha ao excluir.', 'error')
+    }
+  }
 
   const filtrados = useMemo(() => {
     const q = busca.toLowerCase().trim()
@@ -183,14 +246,18 @@ export default function Documentos() {
                             variant="ghost"
                             size="sm"
                             icon={<FileDown size={14} />}
-                            onClick={() => toast('PDF gerado.', 'info')}
-                            aria-label="Baixar"
+                            loading={baixando === d.id}
+                            onClick={() => void baixarPdf(d)}
+                            aria-label="Baixar PDF"
                           />
                           <Button
                             variant="ghost"
                             size="sm"
                             icon={<Mail size={14} />}
-                            onClick={() => setEnviar(d)}
+                            onClick={() => {
+                              setEnviar(d)
+                              setDestinatario(d.enviadoPara ?? '')
+                            }}
                             aria-label="Enviar"
                           />
                           <Button
@@ -222,14 +289,7 @@ export default function Documentos() {
             <Button variant="ghost" onClick={() => setConfirmar(null)}>
               Cancelar
             </Button>
-            <Button
-              variant="danger"
-              onClick={() => {
-                if (confirmar) removerDocumento(confirmar.id)
-                toast('Documento excluído.', 'info')
-                setConfirmar(null)
-              }}
-            >
+            <Button variant="danger" onClick={() => void excluir()}>
               Excluir
             </Button>
           </>
@@ -247,27 +307,26 @@ export default function Documentos() {
         subtitle={enviar?.titulo}
         footer={
           <>
-            <Button variant="ghost" onClick={() => setEnviar(null)}>
+            <Button variant="ghost" onClick={() => setEnviar(null)} disabled={enviando}>
               Cancelar
             </Button>
-            <Button
-              onClick={() => {
-                toast('Documento enviado por e-mail.')
-                setEnviar(null)
-              }}
-            >
+            <Button loading={enviando} onClick={() => void reenviar()}>
               Enviar
             </Button>
           </>
         }
       >
         <p className="mb-4 text-sm text-ink-600">
-          O PDF é anexado automaticamente ao e-mail — Módulo I da proposta.
+          O PDF é gerado na hora e anexado automaticamente ao e-mail — Módulo I da proposta.
         </p>
-        <input
+        <Input
+          label="Destinatário"
           type="email"
+          required
+          value={destinatario}
+          onChange={(e) => setDestinatario(e.target.value)}
           placeholder="destinatario@trt2.jus.br"
-          className="h-10 w-full rounded-lg border border-ink-300 px-3 text-sm focus:border-brand-600"
+          hint="Vários destinatários: separe por vírgula."
         />
       </Modal>
     </>

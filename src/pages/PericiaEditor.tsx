@@ -43,6 +43,7 @@ import type {
   PeriodoFuncao,
   SecaoFoto,
   SecaoTexto,
+  Usuario,
 } from '@/types'
 import { AGENTES_QUIMICOS, ANEXOS_NR15 } from '@/content/agentesQuimicos'
 import { maskProcesso, uid } from '@/lib/utils'
@@ -144,6 +145,11 @@ export default function PericiaEditor() {
     secao: SecaoTexto
   } | null>(null)
   const [emailAberto, setEmailAberto] = useState(false)
+  const [enviando, setEnviando] = useState(false)
+  const [exportando, setExportando] = useState<'pdf' | 'docx' | null>(null)
+  const [enviandoFotos, setEnviandoFotos] = useState(false)
+  /** Documento já emitido para esta perícia — reemitir atualiza, não duplica. */
+  const [documentoId, setDocumentoId] = useState<string | null>(null)
   const [anexo, setAnexo] = useState<string | undefined>()
   const fileRef = useRef<HTMLInputElement>(null)
   const fotoRef = useRef<HTMLInputElement>(null)
@@ -162,59 +168,164 @@ export default function PericiaEditor() {
     [empresas, p.reclamadas],
   )
 
-  function salvarRascunho(silencioso = false) {
-    const atualizado = { ...p, atualizadoEm: new Date().toISOString().slice(0, 10) }
-    salvarPericia(atualizado)
-    setP(atualizado)
-    if (!silencioso) toast('Rascunho salvo. Você pode continuar depois.')
-    return atualizado
-  }
+  const docsDaPericia = documentos.filter((d) => d.periciaId === p.id)
 
-  function finalizarDocumento() {
-    const salva = salvarRascunho(true)
-    const doc = {
-      id: uid('doc'),
-      tipo: tipoDoc,
-      titulo: `${titulo} — ${p.modalidade === 'ambas' ? 'Insalubridade e Periculosidade' : p.modalidade}`,
-      periciaId: salva.id,
-      numeroProcesso: p.numeroProcesso || '—',
-      reclamante: p.reclamante || '—',
-      empresaPrincipal: empresaPrincipal?.nomeFantasia ?? empresaPrincipal?.razaoSocial ?? '—',
-      status: 'finalizado' as const,
-      anexoExternoNome: anexo,
-      criadoEm: new Date().toISOString().slice(0, 10),
-      atualizadoEm: new Date().toISOString().slice(0, 10),
+  // Reabrir uma perícia já documentada continua o mesmo documento.
+  useEffect(() => {
+    if (documentoId) return
+    const existente = docsDaPericia.find((d) => d.tipo === tipoDoc)
+    if (existente) {
+      setDocumentoId(existente.id)
+      setAnexo(existente.anexoExternoNome)
     }
-    salvarDocumento(doc)
-    toast('Documento gerado e adicionado ao histórico.')
+  }, [docsDaPericia, documentoId, tipoDoc])
+
+  async function salvarRascunho(silencioso = false): Promise<Pericia | null> {
+    const atualizado = { ...p, atualizadoEm: new Date().toISOString().slice(0, 10) }
+    try {
+      const salva = await salvarPericia(atualizado)
+      setP(salva)
+      if (!silencioso) toast('Rascunho salvo. Você pode continuar depois.')
+      return salva
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Não foi possível salvar o rascunho.', 'error')
+      return null
+    }
   }
 
+  /** Grava (ou atualiza) o documento no histórico e devolve o id. */
+  async function finalizarDocumento(silencioso = false): Promise<string | null> {
+    const salva = await salvarRascunho(true)
+    if (!salva) return null
+
+    const hoje = new Date().toISOString().slice(0, 10)
+    const modalidade =
+      p.modalidade === 'ambas' ? 'Insalubridade e Periculosidade' : p.modalidade
+
+    try {
+      const doc = await salvarDocumento({
+        id: documentoId ?? uid('doc'),
+        tipo: tipoDoc,
+        titulo: `${titulo} — ${modalidade}`,
+        periciaId: salva.id,
+        numeroProcesso: p.numeroProcesso || '—',
+        reclamante: p.reclamante || '—',
+        empresaPrincipal: empresaPrincipal?.nomeFantasia ?? empresaPrincipal?.razaoSocial ?? '—',
+        status: 'finalizado',
+        anexoExternoNome: anexo,
+        criadoEm: hoje,
+        atualizadoEm: hoje,
+      })
+
+      setDocumentoId(doc.id)
+      if (!silencioso) {
+        toast(
+          documentoId
+            ? 'Documento atualizado no histórico.'
+            : 'Documento gerado e adicionado ao histórico.',
+        )
+      }
+      return doc.id
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Não foi possível salvar o documento.', 'error')
+      return null
+    }
+  }
+
+  /**
+   * Módulo H — o arquivo vem pronto do servidor. O documento é
+   * gravado antes, porque a exportação parte do que está no banco.
+   */
   async function exportar(formato: 'pdf' | 'docx') {
-    toast(`Gerando ${formato.toUpperCase()}…`, 'info')
-    if (formato === 'pdf') {
-      await api.documentos.gerarPdf(p.id)
-      window.print()
-    } else {
-      await api.documentos.gerarDocx(p.id)
-      toast('No modo mock a exportação DOCX é simulada — o backend entrega o arquivo editável.', 'info')
+    if (api.API_MODE !== 'rest') {
+      // Sem backend resta a impressão do navegador.
+      if (formato === 'pdf') window.print()
+      else toast('A exportação em DOCX exige o backend ativo.', 'info')
+      return
+    }
+
+    setExportando(formato)
+    try {
+      const docId = await finalizarDocumento(true)
+      if (!docId) return
+
+      const { blob, nome } =
+        formato === 'pdf'
+          ? await api.documentos.gerarPdf(docId)
+          : await api.documentos.gerarDocx(docId)
+
+      api.salvarArquivo(blob, nome)
+      toast(`${formato.toUpperCase()} gerado.`)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : `Falha ao gerar o ${formato.toUpperCase()}.`, 'error')
+    } finally {
+      setExportando(null)
     }
   }
 
   // ---------- Fotos (Módulo E) ----------
-  function adicionarFotos(files: FileList | null) {
+  async function adicionarFotos(files: FileList | null) {
     if (!files?.length) return
-    const novas: Foto[] = Array.from(files).map((f, i) => ({
-      id: uid('fot'),
-      secao: secaoFotoAtual,
-      url: URL.createObjectURL(f),
-      legenda: f.name.replace(/\.[^.]+$/, ''),
-      ordem: p.fotos.filter((x) => x.secao === secaoFotoAtual).length + i + 1,
-    }))
-    set({ fotos: [...p.fotos, ...novas] })
-    toast(`${novas.length} foto(s) adicionada(s) em "${SECOES_FOTO.find((s) => s.value === secaoFotoAtual)?.label}".`)
+    const rotulo = SECOES_FOTO.find((s) => s.value === secaoFotoAtual)?.label
+
+    setEnviandoFotos(true)
+    try {
+      // A perícia precisa existir no banco antes de receber fotos.
+      const salva = await salvarRascunho(true)
+      if (!salva) return
+
+      const novas = await api.fotos.enviar(salva.id, secaoFotoAtual, files)
+      setP((v) => ({ ...v, fotos: [...v.fotos, ...novas] }))
+      toast(`${novas.length} foto(s) adicionada(s) em "${rotulo}".`)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Falha ao enviar as fotos.', 'error')
+    } finally {
+      setEnviandoFotos(false)
+    }
   }
 
-  const docsDaPericia = documentos.filter((d) => d.periciaId === p.id)
+  async function removerFoto(foto: Foto) {
+    const anterior = p.fotos
+    setP((v) => ({ ...v, fotos: v.fotos.filter((x) => x.id !== foto.id) }))
+    try {
+      await api.fotos.remover(p.id, foto.id)
+    } catch (e) {
+      setP((v) => ({ ...v, fotos: anterior }))
+      toast(e instanceof Error ? e.message : 'Falha ao remover a foto.', 'error')
+    }
+  }
+
+  /** Módulo H — anexo em PDF, concatenado ao final na geração. */
+  async function anexarPdf(arquivo: File) {
+    if (api.API_MODE !== 'rest') {
+      setAnexo(arquivo.name)
+      toast('Sem backend o anexo é apenas indicado no documento.', 'info')
+      return
+    }
+
+    try {
+      const docId = await finalizarDocumento(true)
+      if (!docId) return
+
+      const doc = await api.documentos.anexar(docId, arquivo)
+      setAnexo(doc.anexoExternoNome)
+      toast('PDF anexado — será concatenado ao final do documento.')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Falha ao anexar o PDF.', 'error')
+    }
+  }
+
+  async function removerAnexo() {
+    if (documentoId && api.API_MODE === 'rest') {
+      try {
+        await api.documentos.removerAnexo(documentoId)
+      } catch (e) {
+        toast(e instanceof Error ? e.message : 'Falha ao remover o anexo.', 'error')
+        return
+      }
+    }
+    setAnexo(undefined)
+  }
 
   return (
     <>
@@ -227,7 +338,7 @@ export default function PericiaEditor() {
             <Button variant="ghost" icon={<ArrowLeft size={16} />} onClick={() => navigate('/pericias')}>
               Voltar
             </Button>
-            <Button variant="outline" icon={<Save size={16} />} onClick={() => salvarRascunho()}>
+            <Button variant="outline" icon={<Save size={16} />} onClick={() => void salvarRascunho()}>
               Salvar rascunho
             </Button>
           </>
@@ -886,7 +997,12 @@ export default function PericiaEditor() {
                       </option>
                     ))}
                   </Select>
-                  <Button size="sm" icon={<ImagePlus size={14} />} onClick={() => fotoRef.current?.click()}>
+                  <Button
+                    size="sm"
+                    icon={<ImagePlus size={14} />}
+                    loading={enviandoFotos}
+                    onClick={() => fotoRef.current?.click()}
+                  >
                     Adicionar
                   </Button>
                 </div>
@@ -899,7 +1015,7 @@ export default function PericiaEditor() {
               multiple
               className="hidden"
               onChange={(e) => {
-                adicionarFotos(e.target.files)
+                void adicionarFotos(e.target.files)
                 e.target.value = ''
               }}
             />
@@ -934,7 +1050,7 @@ export default function PericiaEditor() {
                               className="mt-2 w-full rounded border border-ink-200 px-2 py-1 text-[12px] focus:border-brand-600"
                             />
                             <button
-                              onClick={() => set({ fotos: p.fotos.filter((x) => x.id !== f.id) })}
+                              onClick={() => void removerFoto(f)}
                               className="mt-1.5 flex w-full items-center justify-center gap-1 rounded py-1 text-[11px] text-red-600 hover:bg-red-50"
                             >
                               <Trash2 size={12} /> Remover
@@ -1019,10 +1135,8 @@ export default function PericiaEditor() {
                   className="hidden"
                   onChange={(e) => {
                     const f = e.target.files?.[0]
-                    if (f) {
-                      setAnexo(f.name)
-                      toast('PDF anexado ao final do documento.')
-                    }
+                    if (f) void anexarPdf(f)
+                    e.target.value = ''
                   }}
                 />
                 <Button
@@ -1036,7 +1150,7 @@ export default function PericiaEditor() {
                 {anexo && (
                   <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-navy-200 bg-navy-50 px-3 py-2">
                     <span className="truncate text-[12.5px] text-navy-800">{anexo}</span>
-                    <button onClick={() => setAnexo(undefined)} className="text-red-600" aria-label="Remover anexo">
+                    <button onClick={() => void removerAnexo()} className="text-red-600" aria-label="Remover anexo">
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -1048,14 +1162,20 @@ export default function PericiaEditor() {
             <Card>
               <CardHeader title="Exportar e enviar" subtitle="Módulos H e I" icon={<FileDown size={18} />} />
               <div className="space-y-2 p-5">
-                <Button className="w-full" icon={<Printer size={15} />} onClick={() => exportar('pdf')}>
+                <Button
+                  className="w-full"
+                  icon={<Printer size={15} />}
+                  loading={exportando === 'pdf'}
+                  onClick={() => void exportar('pdf')}
+                >
                   Gerar PDF
                 </Button>
                 <Button
                   variant="outline"
                   className="w-full"
                   icon={<FileDown size={15} />}
-                  onClick={() => exportar('docx')}
+                  loading={exportando === 'docx'}
+                  onClick={() => void exportar('docx')}
                 >
                   Exportar editável (DOCX)
                 </Button>
@@ -1068,7 +1188,12 @@ export default function PericiaEditor() {
                   Enviar por e-mail
                 </Button>
                 <div className="border-t border-ink-100 pt-2">
-                  <Button variant="ghost" className="w-full" icon={<Save size={15} />} onClick={finalizarDocumento}>
+                  <Button
+                    variant="ghost"
+                    className="w-full"
+                    icon={<Save size={15} />}
+                    onClick={() => void finalizarDocumento()}
+                  >
                     Finalizar e salvar no histórico
                   </Button>
                 </div>
@@ -1123,14 +1248,14 @@ export default function PericiaEditor() {
           <Button
             icon={<ArrowRight size={16} />}
             onClick={() => {
-              salvarRascunho(true)
+              void salvarRascunho(true)
               setPasso((s) => s + 1)
             }}
           >
             Próximo
           </Button>
         ) : (
-          <Button icon={<Save size={16} />} onClick={finalizarDocumento}>
+          <Button icon={<Save size={16} />} onClick={() => void finalizarDocumento()}>
             Finalizar documento
           </Button>
         )}
@@ -1150,46 +1275,164 @@ export default function PericiaEditor() {
       />
 
       {/* Módulo I */}
-      <Modal
-        open={emailAberto}
-        onClose={() => setEmailAberto(false)}
-        title="Enviar documento por e-mail"
-        subtitle="O PDF gerado é anexado automaticamente — sem precisar baixar."
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setEmailAberto(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={async () => {
-                await api.documentos.enviarEmail(p.id, '', '', '')
-                toast('Documento enviado por e-mail.')
-                setEmailAberto(false)
-              }}
-            >
-              Enviar
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <Input label="Para" type="email" placeholder="vara00@trt2.jus.br" />
-          <Input label="Cópia (Cc)" type="email" placeholder="opcional" />
-          <Input
-            label="Assunto"
-            defaultValue={`${titulo} — Processo ${p.numeroProcesso}`}
-          />
-          <Textarea
-            label="Mensagem"
-            rows={5}
-            defaultValue={`Excelentíssimo(a) Senhor(a) Juiz(a),\n\nSegue anexo o ${titulo.toLowerCase()} referente ao processo nº ${p.numeroProcesso}, reclamante ${p.reclamante}.\n\nRespeitosamente,\n${usuario?.nome ?? ''}\n${usuario?.registroProfissional ?? ''}`}
-          />
-          <div className="flex items-center gap-2 rounded-lg border border-ink-200 bg-ink-50 px-3 py-2.5 text-[13px] text-ink-600">
-            <Paperclip size={15} />
-            {titulo.replace(/\s/g, '_')}.pdf {anexo && `+ ${anexo}`}
-          </div>
-        </div>
-      </Modal>
+      <EnvioPorEmail
+        aberto={emailAberto}
+        onFechar={() => setEmailAberto(false)}
+        enviando={enviando}
+        titulo={titulo}
+        pericia={p}
+        perito={usuario}
+        anexo={anexo}
+        onEnviar={async (dados) => {
+          setEnviando(true)
+          try {
+            const docId = await finalizarDocumento(true)
+            if (!docId) return
+            await api.documentos.enviarEmail(docId, dados)
+            toast(`Documento enviado para ${dados.para}.`)
+            setEmailAberto(false)
+          } catch (e) {
+            toast(e instanceof Error ? e.message : 'Falha ao enviar o e-mail.', 'error')
+          } finally {
+            setEnviando(false)
+          }
+        }}
+      />
     </>
+  )
+}
+
+// ============================================================
+// MÓDULO I — Envio por e-mail.
+// Componente à parte porque os campos precisam de estado próprio:
+// na versão anterior eles usavam defaultValue e o que era digitado
+// nunca chegava à chamada de envio.
+// ============================================================
+
+interface DadosEmail {
+  para: string
+  copia: string
+  assunto: string
+  mensagem: string
+}
+
+function EnvioPorEmail({
+  aberto,
+  onFechar,
+  onEnviar,
+  enviando,
+  titulo,
+  pericia,
+  perito,
+  anexo,
+}: {
+  aberto: boolean
+  onFechar: () => void
+  onEnviar: (dados: DadosEmail) => Promise<void>
+  enviando: boolean
+  titulo: string
+  pericia: Pericia
+  perito?: Usuario | null
+  anexo?: string
+}) {
+  const assuntoPadrao = `${titulo} — Processo ${pericia.numeroProcesso}`
+  const mensagemPadrao =
+    `Excelentíssimo(a) Senhor(a) Juiz(a),\n\n` +
+    `Segue anexo o ${titulo.toLowerCase()} referente ao processo nº ${pericia.numeroProcesso}, ` +
+    `reclamante ${pericia.reclamante}.\n\nRespeitosamente,\n` +
+    `${perito?.nome ?? ''}\n${perito?.registroProfissional ?? ''}`
+
+  const [dados, setDados] = useState<DadosEmail>({
+    para: '',
+    copia: '',
+    assunto: assuntoPadrao,
+    mensagem: mensagemPadrao,
+  })
+  const [erro, setErro] = useState('')
+
+  // Reabrir o modal recompõe assunto e mensagem com os dados atuais
+  // do processo, preservando o que o perito já tinha escrito.
+  useEffect(() => {
+    if (!aberto) return
+    setErro('')
+    setDados((d) => ({
+      ...d,
+      assunto: d.assunto.trim() ? d.assunto : assuntoPadrao,
+      mensagem: d.mensagem.trim() ? d.mensagem : mensagemPadrao,
+    }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aberto])
+
+  const set = (patch: Partial<DadosEmail>) => setDados((d) => ({ ...d, ...patch }))
+
+  function enviar() {
+    if (!dados.para.trim()) {
+      setErro('Informe ao menos um destinatário.')
+      return
+    }
+    if (!dados.assunto.trim()) {
+      setErro('Informe o assunto.')
+      return
+    }
+    setErro('')
+    void onEnviar(dados)
+  }
+
+  return (
+    <Modal
+      open={aberto}
+      onClose={onFechar}
+      title="Enviar documento por e-mail"
+      subtitle="O PDF é gerado no servidor e anexado automaticamente — sem precisar baixar."
+      footer={
+        <>
+          <Button variant="ghost" onClick={onFechar} disabled={enviando}>
+            Cancelar
+          </Button>
+          <Button loading={enviando} onClick={enviar}>
+            Enviar
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <Input
+          label="Para"
+          required
+          value={dados.para}
+          onChange={(e) => set({ para: e.target.value })}
+          placeholder="vara00@trt2.jus.br"
+          hint="Vários destinatários: separe por vírgula."
+          error={erro && !dados.para.trim() ? erro : undefined}
+        />
+        <Input
+          label="Cópia (Cc)"
+          value={dados.copia}
+          onChange={(e) => set({ copia: e.target.value })}
+          placeholder="opcional"
+        />
+        <Input
+          label="Assunto"
+          required
+          value={dados.assunto}
+          onChange={(e) => set({ assunto: e.target.value })}
+        />
+        <Textarea
+          label="Mensagem"
+          rows={7}
+          value={dados.mensagem}
+          onChange={(e) => set({ mensagem: e.target.value })}
+        />
+        <div className="flex items-center gap-2 rounded-lg border border-ink-200 bg-ink-50 px-3 py-2.5 text-[13px] text-ink-600">
+          <Paperclip size={15} />
+          {titulo.replace(/\s/g, '_')}.pdf {anexo && `(com ${anexo} ao final)`}
+        </div>
+        {erro && dados.para.trim() && (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+            {erro}
+          </p>
+        )}
+      </div>
+    </Modal>
   )
 }

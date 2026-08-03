@@ -186,6 +186,36 @@ export interface TextoBiblioteca {
 }
 
 // ---------- Módulos G/H/J — Documentos gerados ----------
+/**
+ * Estado editável de cada tipo de documento — é o que permite
+ * reabrir um documento do histórico e continuar de onde parou,
+ * e o que o servidor usa para remontar o PDF anos depois.
+ */
+export interface ConteudoQuesitos {
+  quesitos: { pergunta: string; resposta: string }[]
+}
+
+export interface ConteudoManifestacao {
+  agente: AgenteManifestacao
+  posicionamento: PosicionamentoManifestacao
+  fundamentacao: string
+  blocos: { titulo: string; conteudo: string }[]
+  encerramento: string
+}
+
+export interface ConteudoEsclarecimento {
+  agente: AgenteManifestacao
+  referencia?: string
+  introducao: string
+  pontos: { origem: 'juizo' | 'reclamante' | 'reclamada'; questionamento: string; resposta: string }[]
+  conclusao: string
+}
+
+export type ConteudoDocumento =
+  | ConteudoQuesitos
+  | ConteudoManifestacao
+  | ConteudoEsclarecimento
+
 export interface DocumentoGerado {
   id: UUID
   tipo: TipoDocumento
@@ -199,7 +229,8 @@ export interface DocumentoGerado {
   criadoEm: string
   atualizadoEm: string
   enviadoPara?: string
-  conteudo?: string
+  /** Parecer e laudo montam a partir da própria perícia; os demais guardam aqui. */
+  conteudo?: ConteudoDocumento
 }
 
 // ---------- Módulo K — Quesitos (item 17) ----------

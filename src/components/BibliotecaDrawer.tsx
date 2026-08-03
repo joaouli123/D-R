@@ -36,7 +36,13 @@ export function BibliotecaDrawer({
   function inserir() {
     const escolhidos = textos.filter((t) => selecionados.includes(t.id))
     if (!escolhidos.length) return
-    escolhidos.forEach((t) => salvarTexto({ ...t, usos: t.usos + 1 }))
+
+    // O texto entra na hora; a contagem de uso é secundária e uma
+    // falha nela não deve impedir a inserção.
+    escolhidos.forEach((t) => {
+      void salvarTexto({ ...t, usos: t.usos + 1 }).catch(() => undefined)
+    })
+
     onInserir(escolhidos.map((t) => t.conteudo).join('\n\n'))
     setSelecionados([])
     onClose()

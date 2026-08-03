@@ -28,6 +28,7 @@ import {
 import { PageHeader } from '@/components/layout/AppLayout'
 import { Logo } from '@/components/Logo'
 import { useApp } from '@/store/AppStore'
+import * as api from '@/services/api'
 import { ORIGENS_QUESITO, TEMAS_QUESITO } from '@/content/quesitos'
 import type { Quesito, QuesitoSelecionado } from '@/types'
 import { cn, extenso, interpolar, uid } from '@/lib/utils'
@@ -54,6 +55,10 @@ export default function Quesitos() {
   const [selecionados, setSelecionados] = useState<QuesitoSelecionado[]>([])
   const [novoAberto, setNovoAberto] = useState(false)
   const [novo, setNovo] = useState<Partial<Quesito>>({ tema: 'gerais', origem: 'proprio' })
+  const [salvando, setSalvando] = useState(false)
+  const [gerandoPdf, setGerandoPdf] = useState(false)
+  /** Reemitir atualiza o mesmo documento em vez de criar outro. */
+  const [documentoId, setDocumentoId] = useState<string | null>(null)
 
   const pericia = pericias.find((p) => p.id === periciaId)
   const empresa = pericia
@@ -113,7 +118,7 @@ export default function Quesitos() {
     toast(`${novos.length} quesito(s) adicionado(s).`)
   }
 
-  function criarQuesito() {
+  async function criarQuesito() {
     if (!novo.pergunta?.trim()) {
       toast('Digite a pergunta do quesito.', 'error')
       return
@@ -129,30 +134,87 @@ export default function Quesitos() {
       usos: 0,
       personalizado: true,
     }
-    salvarQuesito(q)
-    setNovo({ tema: 'gerais', origem: 'proprio' })
-    setNovoAberto(false)
-    toast('Quesito cadastrado na sua base.')
+
+    try {
+      await salvarQuesito(q)
+      setNovo({ tema: 'gerais', origem: 'proprio' })
+      setNovoAberto(false)
+      toast('Quesito cadastrado na sua base.')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Não foi possível cadastrar o quesito.', 'error')
+    }
   }
 
-  function exportar() {
-    selecionados.forEach((s) => {
-      const q = quesitos.find((x) => x.id === s.quesitoId)
-      if (q) salvarQuesito({ ...q, usos: q.usos + 1 })
-    })
-    salvarDocumento({
-      id: uid('doc'),
-      tipo: 'quesitos',
-      titulo: `Quesitos Técnicos — ${selecionados.length} quesitos`,
-      periciaId: periciaId || '—',
-      numeroProcesso: pericia?.numeroProcesso ?? '—',
-      reclamante: pericia?.reclamante ?? '—',
-      empresaPrincipal: empresa?.nomeFantasia ?? empresa?.razaoSocial ?? '—',
-      status: 'finalizado',
-      criadoEm: new Date().toISOString().slice(0, 10),
-      atualizadoEm: new Date().toISOString().slice(0, 10),
-    })
-    toast('Quesitos exportados e salvos no histórico.')
+  /**
+   * Grava o documento com as perguntas e respostas dentro. Sem o
+   * campo `conteudo`, sair desta tela descartava o trabalho de
+   * responder os quesitos.
+   */
+  async function salvar(): Promise<string | null> {
+    const hoje = new Date().toISOString().slice(0, 10)
+    try {
+      const doc = await salvarDocumento({
+        id: documentoId ?? uid('doc'),
+        tipo: 'quesitos',
+        titulo: `Quesitos Técnicos — ${selecionados.length} ${selecionados.length === 1 ? 'quesito' : 'quesitos'}`,
+        periciaId: periciaId || '—',
+        numeroProcesso: pericia?.numeroProcesso ?? '—',
+        reclamante: pericia?.reclamante ?? '—',
+        empresaPrincipal: empresa?.nomeFantasia ?? empresa?.razaoSocial ?? '—',
+        status: 'finalizado',
+        conteudo: {
+          quesitos: selecionados.map((s) => ({ pergunta: s.pergunta, resposta: s.resposta })),
+        },
+        criadoEm: hoje,
+        atualizadoEm: hoje,
+      })
+
+      setDocumentoId(doc.id)
+
+      // Contabiliza o reaproveitamento só depois de gravar.
+      await Promise.all(
+        selecionados.map((s) => {
+          const q = quesitos.find((x) => x.id === s.quesitoId)
+          return q ? salvarQuesito({ ...q, usos: q.usos + 1 }) : Promise.resolve()
+        }),
+      )
+
+      return doc.id
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Não foi possível salvar os quesitos.', 'error')
+      return null
+    }
+  }
+
+  async function exportar() {
+    setSalvando(true)
+    try {
+      const docId = await salvar()
+      if (docId) toast('Quesitos salvos no histórico.')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  /** Módulo H — PDF montado no servidor a partir do documento salvo. */
+  async function gerarPdf() {
+    if (api.API_MODE !== 'rest') {
+      window.print()
+      return
+    }
+
+    setGerandoPdf(true)
+    try {
+      const docId = await salvar()
+      if (!docId) return
+      const { blob, nome } = await api.documentos.gerarPdf(docId)
+      api.salvarArquivo(blob, nome)
+      toast('PDF gerado.')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Falha ao gerar o PDF.', 'error')
+    } finally {
+      setGerandoPdf(false)
+    }
   }
 
   const semResposta = selecionados.filter((s) => !s.resposta.trim()).length
@@ -451,10 +513,21 @@ export default function Quesitos() {
             <Card>
               <CardHeader title="Exportar" icon={<FileDown size={18} />} />
               <div className="space-y-2 p-4">
-                <Button className="w-full" icon={<Printer size={15} />} onClick={() => window.print()}>
+                <Button
+                  className="w-full"
+                  icon={<Printer size={15} />}
+                  loading={gerandoPdf}
+                  onClick={() => void gerarPdf()}
+                >
                   Gerar PDF
                 </Button>
-                <Button variant="outline" className="w-full" icon={<FileDown size={15} />} onClick={exportar}>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  icon={<FileDown size={15} />}
+                  loading={salvando}
+                  onClick={() => void exportar()}
+                >
                   Salvar no histórico
                 </Button>
                 <Button variant="ghost" className="w-full" onClick={() => setEtapa('responder')}>
@@ -543,7 +616,7 @@ export default function Quesitos() {
             <Button variant="ghost" onClick={() => setNovoAberto(false)}>
               Cancelar
             </Button>
-            <Button onClick={criarQuesito}>Cadastrar</Button>
+            <Button onClick={() => void criarQuesito()}>Cadastrar</Button>
           </>
         }
       >

@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Copy, FileStack, Layers, Pencil, Plus, Upload } from 'lucide-react'
-import { Badge, Button, Card, useToast } from '@/components/ui'
+import { Badge, Button, Card, EmptyState, useToast } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
-import { MODELOS_DOC } from '@/mocks/db'
+import * as api from '@/services/api'
+import type { ModeloDoc } from '@/services/api'
 import { formatDate } from '@/lib/utils'
 
 // ============================================================
@@ -30,6 +32,23 @@ const TONE: Record<string, 'green' | 'navy' | 'amber' | 'gray'> = {
 export default function Modelos() {
   const navigate = useNavigate()
   const toast = useToast()
+  const [modelos, setModelos] = useState<ModeloDoc[]>([])
+  const [carregando, setCarregando] = useState(true)
+
+  useEffect(() => {
+    let vivo = true
+    api.modelos
+      .listar()
+      .then((lista) => vivo && setModelos(lista))
+      .catch((e) =>
+        vivo && toast(e instanceof Error ? e.message : 'Falha ao carregar os modelos.', 'error'),
+      )
+      .finally(() => vivo && setCarregando(false))
+    return () => {
+      vivo = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <>
@@ -49,8 +68,18 @@ export default function Modelos() {
         }
       />
 
+      {!carregando && modelos.length === 0 && (
+        <Card>
+          <EmptyState
+            icon={<FileStack size={22} />}
+            title="Nenhum modelo cadastrado"
+            description="Os modelos base são criados na carga inicial do sistema."
+          />
+        </Card>
+      )}
+
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {MODELOS_DOC.map((m) => (
+        {modelos.map((m) => (
           <Card key={m.id} className="flex flex-col p-4">
             <div className="flex items-start gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-navy-50 text-navy-700">
