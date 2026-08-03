@@ -108,11 +108,11 @@ export default function Configuracoes() {
             </div>
           </Card>
 
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             <Card className="p-6 text-center">
               <Logo size="lg" showTagline />
             </Card>
-            <SeloCredenciado />
+            <SeloCredenciado className="flex-1" />
           </div>
         </div>
       )}

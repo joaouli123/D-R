@@ -53,7 +53,13 @@ export function Logo({
 }
 
 /** Selo de credenciamento profissional (rodapé do login). */
-export function SeloCredenciado({ invert = false }: { invert?: boolean }) {
+export function SeloCredenciado({
+  invert = false,
+  className,
+}: {
+  invert?: boolean
+  className?: string
+}) {
   const items = [
     { sigla: 'CREA-SP', texto: 'Conselho Regional de Engenharia e Agronomia de São Paulo' },
     { sigla: 'CONFEA', texto: 'Conselho Federal de Engenharia e Agronomia' },
@@ -62,8 +68,9 @@ export function SeloCredenciado({ invert = false }: { invert?: boolean }) {
   return (
     <div
       className={cn(
-        'rounded-xl border-2 px-5 py-4',
+        'flex flex-col justify-center rounded-xl border-2 px-5 py-4',
         invert ? 'border-white/25' : 'border-navy-600/25',
+        className,
       )}
     >
       <p
