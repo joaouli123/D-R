@@ -2,8 +2,7 @@ import { cn } from '@/lib/utils'
 
 /**
  * Marca D&R Perícia.
- * "D" e "R" em verde, "&" em preto, tarja "PERÍCIA" abaixo —
- * conforme a identidade visual fornecida pelo Contratante.
+ * "D" e "R" na cor de marca (azul), "&" em tom neutro, tarja "PERÍCIA" abaixo.
  */
 export function Logo({
   size = 'md',
@@ -23,16 +22,16 @@ export function Logo({
     xl: { mark: 'text-[64px]', rule: 'text-[15px] tracking-[0.44em]', gap: 'gap-1.5' },
   }
   const s = sizes[size]
-  const green = invert ? 'text-white' : 'text-brand-700'
+  const primary = invert ? 'text-white' : 'text-brand-700'
   const dark = invert ? 'text-white/80' : 'text-ink-900'
   const rule = invert ? 'text-white/90' : 'text-brand-700'
 
   return (
     <div className={cn('flex flex-col items-center leading-none', s.gap, className)}>
       <div className={cn('font-extrabold tracking-tight', s.mark)}>
-        <span className={green}>D</span>
+        <span className={primary}>D</span>
         <span className={dark}>&amp;</span>
-        <span className={green}>R</span>
+        <span className={primary}>R</span>
       </div>
       <div className={cn('flex items-center gap-1.5 font-bold uppercase', s.rule, rule)}>
         <span className={cn('h-px w-3', invert ? 'bg-white/60' : 'bg-brand-700')} />

@@ -194,7 +194,7 @@ export function Checkbox({
 
 // ---------------- Badge ----------------
 const badgeTones = {
-  green: 'bg-brand-50 text-brand-700 border-brand-200',
+  green: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   navy: 'bg-navy-50 text-navy-700 border-navy-200',
   gray: 'bg-ink-100 text-ink-600 border-ink-200',
   amber: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -434,7 +434,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     info: <Info size={16} />,
   }
   const tones = {
-    success: 'bg-brand-700 text-white',
+    success: 'bg-emerald-600 text-white',
     error: 'bg-red-600 text-white',
     info: 'bg-navy-600 text-white',
   }

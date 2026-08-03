@@ -6,16 +6,16 @@ export default {
       colors: {
         // Identidade visual D&R Perícia Elite
         brand: {
-          50: '#ECF5F0',
-          100: '#D2E7DB',
-          200: '#A3CEB8',
-          300: '#6BAE8E',
-          400: '#3C8B66',
-          500: '#186F47',
-          600: '#0E5C39',
-          700: '#0A4A2D', // verde principal do logotipo
-          800: '#073722',
-          900: '#042317',
+          50: '#EEF4FF',
+          100: '#DCE9FE',
+          200: '#B9D3FD',
+          300: '#8AB4FA',
+          400: '#548CF0',
+          500: '#2E68DE',
+          600: '#1E4FBE',
+          700: '#173F9B', // azul principal do logotipo
+          800: '#12317A',
+          900: '#0C2456',
         },
         navy: {
           50: '#EEF2F9',
@@ -30,16 +30,16 @@ export default {
           900: '#0A1729',
         },
         ink: {
-          50: '#F8F6F1',
-          100: '#EFEBE2',
-          200: '#DFDACC',
-          300: '#BFB9A8',
-          400: '#8B8677',
-          500: '#656155',
-          600: '#4A4740',
-          700: '#38352F',
-          800: '#26241F',
-          900: '#171512',
+          50: '#F7F8FA',
+          100: '#EEF1F5',
+          200: '#DEE3EA',
+          300: '#C3CBD6',
+          400: '#94A0B2',
+          500: '#69748A',
+          600: '#4D5668',
+          700: '#38404F',
+          800: '#262C37',
+          900: '#161A21',
         },
         gold: {
           50: '#FBF7EC',
@@ -61,7 +61,7 @@ export default {
       },
       boxShadow: {
         card: '0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.06)',
-        pop: '0 10px 30px -12px rgba(4,35,23,.35)',
+        pop: '0 10px 30px -12px rgba(12,36,86,.35)',
       },
       keyframes: {
         'fade-in': { from: { opacity: '0', transform: 'translateY(4px)' }, to: { opacity: '1', transform: 'none' } },

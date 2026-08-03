@@ -148,8 +148,8 @@ src/
 
 | Uso | Cor |
 |---|---|
-| Verde principal (logotipo, ações) | `brand-700` — `#0A4A2D` |
-| Verde escuro (sidebar, login) | `brand-800` — `#073722` |
+| Azul principal (logotipo, ações) | `brand-700` — `#173F9B` |
+| Azul escuro (painel de login) | `brand-800` — `#12317A` |
 | Azul institucional (credenciais) | `navy-600` — `#1B3A6B` |
 | Neutros | escala `ink-50` → `ink-900` |
 
