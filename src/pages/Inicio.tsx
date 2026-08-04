@@ -5,6 +5,7 @@ import {
   FileCheck2,
   FileText,
   HelpCircle,
+  History,
   MessageSquareText,
   Plus,
   ScrollText,
@@ -85,6 +86,17 @@ export default function Inicio() {
     .sort((a, b) => b.atualizadoEm.localeCompare(a.atualizadoEm))
     .slice(0, 5)
 
+  /**
+   * Perícias que ainda não foram concluídas, da mais recente para
+   * a mais antiga. Sem isto, quem salvava um rascunho e saía da
+   * tela não tinha no painel nenhum caminho de volta — só atalhos
+   * para começar do zero.
+   */
+  const emAberto = [...pericias]
+    .filter((p) => p.status === 'rascunho' || p.status === 'em_andamento')
+    .sort((a, b) => b.atualizadoEm.localeCompare(a.atualizadoEm))
+    .slice(0, 5)
+
   return (
     <>
       <PageHeader
@@ -114,6 +126,55 @@ export default function Inicio() {
           </Card>
         ))}
       </div>
+
+      {/* Retomada — o caminho de volta para o trabalho salvo */}
+      {emAberto.length > 0 && (
+        <Card className="mb-6 overflow-hidden">
+          <CardHeader
+            title="Continuar de onde parou"
+            subtitle="Perícias salvas que ainda não foram concluídas"
+            icon={<History size={19} />}
+            action={
+              <Button variant="ghost" size="sm" onClick={() => navigate('/pericias')}>
+                Ver todas
+              </Button>
+            }
+          />
+          <div className="divide-y divide-ink-100">
+            {emAberto.map((p) => (
+              <Link
+                key={p.id}
+                to={`/pericias/${p.id}`}
+                className="group flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-brand-50/60"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-ink-900">
+                      {p.reclamante || '(sem reclamante)'}
+                    </span>
+                    <Badge tone={p.status === 'rascunho' ? 'amber' : 'navy'}>
+                      {p.status === 'rascunho' ? 'Rascunho' : 'Em andamento'}
+                    </Badge>
+                  </span>
+                  <span className="mt-0.5 block font-mono text-[12.5px] text-ink-500">
+                    {p.numeroProcesso || '(sem número de processo)'}
+                  </span>
+                  <span className="mt-0.5 block text-[12px] text-ink-400">
+                    Salva em {formatDate(p.atualizadoEm)}
+                  </span>
+                </span>
+                <span className="hidden shrink-0 text-[13px] font-semibold text-brand-700 sm:block">
+                  Continuar
+                </span>
+                <ArrowRight
+                  size={17}
+                  className="shrink-0 text-ink-300 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-700"
+                />
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Atalhos de documentos — reproduz a tela de referência */}
       <Card className="mb-6 overflow-hidden">

@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react'
 import { Logo } from '@/components/Logo'
+import { BuscaGlobal } from '@/components/BuscaGlobal'
 import { useApp } from '@/store/AppStore'
 import { cn } from '@/lib/utils'
 
@@ -113,14 +114,16 @@ export function AppLayout() {
             <Menu size={20} />
           </button>
 
-          <div className="hidden min-w-0 flex-1 md:block">
+          <div className="hidden min-w-0 shrink-0 md:block">
             <p className="text-[13px] font-semibold text-ink-800">
               Elaboração de Documentos Técnicos
             </p>
             <p className="text-xs text-ink-500">com agilidade e precisão</p>
           </div>
 
-          <div className="relative ml-auto">
+          <BuscaGlobal />
+
+          <div className="relative ml-auto sm:ml-0">
             <button
               onClick={() => setPerfilAberto((v) => !v)}
               className="flex items-center gap-2 rounded-lg py-1 pl-1 pr-2 hover:bg-ink-100"
