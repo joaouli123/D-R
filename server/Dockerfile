@@ -22,7 +22,10 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
-# Descarta as dependências de desenvolvimento.
+# Descarta as dependências de desenvolvimento. O pacote `prisma`
+# fica em dependencies de propósito: o entrypoint roda
+# `prisma migrate deploy` na subida, e o CLI precisa sobreviver
+# a este prune.
 RUN npm prune --omit=dev
 
 
