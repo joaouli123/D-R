@@ -84,14 +84,22 @@ npm run prisma:studio
 | **H** | Montagem automática, anexo de PDF externo, exportação | `/pericias/:id` — passo 6 |
 | **I** | Envio por e-mail | editor e `/documentos` |
 | **J** | Histórico de documentos | `/documentos` |
-| **K** | **Quesitos Técnicos (item 17)** | `/quesitos` |
-| **L** | **Manifestação ao Laudo (item 18)** | `/manifestacao/:posicionamento` |
+Módulos A–J são o escopo da Cláusula 1ª da proposta.
 
-Telas de apoio: `/processos`, `/calendario`, `/calculadoras`, `/modelos`, `/relatorios`, `/ajuda`, `/esclarecimentos`.
+**Itens levantados depois da v1.1** — fora dos Módulos A–J:
+
+| Item | Escopo | Onde está |
+|---|---|---|
+| **17** | Quesitos Técnicos | `/quesitos` |
+| **18** | Manifestação, Impugnação e Esclarecimento | `/manifestacao/:posicionamento` e `/esclarecimentos` |
+
+Tela de apoio: `/ajuda` — orientação de uso, prevista no item 7 da proposta.
+
+**Fora desta fase** (Cláusula 5ª): assinatura digital nativa e envio automático por WhatsApp, ambos dependentes de API paga de terceiro. O PDF sai pronto para assinatura na ferramenta que o Contratante já utiliza.
 
 ---
 
-## Módulo K — Quesitos (item 17)
+## Item 17 — Quesitos Técnicos
 
 Fluxo em três etapas: **cadastrar → selecionar → responder → exportar**.
 
@@ -101,11 +109,11 @@ Fluxo em três etapas: **cadastrar → selecionar → responder → exportar**.
 - Cadastro de quesitos próprios, que ficam salvos na base.
 - Documento montado e exportável em PDF.
 
-Banco de quesitos: `src/content/quesitos.ts`.
+Banco inicial em `server/src/quesitos-base.ts`; depois do primeiro seed a fonte de verdade é o banco.
 
 ---
 
-## Módulo L — Manifestação ao Laudo (item 18)
+## Item 18 — Manifestação ao Laudo
 
 Seleciona-se o **agente** (Ruído · Calor · Biológico · Periculosidade) e o **posicionamento**; o sistema monta o documento automaticamente.
 
@@ -143,8 +151,6 @@ POST   /documentos              DELETE /documentos/:id
 POST   /documentos/:id/anexo    DELETE /documentos/:id/anexo
 POST   /documentos/:id/pdf      POST   /documentos/:id/docx
 POST   /documentos/:id/email
-GET    /agenda                  POST   /agenda           DELETE /agenda/:id
-GET    /modelos                 POST   /modelos          DELETE /modelos/:id
 GET    /saude
 ```
 
@@ -196,9 +202,9 @@ src/
 │   ├── DocumentoPreview.tsx      Pré-visualização do parecer/laudo
 │   └── Logo.tsx                  Marca e selo de credenciamento
 ├── content/
-│   ├── quesitos.ts               Quesitos do modo mock (a fonte passa a ser o banco)
-│   ├── manifestacao.ts           Modelos 18.1 / 18.2 / 18.3 (Módulo L)
-│   └── agentesQuimicos.ts        CAS, LT, anexos NR-15/NR-16, LINACH
+│   ├── quesitos.ts               Quesitos do modo demonstração (item 17)
+│   ├── manifestacao.ts           Modelos 18.1 / 18.2 / 18.3
+│   └── anexosNr15.ts             Anexos da NR-15 para o cadastro de agentes
 ├── pages/                        Uma tela por rota
 ├── services/api.ts               Camada única de integração (mock ↔ REST)
 ├── store/AppStore.tsx            Estado global, sessão e rollback otimista
@@ -208,7 +214,7 @@ src/
 
 server/
 ├── prisma/
-│   ├── schema.prisma             11 entidades
+│   ├── schema.prisma             9 entidades
 │   └── migrations/
 ├── scripts/                      Smoke tests que rodam sem banco
 └── src/
@@ -243,13 +249,15 @@ Documentos gerados usam serifa em corpo 11,5 pt, texto justificado, recuo de 1,2
 
 ---
 
-## Próxima fase
+## Fora do escopo contratado
 
-- Assinatura digital ICP-Brasil nos documentos gerados
-- Importação de modelo `.docx` do Contratante para servir de base à montagem
-- Favoritos e contagem de uso por usuário nos quesitos do banco global (hoje são compartilhados)
-- Busca global no cabeçalho e central de notificações
-- Suíte de testes automatizados além dos smoke tests
+O sistema implementa exclusivamente o que a proposta descreve. Estes itens **não** fazem parte
+desta fase e são tratados como proposta avulsa (Cláusula 5ª):
+
+- Assinatura eletrônica/digital nativa — o PDF sai pronto para assinar em Clicksign, Autentique ou gov.br
+- Envio automático por WhatsApp
+- Integração com inteligência artificial generativa
+- Leitura automática de FISPQ/FDS — substituída pela Biblioteca Pessoal de Textos (Módulo F), conforme item 6 da proposta
 
 ---
 

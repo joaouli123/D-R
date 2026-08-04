@@ -28,9 +28,6 @@ CREATE TYPE "TipoDocumento" AS ENUM ('parecer', 'laudo', 'quesitos', 'manifestac
 -- CreateEnum
 CREATE TYPE "StatusDocumento" AS ENUM ('rascunho', 'finalizado', 'enviado');
 
--- CreateEnum
-CREATE TYPE "TipoCompromisso" AS ENUM ('vistoria', 'prazo', 'audiencia');
-
 -- CreateTable
 CREATE TABLE "usuarios" (
     "id" TEXT NOT NULL,
@@ -189,32 +186,6 @@ CREATE TABLE "documentos" (
     CONSTRAINT "documentos_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "compromissos" (
-    "id" TEXT NOT NULL,
-    "usuarioId" TEXT NOT NULL,
-    "data" TEXT NOT NULL,
-    "hora" TEXT NOT NULL DEFAULT '',
-    "titulo" TEXT NOT NULL,
-    "local" TEXT NOT NULL DEFAULT '',
-    "processo" TEXT,
-    "tipo" "TipoCompromisso" NOT NULL DEFAULT 'vistoria',
-
-    CONSTRAINT "compromissos_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "modelos" (
-    "id" TEXT NOT NULL,
-    "nome" TEXT NOT NULL,
-    "tipo" "TipoDocumento" NOT NULL,
-    "secoes" INTEGER NOT NULL DEFAULT 0,
-    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "atualizadoEm" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "modelos_pkey" PRIMARY KEY ("id")
-);
-
 -- CreateIndex
 CREATE UNIQUE INDEX "usuarios_email_key" ON "usuarios"("email");
 
@@ -251,12 +222,6 @@ CREATE INDEX "documentos_periciaId_idx" ON "documentos"("periciaId");
 -- CreateIndex
 CREATE INDEX "documentos_criadoPorId_idx" ON "documentos"("criadoPorId");
 
--- CreateIndex
-CREATE INDEX "compromissos_usuarioId_idx" ON "compromissos"("usuarioId");
-
--- CreateIndex
-CREATE INDEX "compromissos_data_idx" ON "compromissos"("data");
-
 -- AddForeignKey
 ALTER TABLE "pericias" ADD CONSTRAINT "pericias_responsavelId_fkey" FOREIGN KEY ("responsavelId") REFERENCES "usuarios"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
@@ -283,7 +248,4 @@ ALTER TABLE "documentos" ADD CONSTRAINT "documentos_criadoPorId_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "documentos" ADD CONSTRAINT "documentos_periciaId_fkey" FOREIGN KEY ("periciaId") REFERENCES "pericias"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "compromissos" ADD CONSTRAINT "compromissos_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "usuarios"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

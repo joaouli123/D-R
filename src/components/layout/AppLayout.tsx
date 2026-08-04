@@ -1,22 +1,15 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
-  Bell,
   BookOpen,
   Building2,
-  Calculator,
-  CalendarDays,
   ChevronDown,
-  FileStack,
   FileText,
-  Gavel,
   HelpCircle,
   LayoutGrid,
   LogOut,
   Menu,
-  PieChart,
   Scale,
-  Search,
   Settings,
   X,
 } from 'lucide-react'
@@ -29,12 +22,7 @@ const NAV = [
   { to: '/pericias', label: 'Perícias', icon: Scale },
   { to: '/documentos', label: 'Documentos', icon: FileText },
   { to: '/clientes', label: 'Clientes', icon: Building2 },
-  { to: '/processos', label: 'Processos', icon: Gavel },
-  { to: '/calendario', label: 'Calendário', icon: CalendarDays },
   { to: '/biblioteca', label: 'Biblioteca', icon: BookOpen },
-  { to: '/calculadoras', label: 'Calculadoras', icon: Calculator },
-  { to: '/modelos', label: 'Modelos', icon: FileStack },
-  { to: '/relatorios', label: 'Relatórios', icon: PieChart },
 ]
 
 const NAV_FOOTER = [
@@ -132,23 +120,7 @@ export function AppLayout() {
             <p className="text-xs text-ink-500">com agilidade e precisão</p>
           </div>
 
-          <div className="relative ml-auto hidden max-w-xs flex-1 sm:block">
-            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-            <input
-              placeholder="Buscar processo, cliente, documento…"
-              className="h-9 w-full rounded-lg border border-ink-200 bg-ink-50 pl-9 pr-3 text-sm placeholder:text-ink-400 focus:border-brand-500 focus:bg-white"
-            />
-          </div>
-
-          <button
-            className="relative rounded-lg p-2 text-ink-500 hover:bg-ink-100 hover:text-ink-800"
-            aria-label="Notificações"
-          >
-            <Bell size={19} strokeWidth={1.9} />
-            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
-          </button>
-
-          <div className="relative">
+          <div className="relative ml-auto">
             <button
               onClick={() => setPerfilAberto((v) => !v)}
               className="flex items-center gap-2 rounded-lg py-1 pl-1 pr-2 hover:bg-ink-100"

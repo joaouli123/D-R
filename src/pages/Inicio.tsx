@@ -1,13 +1,10 @@
-import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
-  CalendarClock,
   CircleAlert,
   FileCheck2,
   FileText,
   HelpCircle,
-  Info,
   MessageSquareText,
   Plus,
   ScrollText,
@@ -17,8 +14,6 @@ import {
 import { Badge, Button, Card, CardHeader } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { useApp } from '@/store/AppStore'
-import * as api from '@/services/api'
-import type { Compromisso } from '@/services/api'
 import { formatDate } from '@/lib/utils'
 
 // ============================================================
@@ -85,25 +80,6 @@ export default function Inicio() {
     { label: 'Rascunhos pendentes', valor: rascunhos, icon: CircleAlert, tone: 'text-amber-600 bg-amber-50' },
     { label: 'Empresas cadastradas', valor: empresas.length, icon: FileCheck2, tone: 'text-ink-700 bg-ink-100' },
   ]
-
-  const [proximos, setProximos] = useState<Compromisso[]>([])
-
-  useEffect(() => {
-    let vivo = true
-    api.agenda
-      .listar()
-      .then((lista) => {
-        if (!vivo) return
-        const limite = new Date().toISOString().slice(0, 10)
-        setProximos(lista.filter((c) => c.data >= limite).slice(0, 4))
-      })
-      // O painel não deve quebrar por causa da agenda: sem ela o
-      // cartão apenas fica vazio.
-      .catch(() => undefined)
-    return () => {
-      vivo = false
-    }
-  }, [])
 
   const recentes = [...documentos]
     .sort((a, b) => b.atualizadoEm.localeCompare(a.atualizadoEm))
@@ -172,9 +148,9 @@ export default function Inicio() {
         </div>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        {/* Documentos recentes */}
-        <Card className="lg:col-span-2">
+      <div className="grid gap-4">
+        {/* Documentos recentes — Módulo J */}
+        <Card>
           <CardHeader
             title="Documentos recentes"
             subtitle={`${finalizados} finalizados · ${rascunhos} em rascunho`}
@@ -206,59 +182,6 @@ export default function Inicio() {
             ))}
           </div>
         </Card>
-
-        {/* Agenda */}
-        <Card>
-          <CardHeader
-            title="Próximos compromissos"
-            icon={<CalendarClock size={18} />}
-            action={
-              <Button variant="ghost" size="sm" onClick={() => navigate('/calendario')}>
-                Agenda
-              </Button>
-            }
-          />
-          <div className="divide-y divide-ink-100">
-            {proximos.length === 0 && (
-              <p className="px-5 py-4 text-[13px] text-ink-400">
-                Nenhum compromisso agendado.
-              </p>
-            )}
-            {proximos.map((a) => (
-              <div key={a.id} className="flex gap-3 px-5 py-3">
-                <div className="w-11 shrink-0 rounded-lg border border-ink-200 py-1 text-center">
-                  <p className="text-[10px] font-bold uppercase text-navy-600">
-                    {['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'][
-                      Number(a.data.slice(5, 7)) - 1
-                    ]}
-                  </p>
-                  <p className="text-[15px] font-bold leading-tight text-ink-900">{a.data.slice(8, 10)}</p>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-semibold text-ink-800">{a.titulo}</p>
-                  <p className="mt-0.5 text-xs text-ink-500">
-                    {a.hora} · {a.local}
-                  </p>
-                  <Badge
-                    tone={a.tipo === 'prazo' ? 'red' : a.tipo === 'audiencia' ? 'navy' : 'green'}
-                    className="mt-1.5"
-                  >
-                    {a.tipo === 'prazo' ? 'Prazo' : a.tipo === 'audiencia' ? 'Audiência' : 'Vistoria'}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-navy-200 bg-navy-50 px-4 py-3 text-[13px] text-navy-800">
-        <Info size={16} className="mt-0.5 shrink-0" />
-        <p>
-          <strong>Fase 1 — Frontend.</strong> As telas estão navegáveis com dados de demonstração.
-          A troca para o backend (Node + PostgreSQL) acontece apenas em{' '}
-          <span className="font-mono text-[12px]">src/services/api.ts</span>, sem alterar nenhuma tela.
-        </p>
       </div>
     </>
   )

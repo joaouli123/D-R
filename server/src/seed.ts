@@ -9,8 +9,7 @@ const prisma = new PrismaClient()
 // Seed idempotente — pode rodar em toda subida sem duplicar.
 //
 //   · administrador inicial (ADMIN_EMAIL / ADMIN_SENHA)
-//   · 39 quesitos do banco global (Módulo K)
-//   · modelos de documento (Módulo H)
+//   · 39 quesitos do banco global (item 17)
 //   · biblioteca de textos inicial do administrador (Módulo F)
 //
 // Empresas e perícias fictícias só entram com SEED_DEMO=true.
@@ -99,15 +98,6 @@ const TEXTOS_INICIAIS = [
   },
 ]
 
-const MODELOS = [
-  { nome: 'Parecer Técnico — Insalubridade (padrão D&R)', tipo: 'parecer' as const, secoes: 12 },
-  { nome: 'Laudo Técnico — Insalubridade e Periculosidade', tipo: 'laudo' as const, secoes: 14 },
-  { nome: 'Quesitos Técnicos — modelo completo', tipo: 'quesitos' as const, secoes: 4 },
-  { nome: 'Manifestação ao Laudo — folha única', tipo: 'manifestacao' as const, secoes: 3 },
-  { nome: 'Impugnação ao Laudo — extensão do parecer', tipo: 'impugnacao' as const, secoes: 6 },
-  { nome: 'Esclarecimentos Técnicos — resposta a quesitos', tipo: 'esclarecimento' as const, secoes: 5 },
-]
-
 async function main() {
   const email = (process.env.ADMIN_EMAIL ?? 'dinoel@drpericiaelite.com.br').toLowerCase()
   const senha = process.env.ADMIN_SENHA
@@ -148,13 +138,6 @@ async function main() {
   } else {
     console.log(`· quesitos globais já presentes (${jaTem}) — nada a fazer`)
   }
-
-  // ---------- Modelos ----------
-  for (const m of MODELOS) {
-    const existe = await prisma.modeloDocumento.findFirst({ where: { nome: m.nome } })
-    if (!existe) await prisma.modeloDocumento.create({ data: m })
-  }
-  console.log(`✓ ${MODELOS.length} modelos de documento`)
 
   // ---------- Biblioteca inicial ----------
   const textosDoAdmin = await prisma.textoBiblioteca.count({ where: { usuarioId: admin.id } })

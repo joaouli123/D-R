@@ -446,20 +446,3 @@ export const TEXTOS: TextoBiblioteca[] = [
     criadoEm: '2026-07-03',
   },
 ]
-
-export const MODELOS_DOC = [
-  { id: 'mdl-1', nome: 'Parecer Técnico — Insalubridade (padrão D&R)', tipo: 'parecer', secoes: 12, atualizado: '2026-06-30' },
-  { id: 'mdl-2', nome: 'Laudo Técnico — Insalubridade e Periculosidade', tipo: 'laudo', secoes: 14, atualizado: '2026-06-30' },
-  { id: 'mdl-3', nome: 'Quesitos Técnicos — modelo completo', tipo: 'quesitos', secoes: 4, atualizado: '2026-07-05' },
-  { id: 'mdl-4', nome: 'Manifestação ao Laudo — folha única', tipo: 'manifestacao', secoes: 3, atualizado: '2026-07-12' },
-  { id: 'mdl-5', nome: 'Impugnação ao Laudo — extensão do parecer', tipo: 'impugnacao', secoes: 6, atualizado: '2026-07-12' },
-  { id: 'mdl-6', nome: 'Esclarecimentos Técnicos — resposta a quesitos', tipo: 'esclarecimento', secoes: 5, atualizado: '2026-07-12' },
-]
-
-export const AGENDA = [
-  { id: 'agd-1', data: '2026-07-29', hora: '09:00', titulo: 'Vistoria — Ferrante Metais', local: 'Cajamar/SP', processo: '1001234-56.2025.5.02.0071', tipo: 'vistoria' },
-  { id: 'agd-2', data: '2026-07-31', hora: '15:00', titulo: 'Prazo — entrega do laudo', local: '71ª VT São Paulo', processo: '1001234-56.2025.5.02.0071', tipo: 'prazo' },
-  { id: 'agd-3', data: '2026-08-04', hora: '10:00', titulo: 'Vistoria — Posto Bandeirante', local: 'São Paulo/SP', processo: '1002468-13.2026.5.02.0018', tipo: 'vistoria' },
-  { id: 'agd-4', data: '2026-08-07', hora: '14:00', titulo: 'Prazo — manifestação ao laudo', local: '34ª VT São Paulo', processo: '1005678-90.2025.5.02.0034', tipo: 'prazo' },
-  { id: 'agd-5', data: '2026-08-12', hora: '11:00', titulo: 'Audiência de instrução', local: '55ª VT São Paulo', processo: '1009876-54.2024.5.02.0055', tipo: 'audiencia' },
-]

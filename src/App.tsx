@@ -11,12 +11,7 @@ import Pericias from '@/pages/Pericias'
 import PericiaEditor from '@/pages/PericiaEditor'
 import Documentos from '@/pages/Documentos'
 import Clientes from '@/pages/Clientes'
-import Processos from '@/pages/Processos'
-import Calendario from '@/pages/Calendario'
 import Biblioteca from '@/pages/Biblioteca'
-import Calculadoras from '@/pages/Calculadoras'
-import Modelos from '@/pages/Modelos'
-import Relatorios from '@/pages/Relatorios'
 import Configuracoes from '@/pages/Configuracoes'
 import Ajuda from '@/pages/Ajuda'
 import Quesitos from '@/pages/Quesitos'
@@ -74,14 +69,11 @@ export default function App() {
         {/* Esclarecimentos Técnicos */}
         <Route path="/esclarecimentos" element={<Esclarecimento />} />
 
-        {/* Módulo B e apoio */}
+        {/* Módulos B e F */}
         <Route path="/clientes" element={<Clientes />} />
-        <Route path="/processos" element={<Processos />} />
-        <Route path="/calendario" element={<Calendario />} />
         <Route path="/biblioteca" element={<Biblioteca />} />
-        <Route path="/calculadoras" element={<Calculadoras />} />
-        <Route path="/modelos" element={<Modelos />} />
-        <Route path="/relatorios" element={<Relatorios />} />
+
+        {/* Módulo A e apoio */}
         <Route path="/configuracoes" element={<Configuracoes />} />
         <Route path="/ajuda" element={<Ajuda />} />
 

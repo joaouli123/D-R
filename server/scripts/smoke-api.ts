@@ -31,8 +31,6 @@ const CASOS: Caso[] = [
   { nome: 'documentos exigem sessão', caminho: '/documentos', statusEsperado: 401 },
   { nome: 'quesitos exigem sessão', caminho: '/quesitos', statusEsperado: 401 },
   { nome: 'textos exigem sessão', caminho: '/textos', statusEsperado: 401 },
-  { nome: 'agenda exige sessão', caminho: '/agenda', statusEsperado: 401 },
-  { nome: 'modelos exigem sessão', caminho: '/modelos', statusEsperado: 401 },
   { nome: 'usuários exigem sessão', caminho: '/usuarios', statusEsperado: 401 },
   { nome: 'quem sou eu sem sessão', caminho: '/auth/eu', statusEsperado: 401 },
   {
@@ -60,6 +58,10 @@ const CASOS: Caso[] = [
   },
 
   { nome: 'rota inexistente', caminho: '/nao-existe', statusEsperado: 404, contem: 'não encontrada' },
+
+  // Fora do escopo contratado (Módulos A–J): não devem existir.
+  { nome: 'agenda não existe', caminho: '/agenda', statusEsperado: 404 },
+  { nome: 'modelos não existem', caminho: '/modelos', statusEsperado: 404 },
 
   // Logout é idempotente: limpa o cookie mesmo sem sessão.
   { nome: 'logout sem sessão', caminho: '/auth/logout', metodo: 'POST', statusEsperado: 204 },

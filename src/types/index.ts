@@ -293,19 +293,3 @@ export interface ModeloManifestacao {
   blocos: BlocoTexto[]
 }
 
-// ---------- Agentes químicos / CAS (Biblioteca técnica) ----------
-export interface AgenteQuimicoCAS {
-  cas: string
-  nome: string
-  nomeIngles?: string
-  ltPpm?: string
-  ltMgM3?: string
-  valorTeto: boolean
-  pele: boolean
-  anexo11: boolean
-  anexo13: boolean
-  anexo13A: string
-  linach?: 'G1' | 'G2A' | 'G2B' | '—'
-  grauPrevisto: string
-  resumo: string
-}

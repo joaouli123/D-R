@@ -3,12 +3,10 @@ import cors from 'cors'
 import express, { type Express } from 'express'
 import { env } from './env.js'
 import { ErroHttp, tratarErros } from './erros.js'
-import { agendaRouter } from './routes/agenda.js'
 import { authRouter } from './routes/auth.js'
 import { documentosRouter } from './routes/documentos.js'
 import { empresasRouter } from './routes/empresas.js'
 import { fotosRouter } from './routes/fotos.js'
-import { modelosRouter } from './routes/modelos.js'
 import { periciasRouter } from './routes/pericias.js'
 import { quesitosRouter } from './routes/quesitos.js'
 import { textosRouter } from './routes/textos.js'
@@ -70,8 +68,6 @@ export function criarApp(): Express {
   app.use('/textos', textosRouter)
   app.use('/quesitos', quesitosRouter)
   app.use('/documentos', documentosRouter)
-  app.use('/agenda', agendaRouter)
-  app.use('/modelos', modelosRouter)
 
   app.use((req, _res, next) => {
     next(new ErroHttp(404, `Rota não encontrada: ${req.method} ${req.path}`))

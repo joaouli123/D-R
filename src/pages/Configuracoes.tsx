@@ -255,35 +255,30 @@ export default function Configuracoes() {
       {aba === 'documento' && (
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
-            <CardHeader title="Preferências de documento" subtitle="Módulo G" />
-            <div className="space-y-4 p-5">
-              <Select label="Título padrão" defaultValue="parecer">
-                <option value="parecer">Parecer Técnico Pericial</option>
-                <option value="laudo">Laudo Técnico Pericial</option>
-              </Select>
-              <Select label="Numeração de seções" defaultValue="numerica">
-                <option value="numerica">Numérica (1, 2, 3…)</option>
-                <option value="romana">Romana (I, II, III…)</option>
-              </Select>
-              <Select label="Formato de exportação padrão" defaultValue="pdf">
-                <option value="pdf">PDF (pronto para assinatura)</option>
-                <option value="docx">DOCX (editável)</option>
-                <option value="ambos">Ambos</option>
-              </Select>
-              <Input label="Local padrão para datar" defaultValue="São Paulo/SP" />
+            <CardHeader title="Assinatura do documento" subtitle="Módulo H" />
+            <div className="space-y-3 p-5 text-[13px] leading-relaxed text-ink-600">
+              <p>
+                Todo documento gerado é assinado com os dados do responsável técnico cadastrados
+                em <strong>Meu perfil</strong>: nome, titulação e registro profissional.
+              </p>
+              <p>
+                O título — <strong>Parecer Técnico</strong> ou <strong>Laudo Técnico</strong> — é
+                escolhido no passo 6 de cada perícia, junto com a exportação em PDF ou DOCX.
+              </p>
             </div>
           </Card>
 
           <Card>
             <CardHeader title="Envio por e-mail" subtitle="Módulo I" icon={<Mail size={18} />} />
-            <div className="space-y-4 p-5">
-              <Input label="Remetente" defaultValue={usuario?.email} />
-              <Input label="Responder para" defaultValue={usuario?.email} />
-              <Input label="Assinatura do e-mail" defaultValue={`${usuario?.nome} — ${usuario?.registroProfissional ?? ''}`} />
-              <div className="rounded-lg border border-navy-200 bg-navy-50 px-3.5 py-2.5 text-[12.5px] text-navy-800">
-                O disparo é feito por serviço transacional (Resend ou SendGrid) configurado no
-                backend, conforme a proposta.
-              </div>
+            <div className="space-y-3 p-5 text-[13px] leading-relaxed text-ink-600">
+              <p>
+                O PDF é gerado no servidor e anexado automaticamente — sem precisar baixar e
+                reanexar. As respostas voltam para <strong>{usuario?.email}</strong>.
+              </p>
+              <p>
+                O envio parte da tela do parecer (passo 6) ou do histórico em{' '}
+                <strong>Documentos</strong>.
+              </p>
             </div>
           </Card>
         </div>
@@ -296,9 +291,9 @@ export default function Configuracoes() {
             <CardHeader title="Ambiente" icon={<Server size={18} />} />
             <dl className="divide-y divide-ink-100 text-[13.5px]">
               {[
-                ['Versão do frontend', '1.0.0'],
-                ['Modo da API', API_MODE === 'mock' ? 'Mock local (sem backend)' : 'REST'],
-                ['Stack prevista', 'React · Node.js/API REST · PostgreSQL'],
+                ['Versão', '1.0.0'],
+                ['Modo da API', API_MODE === 'mock' ? 'Demonstração (sem backend)' : 'REST'],
+                ['Stack', 'React · Node.js/API REST · PostgreSQL'],
                 ['Geração de documentos', 'Motor de PDF + exportação DOCX'],
                 ['Armazenamento de imagens', 'Upload organizado por seção'],
               ].map(([k, v]) => (

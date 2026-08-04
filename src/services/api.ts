@@ -288,43 +288,6 @@ export const documentos = {
   },
 }
 
-// ---------------- Agenda e modelos ----------------
-export interface Compromisso {
-  id: string
-  data: string
-  hora: string
-  titulo: string
-  local: string
-  processo: string
-  tipo: 'vistoria' | 'prazo' | 'audiencia'
-}
-
-export const agenda = {
-  listar: () => (ehRest ? http<Compromisso[]>('/agenda') : delay(mock.AGENDA as Compromisso[])),
-
-  salvar: (c: Omit<Compromisso, 'id'> & { id?: string }) => {
-    if (ehRest) return http<Compromisso>('/agenda', { method: 'POST', body: JSON.stringify(c) })
-    // No mock o id sai daqui; sem ele a lista da tela ficaria com
-    // uma entrada sem chave.
-    return delay({ ...c, id: c.id ?? `agd-${Math.random().toString(36).slice(2, 9)}` })
-  },
-
-  remover: (id: string) =>
-    ehRest ? http<void>(`/agenda/${id}`, { method: 'DELETE' }) : delay(undefined),
-}
-
-export interface ModeloDoc {
-  id: string
-  nome: string
-  tipo: string
-  secoes: number
-  atualizado: string
-}
-
-export const modelos = {
-  listar: () => (ehRest ? http<ModeloDoc[]>('/modelos') : delay(mock.MODELOS_DOC as ModeloDoc[])),
-}
-
 export const API_MODE = MODE
 
 /** Dispara o download de um Blob já baixado da API. */

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronDown, HelpCircle, LifeBuoy, Mail, Rocket } from 'lucide-react'
-import { Badge, Card, CardHeader } from '@/components/ui'
+import { Card, CardHeader } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { cn } from '@/lib/utils'
 
@@ -46,8 +46,12 @@ const FAQ = [
     a: 'O documento é gerado em PDF, pronto para assinatura eletrônica na ferramenta que você já utiliza (Clicksign, Autentique, gov.br), e também em formato editável (DOCX). É possível anexar um PDF externo — como um laudo complementar de dosimetria — ao final do documento gerado.',
   },
   {
-    q: 'Esta versão já salva os dados no servidor?',
-    a: 'Esta é a fase de frontend: as telas estão navegáveis com dados de demonstração e as alterações valem durante a sessão. A troca para o backend (Node + PostgreSQL) acontece em um único arquivo — src/services/api.ts — sem alterar nenhuma tela.',
+    q: 'Os dados ficam salvos no servidor?',
+    a: 'Sim. Tudo é gravado em banco PostgreSQL: empresas, processos, perícias, fotografias, biblioteca de textos e o histórico de documentos. As fotos e os anexos em PDF ficam armazenados no servidor, e o PDF é montado lá — por isso um parecer arquivado pode ser reimpresso a qualquer momento, sem depender do que está aberto na tela.',
+  },
+  {
+    q: 'Quem pode fazer o quê no sistema?',
+    a: 'O administrador cadastra e desativa usuários. Perito e assistente trabalham nas perícias e documentos. A Biblioteca Pessoal de Textos é privada de cada usuário — ninguém vê os textos do outro. Cada um troca a própria senha em Configurações › Meu perfil.',
   },
 ]
 
@@ -135,24 +139,14 @@ export default function Ajuda() {
           </Card>
 
           <Card>
-            <CardHeader title="Fase atual" />
-            <div className="space-y-2.5 p-5 text-[13px]">
-              <div className="flex items-center justify-between">
-                <span className="text-ink-600">Frontend</span>
-                <Badge tone="green">Em desenvolvimento</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-ink-600">Backend / API</span>
-                <Badge tone="gray">Próxima fase</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-ink-600">Banco de dados</span>
-                <Badge tone="gray">Próxima fase</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-ink-600">Geração PDF/DOCX no servidor</span>
-                <Badge tone="gray">Próxima fase</Badge>
-              </div>
+            <CardHeader title="Fora desta fase" subtitle="Cláusula 5ª da proposta" />
+            <div className="space-y-3 p-5 text-[13px] leading-relaxed text-ink-600">
+              <p>
+                O documento sai em PDF pronto para assinatura na ferramenta que você já utiliza
+                (Clicksign, Autentique, gov.br). A <strong>assinatura digital nativa</strong> e o{' '}
+                <strong>envio automático por WhatsApp</strong> dependem de APIs pagas de terceiros e
+                são orçados à parte.
+              </p>
             </div>
           </Card>
         </div>

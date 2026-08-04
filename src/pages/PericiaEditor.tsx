@@ -45,7 +45,7 @@ import type {
   SecaoTexto,
   Usuario,
 } from '@/types'
-import { AGENTES_QUIMICOS, ANEXOS_NR15 } from '@/content/agentesQuimicos'
+import { ANEXOS_NR15 } from '@/content/anexosNr15'
 import { maskProcesso, uid } from '@/lib/utils'
 
 // ============================================================
@@ -831,8 +831,8 @@ export default function PericiaEditor() {
                     >
                       <option value="">—</option>
                       {ANEXOS_NR15.map((an) => (
-                        <option key={an.anexo} value={an.anexo}>
-                          {an.anexo}
+                        <option key={an} value={an}>
+                          {an}
                         </option>
                       ))}
                     </Select>
@@ -923,54 +923,6 @@ export default function PericiaEditor() {
               {p.tecnico.agentes.length === 0 && (
                 <p className="text-sm text-ink-500">Nenhum agente cadastrado.</p>
               )}
-            </div>
-          </Card>
-
-          {/* Importação rápida da biblioteca técnica */}
-          <Card>
-            <CardHeader
-              title="Importar da Biblioteca Técnica"
-              subtitle="Agentes químicos com CAS, limite de tolerância e enquadramento já cadastrados."
-              icon={<BookOpen size={18} />}
-            />
-            <div className="grid gap-2 p-5 sm:grid-cols-2">
-              {AGENTES_QUIMICOS.map((q) => (
-                <button
-                  key={q.cas}
-                  onClick={() => {
-                    setT({
-                      agentes: [
-                        ...p.tecnico.agentes,
-                        {
-                          id: uid('agn'),
-                          nome: q.nome,
-                          tipo: 'quimico',
-                          cas: q.cas,
-                          anexoNr15: q.anexo11 ? 'Anexo 11' : 'Anexo 13',
-                          limiteTolerancia: q.ltPpm !== '—' ? `${q.ltPpm} (${q.ltMgM3})` : '',
-                          criterio: q.anexo11 ? 'quantitativo' : 'qualitativo',
-                          grau: 'medio',
-                        },
-                      ],
-                    })
-                    toast(`${q.nome} adicionado aos agentes.`)
-                  }}
-                  className="rounded-lg border border-ink-200 p-3 text-left transition-colors hover:border-brand-400 hover:bg-brand-50"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-[13.5px] font-semibold text-ink-900">{q.nome}</span>
-                    <Plus size={15} className="mt-0.5 shrink-0 text-brand-600" />
-                  </div>
-                  <p className="mt-0.5 font-mono text-[11px] text-ink-500">CAS {q.cas}</p>
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    <Badge tone={q.anexo11 ? 'navy' : 'gray'}>
-                      {q.anexo11 ? `Anexo 11 · ${q.ltPpm}` : 'Sem LT'}
-                    </Badge>
-                    {q.anexo13 && <Badge tone="green">Anexo 13</Badge>}
-                    {q.pele && <Badge tone="amber">Pele</Badge>}
-                  </div>
-                </button>
-              ))}
             </div>
           </Card>
         </div>
