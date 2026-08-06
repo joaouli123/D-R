@@ -17,10 +17,22 @@ import { QUESITOS } from '@/content/quesitos'
 //   VITE_API_MODE=mock  → dados locais, sem servidor (demonstração)
 //   VITE_API_MODE=rest  → API Node/Express em VITE_API_URL
 //
+// Sem a variável, o padrão vem do tipo de build: produção fala com a
+// API real, desenvolvimento segue nos dados locais. O padrão não é
+// apenas conveniência — as variáveis do Vite são congeladas no build, e
+// a API do Coolify não permite marcar uma variável como build-time
+// (só o painel permite). Deixar o default no código mantém o deploy
+// reproduzível, sem depender de configuração feita à mão.
+//
+// BASE_URL relativo por padrão: a API é servida no mesmo domínio, sob
+// /api, então não há CORS nem endereço fixo por ambiente.
+//
 // Nenhuma tela conhece o modo em uso.
 // ============================================================
 
-const MODE: 'mock' | 'rest' = (import.meta.env.VITE_API_MODE as 'mock' | 'rest') ?? 'mock'
+const MODE: 'mock' | 'rest' =
+  (import.meta.env.VITE_API_MODE as 'mock' | 'rest' | undefined) ??
+  (import.meta.env.PROD ? 'rest' : 'mock')
 const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api'
 
 const LATENCIA = 220 // simula rede, para exercitar os estados de carregamento
