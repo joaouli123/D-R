@@ -13,7 +13,12 @@ WORKDIR /app
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 
 COPY package*.json ./
-RUN npm ci
+# --include=dev e obrigatorio aqui. O Coolify injeta NODE_ENV=production
+# no build, e nesse modo o `npm ci` pula as devDependencies — entre elas
+# os @types/*. O tsc ate roda (vem como dependencia transitiva), mas
+# falha em todo import sem tipos: "Could not find a declaration file for
+# module 'express'". O estagio de runtime remove as dev depois, no prune.
+RUN npm ci --include=dev
 
 COPY prisma ./prisma
 RUN npx prisma generate
