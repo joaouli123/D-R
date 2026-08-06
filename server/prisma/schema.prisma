@@ -12,6 +12,13 @@
 
 generator client {
   provider = "prisma-client-js"
+  // O node:22-bookworm-slim nao traz o libssl, entao a deteccao do
+  // OpenSSL falha no estagio de build e o Prisma cai no default
+  // "debian-openssl-1.1.x". No runtime o Chromium instala o libssl3
+  // e o cliente gerado nao acha o Query Engine correspondente:
+  //   "could not locate the Query Engine for runtime debian-openssl-3.0.x"
+  // Declarar o alvo explicitamente tira a deteccao do caminho.
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
