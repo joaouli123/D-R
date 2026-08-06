@@ -1,6 +1,7 @@
 import { Logo } from '@/components/Logo'
 import type { Empresa, Pericia, Usuario } from '@/types'
 import { extenso, formatDate } from '@/lib/utils'
+import { labelAnexoNr15 } from '@/content/anexosNr15'
 
 // ============================================================
 // MÓDULO H — Montagem automática do documento
@@ -244,10 +245,12 @@ export function DocumentoPreview({
           <thead>
             <tr>
               <th>Agente</th>
-              <th className="w-[14%]">CAS</th>
-              <th className="w-[14%]">Anexo NR-15</th>
-              <th className="w-[14%]">Critério</th>
-              <th className="w-[16%]">Grau</th>
+              <th className="w-[10%]">CAS</th>
+              <th className="w-[16%]">Anexo NR-15</th>
+              <th className="w-[12%]">Critério</th>
+              <th className="w-[12%]">Grau</th>
+              <th className="w-[20%]">Limite de Tolerância</th>
+              <th className="w-[12%]">Valor Medido</th>
             </tr>
           </thead>
           <tbody>
@@ -255,9 +258,11 @@ export function DocumentoPreview({
               <tr key={a.id}>
                 <td>{a.nome}</td>
                 <td>{a.cas || '—'}</td>
-                <td>{a.anexoNr15 || '—'}</td>
+                <td>{labelAnexoNr15(a.anexoNr15) || '—'}</td>
                 <td>{CRITERIO[a.criterio]}</td>
                 <td>{a.grau ? GRAU[a.grau] : '—'}</td>
+                <td>{a.limiteTolerancia || '—'}</td>
+                <td>{a.medido || '—'}</td>
               </tr>
             ))}
           </tbody>

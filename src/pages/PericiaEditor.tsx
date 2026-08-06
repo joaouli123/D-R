@@ -45,7 +45,7 @@ import type {
   SecaoTexto,
   Usuario,
 } from '@/types'
-import { ANEXOS_NR15 } from '@/content/anexosNr15'
+import { ANEXOS_NR15, anexoNr15PorId } from '@/content/anexosNr15'
 import { maskProcesso, uid } from '@/lib/utils'
 
 // ============================================================
@@ -793,7 +793,9 @@ export default function PericiaEditor() {
               }
             />
             <div className="space-y-3 p-5">
-              {p.tecnico.agentes.map((a) => (
+              {p.tecnico.agentes.map((a) => {
+                const anexoInfo = anexoNr15PorId(a.anexoNr15)
+                return (
                 <div key={a.id} className="rounded-lg border border-ink-200 p-3">
                   <div className="grid gap-3 sm:grid-cols-[1.4fr_120px_130px_130px_auto]">
                     <Input
@@ -821,18 +823,33 @@ export default function PericiaEditor() {
                     <Select
                       label="Anexo NR-15"
                       value={a.anexoNr15 ?? ''}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        // Injeção automática de dados (Quinta otimização): ao
+                        // selecionar o anexo, preenche Natureza, Grau, Critério
+                        // e Limite de Tolerância. "Valor medido" nunca é tocado.
+                        const info = anexoNr15PorId(e.target.value)
                         setT({
                           agentes: p.tecnico.agentes.map((x) =>
-                            x.id === a.id ? { ...x, anexoNr15: e.target.value } : x,
+                            x.id === a.id
+                              ? {
+                                  ...x,
+                                  anexoNr15: e.target.value,
+                                  ...(info && {
+                                    tipo: info.tipo,
+                                    grau: info.grau,
+                                    criterio: info.criterio,
+                                    limiteTolerancia: info.limiteTolerancia,
+                                  }),
+                                }
+                              : x,
                           ),
                         })
-                      }
+                      }}
                     >
                       <option value="">—</option>
                       {ANEXOS_NR15.map((an) => (
-                        <option key={an} value={an}>
-                          {an}
+                        <option key={an.id} value={an.id}>
+                          {an.label}
                         </option>
                       ))}
                     </Select>
@@ -847,6 +864,7 @@ export default function PericiaEditor() {
                         })
                       }
                     >
+                      <option value="">— selecione —</option>
                       <option value="minimo">Mínimo 10%</option>
                       <option value="medio">Médio 20%</option>
                       <option value="maximo">Máximo 40%</option>
@@ -904,6 +922,13 @@ export default function PericiaEditor() {
                           ),
                         })
                       }
+                      disabled={!!anexoInfo && !anexoInfo.limiteEditavel}
+                      placeholder={anexoInfo?.dica}
+                      hint={
+                        anexoInfo && !anexoInfo.limiteEditavel
+                          ? 'Valor fixo em lei — injetado automaticamente pelo Anexo NR-15.'
+                          : anexoInfo?.dica
+                      }
                     />
                     <Input
                       label="Valor medido"
@@ -919,7 +944,7 @@ export default function PericiaEditor() {
                     />
                   </div>
                 </div>
-              ))}
+              )})}
               {p.tecnico.agentes.length === 0 && (
                 <p className="text-sm text-ink-500">Nenhum agente cadastrado.</p>
               )}
