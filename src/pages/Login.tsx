@@ -3,6 +3,7 @@ import { AlertCircle, LockKeyhole, Mail } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { Logo, SeloCredenciado } from '@/components/Logo'
 import { useApp } from '@/store/AppStore'
+import { API_MODE } from '@/services/api'
 import loginBg from '@/assets/login-vistoria.jpg'
 
 // ============================================================
@@ -11,7 +12,7 @@ import loginBg from '@/assets/login-vistoria.jpg'
 
 export default function Login() {
   const { login } = useApp()
-  const [email, setEmail] = useState('dinoel@drpericiaelite.com.br')
+  const [email, setEmail] = useState(API_MODE === 'mock' ? 'dinoel@drpericiaelite.com.br' : '')
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState('')
   const [carregando, setCarregando] = useState(false)
@@ -137,13 +138,15 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="mt-6 rounded-lg border border-dashed border-ink-300 bg-ink-50 px-4 py-3 text-[12px] text-ink-500">
-            <p className="font-semibold text-ink-700">Ambiente de demonstração</p>
-            <p className="mt-0.5">
-              Use <span className="font-mono text-ink-800">dinoel@drpericiaelite.com.br</span> com
-              qualquer senha de 4+ caracteres.
-            </p>
-          </div>
+          {API_MODE === 'mock' && (
+            <div className="mt-6 rounded-lg border border-dashed border-ink-300 bg-ink-50 px-4 py-3 text-[12px] text-ink-500">
+              <p className="font-semibold text-ink-700">Ambiente de demonstração</p>
+              <p className="mt-0.5">
+                Use <span className="font-mono text-ink-800">dinoel@drpericiaelite.com.br</span> com
+                qualquer senha de 4+ caracteres.
+              </p>
+            </div>
+          )}
 
           <p className="mt-8 text-center text-[11px] text-ink-400">
             © 2026 D&amp;R Perícia · Plataforma Inteligente de Perícia Trabalhista
