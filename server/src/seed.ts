@@ -113,9 +113,15 @@ async function main() {
   }
 
   // ---------- Administrador ----------
+  // Por padrão o seed nunca mexe na senha de um usuário que já existe
+  // (o admin pode tê-la trocado pela própria UI). ADMIN_RESET_SENHA=true
+  // é a válvula de recuperação: força a senha de volta para ADMIN_SENHA
+  // nesta subida. Definir só enquanto for preciso e depois remover a
+  // variável — ela não se desliga sozinha.
+  const resetarSenha = process.env.ADMIN_RESET_SENHA === 'true'
   const admin = await prisma.usuario.upsert({
     where: { email },
-    update: {},
+    update: resetarSenha ? { senhaHash: await bcrypt.hash(senha, 12) } : {},
     create: {
       nome: process.env.ADMIN_NOME ?? 'Dinoel R. Santos',
       email,
