@@ -30,8 +30,9 @@ const schema = z.object({
   /// Puppeteer: no container usamos o Chromium do sistema.
   PUPPETEER_EXECUTABLE_PATH: z.string().optional(),
 
-  RESEND_API_KEY: z.string().optional(),
-  EMAIL_REMETENTE: z.string().default('D&R Perícia <nao-responda@drpericiaelite.com.br>'),
+  /// Chave de API transacional da Brevo (antiga Sendinblue), começa com "xkeysib-".
+  BREVO_API_KEY: z.string().optional(),
+  EMAIL_REMETENTE: z.string().default('D&R Perícia <nao-responda@drpericiatrabalhista.com.br>'),
 })
 
 const parsed = schema.safeParse(process.env)
@@ -50,6 +51,6 @@ export const env = {
     .filter(Boolean),
 }
 
-if (!env.RESEND_API_KEY) {
-  console.warn('⚠ RESEND_API_KEY ausente — o envio de documentos por e-mail ficará indisponível.')
+if (!env.BREVO_API_KEY) {
+  console.warn('⚠ BREVO_API_KEY ausente — o envio de documentos por e-mail ficará indisponível.')
 }

@@ -47,8 +47,8 @@ services:
       UPLOAD_DIR: /app/uploads
       UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-15}
 
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
-      EMAIL_REMETENTE: ${EMAIL_REMETENTE:-D&R Perícia <nao-responda@drpericiaelite.com.br>}
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      EMAIL_REMETENTE: ${EMAIL_REMETENTE:-D&R Perícia <nao-responda@drpericiatrabalhista.com.br>}
 
       # Carga inicial — idempotente, roda a cada subida.
       ADMIN_NOME: ${ADMIN_NOME:-}

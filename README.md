@@ -65,7 +65,7 @@ npm run prisma:studio
 | Sessão | JWT em cookie httpOnly + bcrypt |
 | PDF | Puppeteer (Chromium headless) |
 | DOCX | biblioteca `docx` — estilos nativos do Word |
-| E-mail | Resend |
+| E-mail | Brevo (API transacional) |
 | Linguagem | TypeScript strict nas duas pontas |
 
 ---
@@ -185,7 +185,7 @@ Defina no painel do Coolify, nunca no repositório:
 | `CORS_ORIGINS` | URL pública do frontend |
 | `API_PUBLIC_URL` | URL pública da API — monta o endereço das fotos |
 | `ADMIN_EMAIL` / `ADMIN_SENHA` | carga inicial, idempotente |
-| `RESEND_API_KEY` | sem ela a API sobe e só o envio de e-mail fica indisponível |
+| `BREVO_API_KEY` | sem ela a API sobe e só o envio de e-mail fica indisponível |
 
 O volume `uploads` guarda as fotos das vistorias e os anexos em PDF — **perdê-lo significa perder o relatório fotográfico dos laudos.**
 
