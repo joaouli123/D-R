@@ -3,13 +3,13 @@ import { env } from '../env.js'
 import { ErroHttp } from '../erros.js'
 
 // ============================================================
-// MÓDULO I — Envio do documento por e-mail, com o PDF anexado
-// automaticamente (o perito não precisa baixar e reanexar).
+// MÓDULO I — Envio do documento por e-mail, com o PDF anexado.
 //
-// Usa o relay SMTP transacional da Brevo. A credencial fornecida pelo
-// painel começa com "xsmtpsib-" e é uma senha SMTP, não uma API key REST.
+// A API REST da Brevo é preferencial (chave "xkeysib-"). O relay
+// SMTP (senha "xsmtpsib-") permanece como fallback opcional.
 // ============================================================
 
+const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
 const smtpConfigurado = !!env.BREVO_SMTP_USER && !!env.BREVO_SMTP_PASSWORD
 
 const transporte = smtpConfigurado
@@ -39,7 +39,6 @@ export interface EnvioEmail {
   anexos: Anexo[]
 }
 
-/** Converte quebras de linha em parágrafos, escapando o conteúdo. */
 function corpoHtml(mensagem: string): string {
   const esc = (t: string) =>
     t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -59,12 +58,54 @@ function corpoHtml(mensagem: string): string {
 }
 
 export async function enviarDocumento(envio: EnvioEmail): Promise<{ id?: string }> {
-  if (!transporte) {
+  if (!env.BREVO_API_KEY && !transporte) {
     throw new ErroHttp(
       503,
-      'Envio de e-mail não configurado. Defina as credenciais SMTP da Brevo.',
+      'Envio de e-mail não configurado. Defina a API key ou as credenciais SMTP da Brevo.',
     )
   }
+
+  if (env.BREVO_API_KEY) return enviarPelaApi(envio)
+  return enviarPorSmtp(envio)
+}
+
+async function enviarPelaApi(envio: EnvioEmail): Promise<{ id?: string }> {
+  const resposta = await fetch(BREVO_API_URL, {
+    method: 'POST',
+    headers: {
+      'api-key': env.BREVO_API_KEY!,
+      'content-type': 'application/json',
+      accept: 'application/json',
+    },
+    body: JSON.stringify({
+      sender: separarRemetente(env.EMAIL_REMETENTE),
+      to: envio.para.map((email) => ({ email })),
+      cc: envio.copia?.length ? envio.copia.map((email) => ({ email })) : undefined,
+      replyTo: envio.responderPara ? { email: envio.responderPara } : undefined,
+      subject: envio.assunto,
+      textContent: envio.mensagem,
+      htmlContent: corpoHtml(envio.mensagem),
+      attachment: envio.anexos.map((a) => ({
+        name: a.nome,
+        content: a.conteudo.toString('base64'),
+      })),
+    }),
+  })
+
+  if (!resposta.ok) {
+    const erro = (await resposta.json().catch(() => null)) as { message?: string } | null
+    throw new ErroHttp(
+      502,
+      `O provedor de e-mail recusou o envio: ${erro?.message ?? `HTTP ${resposta.status}`}`,
+    )
+  }
+
+  const dados = (await resposta.json().catch(() => null)) as { messageId?: string } | null
+  return { id: dados?.messageId }
+}
+
+async function enviarPorSmtp(envio: EnvioEmail): Promise<{ id?: string }> {
+  if (!transporte) throw new ErroHttp(503, 'Credenciais SMTP da Brevo ausentes.')
 
   try {
     const resultado = await transporte.sendMail({
@@ -81,7 +122,6 @@ export async function enviarDocumento(envio: EnvioEmail): Promise<{ id?: string 
         contentType: 'application/pdf',
       })),
     })
-
     return { id: resultado.messageId }
   } catch (erro) {
     const motivo = erro instanceof Error ? erro.message : 'erro desconhecido'
@@ -89,4 +129,11 @@ export async function enviarDocumento(envio: EnvioEmail): Promise<{ id?: string 
   }
 }
 
-export const emailDisponivel = (): boolean => transporte !== null
+function separarRemetente(bruto: string): { name?: string; email: string } {
+  const m = bruto.match(/^(.*)<(.+)>$/)
+  if (!m?.[2]) return { email: bruto.trim() }
+  const nome = (m[1] ?? '').trim()
+  return { name: nome || undefined, email: m[2].trim() }
+}
+
+export const emailDisponivel = (): boolean => !!env.BREVO_API_KEY || transporte !== null

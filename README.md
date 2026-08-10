@@ -65,7 +65,7 @@ npm run prisma:studio
 | Sessão | JWT em cookie httpOnly + bcrypt |
 | PDF | Puppeteer (Chromium headless) |
 | DOCX | biblioteca `docx` — estilos nativos do Word |
-| E-mail | Brevo (relay SMTP transacional) |
+| E-mail | Brevo (API transacional + fallback SMTP) |
 | Linguagem | TypeScript strict nas duas pontas |
 
 ---
@@ -185,7 +185,8 @@ Defina no painel do Coolify, nunca no repositório:
 | `CORS_ORIGINS` | URL pública do frontend |
 | `API_PUBLIC_URL` | URL pública da API — monta o endereço das fotos |
 | `ADMIN_EMAIL` / `ADMIN_SENHA` | carga inicial, idempotente |
-| `BREVO_SMTP_USER` / `BREVO_SMTP_PASSWORD` | credenciais do relay SMTP da Brevo; sem elas a API sobe e só o envio fica indisponível |
+| `BREVO_API_KEY` | chave preferencial da API transacional da Brevo |
+| `BREVO_SMTP_USER` / `BREVO_SMTP_PASSWORD` | fallback opcional pelo relay SMTP da Brevo |
 
 O volume `uploads` guarda as fotos das vistorias e os anexos em PDF — **perdê-lo significa perder o relatório fotográfico dos laudos.**
 

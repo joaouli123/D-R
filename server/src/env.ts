@@ -30,7 +30,8 @@ const schema = z.object({
   /// Puppeteer: no container usamos o Chromium do sistema.
   PUPPETEER_EXECUTABLE_PATH: z.string().optional(),
 
-  /// Credenciais SMTP transacionais da Brevo (antiga Sendinblue).
+  /// Credenciais transacionais da Brevo (antiga Sendinblue).
+  BREVO_API_KEY: z.string().optional(),
   BREVO_SMTP_HOST: z.string().default('smtp-relay.brevo.com'),
   BREVO_SMTP_PORT: z.coerce.number().int().positive().default(587),
   BREVO_SMTP_USER: z.string().optional(),
@@ -54,8 +55,8 @@ export const env = {
     .filter(Boolean),
 }
 
-if (!env.BREVO_SMTP_USER || !env.BREVO_SMTP_PASSWORD) {
+if (!env.BREVO_API_KEY && (!env.BREVO_SMTP_USER || !env.BREVO_SMTP_PASSWORD)) {
   console.warn(
-    '⚠ Credenciais SMTP da Brevo ausentes — o envio de documentos por e-mail ficará indisponível.',
+    '⚠ Credenciais da Brevo ausentes — o envio de documentos por e-mail ficará indisponível.',
   )
 }
