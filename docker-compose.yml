@@ -47,7 +47,10 @@ services:
       UPLOAD_DIR: /app/uploads
       UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-15}
 
-      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      BREVO_SMTP_HOST: ${BREVO_SMTP_HOST:-smtp-relay.brevo.com}
+      BREVO_SMTP_PORT: ${BREVO_SMTP_PORT:-587}
+      BREVO_SMTP_USER: ${BREVO_SMTP_USER:-}
+      BREVO_SMTP_PASSWORD: ${BREVO_SMTP_PASSWORD:-}
       EMAIL_REMETENTE: ${EMAIL_REMETENTE:-D&R Perícia <nao-responda@drpericiatrabalhista.com.br>}
 
       # Carga inicial — idempotente, roda a cada subida.

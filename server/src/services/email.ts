@@ -1,3 +1,4 @@
+import nodemailer from 'nodemailer'
 import { env } from '../env.js'
 import { ErroHttp } from '../erros.js'
 
@@ -5,14 +6,24 @@ import { ErroHttp } from '../erros.js'
 // MÓDULO I — Envio do documento por e-mail, com o PDF anexado
 // automaticamente (o perito não precisa baixar e reanexar).
 //
-// Usa a API transacional da Brevo (POST /v3/smtp/email) direto via
-// fetch — sem SDK. O build da imagem já teve dor de cabeça de sobra
-// com dependência (@types ausentes, engine do Prisma, curl do
-// healthcheck); uma chamada HTTP simples não precisa de mais uma.
-// Docs: https://developers.brevo.com/reference/sendtransacemail
+// Usa o relay SMTP transacional da Brevo. A credencial fornecida pelo
+// painel começa com "xsmtpsib-" e é uma senha SMTP, não uma API key REST.
 // ============================================================
 
-const BREVO_URL = 'https://api.brevo.com/v3/smtp/email'
+const smtpConfigurado = !!env.BREVO_SMTP_USER && !!env.BREVO_SMTP_PASSWORD
+
+const transporte = smtpConfigurado
+  ? nodemailer.createTransport({
+      host: env.BREVO_SMTP_HOST,
+      port: env.BREVO_SMTP_PORT,
+      secure: env.BREVO_SMTP_PORT === 465,
+      requireTLS: env.BREVO_SMTP_PORT === 587,
+      auth: {
+        user: env.BREVO_SMTP_USER,
+        pass: env.BREVO_SMTP_PASSWORD,
+      },
+    })
+  : null
 
 export interface Anexo {
   nome: string
@@ -26,14 +37,6 @@ export interface EnvioEmail {
   assunto: string
   mensagem: string
   anexos: Anexo[]
-}
-
-/** "Nome <email@dominio>" -> { name, email }. Aceita também só o e-mail puro. */
-function remetente(bruto: string): { name?: string; email: string } {
-  const m = bruto.match(/^(.*)<(.+)>$/)
-  if (!m || !m[2]) return { email: bruto.trim() }
-  const nome = (m[1] ?? '').trim()
-  return { name: nome || undefined, email: m[2].trim() }
 }
 
 /** Converte quebras de linha em parágrafos, escapando o conteúdo. */
@@ -56,45 +59,34 @@ function corpoHtml(mensagem: string): string {
 }
 
 export async function enviarDocumento(envio: EnvioEmail): Promise<{ id?: string }> {
-  if (!env.BREVO_API_KEY) {
+  if (!transporte) {
     throw new ErroHttp(
       503,
-      'Envio de e-mail não configurado. Defina BREVO_API_KEY nas variáveis de ambiente.',
+      'Envio de e-mail não configurado. Defina as credenciais SMTP da Brevo.',
     )
   }
 
-  const corpo = {
-    sender: remetente(env.EMAIL_REMETENTE),
-    to: envio.para.map((email) => ({ email })),
-    cc: envio.copia?.length ? envio.copia.map((email) => ({ email })) : undefined,
-    replyTo: envio.responderPara ? { email: envio.responderPara } : undefined,
-    subject: envio.assunto,
-    textContent: envio.mensagem,
-    htmlContent: corpoHtml(envio.mensagem),
-    attachment: envio.anexos.map((a) => ({
-      name: a.nome,
-      content: a.conteudo.toString('base64'),
-    })),
-  }
+  try {
+    const resultado = await transporte.sendMail({
+      from: env.EMAIL_REMETENTE,
+      to: envio.para,
+      cc: envio.copia?.length ? envio.copia : undefined,
+      replyTo: envio.responderPara,
+      subject: envio.assunto,
+      text: envio.mensagem,
+      html: corpoHtml(envio.mensagem),
+      attachments: envio.anexos.map((a) => ({
+        filename: a.nome,
+        content: a.conteudo,
+        contentType: 'application/pdf',
+      })),
+    })
 
-  const resposta = await fetch(BREVO_URL, {
-    method: 'POST',
-    headers: {
-      'api-key': env.BREVO_API_KEY,
-      'content-type': 'application/json',
-      accept: 'application/json',
-    },
-    body: JSON.stringify(corpo),
-  })
-
-  if (!resposta.ok) {
-    const erro = (await resposta.json().catch(() => null)) as { message?: string } | null
-    const motivo = erro?.message ?? `HTTP ${resposta.status}`
+    return { id: resultado.messageId }
+  } catch (erro) {
+    const motivo = erro instanceof Error ? erro.message : 'erro desconhecido'
     throw new ErroHttp(502, `O provedor de e-mail recusou o envio: ${motivo}`)
   }
-
-  const dados = (await resposta.json().catch(() => null)) as { messageId?: string } | null
-  return { id: dados?.messageId }
 }
 
-export const emailDisponivel = (): boolean => !!env.BREVO_API_KEY
+export const emailDisponivel = (): boolean => transporte !== null
