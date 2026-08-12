@@ -109,6 +109,9 @@ export interface AgenteAvaliado {
   tipo: 'quimico' | 'fisico' | 'biologico' | 'periculosidade'
   cas?: string
   anexoNr15?: string // Anexo 1, 3, 11, 12, 13, 13-A, 14...
+  referenciaNormativaId?: string
+  atividadeEnquadrada?: string
+  unidadeLimite?: string
   limiteTolerancia?: string
   medido?: string
   criterio: 'qualitativo' | 'quantitativo' | 'nao_aplicavel'
