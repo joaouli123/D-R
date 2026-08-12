@@ -16,6 +16,10 @@
 
 import type { AgenteAvaliado } from '@/types'
 
+export { SUBSTANCIAS_ANEXO_11 } from './nr15/anexo11'
+export { ATIVIDADES_ANEXO_13 } from './nr15/anexo13'
+export { ATIVIDADES_ANEXO_14 } from './nr15/anexo14'
+
 export interface AnexoNr15Info {
   id: string
   /** Texto exibido no seletor. */
@@ -122,7 +126,7 @@ export const ANEXOS_NR15: AnexoNr15Info[] = [
     criterio: 'quantitativo',
     limiteTolerancia: '',
     limiteEditavel: true,
-    dica: 'Dinâmico conforme a substância (Quadro 1 do Anexo 11), em ppm ou mg/m³. Consulte pelo nome ou pelo número CAS.',
+    dica: 'Dinâmico conforme a substância (Quadro 1 do Anexo 11), em ppm e/ou mg/m³. Consulte pelo nome ou sinônimo.',
   },
   {
     id: 'ANEXO_12_ASBESTO',

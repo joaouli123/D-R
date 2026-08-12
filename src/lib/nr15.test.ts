@@ -1,7 +1,24 @@
 import { describe, expect, it } from 'vitest'
 
+import { ATIVIDADES_ANEXO_13, ATIVIDADES_ANEXO_14, SUBSTANCIAS_ANEXO_11 } from '@/content/anexosNr15'
 import type { ReferenciaNormativa } from '@/content/nr15/tipos'
 import { aplicarAnexo, aplicarReferencia, buscarReferencias, normalizarBuscaNr15 } from './nr15'
+
+describe('bases normativas oficiais da NR-15', () => {
+  it('mantem o Quadro 1 do Anexo 11 completo e aplicavel', () => {
+    expect(SUBSTANCIAS_ANEXO_11.length).toBeGreaterThan(100)
+    expect(SUBSTANCIAS_ANEXO_11.every(x => x.id && x.label && x.limiteTolerancia && x.grau)).toBe(true)
+  })
+
+  it('preserva os graus previstos para as atividades do Anexo 13', () => {
+    expect(ATIVIDADES_ANEXO_13.some(x => x.grau === 'minimo')).toBe(true)
+    expect(ATIVIDADES_ANEXO_13.some(x => x.grau === 'maximo')).toBe(true)
+  })
+
+  it('restringe as atividades do Anexo 14 aos graus medio e maximo', () => {
+    expect(new Set(ATIVIDADES_ANEXO_14.map(x => x.grau))).toEqual(new Set(['medio', 'maximo']))
+  })
+})
 
 describe('normalizarBuscaNr15', () => {
   it('normaliza acentos e letras maiusculas para busca normativa', () => {
