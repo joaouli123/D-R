@@ -5,14 +5,15 @@
 
 import type { ReferenciaNormativa } from './tipos'
 
-type GrauNormativo = ReferenciaNormativa['grau']
+type GrauNormativo = 'minimo' | 'medio' | 'maximo'
+const LIMITE_QUALITATIVO = 'Não aplicável (análise qualitativa por inspeção da operação prevista no Anexo 13)'
 
 function atividade(
   id: string,
   grupo: string,
   label: string,
   atividadeEnquadrada: string,
-  grau?: GrauNormativo,
+  grau: GrauNormativo,
   sinonimos: readonly string[] = [],
 ): ReferenciaNormativa {
   return {
@@ -22,8 +23,27 @@ function atividade(
     sinonimos: [grupo, ...sinonimos],
     tipo: 'quimico',
     criterio: 'qualitativo',
-    limiteTolerancia: 'Não aplicável (análise qualitativa por inspeção da operação prevista no Anexo 13)',
+    limiteTolerancia: LIMITE_QUALITATIVO,
     grau,
+    atividadeEnquadrada,
+  }
+}
+
+function atividadeSemGrau(
+  id: 'SUBSTANCIAS_CANCERIGENAS_01',
+  grupo: string,
+  label: string,
+  atividadeEnquadrada: string,
+  sinonimos: readonly string[] = [],
+): ReferenciaNormativa {
+  return {
+    id: `ANEXO_13_${id}`,
+    anexoId: 'ANEXO_13',
+    label: `${grupo} — ${label}`,
+    sinonimos: [grupo, ...sinonimos],
+    tipo: 'quimico',
+    criterio: 'qualitativo',
+    limiteTolerancia: LIMITE_QUALITATIVO,
     atividadeEnquadrada,
   }
 }
@@ -110,12 +130,11 @@ export const ATIVIDADES_ANEXO_13: readonly ReferenciaNormativa[] = [
 
   // O texto oficial vigente não explicita um grau neste item; por isso ele
   // permanece sem grau, sem inferência jurídica silenciosa.
-  atividade(
+  atividadeSemGrau(
     'SUBSTANCIAS_CANCERIGENAS_01',
     'SUBSTÂNCIAS CANCERÍGENAS',
     'Exposição ou contato por qualquer via',
     'Para as substâncias ou processos as seguir relacionados, não deve ser permitida nenhuma exposição ou contato, por qualquer via:\n- 4 - amino difenil (p-xenilamina);\n- Produção de Benzidina;\n- Betanaftilamina;\n- 4 - nitrodifenil,\n\nEntende-se por nenhuma exposição ou contato significa hermetizar o processo ou operação, através dos melhores métodos praticáveis de engenharia, sendo que o trabalhador deve ser protegido adequadamente de modo a não permitir nenhum contato com o carcinogênico.\n\nSempre que os processos ou operações não forem hermetizados, será considerada como situação de risco grave e iminente para o trabalhador.\n\nPara o Benzeno, deve ser observado o disposto no anexo 13-A.',
-    undefined,
     ['4 - amino difenil', 'p-xenilamina', 'Produção de Benzidina', 'Betanaftilamina', '4 - nitrodifenil'],
   ),
 
@@ -126,7 +145,7 @@ export const ATIVIDADES_ANEXO_13: readonly ReferenciaNormativa[] = [
     'Operações com substâncias relacionadas',
     "Operações com as seguintes substâncias:\n- Éter bis (cloro-metílico)\n- Benzopireno\n- Berílio\n- Cloreto de dimetil-carbamila\n- 3,3' – dicloro-benzidina\n- Dióxido de vinil ciclohexano\n- Epicloridrina\n- Hexametilfosforamida\n- 4,4' - metileno bis (2-cloro anilina)\n- 4,4' - metileno dianilina\n- Nitrosaminas\n- Propano sultone\n- Betapropiolactona\n- Tálio\n- Produção de trióxido de amônio ustulação de sulfeto de níquel.",
     'maximo',
-    ['Éter bis (cloro-metílico)', 'Benzopireno', 'Berílio', 'Cloreto de dimetil-carbamila', "3,3' – dicloro-benzidina", 'Dióxido de vinil ciclohexano', 'Epicloridrina', 'Hexametilfosforamida', "4,4' - metileno bis (2-cloro anilina)", "4,4' - metileno dianilina", 'Nitrosaminas', 'Propano sultone', 'Betapropiolactona', 'Tálio'],
+    ['Éter bis (cloro-metílico)', 'Benzopireno', 'Berílio', 'Cloreto de dimetil-carbamila', "3,3' – dicloro-benzidina", 'Dióxido de vinil ciclohexano', 'Epicloridrina', 'Hexametilfosforamida', "4,4' - metileno bis (2-cloro anilina)", "4,4' - metileno dianilina", 'Nitrosaminas', 'Propano sultone', 'Betapropiolactona', 'Tálio', 'Sulfeto de níquel'],
   ),
   atividade('OPERACOES_DIVERSAS_MED_01', 'OPERAÇÕES DIVERSAS', 'Tintas de alumínio', 'Aplicação a pistola de tintas de alumínio.', 'medio'),
   atividade('OPERACOES_DIVERSAS_MED_02', 'OPERAÇÕES DIVERSAS', 'Pós de alumínio', 'Fabricação de pós de alumínio (trituração e moagem).', 'medio'),

@@ -134,7 +134,7 @@ const SUBSTANCIAS_FONTE: readonly SubstanciaFonte[] = [
   { id: 'DIMETIFORMAMIDA', label: 'Dimetiformamida', ppm: '8', mgM3: '24', grau: 'medio' },
   { id: 'DIMETIL_HIDRAZINA', label: 'l,l Dimetil hidrazina', ppm: '0,4', mgM3: '0,8', grau: 'maximo', absorcaoPele: true },
   { id: 'DIOXIDO_DE_CARBONO', label: 'Dióxido de carbono', sinonimos: ['Gás carbônico'], ppm: '3900', mgM3: '7020', grau: 'minimo' },
-  { id: 'DIOXIDO_DE_CLORO', label: 'Dióxido de cloro', ppm: '0,08', mgM3: '0,25', grau: 'minimo' },
+  { id: 'DIOXIDO_DE_CLORO', label: 'Dióxido de cloro', ppm: '0,08', mgM3: '0,25', grau: 'maximo' },
   { id: 'DIOXIDO_DE_ENXOFRE', label: 'Dióxido de enxofre', sinonimos: ['Anidro sulfuroso'], ppm: '4', mgM3: '10', grau: 'maximo' },
   { id: 'DIOXIDO_DE_NITROGENIO', label: 'Dióxido de nitrogênio', ppm: '4', mgM3: '7', grau: 'maximo', valorTeto: true },
   { id: 'DISSULFETO_DE_CARBONO', label: 'Dissulfeto de carbono', ppm: '16', mgM3: '47', grau: 'maximo', absorcaoPele: true },
@@ -142,7 +142,7 @@ const SUBSTANCIAS_FONTE: readonly SubstanciaFonte[] = [
   { id: 'ESTIRENO', label: 'Estireno', sinonimos: ['Vinibenzeno'], ppm: '78', mgM3: '328', grau: 'medio' },
   { id: 'ETANO', label: 'Etano', grau: 'nao_caracterizado', asfixianteSimples: true },
   { id: 'ETANOTIOL', label: 'Etil mercaptana', sinonimos: ['Etanotiol'], ppm: '0,4', mgM3: '0,8', grau: 'medio' },
-  { id: 'ETER_DECLOROETILICO', label: 'Éter decloroetílico', ppm: '4', mgM3: '24', grau: 'maximo', valorTeto: true },
+  { id: 'ETER_DECLOROETILICO', label: 'Éter decloroetílico', ppm: '4', mgM3: '24', grau: 'maximo', absorcaoPele: true },
   {
     id: 'ETOXIETANOL_2',
     label: '2-Etoxietanol',

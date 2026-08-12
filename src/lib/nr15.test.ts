@@ -4,19 +4,100 @@ import { ATIVIDADES_ANEXO_13, ATIVIDADES_ANEXO_14, SUBSTANCIAS_ANEXO_11 } from '
 import type { ReferenciaNormativa } from '@/content/nr15/tipos'
 import { aplicarAnexo, aplicarReferencia, buscarReferencias, normalizarBuscaNr15 } from './nr15'
 
+function referenciaPorId(
+  referencias: readonly ReferenciaNormativa[],
+  id: string,
+): ReferenciaNormativa {
+  const referencia = referencias.find(item => item.id === id)
+  expect(referencia, `Referência normativa ausente: ${id}`).toBeDefined()
+  return referencia!
+}
+
 describe('bases normativas oficiais da NR-15', () => {
-  it('mantem o Quadro 1 do Anexo 11 completo e aplicavel', () => {
-    expect(SUBSTANCIAS_ANEXO_11.length).toBeGreaterThan(100)
-    expect(SUBSTANCIAS_ANEXO_11.every(x => x.id && x.label && x.limiteTolerancia && x.grau)).toBe(true)
+  it('protege as contagens exatas e a unicidade global dos IDs', () => {
+    expect(SUBSTANCIAS_ANEXO_11).toHaveLength(146)
+    expect(ATIVIDADES_ANEXO_13).toHaveLength(83)
+    expect(ATIVIDADES_ANEXO_14).toHaveLength(12)
+
+    const referencias = [
+      ...SUBSTANCIAS_ANEXO_11,
+      ...ATIVIDADES_ANEXO_13,
+      ...ATIVIDADES_ANEXO_14,
+    ]
+    expect(new Set(referencias.map(item => item.id)).size).toBe(referencias.length)
   })
 
-  it('preserva os graus previstos para as atividades do Anexo 13', () => {
-    expect(ATIVIDADES_ANEXO_13.some(x => x.grau === 'minimo')).toBe(true)
-    expect(ATIVIDADES_ANEXO_13.some(x => x.grau === 'maximo')).toBe(true)
+  it('protege anexo, tipo, critério e unidades de cada base', () => {
+    expect(SUBSTANCIAS_ANEXO_11.every(item =>
+      item.anexoId === 'ANEXO_11'
+      && item.tipo === 'quimico'
+      && item.criterio === 'quantitativo'
+      && item.limiteTolerancia
+      && item.unidadeLimite
+      && ['ppm', 'mg/m³', 'ppm | mg/m³', '% O₂ em volume'].includes(item.unidadeLimite),
+    )).toBe(true)
+
+    expect(ATIVIDADES_ANEXO_13.every(item =>
+      item.anexoId === 'ANEXO_13'
+      && item.tipo === 'quimico'
+      && item.criterio === 'qualitativo',
+    )).toBe(true)
+
+    expect(ATIVIDADES_ANEXO_14.every(item =>
+      item.anexoId === 'ANEXO_14'
+      && item.tipo === 'biologico'
+      && item.criterio === 'qualitativo',
+    )).toBe(true)
   })
 
-  it('restringe as atividades do Anexo 14 aos graus medio e maximo', () => {
-    expect(new Set(ATIVIDADES_ANEXO_14.map(x => x.grau))).toEqual(new Set(['medio', 'maximo']))
+  it('restringe a ausência de grau no Anexo 13 ao item oficial de substâncias cancerígenas', () => {
+    expect(ATIVIDADES_ANEXO_13.filter(item => item.grau === undefined).map(item => item.id)).toEqual([
+      'ANEXO_13_SUBSTANCIAS_CANCERIGENAS_01',
+    ])
+    expect(ATIVIDADES_ANEXO_13
+      .filter(item => item.id !== 'ANEXO_13_SUBSTANCIAS_CANCERIGENAS_01')
+      .every(item => ['minimo', 'medio', 'maximo'].includes(item.grau!))).toBe(true)
+    expect(new Set(ATIVIDADES_ANEXO_14.map(item => item.grau))).toEqual(new Set(['medio', 'maximo']))
+  })
+
+  it('protege o grau máximo do Dióxido de cloro no Anexo 11', () => {
+    expect(referenciaPorId(SUBSTANCIAS_ANEXO_11, 'ANEXO_11_DIOXIDO_DE_CLORO')).toMatchObject({
+      limiteTolerancia: '0,08 ppm | 0,25 mg/m³',
+      unidadeLimite: 'ppm | mg/m³',
+      grau: 'maximo',
+      atividadeEnquadrada: undefined,
+    })
+  })
+
+  it('protege o marcador de absorção pela pele do Éter decloroetílico', () => {
+    expect(referenciaPorId(SUBSTANCIAS_ANEXO_11, 'ANEXO_11_ETER_DECLOROETILICO')).toMatchObject({
+      limiteTolerancia: '4 ppm | 24 mg/m³',
+      unidadeLimite: 'ppm | mg/m³',
+      grau: 'maximo',
+      atividadeEnquadrada: 'Absorção também pela pele.',
+    })
+  })
+
+  it('protege valores, unidades e demais marcadores sentinela do Anexo 11', () => {
+    expect(SUBSTANCIAS_ANEXO_11.filter(item => item.atividadeEnquadrada?.includes('Valor teto.')))
+      .toHaveLength(11)
+    expect(SUBSTANCIAS_ANEXO_11.filter(item => item.atividadeEnquadrada?.includes('Absorção também pela pele.')))
+      .toHaveLength(42)
+    expect(referenciaPorId(SUBSTANCIAS_ANEXO_11, 'ANEXO_11_ACIDO_CLORIDRICO').atividadeEnquadrada)
+      .toBe('Valor teto.')
+    expect(referenciaPorId(SUBSTANCIAS_ANEXO_11, 'ANEXO_11_N_BUTILAMINA').atividadeEnquadrada)
+      .toBe('Valor teto. Absorção também pela pele.')
+    expect(referenciaPorId(SUBSTANCIAS_ANEXO_11, 'ANEXO_11_ACETILENO')).toMatchObject({
+      limiteTolerancia: 'Asfixiante simples (oxigênio mínimo de 18% em volume)',
+      unidadeLimite: '% O₂ em volume',
+      grau: 'nao_caracterizado',
+      atividadeEnquadrada: 'Asfixiante simples: concentração mínima de oxigênio de 18% em volume.',
+    })
+    expect(referenciaPorId(SUBSTANCIAS_ANEXO_11, 'ANEXO_11_CHUMBO')).toMatchObject({
+      limiteTolerancia: '0,1 mg/m³',
+      unidadeLimite: 'mg/m³',
+      grau: 'maximo',
+    })
   })
 })
 
@@ -27,7 +108,7 @@ describe('normalizarBuscaNr15', () => {
 })
 
 describe('buscarReferencias', () => {
-  it('encontra referencias por texto normalizado no rotulo e sinonimos', () => {
+  it('encontra referencias por texto normalizado no rotulo, sinonimos e atividade', () => {
     const referencias: ReferenciaNormativa[] = [
       {
         id: 'ANEXO_11_ACIDO_NITRICO',
@@ -49,10 +130,22 @@ describe('buscarReferencias', () => {
         limiteTolerancia: '780 ppm',
         unidadeLimite: 'ppm',
         grau: 'medio',
+        atividadeEnquadrada: 'Contato habitual com tuberculose bovina',
       },
     ]
 
     expect(buscarReferencias(referencias, 'AQUA FORTIS')).toEqual([referencias[0]])
+    expect(buscarReferencias(referencias, 'TUBERCULOSE BOVINA')).toEqual([referencias[1]])
+  })
+
+  it.each([
+    { referencias: ATIVIDADES_ANEXO_13, consulta: 'DDT', idEsperado: 'ANEXO_13_HIDROCARBONETOS_MED_01' },
+    { referencias: ATIVIDADES_ANEXO_13, consulta: 'BHC', idEsperado: 'ANEXO_13_HIDROCARBONETOS_MED_01' },
+    { referencias: ATIVIDADES_ANEXO_13, consulta: 'sulfeto de níquel', idEsperado: 'ANEXO_13_OPERACOES_DIVERSAS_MAX_02' },
+    { referencias: ATIVIDADES_ANEXO_14, consulta: 'brucelose', idEsperado: 'ANEXO_14_MAX_ANIMAIS_PORTADORES' },
+    { referencias: ATIVIDADES_ANEXO_14, consulta: 'tuberculose', idEsperado: 'ANEXO_14_MAX_ANIMAIS_PORTADORES' },
+  ])('encontra $consulta pelo texto integral da atividade', ({ referencias, consulta, idEsperado }) => {
+    expect(buscarReferencias(referencias, consulta).map(item => item.id)).toContain(idEsperado)
   })
 })
 

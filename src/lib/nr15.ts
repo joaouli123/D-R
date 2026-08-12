@@ -18,7 +18,8 @@ export function buscarReferencias<T extends ReferenciaNormativa>(
 
   if (!termoNormalizado) return [...itens]
 
-  return itens.filter((item) => [item.label, ...(item.sinonimos ?? [])]
+  return itens.filter((item) => [item.label, ...(item.sinonimos ?? []), item.atividadeEnquadrada]
+    .filter((texto): texto is string => Boolean(texto))
     .some((texto) => normalizarBuscaNr15(texto).includes(termoNormalizado)))
 }
 
