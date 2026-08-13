@@ -257,7 +257,49 @@ git add ../src/components/DocumentoPreview.tsx src/services/documento-comum.ts s
 git commit -m "Exibe enquadramentos NR-15 nos documentos"
 ```
 
-### Task 6: Verificacao integrada, publicacao e producao
+### Task 6: Participantes com qualificacao e atuacao automatica
+
+**Files:**
+- Modify: `src/types/index.ts`
+- Modify: `src/pages/PericiaEditor.tsx`
+- Modify: `src/components/DocumentoPreview.tsx`
+- Modify: `server/prisma/schema.prisma`
+- Create: `server/prisma/migrations/1_participantes_atuacao/migration.sql`
+- Modify: `server/src/routes/pericias.ts`
+- Modify: `server/src/services/documento-comum.ts`
+- Modify: `server/src/services/documento-html.ts`
+- Modify: `server/src/services/docx.ts`
+- Modify: `server/scripts/smoke-documentos.ts`
+
+**Interfaces:**
+- Produces: mapa de qualificacao e atuacao por `PapelParticipante`, com suporte aos papeis legados.
+
+- [ ] **Step 1: Escrever testes/fixtures que falham**
+
+Fazer o smoke documental exigir as colunas `Nome do Participante`, `Qualificacao / Representacao` e `Atuacao no Ato`, alem dos textos de atuacao de representantes de ambos os polos, perito, auxiliar, paradigma e entrevistado.
+
+- [ ] **Step 2: Ampliar tipos, enum Prisma e validacao Zod**
+
+Adicionar papeis especificos para reclamante, engenheiro/tecnico de cada polo, auxiliar do perito, paradigma e entrevistado. Manter todos os valores legados aceitos. Criar migracao apenas aditiva do enum PostgreSQL.
+
+- [ ] **Step 3: Atualizar cadastro**
+
+Remover o campo Registro, oferecer as 12 qualificacoes e mostrar a atuacao derivada como texto somente leitura. Novos participantes nao enviam `registro`.
+
+- [ ] **Step 4: Atualizar previa, HTML/PDF e DOCX**
+
+Substituir a coluna Registro por Atuacao no Ato. Usar o rotulo aprovado e preservar participantes antigos via mapeamento legado.
+
+- [ ] **Step 5: Testar e commitar**
+
+Run: `npm.cmd test; npm.cmd run typecheck; npm.cmd run build; npm.cmd run prisma:generate --prefix server; npm.cmd run smoke --prefix server; npm.cmd run typecheck --prefix server; npm.cmd run build --prefix server`
+
+```powershell
+git add src server
+git commit -m "Atualiza qualificacao e atuacao dos participantes"
+```
+
+### Task 7: Verificacao integrada, publicacao e producao
 
 **Files:**
 - Modify: `README.md`
