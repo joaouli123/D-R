@@ -120,6 +120,38 @@ const pericia = {
         criterio: 'quantitativo',
         grau: 'medio',
       },
+      {
+        id: 'agn-11',
+        nome: 'Ácido crômico (névoa)',
+        tipo: 'quimico',
+        anexoNr15: 'Anexo 11',
+        referenciaNormativaId: 'ANEXO_11_ACIDO_CROMICO_NEVOA',
+        atividadeEnquadrada: 'Valor teto. <referência especial & controlada>.',
+        unidadeLimite: 'mg/m³',
+        limiteTolerancia: '0,04 mg/m³',
+        criterio: 'quantitativo',
+        grau: 'maximo',
+      },
+      {
+        id: 'agn-13',
+        nome: 'CROMO — Cromagem eletrolítica',
+        tipo: 'quimico',
+        anexoNr15: 'Anexo 13',
+        referenciaNormativaId: 'ANEXO_13_CROMO_MED_01',
+        atividadeEnquadrada: 'Cromagem eletrolítica dos metais.',
+        criterio: 'qualitativo',
+        grau: 'medio',
+      },
+      {
+        id: 'agn-14',
+        nome: 'Lixo urbano',
+        tipo: 'biologico',
+        anexoNr15: 'Anexo 14',
+        referenciaNormativaId: 'ANEXO_14_MAX_LIXO_URBANO',
+        atividadeEnquadrada: 'Trabalho ou operações, em contato permanente com: lixo urbano (coleta e industrialização).',
+        criterio: 'qualitativo',
+        grau: 'maximo',
+      },
     ],
     normasReferencias:
       'Portaria MTb nº 3.214/78 — NR-15 e NR-16; NHO-01 e NHO-06 da FUNDACENTRO; NR-06; NR-09.',
@@ -266,18 +298,34 @@ async function main() {
   // O escape precisa ter neutralizado a <tag> plantada em observacoesAdicionais.
   const escapou = htmlParecer.includes('&lt;tags&gt;') && !htmlParecer.includes('<tags>')
 
+  // Os enquadramentos dos Anexos 11, 13 e 14 precisam sobreviver no HTML/PDF.
+  const enquadramentos = [
+    'Ácido crômico (névoa)',
+    'Cromagem eletrolítica dos metais.',
+    'lixo urbano (coleta e industrialização).',
+    'Máximo (40%)',
+    'Atividade ou referência normativa',
+  ].every((trecho) => htmlParecer.includes(trecho))
+  const escapouEnquadramento =
+    htmlParecer.includes('&lt;referência especial &amp; controlada&gt;') &&
+    !htmlParecer.includes('<referência especial & controlada>')
+  const unidadeSemRepeticao = (htmlParecer.match(/mg\/m³/g) ?? []).length === 1
+
   // As seções têm de sair numeradas 1, 2, 3… na ordem em que aparecem.
   const numeros = [...htmlParecer.matchAll(/<h2>(\d+)\./g)].map((m) => Number(m[1]))
   const sequencial = numeros.length > 0 && numeros.every((n, i) => n === i + 1)
 
   console.log('\n' + resumo.join('\n'))
   console.log(`\nescape de HTML no conteúdo: ${escapou ? 'ok' : 'FALHOU'}`)
+  console.log(`enquadramentos NR-15:       ${enquadramentos ? 'ok' : 'FALHOU'}`)
+  console.log(`escape no enquadramento:    ${escapouEnquadramento ? 'ok' : 'FALHOU'}`)
+  console.log(`unidade sem repetição:      ${unidadeSemRepeticao ? 'ok' : 'FALHOU'}`)
   console.log(
     `numeração das seções:       ${sequencial ? `ok (1..${numeros.length})` : `FALHOU → ${numeros.join(', ')}`}`,
   )
   console.log(`arquivos em: ${path.resolve(SAIDA)}\n`)
 
-  if (!escapou || !sequencial) process.exitCode = 1
+  if (!escapou || !enquadramentos || !escapouEnquadramento || !unidadeSemRepeticao || !sequencial) process.exitCode = 1
 
   await encerrarBrowser()
 }

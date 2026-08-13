@@ -32,6 +32,7 @@ import {
   emParagrafos,
   extenso,
   hoje,
+  limiteComUnidade,
 } from './documento-comum.js'
 
 // ============================================================
@@ -377,17 +378,28 @@ function docParecer(
             celula('Anexo NR-15', { cabecalho: true, largura: 14 }),
             celula('Critério', { cabecalho: true, largura: 14 }),
             celula('Grau', { cabecalho: true, largura: 16 }),
+            celula('Limite de Tolerância', { cabecalho: true, largura: 20 }),
           ],
         }),
         ...t.agentes.map(
           (a) =>
             new TableRow({
               children: [
-                celula(a.nome),
+                celula(
+                  [
+                    a.nome,
+                    a.atividadeEnquadrada?.trim()
+                      ? `Atividade ou referência normativa: ${a.atividadeEnquadrada}`
+                      : undefined,
+                  ]
+                    .filter(Boolean)
+                    .join('\n'),
+                ),
                 celula(a.cas || '—'),
                 celula(a.anexoNr15 || '—'),
                 celula(CRITERIO[a.criterio] ?? a.criterio),
                 celula(a.grau ? (GRAU[a.grau] ?? a.grau) : '—'),
+                celula(limiteComUnidade(a.limiteTolerancia, a.unidadeLimite)),
               ],
             }),
         ),

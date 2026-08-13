@@ -32,6 +32,18 @@ const GRAU: Record<string, string> = {
   nao_caracterizado: 'Não caracterizado',
 }
 
+function limiteComUnidade(limite?: string, unidade?: string): string {
+  const valor = limite?.trim() ?? ''
+  const medida = unidade?.trim() ?? ''
+  if (!medida) return valor || '—'
+  if (!valor) return medida
+
+  const componentes = medida.split('|').map((parte) => parte.trim()).filter(Boolean)
+  return componentes.length > 0 && componentes.every((parte) => valor.includes(parte))
+    ? valor
+    : `${valor} (${medida})`
+}
+
 function Paragrafos({ texto }: { texto: string }) {
   if (!texto?.trim()) {
     return <p className="italic text-ink-400">[Seção não preenchida]</p>
@@ -256,12 +268,19 @@ export function DocumentoPreview({
           <tbody>
             {t.agentes.map((a) => (
               <tr key={a.id}>
-                <td>{a.nome}</td>
+                <td>
+                  <p>{a.nome}</p>
+                  {a.atividadeEnquadrada && (
+                    <p className="mt-1 text-xs text-ink-500">
+                      Atividade ou referência normativa: {a.atividadeEnquadrada}
+                    </p>
+                  )}
+                </td>
                 <td>{a.cas || '—'}</td>
                 <td>{labelAnexoNr15(a.anexoNr15) || '—'}</td>
                 <td>{CRITERIO[a.criterio]}</td>
                 <td>{a.grau ? GRAU[a.grau] : '—'}</td>
-                <td>{a.limiteTolerancia || '—'}</td>
+                <td>{limiteComUnidade(a.limiteTolerancia, a.unidadeLimite)}</td>
                 <td>{a.medido || '—'}</td>
               </tr>
             ))}

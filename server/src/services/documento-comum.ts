@@ -111,6 +111,23 @@ export function emParagrafos(texto?: string | null): string[] {
 
 export const VAZIO = '[Seção não preenchida]'
 
+/**
+ * Acrescenta a unidade informada pela referência normativa apenas quando o
+ * limite ainda não a traz. Referências com mais de uma unidade (ex.: ppm |
+ * mg/m³) são consideradas cobertas quando todos os seus componentes já
+ * aparecem no limite.
+ */
+export function limiteComUnidade(limite?: string, unidade?: string): string {
+  const valor = limite?.trim() ?? ''
+  const medida = unidade?.trim() ?? ''
+  if (!medida) return valor || '—'
+  if (!valor) return medida
+
+  const componentes = medida.split('|').map((parte) => parte.trim()).filter(Boolean)
+  const jaContemUnidade = componentes.length > 0 && componentes.every((parte) => valor.includes(parte))
+  return jaContemUnidade ? valor : `${valor} (${medida})`
+}
+
 /** Estrutura do preenchimento técnico guardada em Pericia.tecnico. */
 export interface TecnicoJson {
   apresentacao: string
@@ -132,6 +149,11 @@ export interface TecnicoJson {
     nome: string
     cas?: string
     anexoNr15?: string
+    referenciaNormativaId?: string
+    atividadeEnquadrada?: string
+    unidadeLimite?: string
+    limiteTolerancia?: string
+    medido?: string
     criterio: string
     grau?: string
   }[]

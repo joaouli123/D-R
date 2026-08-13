@@ -20,6 +20,7 @@ import {
   emParagrafos,
   extenso,
   hoje,
+  limiteComUnidade,
 } from './documento-comum.js'
 
 // ============================================================
@@ -211,13 +212,19 @@ export async function htmlDoParecer(
 
   const tabelaAgentes = t.agentes?.length
     ? `<table>
-        <thead><tr><th>Agente</th><th style="width:14%">CAS</th><th style="width:14%">Anexo NR-15</th><th style="width:14%">Critério</th><th style="width:16%">Grau</th></tr></thead>
+        <thead><tr><th>Agente</th><th style="width:12%">CAS</th><th style="width:13%">Anexo NR-15</th><th style="width:12%">Critério</th><th style="width:14%">Grau</th><th style="width:20%">Limite de Tolerância</th></tr></thead>
         <tbody>${t.agentes
           .map(
             (a) =>
-              `<tr><td>${esc(a.nome)}</td><td>${esc(a.cas || '—')}</td><td>${esc(a.anexoNr15 || '—')}</td><td>${esc(
+              `<tr><td><strong>${esc(a.nome)}</strong>${
+                a.atividadeEnquadrada?.trim()
+                  ? `<br><small>Atividade ou referência normativa: ${esc(a.atividadeEnquadrada).replace(/\n/g, '<br>')}</small>`
+                  : ''
+              }</td><td>${esc(a.cas || '—')}</td><td>${esc(a.anexoNr15 || '—')}</td><td>${esc(
                 CRITERIO[a.criterio] ?? a.criterio,
-              )}</td><td>${esc(a.grau ? (GRAU[a.grau] ?? a.grau) : '—')}</td></tr>`,
+              )}</td><td>${esc(a.grau ? (GRAU[a.grau] ?? a.grau) : '—')}</td><td>${esc(
+                limiteComUnidade(a.limiteTolerancia, a.unidadeLimite),
+              )}</td></tr>`,
           )
           .join('')}</tbody>
       </table>`
