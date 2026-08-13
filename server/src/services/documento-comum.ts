@@ -28,13 +28,39 @@ export const MARCA = {
 export const css = (cor: string): string => `#${cor}`
 
 export const PAPEL: Record<string, string> = {
-  perito_judicial: 'Perito Judicial',
+  reclamante: 'Reclamante',
+  engenheiro_assistente_reclamante: 'Eng. Segurança do Trabalho - Assistente Técnico',
+  tecnico_assistente_reclamante: 'Téc. Segurança do Trabalho - Assistente Técnico',
+  perito_judicial: 'Perito Judicial do Trabalho',
   assistente_reclamante: 'Assistente Técnico do Reclamante',
+  engenheiro_assistente_reclamada: 'Eng. Segurança do Trabalho - Assistente Técnico',
+  tecnico_assistente_reclamada: 'Téc. Segurança do Trabalho - Assistente Técnico',
   assistente_reclamada: 'Assistente Técnico da Reclamada',
-  advogado_reclamante: 'Advogado do Reclamante',
-  advogado_reclamada: 'Advogado da Reclamada',
+  advogado_reclamante: 'Advogado (a)',
+  advogado_reclamada: 'Advogado (a)',
   preposto: 'Preposto',
+  auxiliar_perito: 'Auxiliar do Perito',
+  paradigma: 'Paradigma',
+  entrevistado: 'Entrevistado',
   acompanhante: 'Acompanhante',
+}
+
+export const ATUACAO: Record<string, string> = {
+  reclamante: 'Apresentação das suas alegações.',
+  engenheiro_assistente_reclamante: 'Acompanhamento Técnico – Reclamante',
+  tecnico_assistente_reclamante: 'Acompanhamento Técnico – Reclamante',
+  assistente_reclamante: 'Acompanhamento Técnico – Reclamante',
+  advogado_reclamante: 'Representante Jurídico - Reclamante.',
+  engenheiro_assistente_reclamada: 'Acompanhamento Técnico – Reclamada',
+  tecnico_assistente_reclamada: 'Acompanhamento Técnico – Reclamada',
+  assistente_reclamada: 'Acompanhamento Técnico – Reclamada',
+  advogado_reclamada: 'Representante Jurídico - Reclamada.',
+  preposto: 'Representação da Reclamada, prestação de esclarecimentos e narrativa da defesa',
+  perito_judicial: 'Condução da diligência pericial',
+  auxiliar_perito: 'Auxílio e suporte ao Perito',
+  paradigma: 'Demonstração das atividades exercidas',
+  entrevistado: 'Prestação de informações complementares',
+  acompanhante: 'Prestação de informações complementares',
 }
 
 export const CRITERIO: Record<string, string> = {

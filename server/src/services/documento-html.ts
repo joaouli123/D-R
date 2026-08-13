@@ -21,6 +21,7 @@ import {
   extenso,
   hoje,
   limiteComUnidade,
+  ATUACAO,
 } from './documento-comum.js'
 
 // ============================================================
@@ -182,11 +183,11 @@ export async function htmlDoParecer(
 
   const tabelaParticipantes = pericia.participantes.length
     ? `<table>
-        <thead><tr><th>Nome</th><th style="width:35%">Qualificação</th><th style="width:22%">Registro</th></tr></thead>
+        <thead><tr><th>Nome do Participante</th><th style="width:32%">Qualificação / Representação</th><th style="width:38%">Atuação no Ato</th></tr></thead>
         <tbody>${pericia.participantes
           .map(
             (p) =>
-              `<tr><td>${esc(p.nome)}</td><td>${esc(PAPEL[p.papel] ?? p.papel)}</td><td>${esc(p.registro || '—')}</td></tr>`,
+              `<tr><td>${esc(p.nome)}</td><td>${esc(PAPEL[p.papel] ?? p.papel)}</td><td>${esc(ATUACAO[p.papel] ?? '—')}</td></tr>`,
           )
           .join('')}</tbody>
       </table>`

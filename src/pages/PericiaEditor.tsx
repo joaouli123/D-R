@@ -48,6 +48,7 @@ import type {
 } from '@/types'
 import { ANEXOS_NR15, anexoNr15PorId } from '@/content/anexosNr15'
 import { aplicarAnexo } from '@/lib/nr15'
+import { dadosPapel, PAPEIS } from '@/lib/participantes'
 import { maskProcesso, uid } from '@/lib/utils'
 
 // ============================================================
@@ -72,16 +73,6 @@ const SECOES_FOTO: { value: SecaoFoto; label: string }[] = [
   { value: 'epi', label: 'EPIs utilizados' },
   { value: 'produtos', label: 'Produtos químicos' },
   { value: 'documentos', label: 'Documentos apresentados' },
-]
-
-const PAPEIS: { value: Participante['papel']; label: string }[] = [
-  { value: 'perito_judicial', label: 'Perito Judicial' },
-  { value: 'assistente_reclamante', label: 'Assistente Técnico do Reclamante' },
-  { value: 'assistente_reclamada', label: 'Assistente Técnico da Reclamada' },
-  { value: 'advogado_reclamante', label: 'Advogado do Reclamante' },
-  { value: 'advogado_reclamada', label: 'Advogado da Reclamada' },
-  { value: 'preposto', label: 'Preposto' },
-  { value: 'acompanhante', label: 'Acompanhante' },
 ]
 
 function novaPericia(responsavelId: string): Pericia {
@@ -520,7 +511,7 @@ export default function PericiaEditor() {
                     set({
                       participantes: [
                         ...p.participantes,
-                        { id: uid('par'), nome: '', papel: 'assistente_reclamante' },
+                        { id: uid('par'), nome: '', papel: 'reclamante' },
                       ],
                     })
                   }
@@ -531,7 +522,7 @@ export default function PericiaEditor() {
             />
             <div className="space-y-3 p-5">
               {p.participantes.map((pt) => (
-                <div key={pt.id} className="grid gap-3 rounded-lg border border-ink-200 p-3 sm:grid-cols-[1fr_1fr_150px_auto]">
+                <div key={pt.id} className="grid gap-3 rounded-lg border border-ink-200 p-3 sm:grid-cols-[1fr_1fr_1.25fr_auto]">
                   <Input
                     label="Nome"
                     value={pt.nome}
@@ -560,18 +551,12 @@ export default function PericiaEditor() {
                       </option>
                     ))}
                   </Select>
-                  <Input
-                    label="Registro"
-                    placeholder="OAB / CREA"
-                    value={pt.registro ?? ''}
-                    onChange={(e) =>
-                      set({
-                        participantes: p.participantes.map((x) =>
-                          x.id === pt.id ? { ...x, registro: e.target.value } : x,
-                        ),
-                      })
-                    }
-                  />
+                  <div>
+                    <span className="mb-1.5 block text-sm font-medium text-ink-700">Atuação no ato</span>
+                    <div className="flex min-h-10 items-center rounded-md border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-700">
+                      {dadosPapel(pt.papel).atuacao}
+                    </div>
+                  </div>
                   <Button
                     variant="ghost"
                     className="mb-1 self-end text-red-600 hover:bg-red-50"

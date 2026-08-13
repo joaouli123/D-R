@@ -2,22 +2,13 @@ import { Logo } from '@/components/Logo'
 import type { Empresa, Pericia, Usuario } from '@/types'
 import { extenso, formatDate } from '@/lib/utils'
 import { labelAnexoNr15 } from '@/content/anexosNr15'
+import { dadosPapel } from '@/lib/participantes'
 
 // ============================================================
 // MÓDULO H — Montagem automática do documento
 // Reproduz a identidade visual D&R e a estrutura do modelo
 // em Word fornecido pelo Contratante.
 // ============================================================
-
-const PAPEL: Record<string, string> = {
-  perito_judicial: 'Perito Judicial',
-  assistente_reclamante: 'Assistente Técnico do Reclamante',
-  assistente_reclamada: 'Assistente Técnico da Reclamada',
-  advogado_reclamante: 'Advogado do Reclamante',
-  advogado_reclamada: 'Advogado da Reclamada',
-  preposto: 'Preposto',
-  acompanhante: 'Acompanhante',
-}
 
 const CRITERIO: Record<string, string> = {
   qualitativo: 'Qualitativo',
@@ -195,17 +186,17 @@ export function DocumentoPreview({
         <table>
           <thead>
             <tr>
-              <th>Nome</th>
-              <th className="w-[35%]">Qualificação</th>
-              <th className="w-[22%]">Registro</th>
+              <th>Nome do Participante</th>
+              <th className="w-[32%]">Qualificação / Representação</th>
+              <th className="w-[38%]">Atuação no Ato</th>
             </tr>
           </thead>
           <tbody>
             {pericia.participantes.map((p) => (
               <tr key={p.id}>
                 <td>{p.nome}</td>
-                <td>{PAPEL[p.papel]}</td>
-                <td>{p.registro || '—'}</td>
+                <td>{dadosPapel(p.papel).label}</td>
+                <td>{dadosPapel(p.papel).atuacao}</td>
               </tr>
             ))}
           </tbody>

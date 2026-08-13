@@ -33,6 +33,7 @@ import {
   extenso,
   hoje,
   limiteComUnidade,
+  ATUACAO,
 } from './documento-comum.js'
 
 // ============================================================
@@ -312,9 +313,9 @@ function docParecer(
       tabela([
         new TableRow({
           children: [
-            celula('Nome', { cabecalho: true }),
-            celula('Qualificação', { cabecalho: true, largura: 35 }),
-            celula('Registro', { cabecalho: true, largura: 22 }),
+            celula('Nome do Participante', { cabecalho: true }),
+            celula('Qualificação / Representação', { cabecalho: true, largura: 32 }),
+            celula('Atuação no Ato', { cabecalho: true, largura: 38 }),
           ],
         }),
         ...pericia.participantes.map(
@@ -323,7 +324,7 @@ function docParecer(
               children: [
                 celula(pt.nome),
                 celula(PAPEL[pt.papel] ?? pt.papel),
-                celula(pt.registro || '—'),
+                celula(ATUACAO[pt.papel] ?? '—'),
               ],
             }),
         ),

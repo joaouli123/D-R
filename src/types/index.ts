@@ -60,11 +60,19 @@ export interface Participante {
   nome: string
   papel:
     | 'perito_judicial'
+    | 'reclamante'
+    | 'engenheiro_assistente_reclamante'
+    | 'tecnico_assistente_reclamante'
     | 'assistente_reclamante'
+    | 'engenheiro_assistente_reclamada'
+    | 'tecnico_assistente_reclamada'
     | 'assistente_reclamada'
     | 'advogado_reclamante'
     | 'advogado_reclamada'
     | 'preposto'
+    | 'auxiliar_perito'
+    | 'paradigma'
+    | 'entrevistado'
     | 'acompanhante'
   registro?: string // OAB / CREA
   contato?: string
