@@ -19,7 +19,8 @@
     "seed": "tsx src/seed.ts",
     "seed:prod": "node dist/seed.js",
     "smoke": "tsx scripts/smoke-documentos.ts",
-    "smoke:api": "tsx scripts/smoke-api.ts"
+    "smoke:api": "tsx scripts/smoke-api.ts",
+    "smoke:pericia": "tsx scripts/smoke-validacao-pericia.ts"
   },
   "prisma": {
     "seed": "tsx src/seed.ts"

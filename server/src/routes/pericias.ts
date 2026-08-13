@@ -26,12 +26,15 @@ const periodoSchema = z.object({
   descricaoAtividades: texto.optional(),
 })
 
-const agenteSchema = z.object({
+export const agenteSchema = z.object({
   id: z.string(),
   nome: texto,
   tipo: z.enum(['quimico', 'fisico', 'biologico', 'periculosidade']),
   cas: texto.optional(),
   anexoNr15: texto.optional(),
+  referenciaNormativaId: texto.optional(),
+  atividadeEnquadrada: texto.optional(),
+  unidadeLimite: texto.optional(),
   limiteTolerancia: texto.optional(),
   medido: texto.optional(),
   criterio: z.enum(['qualitativo', 'quantitativo', 'nao_aplicavel']),
