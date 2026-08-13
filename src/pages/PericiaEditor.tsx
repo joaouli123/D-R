@@ -33,6 +33,7 @@ import {
 import { PageHeader } from '@/components/layout/AppLayout'
 import { BibliotecaDrawer } from '@/components/BibliotecaDrawer'
 import { DocumentoPreview } from '@/components/DocumentoPreview'
+import { AgenteNr15Fields } from '@/components/AgenteNr15Fields'
 import { useApp } from '@/store/AppStore'
 import * as api from '@/services/api'
 import type {
@@ -46,6 +47,7 @@ import type {
   Usuario,
 } from '@/types'
 import { ANEXOS_NR15, anexoNr15PorId } from '@/content/anexosNr15'
+import { aplicarAnexo } from '@/lib/nr15'
 import { maskProcesso, uid } from '@/lib/utils'
 
 // ============================================================
@@ -795,12 +797,14 @@ export default function PericiaEditor() {
             <div className="space-y-3 p-5">
               {p.tecnico.agentes.map((a) => {
                 const anexoInfo = anexoNr15PorId(a.anexoNr15)
+                const referenciaNormativaSelecionada = Boolean(a.referenciaNormativaId)
                 return (
                 <div key={a.id} className="rounded-lg border border-ink-200 p-3">
                   <div className="grid gap-3 sm:grid-cols-[1.4fr_120px_130px_130px_auto]">
                     <Input
                       label="Agente"
                       value={a.nome}
+                      disabled={referenciaNormativaSelecionada}
                       onChange={(e) =>
                         setT({
                           agentes: p.tecnico.agentes.map((x) =>
@@ -823,28 +827,11 @@ export default function PericiaEditor() {
                     <Select
                       label="Anexo NR-15"
                       value={a.anexoNr15 ?? ''}
-                      onChange={(e) => {
-                        // Injeção automática de dados (Quinta otimização): ao
-                        // selecionar o anexo, preenche Natureza, Grau, Critério
-                        // e Limite de Tolerância. "Valor medido" nunca é tocado.
-                        const info = anexoNr15PorId(e.target.value)
-                        setT({
-                          agentes: p.tecnico.agentes.map((x) =>
-                            x.id === a.id
-                              ? {
-                                  ...x,
-                                  anexoNr15: e.target.value,
-                                  ...(info && {
-                                    tipo: info.tipo,
-                                    grau: info.grau,
-                                    criterio: info.criterio,
-                                    limiteTolerancia: info.limiteTolerancia,
-                                  }),
-                                }
-                              : x,
-                          ),
-                        })
-                      }}
+                      onChange={(e) => setT({
+                        agentes: p.tecnico.agentes.map((x) =>
+                          x.id === a.id ? aplicarAnexo(x, e.target.value) : x,
+                        ),
+                      })}
                     >
                       <option value="">—</option>
                       {ANEXOS_NR15.map((an) => (
@@ -856,6 +843,7 @@ export default function PericiaEditor() {
                     <Select
                       label="Grau"
                       value={a.grau ?? ''}
+                      disabled={referenciaNormativaSelecionada}
                       onChange={(e) =>
                         setT({
                           agentes: p.tecnico.agentes.map((x) =>
@@ -878,10 +866,17 @@ export default function PericiaEditor() {
                       aria-label="Remover agente"
                     />
                   </div>
+                  <AgenteNr15Fields
+                    agente={a}
+                    onChange={(agenteAtualizado) => setT({
+                      agentes: p.tecnico.agentes.map((x) => x.id === a.id ? agenteAtualizado : x),
+                    })}
+                  />
                   <div className="mt-3 grid gap-3 sm:grid-cols-4">
                     <Select
                       label="Natureza"
                       value={a.tipo}
+                      disabled={referenciaNormativaSelecionada}
                       onChange={(e) =>
                         setT({
                           agentes: p.tecnico.agentes.map((x) =>
@@ -898,6 +893,7 @@ export default function PericiaEditor() {
                     <Select
                       label="Critério"
                       value={a.criterio}
+                      disabled={referenciaNormativaSelecionada}
                       onChange={(e) =>
                         setT({
                           agentes: p.tecnico.agentes.map((x) =>
@@ -922,10 +918,12 @@ export default function PericiaEditor() {
                           ),
                         })
                       }
-                      disabled={!!anexoInfo && !anexoInfo.limiteEditavel}
+                      disabled={referenciaNormativaSelecionada || (!!anexoInfo && !anexoInfo.limiteEditavel)}
                       placeholder={anexoInfo?.dica}
                       hint={
-                        anexoInfo && !anexoInfo.limiteEditavel
+                        referenciaNormativaSelecionada
+                          ? 'Valor definido pela referência normativa selecionada.'
+                          : anexoInfo && !anexoInfo.limiteEditavel
                           ? 'Valor fixo em lei — injetado automaticamente pelo Anexo NR-15.'
                           : anexoInfo?.dica
                       }

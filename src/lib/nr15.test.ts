@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 
 import { ATIVIDADES_ANEXO_13, ATIVIDADES_ANEXO_14, SUBSTANCIAS_ANEXO_11 } from '@/content/anexosNr15'
+import { BuscaNormativa } from '@/components/BuscaNormativa'
 import type { ReferenciaNormativa } from '@/content/nr15/tipos'
 import { aplicarAnexo, aplicarReferencia, buscarReferencias, normalizarBuscaNr15 } from './nr15'
 
@@ -229,5 +232,60 @@ describe('aplicarReferencia', () => {
       epiEficaz: false,
       observacao: 'Jornada completa',
     })
+  })
+
+  it('aplica os dados especializados dos Anexos 11, 13 e 14 sem perder os dados periciais', () => {
+    const agenteBase = {
+      id: 'a1',
+      nome: 'Legado',
+      tipo: 'quimico' as const,
+      criterio: 'qualitativo' as const,
+      medido: '12 ppm',
+      epiEficaz: false,
+      observacao: 'Jornada completa',
+    }
+
+    expect(aplicarReferencia(agenteBase, referenciaPorId(SUBSTANCIAS_ANEXO_11, 'ANEXO_11_ACIDO_CLORIDRICO')))
+      .toMatchObject({
+        nome: 'Ácido clorídrico',
+        limiteTolerancia: '4 ppm | 5,5 mg/m³',
+        unidadeLimite: 'ppm | mg/m³',
+        grau: 'maximo',
+        medido: '12 ppm',
+        epiEficaz: false,
+        observacao: 'Jornada completa',
+      })
+
+    expect(aplicarReferencia(agenteBase, referenciaPorId(ATIVIDADES_ANEXO_13, 'ANEXO_13_HIDROCARBONETOS_MED_01')))
+      .toMatchObject({
+        atividadeEnquadrada: expect.stringContaining('DDT'),
+        grau: 'medio',
+        medido: '12 ppm',
+        epiEficaz: false,
+        observacao: 'Jornada completa',
+      })
+
+    expect(aplicarReferencia(agenteBase, referenciaPorId(ATIVIDADES_ANEXO_14, 'ANEXO_14_MAX_ANIMAIS_PORTADORES')))
+      .toMatchObject({
+        tipo: 'biologico',
+        atividadeEnquadrada: expect.stringContaining('brucelose'),
+        grau: 'maximo',
+        medido: '12 ppm',
+        epiEficaz: false,
+        observacao: 'Jornada completa',
+      })
+  })
+})
+
+describe('BuscaNormativa', () => {
+  it('limita a lista inicial a trinta referencias normativas', () => {
+    const html = renderToStaticMarkup(createElement(BuscaNormativa, {
+      itens: SUBSTANCIAS_ANEXO_11,
+      value: '',
+      onSelect: () => undefined,
+      placeholder: 'Buscar substância',
+    }))
+
+    expect((html.match(/role="option"/g) ?? [])).toHaveLength(30)
   })
 })
