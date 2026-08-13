@@ -3,6 +3,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import { ATIVIDADES_ANEXO_13, ATIVIDADES_ANEXO_14, SUBSTANCIAS_ANEXO_11 } from '@/content/anexosNr15'
+import { AgenteNr15Fields } from '@/components/AgenteNr15Fields'
 import { BuscaNormativa } from '@/components/BuscaNormativa'
 import type { ReferenciaNormativa } from '@/content/nr15/tipos'
 import { aplicarAnexo, aplicarReferencia, buscarReferencias, normalizarBuscaNr15 } from './nr15'
@@ -287,5 +288,27 @@ describe('BuscaNormativa', () => {
     }))
 
     expect((html.match(/role="option"/g) ?? [])).toHaveLength(30)
+  })
+})
+
+describe('AgenteNr15Fields', () => {
+  it('avisa sobre referência legada ausente fora dos anexos com busca especializada', () => {
+    const html = renderToStaticMarkup(createElement(AgenteNr15Fields, {
+      agente: {
+        id: 'a1',
+        nome: 'Radiação legada',
+        tipo: 'fisico',
+        criterio: 'qualitativo',
+        anexoNr15: 'ANEXO_07',
+        referenciaNormativaId: 'ANEXO_07_REFERENCIA_REMOVIDA',
+        medido: '12',
+        epiEficaz: false,
+        observacao: 'Registro original preservado',
+      },
+      onChange: () => undefined,
+    }))
+
+    expect(html).toContain('A referência normativa salva não está na base atual.')
+    expect(html).not.toContain('role="combobox"')
   })
 })

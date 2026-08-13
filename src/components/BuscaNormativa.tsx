@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 
 import type { ReferenciaNormativa } from '@/content/nr15/tipos'
 import { buscarReferencias } from '@/lib/nr15'
@@ -23,6 +23,12 @@ export function BuscaNormativa<T extends ReferenciaNormativa>({
   const [consulta, setConsulta] = useState('')
   const [aberto, setAberto] = useState(true)
   const [indiceAtivo, setIndiceAtivo] = useState(0)
+
+  useEffect(() => {
+    setConsulta('')
+    setIndiceAtivo(0)
+  }, [itens, value])
+
   const resultados = useMemo(
     () => buscarReferencias(itens, consulta).slice(0, LIMITE_RESULTADOS),
     [consulta, itens],

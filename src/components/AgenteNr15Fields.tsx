@@ -30,10 +30,14 @@ interface AgenteNr15FieldsProps {
 
 export function AgenteNr15Fields({ agente, onChange }: AgenteNr15FieldsProps) {
   const configuracao = CONFIGURACOES[agente.anexoNr15 as keyof typeof CONFIGURACOES]
-  if (!configuracao) return null
-
-  const referencia = configuracao.itens.find((item) => item.id === agente.referenciaNormativaId)
+  const referencia = configuracao?.itens.find((item) => item.id === agente.referenciaNormativaId)
   const referenciaLegadaAusente = Boolean(agente.referenciaNormativaId && !referencia)
+
+  if (!configuracao) {
+    if (!referenciaLegadaAusente) return null
+
+    return <AvisoReferenciaLegada />
+  }
 
   function limparReferencia() {
     const { referenciaNormativaId, atividadeEnquadrada, unidadeLimite, ...agenteSemReferencia } = agente
@@ -67,10 +71,16 @@ export function AgenteNr15Fields({ agente, onChange }: AgenteNr15FieldsProps) {
         </p>
       )}
       {referenciaLegadaAusente && (
-        <p role="alert" className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800">
-          A referência normativa salva não está na base atual. Os dados já registrados foram preservados; selecione uma referência para atualizá-los.
-        </p>
+        <AvisoReferenciaLegada className="mt-2" />
       )}
     </div>
+  )
+}
+
+function AvisoReferenciaLegada({ className = '' }: { className?: string }) {
+  return (
+    <p role="alert" className={`rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800 ${className}`}>
+      A referência normativa salva não está na base atual. Os dados já registrados foram preservados; selecione uma referência para atualizá-los.
+    </p>
   )
 }
