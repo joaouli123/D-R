@@ -16,6 +16,7 @@ const incluirTudo = {
 } as const
 
 const texto = z.string().default('')
+const textoObrigatorio = z.string().trim().min(1)
 
 const periodoSchema = z.object({
   id: z.string(),
@@ -28,9 +29,9 @@ const periodoSchema = z.object({
 
 const epiSelecionadoSchema = z.object({
   catalogoId: texto.optional(),
-  categoria: texto,
-  modelo: texto,
-  marca: texto,
+  categoria: textoObrigatorio,
+  modelo: textoObrigatorio,
+  marca: textoObrigatorio,
   caUnico: texto.optional(),
   caPecaFacial: texto.optional(),
   caFiltroCartucho: texto.optional(),

@@ -59,12 +59,30 @@ const agenteComMuitosEpis = {
   epis: Array.from({ length: 11 }, (_, indice) => ({ ...epiSelecionado, catalogoId: `epi-${indice}` })),
 }
 
+const agenteComEpiSemCamposObrigatorios = {
+  ...agenteLegado,
+  epis: [{ catalogoId: 'epi-incompleto' }],
+}
+
+const agenteComEpiComCamposObrigatoriosVazios = {
+  ...agenteLegado,
+  epis: [{ ...epiSelecionado, categoria: ' ', modelo: '', marca: '  ' }],
+}
+
+const agenteComEpiMinimo = {
+  ...agenteLegado,
+  epis: [{ categoria: 'Vapores Orgânicos', modelo: '3M 6200', marca: '3M' }],
+}
+
 const legado = agenteSchema.safeParse(agenteLegado)
 const completo = agenteSchema.safeParse(agenteCompleto)
 const enumInvalido = agenteSchema.safeParse(agenteComEnumInvalido)
 const medicaoEEpi = agenteSchema.safeParse(agenteComMedicaoEEpi)
 const valorMedidoInvalido = agenteSchema.safeParse(agenteComValorMedidoInvalido)
 const muitosEpis = agenteSchema.safeParse(agenteComMuitosEpis)
+const epiSemCamposObrigatorios = agenteSchema.safeParse(agenteComEpiSemCamposObrigatorios)
+const epiComCamposObrigatoriosVazios = agenteSchema.safeParse(agenteComEpiComCamposObrigatoriosVazios)
+const epiMinimo = agenteSchema.safeParse(agenteComEpiMinimo)
 
 const resultados = [
   {
@@ -102,6 +120,10 @@ const resultados = [
   {
     nome: 'mais de dez EPIs é rejeitado',
     ok: !muitosEpis.success,
+  },
+  {
+    nome: 'snapshot de EPI incompleto ou vazio é rejeitado sem exigir campos opcionais',
+    ok: !epiSemCamposObrigatorios.success && !epiComCamposObrigatoriosVazios.success && epiMinimo.success,
   },
 ]
 
