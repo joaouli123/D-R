@@ -276,6 +276,7 @@ export const SUBSTANCIAS_ANEXO_11: readonly ReferenciaNormativa[] = SUBSTANCIAS_
   limites: {
     ...(item.ppm ? { ppm: item.ppm } : {}),
     ...(item.mgM3 ? { 'mg/m³': item.mgM3 } : {}),
+    ...(item.asfixianteSimples ? { '% O₂ em volume': '18' } : {}),
   },
   tipo: 'quimico',
   criterio: 'quantitativo',

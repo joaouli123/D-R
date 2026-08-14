@@ -18,6 +18,26 @@ function referenciaPorId(
 }
 
 describe('bases normativas oficiais da NR-15', () => {
+  it('protege a lista fechada dos CAS importados da planilha', () => {
+    expect(SUBSTANCIAS_ANEXO_11.flatMap(item => item.cas ? [item.cas] : [])).toEqual([
+      '75-07-0',
+      '111-15-9',
+      '141-78-6',
+      '74-86-2',
+      '67-64-1',
+      '75-05-8',
+      '64-19-7',
+      '74-90-8',
+      '7647-01-0',
+      '7738-94-5',
+      '7664-39-3',
+      '64-18-6',
+      '96-33-3',
+      '107-13-1',
+      '123-51-3',
+    ])
+  })
+
   it('protege as contagens exatas e a unicidade global dos IDs', () => {
     expect(SUBSTANCIAS_ANEXO_11).toHaveLength(146)
     expect(ATIVIDADES_ANEXO_13).toHaveLength(83)
