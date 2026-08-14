@@ -92,3 +92,55 @@ O comando combinado com `&&` não iniciou neste Windows PowerShell por incompati
 - `npm install` reportou 7 vulnerabilidades no grafo (5 moderadas, 1 alta e 1 crítica). Não foi executado `npm audit fix`, pois alteraria dependências fora do escopo.
 - Em `VITE_API_MODE=mock`, não há catálogo local de EPI; a entrada manual continua disponível. Em modo REST, as sugestões usam `GET /epis` com sessão.
 - O catálogo sugere por anexo e pesquisa; quando uma configuração tem várias aplicações, o snapshot usa a primeira aplicação devolvida pela API filtrada.
+
+## Fix round 1 — compatibilidade, unidades e concorrência
+
+Commit funcional: `1f56d3d34d5303a1f5bb2453e3fd2655379f0404` — `Corrige compatibilidade e concorrencia da interface NR-15`.
+
+### Findings corrigidos
+
+- Anexos fora de 11, 13 e 14 voltaram a exibir e editar os campos genéricos de limite e medição, mantendo também o aviso de referência legada ausente.
+- Aplicar ou trocar referência agora preserva uma unidade somente quando ela existe na nova referência; caso contrário, escolhe a primeira unidade válida. Referências sem unidades e limpeza/troca de anexo removem `unidadeMedicao` incompatível.
+- Buscas submetidas no `EpiSelector` usam um identificador monotônico de requisição. Respostas antigas não substituem o resultado da busca mais recente, inclusive após mudança de anexo ou desmontagem.
+- `DocumentoPreview` não foi alterado; o finding documental permanece destinado à Task 5. Minors de acessibilidade e ampliação de testes continuaram deferidos conforme orientação.
+
+### TDD — RED
+
+Comando executado antes das correções de produção:
+
+```powershell
+npm.cmd run test -- --run src/components/EpiSelector.test.tsx src/lib/nr15.test.ts
+```
+
+Saída observada: código 1; 2 arquivos falhos; 5 testes falhos e 30 aprovados. As falhas confirmaram: ausência dos inputs genéricos, preservação indevida de `unidadeMedicao` ao trocar anexo/limpar referência, falta de escolha da primeira unidade válida e resposta antiga de EPI substituindo a mais nova.
+
+### TDD — GREEN
+
+Após a implementação mínima:
+
+```powershell
+npm.cmd run test -- --run src/components/EpiSelector.test.tsx src/lib/nr15.test.ts
+```
+
+Saída observada: código 0; 2 arquivos aprovados; 35 testes aprovados. Os novos casos de fallback genérico, reconciliação de unidade, limpeza de referência e respostas fora de ordem passaram.
+
+### Suíte completa e build final
+
+```powershell
+npm.cmd run test -- --run
+```
+
+Saída observada: código 0; 4 arquivos aprovados; 41 testes aprovados.
+
+```powershell
+npm.cmd run build
+```
+
+Saída observada: código 0; `tsc -b && vite build`; 1608 módulos transformados; build concluído em 18,42 s.
+
+### Self-review e concerns
+
+- `git diff --check` retornou código 0.
+- O diff funcional ficou limitado a `AgenteNr15Fields`, `EpiSelector`, `nr15.ts` e seus testes.
+- `DocumentoPreview` não apareceu no diff.
+- Nenhum concern funcional adicional identificado neste fix round. Permanecem apenas os concerns gerais já registrados para dependências e modo mock.
