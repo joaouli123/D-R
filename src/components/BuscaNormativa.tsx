@@ -68,7 +68,7 @@ export function BuscaNormativa<T extends ReferenciaNormativa>({
         aria-expanded={aberto}
         aria-activedescendant={aberto && resultados[indiceAtivo] ? `${listboxId}-${indiceAtivo}` : undefined}
         placeholder={placeholder}
-        className="h-10 w-full rounded-lg border border-ink-300 bg-white px-3 text-sm text-ink-900 placeholder:text-ink-400 transition-colors hover:border-ink-400 focus:border-brand-600"
+        className="h-10 w-full rounded-lg border border-ink-300 bg-white px-3 text-sm text-ink-900 placeholder:text-ink-400 transition-colors hover:border-ink-400 focus:border-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
         onFocus={() => setAberto(true)}
         onChange={(event) => {
           setConsulta(event.target.value)
@@ -150,7 +150,7 @@ function OpcaoNormativa<T extends ReferenciaNormativa>({
       onMouseDown={(event) => event.preventDefault()}
       onClick={() => onSelect(item)}
     >
-      <p className="font-medium">{item.label}</p>
+      <p className="font-medium">{item.label}{item.cas ? ` — CAS ${item.cas}` : ''}</p>
       {item.atividadeEnquadrada && <p className="mt-0.5 text-xs text-ink-500">{item.atividadeEnquadrada}</p>}
     </li>
   )

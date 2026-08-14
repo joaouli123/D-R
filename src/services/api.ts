@@ -1,6 +1,7 @@
 import * as mock from '@/mocks/db'
 import type {
   DocumentoGerado,
+  EpiSelecionado,
   Empresa,
   Foto,
   Pericia,
@@ -121,6 +122,60 @@ async function baixar(path: string, init?: RequestInit): Promise<{ blob: Blob; n
 }
 
 const ehRest = MODE === 'rest'
+
+export interface AplicacaoEpiCatalogo {
+  anexo: string
+  categoria: string
+}
+
+export interface EpiCatalogo {
+  id: string
+  chave: string
+  modelo: string
+  marca: string
+  caUnico: string | null
+  caPecaFacial: string | null
+  caFiltroCartucho: string | null
+  observacao: string | null
+  ativo: boolean
+  aplicacoes: AplicacaoEpiCatalogo[]
+}
+
+interface FiltrosEpi {
+  q?: string
+  categoria?: string
+  anexo?: string
+}
+
+function parametrosEpi(filtros: FiltrosEpi): string {
+  const parametros = new URLSearchParams()
+  Object.entries(filtros).forEach(([chave, valor]) => {
+    if (valor) parametros.set(chave, valor)
+  })
+  const consulta = parametros.toString()
+  return consulta ? `?${consulta}` : ''
+}
+
+export const epis = {
+  listar: (filtros: FiltrosEpi = {}) =>
+    ehRest
+      ? http<EpiCatalogo[]>(`/epis${parametrosEpi(filtros)}`)
+      : delay([] as EpiCatalogo[]),
+}
+
+export function snapshotEpi(item: EpiCatalogo): EpiSelecionado {
+  const aplicacao = item.aplicacoes[0]
+  return {
+    catalogoId: item.id,
+    categoria: aplicacao?.categoria ?? 'Proteção respiratória',
+    modelo: item.modelo,
+    marca: item.marca,
+    ...(item.caUnico ? { caUnico: item.caUnico } : {}),
+    ...(item.caPecaFacial ? { caPecaFacial: item.caPecaFacial } : {}),
+    ...(item.caFiltroCartucho ? { caFiltroCartucho: item.caFiltroCartucho } : {}),
+    ...(item.observacao ? { observacao: item.observacao } : {}),
+  }
+}
 
 // ---------------- Módulo A — Acesso ----------------
 export const auth = {

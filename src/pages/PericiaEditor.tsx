@@ -34,6 +34,7 @@ import { PageHeader } from '@/components/layout/AppLayout'
 import { BibliotecaDrawer } from '@/components/BibliotecaDrawer'
 import { DocumentoPreview } from '@/components/DocumentoPreview'
 import { AgenteNr15Fields } from '@/components/AgenteNr15Fields'
+import { EpiSelector } from '@/components/EpiSelector'
 import { useApp } from '@/store/AppStore'
 import * as api from '@/services/api'
 import type {
@@ -46,7 +47,7 @@ import type {
   SecaoTexto,
   Usuario,
 } from '@/types'
-import { ANEXOS_NR15, anexoNr15PorId } from '@/content/anexosNr15'
+import { ANEXOS_NR15 } from '@/content/anexosNr15'
 import { aplicarAnexo } from '@/lib/nr15'
 import { dadosPapel, PAPEIS } from '@/lib/participantes'
 import { maskProcesso, uid } from '@/lib/utils'
@@ -781,10 +782,12 @@ export default function PericiaEditor() {
             />
             <div className="space-y-3 p-5">
               {p.tecnico.agentes.map((a) => {
-                const anexoInfo = anexoNr15PorId(a.anexoNr15)
                 const referenciaNormativaSelecionada = Boolean(a.referenciaNormativaId)
                 return (
-                <div key={a.id} className="rounded-lg border border-ink-200 p-3">
+                <div key={a.id} className="rounded-lg border border-ink-200 border-l-4 border-l-navy-700 p-3">
+                  <ol aria-label="Fluxo técnico do agente" className="mb-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+                    <li className="text-navy-700">Agente</li><li aria-hidden="true">→</li><li>Medição</li><li aria-hidden="true">→</li><li>Proteção</li>
+                  </ol>
                   <div className="grid gap-3 sm:grid-cols-[1.4fr_120px_130px_130px_auto]">
                     <Input
                       label="Agente"
@@ -801,6 +804,7 @@ export default function PericiaEditor() {
                     <Input
                       label="CAS"
                       value={a.cas ?? ''}
+                      disabled={referenciaNormativaSelecionada}
                       onChange={(e) =>
                         setT({
                           agentes: p.tecnico.agentes.map((x) =>
@@ -857,7 +861,7 @@ export default function PericiaEditor() {
                       agentes: p.tecnico.agentes.map((x) => x.id === a.id ? agenteAtualizado : x),
                     })}
                   />
-                  <div className="mt-3 grid gap-3 sm:grid-cols-4">
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <Select
                       label="Natureza"
                       value={a.tipo}
@@ -893,39 +897,15 @@ export default function PericiaEditor() {
                       <option value="quantitativo">Quantitativo</option>
                       <option value="nao_aplicavel">Não aplicável</option>
                     </Select>
-                    <Input
-                      label="Limite de tolerância"
-                      value={a.limiteTolerancia ?? ''}
-                      onChange={(e) =>
-                        setT({
-                          agentes: p.tecnico.agentes.map((x) =>
-                            x.id === a.id ? { ...x, limiteTolerancia: e.target.value } : x,
-                          ),
-                        })
-                      }
-                      disabled={referenciaNormativaSelecionada || (!!anexoInfo && !anexoInfo.limiteEditavel)}
-                      placeholder={anexoInfo?.dica}
-                      hint={
-                        referenciaNormativaSelecionada
-                          ? 'Valor definido pela referência normativa selecionada.'
-                          : anexoInfo && !anexoInfo.limiteEditavel
-                          ? 'Valor fixo em lei — injetado automaticamente pelo Anexo NR-15.'
-                          : anexoInfo?.dica
-                      }
-                    />
-                    <Input
-                      label="Valor medido"
-                      value={a.medido ?? ''}
-                      onChange={(e) =>
-                        setT({
-                          agentes: p.tecnico.agentes.map((x) =>
-                            x.id === a.id ? { ...x, medido: e.target.value } : x,
-                          ),
-                        })
-                      }
-                      hint="Vazio = sem quantificação"
-                    />
                   </div>
+                  <EpiSelector agente={a} onChange={(agenteAtualizado) => setT({ agentes: p.tecnico.agentes.map((x) => x.id === a.id ? agenteAtualizado : x) })} />
+                  <Checkbox
+                    className="mt-3 rounded-md px-1 py-1 focus-within:ring-2 focus-within:ring-brand-600"
+                    label="EPI comprovadamente eficaz para este agente"
+                    description="Adicionar equipamento não altera automaticamente esta conclusão técnica."
+                    checked={a.epiEficaz ?? false}
+                    onChange={(e) => setT({ agentes: p.tecnico.agentes.map((x) => x.id === a.id ? { ...x, epiEficaz: e.target.checked } : x) })}
+                  />
                 </div>
               )})}
               {p.tecnico.agentes.length === 0 && (

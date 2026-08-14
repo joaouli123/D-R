@@ -322,6 +322,7 @@ describe('BuscaNormativa', () => {
     }))
 
     expect((html.match(/role="option"/g) ?? [])).toHaveLength(30)
+    expect(html).toContain('Acetaldeído — CAS 75-07-0')
   })
 })
 
