@@ -1,4 +1,4 @@
-import type { ReferenciaNormativa } from '@/content/nr15/tipos'
+import type { ReferenciaNormativa, UnidadeMedicao } from '@/content/nr15/tipos'
 import { anexoNr15PorId, SUBSTANCIAS_ANEXO_11 } from '@/content/anexosNr15'
 import type { AgenteAvaliado } from '@/types'
 
@@ -30,7 +30,7 @@ export function buscarReferenciasNr15(consulta: string): ReferenciaNormativa[] {
 export function aplicarAnexo(agente: AgenteAvaliado, anexoId: string): AgenteAvaliado {
   const anexo = anexoNr15PorId(anexoId)
   const mudouAnexo = agente.anexoNr15 !== anexoId
-  const { referenciaNormativaId, atividadeEnquadrada, unidadeLimite, ...agenteSemReferencia } = agente
+  const { referenciaNormativaId, atividadeEnquadrada, unidadeLimite, unidadeMedicao, ...agenteSemReferencia } = agente
   const base = mudouAnexo ? agenteSemReferencia : agente
 
   if (!anexo) return { ...base, anexoNr15: anexoId }
@@ -52,17 +52,24 @@ export function aplicarReferencia(
   referencia: ReferenciaNormativa,
 ): AgenteAvaliado {
   const agenteComAnexo = aplicarAnexo(agente, referencia.anexoId)
+  const unidades = Object.keys(referencia.limites ?? {}) as UnidadeMedicao[]
+  const unidade = agente.unidadeMedicao && unidades.includes(agente.unidadeMedicao)
+    ? agente.unidadeMedicao
+    : unidades[0]
+  const limite = unidade ? referencia.limites?.[unidade] : undefined
+  const { unidadeMedicao, ...agenteSemUnidade } = agenteComAnexo
 
   return {
-    ...agenteComAnexo,
+    ...agenteSemUnidade,
     anexoNr15: referencia.anexoId,
     referenciaNormativaId: referencia.id,
     nome: referencia.label,
     cas: referencia.cas,
     tipo: referencia.tipo,
     criterio: referencia.criterio,
-    limiteTolerancia: referencia.limiteTolerancia,
-    unidadeLimite: referencia.unidadeLimite,
+    limiteTolerancia: limite && unidade ? `${limite} ${unidade}` : referencia.limiteTolerancia,
+    unidadeLimite: unidade ?? referencia.unidadeLimite,
+    ...(unidade ? { unidadeMedicao: unidade } : {}),
     grau: referencia.grau,
     atividadeEnquadrada: referencia.atividadeEnquadrada,
   }

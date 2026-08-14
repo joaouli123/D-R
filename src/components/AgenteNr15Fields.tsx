@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { ATIVIDADES_ANEXO_13, ATIVIDADES_ANEXO_14, SUBSTANCIAS_ANEXO_11 } from '@/content/anexosNr15'
+import { anexoNr15PorId, ATIVIDADES_ANEXO_13, ATIVIDADES_ANEXO_14, SUBSTANCIAS_ANEXO_11 } from '@/content/anexosNr15'
 import type { ReferenciaNormativa, UnidadeMedicao } from '@/content/nr15/tipos'
 import { normalizarNumeroMedido, unidadesDisponiveis } from '@/lib/medicoes'
 import { aplicarReferencia } from '@/lib/nr15'
@@ -28,10 +28,10 @@ export function AgenteNr15Fields({ agente, onChange }: AgenteNr15FieldsProps) {
 
   useEffect(() => setValorDigitado(agente.valorMedido ?? ''), [agente.valorMedido])
 
-  if (!configuracao) return referenciaLegadaAusente ? <AvisoReferenciaLegada /> : null
+  if (!configuracao) return <CamposGenericos agente={agente} onChange={onChange} referenciaLegadaAusente={referenciaLegadaAusente} />
 
   function limparReferencia() {
-    const { referenciaNormativaId, atividadeEnquadrada, unidadeLimite, ...agenteSemReferencia } = agente
+    const { referenciaNormativaId, atividadeEnquadrada, unidadeLimite, unidadeMedicao, ...agenteSemReferencia } = agente
     onChange(agenteSemReferencia)
   }
 
@@ -106,6 +106,39 @@ export function AgenteNr15Fields({ agente, onChange }: AgenteNr15FieldsProps) {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+function CamposGenericos({
+  agente,
+  onChange,
+  referenciaLegadaAusente,
+}: AgenteNr15FieldsProps & { referenciaLegadaAusente: boolean }) {
+  const anexo = anexoNr15PorId(agente.anexoNr15)
+  const medicaoExibida = agente.medido ?? [agente.valorMedido, agente.unidadeMedicao].filter(Boolean).join(' ')
+
+  return (
+    <div className="mt-3 rounded-lg border border-ink-200 bg-ink-50/60 p-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Input
+          label="Limite de tolerância"
+          aria-label="Limite de tolerância"
+          value={agente.limiteTolerancia ?? ''}
+          disabled={Boolean(anexo && !anexo.limiteEditavel)}
+          placeholder={anexo?.dica}
+          hint={anexo && !anexo.limiteEditavel ? 'Valor fixo em lei para o anexo selecionado.' : anexo?.dica}
+          onChange={(evento) => onChange({ ...agente, limiteTolerancia: evento.target.value })}
+        />
+        <Input
+          label="Medição registrada"
+          aria-label="Medição registrada"
+          value={medicaoExibida}
+          hint="Registro livre preservado para anexos sem unidades estruturadas."
+          onChange={(evento) => onChange({ ...agente, medido: evento.target.value })}
+        />
+      </div>
+      {referenciaLegadaAusente && <AvisoReferenciaLegada className="mt-2" />}
     </div>
   )
 }

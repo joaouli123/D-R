@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
@@ -44,6 +44,20 @@ const EPI_3M = {
   observacao: 'Conjunto respiratório',
   ativo: true,
   aplicacoes: [{ anexo: 'Anexo 11', categoria: 'Vapores Orgânicos' }],
+}
+
+const EPI_7502 = {
+  ...EPI_3M,
+  id: 'epi-3m-7502',
+  chave: '3m|7502|12069|5635',
+  modelo: '3M 7502 + Cartucho 3M 6001',
+  caPecaFacial: '12069',
+}
+
+function promessaControlada<T>() {
+  let resolver!: (valor: T) => void
+  const promise = new Promise<T>((resolve) => { resolver = resolve })
+  return { promise, resolver }
 }
 
 afterEach(() => {
@@ -118,6 +132,40 @@ describe('EpiSelector', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
+  it('ignora resposta antiga quando buscas submetidas terminam fora de ordem', async () => {
+    const user = userEvent.setup()
+    const buscaAntiga = promessaControlada<api.EpiCatalogo[]>()
+    const buscaNova = promessaControlada<api.EpiCatalogo[]>()
+    vi.mocked(api.epis.listar).mockImplementation((filtros = {}) => {
+      if (filtros.q === '6200') return buscaAntiga.promise
+      if (filtros.q === '7502') return buscaNova.promise
+      return Promise.resolve([])
+    })
+
+    render(<EpiSelector agente={AGENTE_BASE} onChange={() => undefined} />)
+    await screen.findByText('Nenhum EPI sugerido para este agente.')
+
+    const campo = screen.getByRole('searchbox', { name: 'Pesquisar EPI, marca ou CA' })
+    await user.type(campo, '6200')
+    await user.click(screen.getByRole('button', { name: 'Pesquisar EPI' }))
+    await user.clear(campo)
+    await user.type(campo, '7502')
+    await user.click(screen.getByRole('button', { name: 'Pesquisar EPI' }))
+
+    await act(async () => {
+      buscaNova.resolver([EPI_7502])
+      await buscaNova.promise
+    })
+    expect(screen.getByRole('button', { name: /Adicionar 3M 7502/ })).toBeDefined()
+
+    await act(async () => {
+      buscaAntiga.resolver([EPI_3M])
+      await buscaAntiga.promise
+    })
+    expect(screen.queryByRole('button', { name: /Adicionar 3M 6200/ })).toBeNull()
+    expect(screen.getByRole('button', { name: /Adicionar 3M 7502/ })).toBeDefined()
+  })
+
   it('remove um snapshot associado sem alterar os demais dados do agente', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
@@ -165,6 +213,51 @@ describe('EpiSelector', () => {
         marca: 'Marca informada',
       })],
     }))
+  })
+})
+
+describe('compatibilidade de agentes sem referencia especializada', () => {
+  function Harness({ inicial, onChange }: { inicial: AgenteAvaliado; onChange: (agente: AgenteAvaliado) => void }) {
+    const [agente, setAgente] = useState(inicial)
+    return <AgenteNr15Fields agente={agente} onChange={(atualizado) => { setAgente(atualizado); onChange(atualizado) }} />
+  }
+
+  it('mantem limite, medicao e aviso legado editaveis fora dos anexos especializados', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<Harness inicial={{
+      id: 'agente-7',
+      nome: 'Radiacao nao ionizante',
+      tipo: 'fisico',
+      criterio: 'qualitativo',
+      anexoNr15: 'ANEXO_07',
+      referenciaNormativaId: 'ANEXO_07_REFERENCIA_LEGADA',
+      limiteTolerancia: 'Exposicao habitual',
+      medido: 'Registro legado',
+    }} onChange={onChange} />)
+
+    const limite = screen.getByRole('textbox', { name: 'Limite de tolerância' }) as HTMLInputElement
+    const medicao = screen.getByRole('textbox', { name: 'Medição registrada' }) as HTMLInputElement
+    expect(limite.value).toBe('Exposicao habitual')
+    expect(medicao.value).toBe('Registro legado')
+    expect(screen.getByRole('alert').textContent).toContain('referência normativa salva')
+
+    await user.clear(medicao)
+    await user.type(medicao, 'Sem quantificacao instrumental')
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ medido: 'Sem quantificacao instrumental' }))
+  })
+
+  it('remove unidade estruturada ao limpar a referencia', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<Harness inicial={{ ...AGENTE_BASE, unidadeMedicao: 'mg/m³', valorMedido: '12.5' }} onChange={onChange} />)
+
+    await user.click(screen.getByRole('button', { name: 'Limpar referência' }))
+
+    const limpo = onChange.mock.calls[onChange.mock.calls.length - 1]?.[0] as AgenteAvaliado
+    expect(limpo).not.toHaveProperty('unidadeMedicao')
+    expect(limpo).not.toHaveProperty('unidadeLimite')
+    expect(limpo.valorMedido).toBe('12.5')
   })
 })
 

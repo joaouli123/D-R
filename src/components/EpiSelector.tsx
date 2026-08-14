@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Plus, Search, ShieldCheck, Trash2 } from 'lucide-react'
 
 import { Button, Input } from '@/components/ui'
@@ -57,10 +57,12 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
   const [erro, setErro] = useState('')
   const [manual, setManual] = useState<FormularioManual>(MANUAL_VAZIO)
   const [erroManual, setErroManual] = useState('')
+  const requisicaoAtual = useRef(0)
   const selecionados = agente.epis ?? []
   const limiteAtingido = selecionados.length >= 10
 
   async function carregar(q = '', sinal?: AbortSignal) {
+    const requisicao = ++requisicaoAtual.current
     setCarregando(true)
     setErro('')
     try {
@@ -69,21 +71,24 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
         ...(q.trim() ? { q: q.trim() } : {}),
         ...(anexo ? { anexo } : {}),
       })
-      if (!sinal?.aborted) setCatalogo(itens)
+      if (!sinal?.aborted && requisicao === requisicaoAtual.current) setCatalogo(itens)
     } catch {
-      if (!sinal?.aborted) {
+      if (!sinal?.aborted && requisicao === requisicaoAtual.current) {
         setCatalogo([])
         setErro('Não foi possível carregar o catálogo. Pesquise novamente ou informe o EPI manualmente.')
       }
     } finally {
-      if (!sinal?.aborted) setCarregando(false)
+      if (!sinal?.aborted && requisicao === requisicaoAtual.current) setCarregando(false)
     }
   }
 
   useEffect(() => {
     const controle = new AbortController()
     void carregar('', controle.signal)
-    return () => controle.abort()
+    return () => {
+      controle.abort()
+      requisicaoAtual.current += 1
+    }
   }, [agente.anexoNr15])
 
   function adicionar(epi: EpiSelecionado) {

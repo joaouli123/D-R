@@ -214,6 +214,7 @@ describe('aplicarAnexo', () => {
       referenciaNormativaId: 'ANEXO_11_ACIDO_NITRICO',
       atividadeEnquadrada: 'Exposição a ácido nítrico',
       unidadeLimite: 'ppm',
+      unidadeMedicao: 'ppm',
       medido: '12 ppm',
       epiEficaz: false,
       observacao: 'Jornada completa',
@@ -222,6 +223,7 @@ describe('aplicarAnexo', () => {
     expect(agente).not.toHaveProperty('referenciaNormativaId')
     expect(agente).not.toHaveProperty('atividadeEnquadrada')
     expect(agente).not.toHaveProperty('unidadeLimite')
+    expect(agente).not.toHaveProperty('unidadeMedicao')
     expect(agente).toMatchObject({
       anexoNr15: 'ANEXO_14',
       medido: '12 ppm',
@@ -232,6 +234,27 @@ describe('aplicarAnexo', () => {
 })
 
 describe('aplicarReferencia', () => {
+  it('preserva unidade valida, escolhe a primeira unidade possivel e remove unidade sem suporte', () => {
+    const acetaldeido = referenciaPorId(SUBSTANCIAS_ANEXO_11, 'ANEXO_11_ACETALDEIDO')
+    const atividadeQualitativa = referenciaPorId(ATIVIDADES_ANEXO_13, 'ANEXO_13_HIDROCARBONETOS_MED_01')
+    const agente = {
+      id: 'a1',
+      nome: 'Legado',
+      tipo: 'quimico' as const,
+      criterio: 'quantitativo' as const,
+      unidadeMedicao: '% O₂ em volume' as const,
+    }
+
+    const primeiraValida = aplicarReferencia(agente, acetaldeido)
+    expect(primeiraValida).toMatchObject({ unidadeMedicao: 'ppm', unidadeLimite: 'ppm', limiteTolerancia: '78 ppm' })
+
+    const unidadePreservada = aplicarReferencia({ ...agente, unidadeMedicao: 'mg/m³' }, acetaldeido)
+    expect(unidadePreservada).toMatchObject({ unidadeMedicao: 'mg/m³', unidadeLimite: 'mg/m³', limiteTolerancia: '140 mg/m³' })
+
+    const semUnidade = aplicarReferencia(unidadePreservada, atividadeQualitativa)
+    expect(semUnidade).not.toHaveProperty('unidadeMedicao')
+  })
+
   it('injeta somente os campos derivados da referencia normativa', () => {
     const referencia: ReferenciaNormativa = {
       id: 'ANEXO_11_ACETALDEIDO',
@@ -283,8 +306,9 @@ describe('aplicarReferencia', () => {
     expect(aplicarReferencia(agenteBase, referenciaPorId(SUBSTANCIAS_ANEXO_11, 'ANEXO_11_ACIDO_CLORIDRICO')))
       .toMatchObject({
         nome: 'Ácido clorídrico',
-        limiteTolerancia: '4 ppm | 5,5 mg/m³',
-        unidadeLimite: 'ppm | mg/m³',
+        limiteTolerancia: '4 ppm',
+        unidadeLimite: 'ppm',
+        unidadeMedicao: 'ppm',
         grau: 'maximo',
         medido: '12 ppm',
         epiEficaz: false,
