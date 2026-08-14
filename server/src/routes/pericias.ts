@@ -26,6 +26,17 @@ const periodoSchema = z.object({
   descricaoAtividades: texto.optional(),
 })
 
+const epiSelecionadoSchema = z.object({
+  catalogoId: texto.optional(),
+  categoria: texto,
+  modelo: texto,
+  marca: texto,
+  caUnico: texto.optional(),
+  caPecaFacial: texto.optional(),
+  caFiltroCartucho: texto.optional(),
+  observacao: texto.optional(),
+})
+
 export const agenteSchema = z.object({
   id: z.string(),
   nome: texto,
@@ -37,6 +48,9 @@ export const agenteSchema = z.object({
   unidadeLimite: texto.optional(),
   limiteTolerancia: texto.optional(),
   medido: texto.optional(),
+  valorMedido: z.string().regex(/^-?\d+(\.\d+)?$/).optional(),
+  unidadeMedicao: z.enum(['ppm', 'mg/m³', '% O₂ em volume']).optional(),
+  epis: z.array(epiSelecionadoSchema).max(10).default([]),
   criterio: z.enum(['qualitativo', 'quantitativo', 'nao_aplicavel']),
   grau: z.enum(['minimo', 'medio', 'maximo', 'nao_caracterizado']).optional(),
   epiEficaz: z.boolean().optional(),

@@ -14,6 +14,7 @@ const agenteLegado = {
   nome: 'Ruído contínuo',
   tipo: 'fisico',
   criterio: 'quantitativo',
+  medido: '85 dB(A)',
 }
 
 const agenteCompleto = {
@@ -29,14 +30,46 @@ const agenteComEnumInvalido = {
   tipo: 'ergonomico',
 }
 
+const epiSelecionado = {
+  catalogoId: 'epi-1',
+  categoria: 'Vapores Orgânicos',
+  modelo: '3M 6200 + Cartucho 3M 6001',
+  marca: '3M',
+  caPecaFacial: '4115',
+  caFiltroCartucho: '5635',
+  observacao: 'Conjunto respiratório',
+}
+
+const agenteComMedicaoEEpi = {
+  ...agenteLegado,
+  id: 'agn-medicao-epi',
+  valorMedido: '12.5',
+  unidadeMedicao: 'ppm',
+  epis: [epiSelecionado],
+}
+
+const agenteComValorMedidoInvalido = {
+  ...agenteLegado,
+  valorMedido: 'doze',
+  unidadeMedicao: 'ppm',
+}
+
+const agenteComMuitosEpis = {
+  ...agenteLegado,
+  epis: Array.from({ length: 11 }, (_, indice) => ({ ...epiSelecionado, catalogoId: `epi-${indice}` })),
+}
+
 const legado = agenteSchema.safeParse(agenteLegado)
 const completo = agenteSchema.safeParse(agenteCompleto)
 const enumInvalido = agenteSchema.safeParse(agenteComEnumInvalido)
+const medicaoEEpi = agenteSchema.safeParse(agenteComMedicaoEEpi)
+const valorMedidoInvalido = agenteSchema.safeParse(agenteComValorMedidoInvalido)
+const muitosEpis = agenteSchema.safeParse(agenteComMuitosEpis)
 
 const resultados = [
   {
     nome: 'registro legado é aceito',
-    ok: legado.success,
+    ok: legado.success && legado.data.medido === '85 dB(A)' && legado.data.epis?.length === 0,
   },
   {
     nome: 'novos metadados normativos são preservados',
@@ -49,6 +82,26 @@ const resultados = [
   {
     nome: 'tipo de agente inválido é rejeitado',
     ok: !enumInvalido.success,
+  },
+  {
+    nome: 'medição estruturada e snapshot de EPI são preservados',
+    ok:
+      medicaoEEpi.success &&
+      medicaoEEpi.data.valorMedido === '12.5' &&
+      medicaoEEpi.data.unidadeMedicao === 'ppm' &&
+      medicaoEEpi.data.epis.length === 1 &&
+      medicaoEEpi.data.epis[0]?.catalogoId === 'epi-1' &&
+      medicaoEEpi.data.epis[0]?.caPecaFacial === '4115' &&
+      medicaoEEpi.data.epis[0]?.caFiltroCartucho === '5635' &&
+      medicaoEEpi.data.epis[0]?.observacao === 'Conjunto respiratório',
+  },
+  {
+    nome: 'valor medido não numérico é rejeitado',
+    ok: !valorMedidoInvalido.success,
+  },
+  {
+    nome: 'mais de dez EPIs é rejeitado',
+    ok: !muitosEpis.success,
   },
 ]
 

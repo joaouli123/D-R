@@ -180,6 +180,18 @@ export interface TecnicoJson {
     unidadeLimite?: string
     limiteTolerancia?: string
     medido?: string
+    valorMedido?: string
+    unidadeMedicao?: 'ppm' | 'mg/m³' | '% O₂ em volume'
+    epis?: {
+      catalogoId?: string
+      categoria: string
+      modelo: string
+      marca: string
+      caUnico?: string
+      caPecaFacial?: string
+      caFiltroCartucho?: string
+      observacao?: string
+    }[]
     criterio: string
     grau?: string
   }[]

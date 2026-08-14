@@ -8,7 +8,12 @@
 // qualquer consulta ao PostgreSQL.
 // ============================================================
 import type { Server } from 'node:http'
-import { criarApp } from '../src/app.js'
+import jwt from 'jsonwebtoken'
+
+process.env.DATABASE_URL ??= 'postgresql://smoke:smoke@127.0.0.1:5432/smoke'
+process.env.JWT_SECRET ??= 'smoke-test-secret-with-at-least-32-characters'
+
+const [{ criarApp }, { env }] = await Promise.all([import('../src/app.js'), import('../src/env.js')])
 
 interface Caso {
   nome: string
@@ -16,10 +21,16 @@ interface Caso {
   metodo?: string
   corpo?: unknown
   origem?: string
+  cookie?: string
   statusEsperado: number
   /** Trecho que a mensagem de erro precisa conter. */
   contem?: string
 }
+
+const sessaoTeste = `dr_sessao=${jwt.sign(
+  { id: 'usuario-smoke', email: 'smoke@example.test', perfil: 'perito' },
+  env.JWT_SECRET,
+)}`
 
 const CASOS: Caso[] = [
   { nome: 'healthcheck', caminho: '/saude', statusEsperado: 200 },
@@ -56,6 +67,28 @@ const CASOS: Caso[] = [
     corpo: { email: 'nao-e-email', senha: '12345678' },
     statusEsperado: 422,
   },
+  {
+    nome: 'medição textual é rejeitada antes do banco',
+    caminho: '/pericias',
+    metodo: 'POST',
+    cookie: sessaoTeste,
+    corpo: {
+      tecnico: {
+        agentes: [
+          {
+            id: 'agn-medicao-invalida',
+            nome: 'Benzeno',
+            tipo: 'quimico',
+            criterio: 'quantitativo',
+            valorMedido: 'doze',
+            unidadeMedicao: 'ppm',
+          },
+        ],
+      },
+    },
+    statusEsperado: 422,
+    contem: 'tecnico.agentes.0.valorMedido',
+  },
 
   { nome: 'rota inexistente', caminho: '/nao-existe', statusEsperado: 404, contem: 'não encontrada' },
 
@@ -87,6 +120,7 @@ for (const caso of CASOS) {
     method: caso.metodo ?? 'GET',
     headers: {
       'Content-Type': 'application/json',
+      ...(caso.cookie ? { Cookie: caso.cookie } : {}),
       ...(caso.origem ? { Origin: caso.origem } : {}),
     },
     body: caso.corpo ? JSON.stringify(caso.corpo) : undefined,
