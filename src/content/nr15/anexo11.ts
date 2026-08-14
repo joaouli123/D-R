@@ -11,6 +11,7 @@ interface SubstanciaFonte {
   id: string
   label: string
   sinonimos?: readonly string[]
+  cas?: string
   ppm?: string
   mgM3?: string
   grau: GrauNormativo
@@ -25,29 +26,30 @@ interface SubstanciaFonte {
 // Para asfixiantes simples, "nao_caracterizado" representa o traço da
 // coluna de grau; o limite de 18% de oxigênio vem do item 3 do Anexo.
 const SUBSTANCIAS_FONTE: readonly SubstanciaFonte[] = [
-  { id: 'ACETALDEIDO', label: 'Acetaldeído', sinonimos: ['Aldeído acético', 'Etanol'], ppm: '78', mgM3: '140', grau: 'maximo' },
+  { id: 'ACETALDEIDO', label: 'Acetaldeído', sinonimos: ['Aldeído acético', 'Etanol'], cas: '75-07-0', ppm: '78', mgM3: '140', grau: 'maximo' },
   {
     id: 'ACETATO_DE_CELLOSOLVE',
     label: 'Acetato de cellosolve',
     sinonimos: ['Acetato de éter monoetílico de etileno glicol', 'Acetato de 2-etóxi etila'],
+    cas: '111-15-9',
     ppm: '78',
     mgM3: '420',
     grau: 'medio',
     absorcaoPele: true,
   },
-  { id: 'ACETATO_DE_ETILA', label: 'Acetato de etila', ppm: '310', mgM3: '1090', grau: 'minimo' },
-  { id: 'ACETILENO', label: 'Acetileno', grau: 'nao_caracterizado', asfixianteSimples: true },
-  { id: 'ACETONA', label: 'Acetona', sinonimos: ['Propanona'], ppm: '780', mgM3: '1870', grau: 'minimo' },
-  { id: 'ACETONITRILA', label: 'Acetonitrila', sinonimos: ['Cianeto de metila'], ppm: '30', mgM3: '55', grau: 'maximo' },
-  { id: 'ACIDO_ACETICO', label: 'Ácido acético', sinonimos: ['Ácido etanóico'], ppm: '8', mgM3: '20', grau: 'medio' },
-  { id: 'ACIDO_CIANIDRICO', label: 'Ácido cianídrico', sinonimos: ['Gás cianídrico'], ppm: '8', mgM3: '9', grau: 'maximo', absorcaoPele: true },
-  { id: 'ACIDO_CLORIDRICO', label: 'Ácido clorídrico', sinonimos: ['Gás clorídrico'], ppm: '4', mgM3: '5,5', grau: 'maximo', valorTeto: true },
-  { id: 'ACIDO_CROMICO_NEVOA', label: 'Ácido crômico (névoa)', mgM3: '0,04', grau: 'maximo' },
-  { id: 'ACIDO_FLUORIDRICO', label: 'Ácido fluorídrico', ppm: '2,5', mgM3: '1,5', grau: 'maximo' },
-  { id: 'ACIDO_FORMICO', label: 'Ácido fórmico', sinonimos: ['Ácido metanóico'], ppm: '4', mgM3: '7', grau: 'medio' },
-  { id: 'ACRILATO_DE_METILA', label: 'Acrilato de metila', ppm: '8', mgM3: '27', grau: 'maximo', absorcaoPele: true },
-  { id: 'ACRILONITRILA', label: 'Acrilonitrila', sinonimos: ['Cianeto de vinila'], ppm: '16', mgM3: '35', grau: 'maximo', absorcaoPele: true },
-  { id: 'ALCOOL_ISOAMILICO', label: 'Álcool isoamílico', ppm: '78', mgM3: '280', grau: 'minimo' },
+  { id: 'ACETATO_DE_ETILA', label: 'Acetato de etila', cas: '141-78-6', ppm: '310', mgM3: '1090', grau: 'minimo' },
+  { id: 'ACETILENO', label: 'Acetileno', cas: '74-86-2', grau: 'nao_caracterizado', asfixianteSimples: true },
+  { id: 'ACETONA', label: 'Acetona', sinonimos: ['Propanona'], cas: '67-64-1', ppm: '780', mgM3: '1870', grau: 'minimo' },
+  { id: 'ACETONITRILA', label: 'Acetonitrila', sinonimos: ['Cianeto de metila'], cas: '75-05-8', ppm: '30', mgM3: '55', grau: 'maximo' },
+  { id: 'ACIDO_ACETICO', label: 'Ácido acético', sinonimos: ['Ácido etanóico'], cas: '64-19-7', ppm: '8', mgM3: '20', grau: 'medio' },
+  { id: 'ACIDO_CIANIDRICO', label: 'Ácido cianídrico', sinonimos: ['Gás cianídrico'], cas: '74-90-8', ppm: '8', mgM3: '9', grau: 'maximo', absorcaoPele: true },
+  { id: 'ACIDO_CLORIDRICO', label: 'Ácido clorídrico', sinonimos: ['Gás clorídrico'], cas: '7647-01-0', ppm: '4', mgM3: '5,5', grau: 'maximo', valorTeto: true },
+  { id: 'ACIDO_CROMICO_NEVOA', label: 'Ácido crômico (névoa)', cas: '7738-94-5', mgM3: '0,04', grau: 'maximo' },
+  { id: 'ACIDO_FLUORIDRICO', label: 'Ácido fluorídrico', cas: '7664-39-3', ppm: '2,5', mgM3: '1,5', grau: 'maximo' },
+  { id: 'ACIDO_FORMICO', label: 'Ácido fórmico', sinonimos: ['Ácido metanóico'], cas: '64-18-6', ppm: '4', mgM3: '7', grau: 'medio' },
+  { id: 'ACRILATO_DE_METILA', label: 'Acrilato de metila', cas: '96-33-3', ppm: '8', mgM3: '27', grau: 'maximo', absorcaoPele: true },
+  { id: 'ACRILONITRILA', label: 'Acrilonitrila', sinonimos: ['Cianeto de vinila'], cas: '107-13-1', ppm: '16', mgM3: '35', grau: 'maximo', absorcaoPele: true },
+  { id: 'ALCOOL_ISOAMILICO', label: 'Álcool isoamílico', cas: '123-51-3', ppm: '78', mgM3: '280', grau: 'minimo' },
   {
     id: 'ALCOOL_N_BUTILICO',
     label: 'Álcool n-butílico',
@@ -270,6 +272,11 @@ export const SUBSTANCIAS_ANEXO_11: readonly ReferenciaNormativa[] = SUBSTANCIAS_
   anexoId: 'ANEXO_11',
   label: item.label,
   sinonimos: item.sinonimos,
+  cas: item.cas,
+  limites: {
+    ...(item.ppm ? { ppm: item.ppm } : {}),
+    ...(item.mgM3 ? { 'mg/m³': item.mgM3 } : {}),
+  },
   tipo: 'quimico',
   criterio: 'quantitativo',
   limiteTolerancia: limiteTolerancia(item),

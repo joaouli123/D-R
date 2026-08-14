@@ -6,7 +6,7 @@ import { ATIVIDADES_ANEXO_13, ATIVIDADES_ANEXO_14, SUBSTANCIAS_ANEXO_11 } from '
 import { AgenteNr15Fields } from '@/components/AgenteNr15Fields'
 import { BuscaNormativa } from '@/components/BuscaNormativa'
 import type { ReferenciaNormativa } from '@/content/nr15/tipos'
-import { aplicarAnexo, aplicarReferencia, buscarReferencias, normalizarBuscaNr15 } from './nr15'
+import { aplicarAnexo, aplicarReferencia, buscarReferencias, buscarReferenciasNr15, normalizarBuscaNr15 } from './nr15'
 
 function referenciaPorId(
   referencias: readonly ReferenciaNormativa[],
@@ -112,6 +112,18 @@ describe('normalizarBuscaNr15', () => {
 })
 
 describe('buscarReferencias', () => {
+  it('localiza a referência pelo CAS recebido', () => {
+    expect(buscarReferenciasNr15('75-07-0')[0]).toMatchObject({
+      label: 'Acetaldeído',
+      cas: '75-07-0',
+      limites: { ppm: '78', 'mg/m³': '140' },
+    })
+  })
+
+  it('mantém agente sem CAS selecionável', () => {
+    expect(SUBSTANCIAS_ANEXO_11.find((x) => x.label === 'Álcool terc-butílico')).toBeDefined()
+  })
+
   it('encontra referencias por texto normalizado no rotulo, sinonimos e atividade', () => {
     const referencias: ReferenciaNormativa[] = [
       {
@@ -202,14 +214,15 @@ describe('aplicarAnexo', () => {
 describe('aplicarReferencia', () => {
   it('injeta somente os campos derivados da referencia normativa', () => {
     const referencia: ReferenciaNormativa = {
-      id: 'ANEXO_11_ACIDO_NITRICO',
+      id: 'ANEXO_11_ACETALDEIDO',
       anexoId: 'ANEXO_11',
-      label: 'Ácido Nítrico',
+      label: 'Acetaldeído',
       tipo: 'quimico',
       criterio: 'quantitativo',
-      limiteTolerancia: '2 ppm',
-      unidadeLimite: 'ppm',
-      grau: 'medio',
+      limiteTolerancia: '78 ppm | 140 mg/m³',
+      unidadeLimite: 'ppm | mg/m³',
+      grau: 'maximo',
+      cas: '75-07-0',
     }
 
     expect(aplicarReferencia({
@@ -222,13 +235,14 @@ describe('aplicarReferencia', () => {
       observacao: 'Jornada completa',
     }, referencia)).toMatchObject({
       anexoNr15: 'ANEXO_11',
-      referenciaNormativaId: 'ANEXO_11_ACIDO_NITRICO',
-      nome: 'Ácido Nítrico',
+      referenciaNormativaId: 'ANEXO_11_ACETALDEIDO',
+      nome: 'Acetaldeído',
       tipo: 'quimico',
       criterio: 'quantitativo',
-      limiteTolerancia: '2 ppm',
-      unidadeLimite: 'ppm',
-      grau: 'medio',
+      limiteTolerancia: '78 ppm | 140 mg/m³',
+      unidadeLimite: 'ppm | mg/m³',
+      grau: 'maximo',
+      cas: '75-07-0',
       medido: '12 ppm',
       epiEficaz: false,
       observacao: 'Jornada completa',

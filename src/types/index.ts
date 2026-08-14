@@ -4,6 +4,8 @@
 // + Módulo K (Quesitos) e Módulo L (Manifestação/Impugnação/Esclarecimento)
 // ============================================================
 
+import type { UnidadeMedicao } from '@/content/nr15/tipos'
+
 export type UUID = string
 
 // ---------- Módulo A — Acesso e Gestão de Usuários ----------
@@ -111,6 +113,17 @@ export interface Pericia {
 }
 
 // ---------- Módulo D — Preenchimento Técnico ----------
+export interface EpiSelecionado {
+  catalogoId?: string
+  categoria: string
+  modelo: string
+  marca: string
+  caUnico?: string
+  caPecaFacial?: string
+  caFiltroCartucho?: string
+  observacao?: string
+}
+
 export interface AgenteAvaliado {
   id: UUID
   nome: string
@@ -122,6 +135,9 @@ export interface AgenteAvaliado {
   unidadeLimite?: string
   limiteTolerancia?: string
   medido?: string
+  valorMedido?: string
+  unidadeMedicao?: UnidadeMedicao
+  epis?: EpiSelecionado[]
   criterio: 'qualitativo' | 'quantitativo' | 'nao_aplicavel'
   grau?: 'minimo' | 'medio' | 'maximo' | 'nao_caracterizado'
   epiEficaz?: boolean
@@ -303,4 +319,3 @@ export interface ModeloManifestacao {
   fundamentacao: string
   blocos: BlocoTexto[]
 }
-
