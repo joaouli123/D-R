@@ -51,3 +51,30 @@
 - O smoke emite o aviso preexistente de credenciais Brevo ausentes; não afeta as verificações do Task 2.
 - O worktree usa conversão Git LF→CRLF; `git diff --check` não encontrou erro de whitespace.
 - Nenhum trabalho do Task 3 foi iniciado.
+
+## Fix round 1 — atomicidade e autenticação
+
+### Findings corrigidos
+
+- **Important — atomicidade:** toda a migração `20260814_catalogo_epi` agora está entre `BEGIN;` e `COMMIT;`, cobrindo DDL, índices, FK e carga na mesma transação PostgreSQL.
+- **Important — autenticação:** `GET /epis` agora usa `episRouter.use(exigirSessao)`, exatamente como as demais rotas de negócio.
+- **Minor deferido:** o ledger registra que o smoke não afirma `where.aplicacoes.some` e `take: 100`; nenhum trabalho foi feito nesse finding neste round.
+
+### RED / GREEN
+
+- Autenticação: a primeira execução do teste novo encontrou um erro de sintaxe no próprio smoke e não foi contabilizada como RED. Após corrigi-lo, `npm.cmd run smoke:epis` falhou pelo motivo esperado em `smoke-epis.ts:117`: resposta anônima `200 !== 401`.
+- Atomicidade: após o GREEN da autenticação, o assert textual novo falhou pelo motivo esperado: `assert.ok(migracao.startsWith('BEGIN;'))` recebeu `false`.
+- GREEN: o smoke passou com requisição anônima `401`, nenhuma consulta ao repositório sem sessão, requisição com JWT válido `200`, e asserts de `BEGIN;`/`COMMIT;` satisfeitos.
+
+### Verificações finais
+
+- `cd server && npm.cmd run smoke:epis` — PASS, exit 0.
+- `cd server && npm.cmd run prisma:generate` — PASS; Prisma Client 5.22.0 gerado, exit 0.
+- `cd server && npm.cmd run typecheck` — PASS; `tsc --noEmit`, exit 0.
+- `cd server && npm.cmd run build` — PASS; `tsc -p tsconfig.json`, exit 0.
+- `git diff --check` — PASS; apenas avisos LF→CRLF já conhecidos.
+- Commit do fix: `97f9cbd9a894360d63a170b092436ee384417ed5` (`Protege catalogo EPI e torna migracao atomica`).
+
+### Concerns do round
+
+- A migração continua sem execução em PostgreSQL local; atomicidade e delimitadores transacionais foram validados textualmente no smoke puro.
