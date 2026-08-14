@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import { Router } from 'express'
 import { z } from 'zod'
+import { exigirSessao } from '../auth.js'
 import { rota } from '../erros.js'
 import { prisma } from '../prisma.js'
 
@@ -16,6 +17,7 @@ type BuscarEpis = (
 
 export function criarEpisRouter(buscarEpis: BuscarEpis = (consulta) => prisma.epiCatalogo.findMany(consulta)) {
   const episRouter = Router()
+  episRouter.use(exigirSessao)
 
   episRouter.get(
     '/',

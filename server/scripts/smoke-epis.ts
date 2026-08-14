@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
+import cookieParser from 'cookie-parser'
 import express from 'express'
+import jwt from 'jsonwebtoken'
 
 process.env.DATABASE_URL ??= 'postgresql://smoke:smoke@127.0.0.1:5432/smoke'
 process.env.JWT_SECRET ??= 'smoke-test-secret-with-at-least-32-characters'
@@ -11,7 +14,15 @@ const {
   sugerirEpis,
 } = await import('../src/catalogo-epis.js')
 const { criarEpisRouter } = await import('../src/routes/epis.js')
+const { tratarErros } = await import('../src/erros.js')
 type EpiCatalogoComAplicacoes = import('../src/catalogo-epis.js').EpiCatalogoComAplicacoes
+
+const migracao = (await readFile(
+  new URL('../prisma/migrations/20260814_catalogo_epi/migration.sql', import.meta.url),
+  'utf8',
+)).trim()
+assert.ok(migracao.startsWith('BEGIN;'))
+assert.ok(migracao.endsWith('COMMIT;'))
 
 assert.equal(LINHAS_EPI_RECEBIDAS.length, 61)
 const catalogoRecebido = configuracoesUnicas(LINHAS_EPI_RECEBIDAS)
@@ -98,6 +109,7 @@ assert.deepEqual(
 
 const consultas: unknown[] = []
 const app = express()
+app.use(cookieParser())
 app.use(
   '/epis',
   criarEpisRouter(async (consulta) => {
@@ -105,15 +117,25 @@ app.use(
     return [itens[1]]
   }),
 )
+app.use(tratarErros)
 const servidor = await new Promise<ReturnType<typeof app.listen>>((resolve) => {
   const instancia = app.listen(0, () => resolve(instancia))
 })
 try {
   const endereco = servidor.address()
   assert.ok(endereco && typeof endereco !== 'string')
-  const resposta = await fetch(
-    `http://127.0.0.1:${endereco.port}/epis?q=cartucho&categoria=Vapores%20Org%C3%A2nicos&anexo=Anexo%2011`,
+  const url = `http://127.0.0.1:${endereco.port}/epis?q=cartucho&categoria=Vapores%20Org%C3%A2nicos&anexo=Anexo%2011`
+  const respostaSemSessao = await fetch(url)
+  assert.equal(respostaSemSessao.status, 401)
+  assert.equal(consultas.length, 0)
+
+  const token = jwt.sign(
+    { id: 'smoke-user', email: 'smoke@example.test', perfil: 'admin' },
+    process.env.JWT_SECRET,
   )
+  const resposta = await fetch(url, {
+    headers: { cookie: `dr_sessao=${token}` },
+  })
   assert.equal(resposta.status, 200)
   assert.deepEqual(await resposta.json(), [itens[1]])
 

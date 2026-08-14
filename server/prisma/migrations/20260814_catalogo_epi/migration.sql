@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Catálogo consolidado das 61 linhas recebidas nas três planilhas de respiradores.
 CREATE TABLE "epis_catalogo" (
     "id" TEXT NOT NULL,
@@ -126,3 +128,5 @@ CROSS JOIN LATERAL (
   FROM regexp_split_to_table(n.anexos, '\s*,\s*') AS parte
 ) anexos_independentes
 ON CONFLICT ("epiId", "anexo", "categoria") DO NOTHING;
+
+COMMIT;
