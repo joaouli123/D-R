@@ -54,6 +54,10 @@ const agenteComValorMedidoInvalido = {
   unidadeMedicao: 'ppm',
 }
 
+const medicoesPorUnidade = ['ppm', 'mg/m³', '% O₂ em volume'].map((unidadeMedicao) =>
+  agenteSchema.safeParse({ ...agenteLegado, valorMedido: '1.5', unidadeMedicao }),
+)
+
 const agenteComMuitosEpis = {
   ...agenteLegado,
   epis: Array.from({ length: 11 }, (_, indice) => ({ ...epiSelecionado, catalogoId: `epi-${indice}` })),
@@ -116,6 +120,10 @@ const resultados = [
   {
     nome: 'valor medido não numérico é rejeitado',
     ok: !valorMedidoInvalido.success,
+  },
+  {
+    nome: 'todas as unidades estruturadas são aceitas',
+    ok: medicoesPorUnidade.every((resultado) => resultado.success),
   },
   {
     nome: 'mais de dez EPIs é rejeitado',

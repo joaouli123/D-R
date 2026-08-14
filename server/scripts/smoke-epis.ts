@@ -139,9 +139,18 @@ try {
   assert.equal(resposta.status, 200)
   assert.deepEqual(await resposta.json(), [itens[1]])
 
-  const consulta = consultas[0] as { where: { ativo: boolean; OR: unknown[] }; include: { aplicacoes: { where: unknown } } }
+  const consulta = consultas[0] as {
+    where: { ativo: boolean; OR: unknown[]; aplicacoes: { some: unknown } }
+    include: { aplicacoes: { where: unknown } }
+    take: number
+  }
   assert.equal(consulta.where.ativo, true)
   assert.equal(consulta.where.OR.length, 6)
+  assert.deepEqual(consulta.where.aplicacoes.some, {
+    anexo: 'Anexo 11',
+    categoria: 'Vapores Orgânicos',
+  })
+  assert.equal(consulta.take, 100)
   assert.deepEqual(consulta.include.aplicacoes.where, {
     anexo: 'Anexo 11',
     categoria: 'Vapores Orgânicos',

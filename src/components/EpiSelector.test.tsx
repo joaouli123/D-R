@@ -319,7 +319,10 @@ describe('medição estruturada', () => {
     await user.type(valor, 'doze')
     await user.tab()
 
-    expect(screen.getByText(/Informe um valor numérico/).textContent).toContain('Informe um valor numérico')
+    const erro = screen.getByRole('alert')
+    expect(erro.textContent).toContain('Informe um valor numérico')
+    expect(valor.getAttribute('aria-invalid')).toBe('true')
+    expect(valor.getAttribute('aria-describedby')).toBe(erro.id)
     expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ valorMedido: 'doze' }))
   })
 

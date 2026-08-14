@@ -15,6 +15,12 @@ describe('medições estruturadas', () => {
     expect(unidadesDisponiveis(acetileno!)).toEqual(['% O₂ em volume'])
   })
 
+  it('ignora chaves de unidade desconhecidas recebidas em runtime', () => {
+    const referencia = { limites: { ppm: '78', psi: '10', 'mg/m³': '140' } } as never
+
+    expect(unidadesDisponiveis(referencia)).toEqual(['ppm', 'mg/m³'])
+  })
+
   it('normaliza decimal com vírgula e rejeita valor não numérico', () => {
     expect(normalizarNumeroMedido(' 12,5 ')).toBe('12.5')
     expect(normalizarNumeroMedido('doze')).toBeNull()

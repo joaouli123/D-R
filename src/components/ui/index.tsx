@@ -92,8 +92,9 @@ function FieldWrap({
   hint,
   error,
   required,
+  errorId,
   children,
-}: FieldProps & { children: React.ReactNode }) {
+}: FieldProps & { errorId?: string; children: React.ReactNode }) {
   return (
     <div className="w-full">
       {label && (
@@ -104,7 +105,7 @@ function FieldWrap({
       )}
       {children}
       {error ? (
-        <p className="text-xs text-red-600 mt-1">{error}</p>
+        <p id={errorId} role="alert" className="text-xs text-red-600 mt-1">{error}</p>
       ) : (
         hint && <p className="hint">{hint}</p>
       )}
@@ -123,11 +124,14 @@ export function Input({
   className,
   ...props
 }: React.InputHTMLAttributes<HTMLInputElement> & FieldProps) {
+  const errorId = React.useId()
   return (
-    <FieldWrap label={label} hint={hint} error={error} required={required}>
+    <FieldWrap label={label} hint={hint} error={error} required={required} errorId={error ? errorId : undefined}>
       <input
-        className={cn(inputBase, 'h-10', error && 'border-red-500', className)}
         {...props}
+        className={cn(inputBase, 'h-10', error && 'border-red-500', className)}
+        aria-invalid={error ? true : props['aria-invalid']}
+        aria-describedby={error ? errorId : props['aria-describedby']}
       />
     </FieldWrap>
   )
