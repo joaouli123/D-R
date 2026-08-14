@@ -14,7 +14,35 @@ const { criarEpisRouter } = await import('../src/routes/epis.js')
 type EpiCatalogoComAplicacoes = import('../src/catalogo-epis.js').EpiCatalogoComAplicacoes
 
 assert.equal(LINHAS_EPI_RECEBIDAS.length, 61)
-assert.equal(configuracoesUnicas(LINHAS_EPI_RECEBIDAS).length, 34)
+const catalogoRecebido = configuracoesUnicas(LINHAS_EPI_RECEBIDAS)
+assert.equal(catalogoRecebido.length, 34)
+
+const aplicacoesRecebidas = catalogoRecebido.flatMap((item) => item.aplicacoes)
+assert.equal(aplicacoesRecebidas.length, 57)
+assert.deepEqual(
+  Object.fromEntries(
+    ['Anexo 11', 'Anexo 12', 'Anexo 13'].map((anexo) => [
+      anexo,
+      aplicacoesRecebidas.filter((aplicacao) => aplicacao.anexo === anexo).length,
+    ]),
+  ),
+  { 'Anexo 11': 20, 'Anexo 12': 19, 'Anexo 13': 18 },
+)
+
+const primeiraLinha = LINHAS_EPI_RECEBIDAS[0]
+assert.ok(primeiraLinha)
+assert.equal(
+  configuracoesUnicas([
+    primeiraLinha,
+    {
+      ...primeiraLinha,
+      marca: `  ${primeiraLinha.marca}  `,
+      modelo: `  ${primeiraLinha.modelo}  `,
+      ca: `  ${primeiraLinha.ca}  `,
+    },
+  ]).length,
+  1,
+)
 assert.deepEqual(
   separarCas('4115 / 5635'),
   { caPecaFacial: '4115', caFiltroCartucho: '5635', caUnico: null },
@@ -101,6 +129,7 @@ try {
 }
 
 console.log('✓ 61 linhas consolidadas em 34 configurações únicas')
+console.log('✓ 57 vínculos independentes distribuídos entre os Anexos 11, 12 e 13')
 console.log('✓ CAs simples e compostos separados')
 console.log('✓ sugestão prioriza categoria e mantém Multigases como alternativa')
 console.log('✓ endpoint aplica filtros ativos e de aplicações sem SQL manual')

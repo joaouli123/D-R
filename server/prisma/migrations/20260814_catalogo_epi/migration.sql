@@ -101,7 +101,7 @@ WITH linhas(categoria, modelo, marca, ca, anexos) AS (
     CASE WHEN ca LIKE '%/%' THEN trim(split_part(ca, '/', 2)) ELSE NULL END AS ca_filtro_cartucho
   FROM linhas
 ), normalizadas AS (
-  SELECT *, lower(regexp_replace(concat_ws('|', trim(marca), trim(modelo), coalesce(ca_unico, ''), coalesce(ca_peca_facial, ''), coalesce(ca_filtro_cartucho, '')), '\\s+', ' ', 'g')) AS chave
+  SELECT *, lower(regexp_replace(concat_ws('|', trim(marca), trim(modelo), coalesce(ca_unico, ''), coalesce(ca_peca_facial, ''), coalesce(ca_filtro_cartucho, '')), '\s+', ' ', 'g')) AS chave
   FROM separados
 ), catalogo AS (
   INSERT INTO "epis_catalogo" ("id", "chave", "modelo", "marca", "caUnico", "caPecaFacial", "caFiltroCartucho", "observacao", "updatedAt")
@@ -123,6 +123,6 @@ FROM normalizadas n
 JOIN catalogo c ON c."chave" = n.chave
 CROSS JOIN LATERAL (
   SELECT CASE WHEN trim(parte) LIKE 'Anexo %' THEN trim(parte) ELSE 'Anexo ' || trim(parte) END AS anexo
-  FROM regexp_split_to_table(n.anexos, '\\s*,\\s*') AS parte
+  FROM regexp_split_to_table(n.anexos, '\s*,\s*') AS parte
 ) anexos_independentes
 ON CONFLICT ("epiId", "anexo", "categoria") DO NOTHING;

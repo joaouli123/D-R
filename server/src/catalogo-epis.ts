@@ -137,9 +137,8 @@ function chaveEpi(linhaRecebida: LinhaEpiRecebida) {
     cas.caPecaFacial ?? '',
     cas.caFiltroCartucho ?? '',
   ]
+    .map((parte) => parte.trim().replace(/\s+/g, ' '))
     .join('|')
-    .trim()
-    .replace(/\s+/g, ' ')
     .toLocaleLowerCase('pt-BR')
 }
 
