@@ -166,6 +166,15 @@ const pericia = {
         grau: 'nao_caracterizado',
       },
       {
+        id: 'agn-medicao-sem-unidade',
+        nome: 'Índice adimensional',
+        tipo: 'fisico',
+        medido: 'legado sem unidade que não deve prevalecer',
+        valorMedido: '7.25',
+        criterio: 'quantitativo',
+        grau: 'nao_caracterizado',
+      },
+      {
         id: 'agn-11',
         nome: 'Ácido crômico (névoa)',
         tipo: 'quimico',
@@ -347,8 +356,22 @@ async function main() {
   assert.match(htmlParecer, /CA: 5657/)
   assert.match(htmlParecer, /85 dB\(A\)/)
   assert.match(htmlParecer, /18 % O₂ em volume/)
+  assert.match(htmlParecer, /7,25/)
   assert.doesNotMatch(htmlParecer, /registro legado que não deve prevalecer/)
+  assert.doesNotMatch(htmlParecer, /legado sem unidade que não deve prevalecer/)
   assert.doesNotMatch(htmlParecer, /undefined|null/)
+
+  const corpoTabelaAgentes = htmlParecer.match(
+    /<h2>\d+\. Agentes e Riscos Avaliados<\/h2>\s*<table[^>]*>([\s\S]*?)<\/table>/,
+  )?.[1]
+  assert.ok(corpoTabelaAgentes, 'tabela de agentes não encontrada')
+  assert.equal((corpoTabelaAgentes.match(/<th(?:\s|>)/g) ?? []).length, 7)
+  assert.doesNotMatch(corpoTabelaAgentes, /<th[^>]*>EPIs associados<\/th>/)
+  assert.match(
+    corpoTabelaAgentes,
+    /<td><strong>Acetaldeído<\/strong>[\s\S]*EPIs associados[\s\S]*CA: 5657[\s\S]*<\/td><td>/,
+  )
+  assert.equal((corpoTabelaAgentes.match(/EPIs associados/g) ?? []).length, 1)
 
   // O escape precisa ter neutralizado a <tag> plantada em observacoesAdicionais.
   const escapou = htmlParecer.includes('&lt;tags&gt;') && !htmlParecer.includes('<tags>')

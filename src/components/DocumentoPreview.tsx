@@ -36,8 +36,10 @@ function limiteComUnidade(limite?: string, unidade?: string): string {
 }
 
 function formatarMedicao(agente: AgenteAvaliado): string {
-  if (agente.valorMedido && agente.unidadeMedicao) {
-    return `${agente.valorMedido.replace('.', ',')} ${agente.unidadeMedicao}`
+  const valor = agente.valorMedido?.trim()
+  if (valor) {
+    const formatado = valor.replace('.', ',')
+    return agente.unidadeMedicao ? `${formatado} ${agente.unidadeMedicao}` : formatado
   }
   return agente.medido?.trim() || '—'
 }
@@ -261,16 +263,16 @@ export function DocumentoPreview({
       {t.agentes.length === 0 ? (
         <p className="italic text-ink-400">[Nenhum agente cadastrado]</p>
       ) : (
-        <table>
+        <table className="agentes-table table-fixed">
           <thead>
             <tr>
-              <th>Agente</th>
-              <th className="w-[10%]">CAS</th>
-              <th className="w-[16%]">Anexo NR-15</th>
-              <th className="w-[12%]">Critério</th>
-              <th className="w-[12%]">Grau</th>
-              <th className="w-[20%]">Limite de Tolerância</th>
-              <th className="w-[12%]">Valor Medido</th>
+              <th className="w-[28%]">Agente</th>
+              <th className="w-[9%]">CAS</th>
+              <th className="w-[11%]">Anexo NR-15</th>
+              <th className="w-[13%]">Critério</th>
+              <th className="w-[13%]">Grau</th>
+              <th className="w-[15%]">Limite de Tolerância</th>
+              <th className="w-[11%]">Valor Medido</th>
             </tr>
           </thead>
           <tbody>

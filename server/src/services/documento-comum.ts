@@ -183,8 +183,10 @@ export interface AgenteDocumento {
 }
 
 export function formatarMedicao(agente: AgenteDocumento): string {
-  if (agente.valorMedido && agente.unidadeMedicao) {
-    return `${agente.valorMedido.replace('.', ',')} ${agente.unidadeMedicao}`
+  const valor = agente.valorMedido?.trim()
+  if (valor) {
+    const formatado = valor.replace('.', ',')
+    return agente.unidadeMedicao ? `${formatado} ${agente.unidadeMedicao}` : formatado
   }
   return agente.medido?.trim() || '—'
 }

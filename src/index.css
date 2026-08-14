@@ -60,6 +60,9 @@
   .doc-sheet table {
     @apply w-full border-collapse my-3 text-[10pt];
   }
+  .doc-sheet .agentes-table {
+    table-layout: fixed;
+  }
   .doc-sheet th,
   .doc-sheet td {
     @apply border border-ink-400 px-2 py-1 align-top text-left;
@@ -94,6 +97,17 @@
     border: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
+  }
+  .doc-sheet .agentes-table {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+  .doc-sheet .agentes-table thead {
+    display: table-header-group;
+  }
+  .doc-sheet .agentes-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
   @page {
     size: A4;

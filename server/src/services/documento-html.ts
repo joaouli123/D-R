@@ -53,6 +53,20 @@ function paragrafos(texto?: string | null): string {
   return partes.map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('')
 }
 
+function episNaCelulaAgente(epis: TecnicoJson['agentes'][number]['epis']): string {
+  if (!epis?.length) return ''
+  return `<div class="epis-associados"><strong>EPIs associados</strong><ul>${epis
+    .map((epi) => {
+      const identificacao = [epi.categoria, epi.modelo, epi.marca]
+        .map((parte) => parte.trim())
+        .filter(Boolean)
+        .join(' — ')
+      const cas = formatarCasEpi(epi).map(esc).join('<br>')
+      return `<li>${esc(identificacao)}${cas ? `<br>${cas}` : ''}</li>`
+    })
+    .join('')}</ul></div>`
+}
+
 const linha = (rotulo: string, valor: string): string =>
   `<tr><th>${esc(rotulo)}</th><td>${valor}</td></tr>`
 
@@ -102,6 +116,13 @@ const CSS = `
   table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 10pt; page-break-inside: avoid; }
   th, td { border: 1px solid ${css(MARCA.tinta400)}; padding: 4px 8px; vertical-align: top; text-align: left; text-indent: 0; }
   th { background: ${css(MARCA.tinta100)}; font-weight: 700; }
+  table.tabela-agentes { table-layout: fixed; page-break-inside: auto; font-size: 8.5pt; }
+  table.tabela-agentes thead { display: table-header-group; }
+  table.tabela-agentes tr { break-inside: avoid; page-break-inside: avoid; }
+  table.tabela-agentes th, table.tabela-agentes td { padding: 3px 5px; overflow-wrap: break-word; word-break: normal; }
+  .epis-associados { margin-top: 6px; font-size: 8.5pt; line-height: 1.35; }
+  .epis-associados ul { margin: 2px 0 0; padding-left: 14px; }
+  .epis-associados li { margin-bottom: 3px; }
   .fotos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
   figure { margin: 0; text-align: center; page-break-inside: avoid; }
   figure img { width: 100%; height: 180px; object-fit: cover; border: 1px solid ${css(MARCA.tinta300)}; display: block; }
@@ -214,8 +235,9 @@ export async function htmlDoParecer(
     : ''
 
   const tabelaAgentes = t.agentes?.length
-    ? `<table>
-        <thead><tr><th>Agente</th><th>CAS</th><th>Anexo NR-15</th><th>Critério</th><th>Grau</th><th>Limite de Tolerância</th><th>Valor Medido</th><th>EPIs associados</th></tr></thead>
+    ? `<table class="tabela-agentes">
+        <colgroup><col style="width:28%"><col style="width:9%"><col style="width:11%"><col style="width:13%"><col style="width:13%"><col style="width:15%"><col style="width:11%"></colgroup>
+        <thead><tr><th>Agente</th><th>CAS</th><th>Anexo NR-15</th><th>Critério</th><th>Grau</th><th>Limite de Tolerância</th><th>Valor Medido</th></tr></thead>
         <tbody>${t.agentes
           .map(
             (a) =>
@@ -223,24 +245,11 @@ export async function htmlDoParecer(
                 a.atividadeEnquadrada?.trim()
                   ? `<br><small>Atividade ou referência normativa: ${esc(a.atividadeEnquadrada).replace(/\n/g, '<br>')}</small>`
                   : ''
-              }</td><td>${esc(a.cas || '—')}</td><td>${esc(a.anexoNr15 || '—')}</td><td>${esc(
+              }${episNaCelulaAgente(a.epis)}</td><td>${esc(a.cas || '—')}</td><td>${esc(a.anexoNr15 || '—')}</td><td>${esc(
                 CRITERIO[a.criterio] ?? a.criterio,
               )}</td><td>${esc(a.grau ? (GRAU[a.grau] ?? a.grau) : '—')}</td><td>${esc(
                 limiteComUnidade(a.limiteTolerancia, a.unidadeLimite),
-              )}</td><td>${esc(formatarMedicao(a))}</td><td>${
-                a.epis?.length
-                  ? `<ul>${a.epis
-                      .map((epi) => {
-                        const identificacao = [epi.categoria, epi.modelo, epi.marca]
-                          .map((parte) => parte.trim())
-                          .filter(Boolean)
-                          .join(' — ')
-                        const cas = formatarCasEpi(epi).map(esc).join('<br>')
-                        return `<li>${esc(identificacao)}${cas ? `<br>${cas}` : ''}</li>`
-                      })
-                      .join('')}</ul>`
-                  : ''
-              }</td></tr>`,
+              )}</td><td>${esc(formatarMedicao(a))}</td></tr>`,
           )
           .join('')}</tbody>
       </table>`

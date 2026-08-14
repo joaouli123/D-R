@@ -133,6 +133,22 @@ function celula(conteudo: string, opcoes: { cabecalho?: boolean; largura?: numbe
   })
 }
 
+function episNaCelulaAgente(epis: TecnicoJson['agentes'][number]['epis']): string[] {
+  if (!epis?.length) return []
+  return [
+    'EPIs associados',
+    ...epis.map((epi) =>
+      [
+        [epi.categoria, epi.modelo, epi.marca]
+          .map((parte) => parte.trim())
+          .filter(Boolean)
+          .join(' — '),
+        ...formatarCasEpi(epi),
+      ].join('\n'),
+    ),
+  ]
+}
+
 const tabela = (linhas: TableRow[]) =>
   new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: linhas })
 
@@ -375,20 +391,21 @@ function docParecer(
     filhos.push(
       tabela([
         new TableRow({
+          cantSplit: true,
           children: [
-            celula('Agente', { cabecalho: true }),
-            celula('CAS', { cabecalho: true, largura: 14 }),
-            celula('Anexo NR-15', { cabecalho: true, largura: 14 }),
-            celula('Critério', { cabecalho: true, largura: 14 }),
-            celula('Grau', { cabecalho: true, largura: 16 }),
-            celula('Limite de Tolerância', { cabecalho: true, largura: 20 }),
-            celula('Valor Medido', { cabecalho: true }),
-            celula('EPIs associados', { cabecalho: true }),
+            celula('Agente', { cabecalho: true, largura: 28 }),
+            celula('CAS', { cabecalho: true, largura: 9 }),
+            celula('Anexo NR-15', { cabecalho: true, largura: 11 }),
+            celula('Critério', { cabecalho: true, largura: 13 }),
+            celula('Grau', { cabecalho: true, largura: 13 }),
+            celula('Limite de Tolerância', { cabecalho: true, largura: 15 }),
+            celula('Valor Medido', { cabecalho: true, largura: 11 }),
           ],
         }),
         ...t.agentes.map(
           (a) =>
             new TableRow({
+              cantSplit: true,
               children: [
                 celula(
                   [
@@ -396,6 +413,7 @@ function docParecer(
                     a.atividadeEnquadrada?.trim()
                       ? `Atividade ou referência normativa: ${a.atividadeEnquadrada}`
                       : undefined,
+                    ...episNaCelulaAgente(a.epis),
                   ]
                     .filter(Boolean)
                     .join('\n'),
@@ -406,19 +424,6 @@ function docParecer(
                 celula(a.grau ? (GRAU[a.grau] ?? a.grau) : '—'),
                 celula(limiteComUnidade(a.limiteTolerancia, a.unidadeLimite)),
                 celula(formatarMedicao(a)),
-                celula(
-                  a.epis
-                    ?.map((epi) =>
-                      [
-                        [epi.categoria, epi.modelo, epi.marca]
-                          .map((parte) => parte.trim())
-                          .filter(Boolean)
-                          .join(' — '),
-                        ...formatarCasEpi(epi),
-                      ].join('\n'),
-                    )
-                    .join('\n\n') ?? '',
-                ),
               ],
             }),
         ),

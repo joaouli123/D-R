@@ -75,6 +75,14 @@ const pericia = {
         unidadeMedicao: '% O₂ em volume',
         criterio: 'quantitativo',
       },
+      {
+        id: 'agente-medicao-sem-unidade',
+        nome: 'Índice adimensional',
+        tipo: 'fisico',
+        medido: 'legado sem unidade que não deve prevalecer',
+        valorMedido: '7.25',
+        criterio: 'quantitativo',
+      },
     ],
     normasReferencias: '',
     equipamentosAnalisados: '',
@@ -109,5 +117,29 @@ describe('DocumentoPreview', () => {
     expect(html).toContain('85 dB(A)')
     expect(html).toContain('18 % O₂ em volume')
     expect(html.match(/EPIs associados/g) ?? []).toHaveLength(1)
+  })
+
+  it('preserva valor medido estruturado mesmo quando a unidade não foi informada', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={pericia} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    expect(html).toContain('7,25')
+    expect(html).not.toContain('legado sem unidade que não deve prevalecer')
+  })
+
+  it('mantém sete colunas e incorpora os EPIs somente na célula do agente', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={pericia} empresas={[]} titulo="Parecer de teste" />,
+    )
+    const inicio = html.indexOf('Agentes e Riscos Avaliados')
+    const fim = html.indexOf('Normas e Referências Técnicas Utilizadas')
+    const secaoAgentes = html.slice(inicio, fim)
+
+    expect(secaoAgentes).toContain('<table class="agentes-table table-fixed">')
+    expect(secaoAgentes.match(/<th(?:\s|>)/g) ?? []).toHaveLength(7)
+    expect(secaoAgentes).not.toMatch(/<th[^>]*>EPIs associados<\/th>/)
+    expect(secaoAgentes).toMatch(/<td><p>Acetaldeído<\/p>[\s\S]*EPIs associados[\s\S]*CA: 5657[\s\S]*<\/td><td>/)
+    expect(secaoAgentes.match(/EPIs associados/g) ?? []).toHaveLength(1)
   })
 })
