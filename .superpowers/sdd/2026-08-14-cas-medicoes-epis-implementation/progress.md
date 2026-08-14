@@ -7,3 +7,5 @@ Task 1: complete (commits 37c6668..f2e0722, review clean)
 Task 2: minor (deferred): smoke não afirma where.aplicacoes.some e take: 100.
 Task 2: complete (commits f2e0722..7b0f047, self-review clean; PostgreSQL execution deferred by user)
 Task 2: fix round 1/5 (2 addressed, 0 open; commit 97f9cbd; minor deferred)
+Task 5: fix round 1/5 (2 Important addressed, 0 open; commit e2cc2ee)
+Task 5: verification — smoke HTML/PDF/DOCX, frontend 45 tests, builds e inspeção PDF/OOXML aprovados; render visual DOCX indisponível sem LibreOffice.

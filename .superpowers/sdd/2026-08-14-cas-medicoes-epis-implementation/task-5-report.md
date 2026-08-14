@@ -53,3 +53,35 @@ Concluída. Commit funcional: `74609dec184be5bd39434e50cc92eccc59aa692b` (`Exibe
 - Por prioridade explícita de prazo, não houve inspeção visual manual prolongada dos artefatos. O smoke validou conteúdo HTML, fonte do PDF, assinaturas binárias PDF/DOCX e geração dos quatro tipos.
 - A tabela do parecer ganhou duas colunas; a geração automatizada passou, mas a densidade visual em documentos com textos longos merece conferência humana posterior.
 - A alteração preexistente em `progress.md` foi preservada e excluída do commit funcional.
+
+## Fix round 1 — Important findings
+
+Commit funcional: `e2cc2ee1e4a613e07118881ea6aa8c6a652e66db` (`Corrige medicoes e layout dos documentos`).
+
+### Findings corrigidos
+
+- `formatarMedicao` na prévia e no servidor agora preserva `valorMedido` mesmo sem `unidadeMedicao`; a unidade é acrescentada somente quando existe e o legado só é usado quando o valor estruturado está ausente.
+- HTML/PDF e DOCX voltaram a ter sete colunas. Os EPIs são renderizados dentro da célula `Agente`, como na prévia, e nenhum rótulo, linha ou célula EPI é criado para snapshots vazios.
+- A tabela usa larguras proporcionais somando 100%. HTML/PDF e impressão da prévia permitem quebra entre linhas, repetem o cabeçalho e evitam dividir uma linha; DOCX marca todas as linhas com `cantSplit`.
+
+### TDD — RED/GREEN
+
+- RED da prévia: `npm.cmd run test -- --run src/components/DocumentoPreview.test.tsx` retornou código 1 porque `7,25` não era renderizado; após corrigir o assert estrutural, restou 1 falha real e 3 testes aprovados.
+- RED do smoke: primeiro código 1 por ausência de `7,25`; após a correção isolada da medição, código 1 com `8 !== 7`, comprovando a coluna EPI extra.
+- GREEN da prévia: código 0; 4/4 testes aprovados.
+- GREEN documental com env dummy: código 0; parecer HTML 10753 B, PDF 135620 B e DOCX 13929 B; demais tipos também gerados com assinaturas válidas.
+
+### Verificação final
+
+- DOCX estrutural: 9 linhas, todas com 7 células; `cantSplit` em 9/9; um único rótulo `EPIs associados`; nenhum cabeçalho EPI.
+- PDF visual: 4 páginas inspecionadas após o render final; cabeçalho repetido na continuação da tabela, nenhuma linha dividida, sem clipping ou sobreposição.
+- Render canônico do DOCX: indisponível porque LibreOffice/`soffice` não existe no ambiente; o comando falhou em 2 s e a limitação foi coberta pela inspeção OOXML automatizada.
+- `cd server; npm.cmd run typecheck && npm.cmd run build`: código 0.
+- `npm.cmd run test -- --run`: código 0; 5 arquivos e 45 testes aprovados.
+- `npm.cmd run build`: código 0; 1608 módulos; build concluído em 12,38 s.
+- `git diff --check`: código 0; somente avisos de normalização LF/CRLF.
+- Temporários removidos: `tmp/pdfs/task5-fix` e `tmp/docx-task5-render`.
+
+### Concerns
+
+- A inspeção visual do DOCX em LibreOffice não pôde ser executada neste ambiente. O smoke binário, a validação OOXML e o build do gerador passaram; uma abertura no Word/LibreOffice continua sendo uma verificação manual opcional.
