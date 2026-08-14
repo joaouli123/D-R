@@ -154,6 +154,51 @@ export function limiteComUnidade(limite?: string, unidade?: string): string {
   return jaContemUnidade ? valor : `${valor} (${medida})`
 }
 
+export interface EpiDocumento {
+  catalogoId?: string
+  categoria: string
+  modelo: string
+  marca: string
+  caUnico?: string
+  caPecaFacial?: string
+  caFiltroCartucho?: string
+  observacao?: string
+}
+
+export interface AgenteDocumento {
+  id: string
+  nome: string
+  cas?: string
+  anexoNr15?: string
+  referenciaNormativaId?: string
+  atividadeEnquadrada?: string
+  unidadeLimite?: string
+  limiteTolerancia?: string
+  medido?: string
+  valorMedido?: string
+  unidadeMedicao?: 'ppm' | 'mg/m³' | '% O₂ em volume'
+  epis?: EpiDocumento[]
+  criterio: string
+  grau?: string
+}
+
+export function formatarMedicao(agente: AgenteDocumento): string {
+  if (agente.valorMedido && agente.unidadeMedicao) {
+    return `${agente.valorMedido.replace('.', ',')} ${agente.unidadeMedicao}`
+  }
+  return agente.medido?.trim() || '—'
+}
+
+export function formatarCasEpi(epi: EpiDocumento): string[] {
+  return [
+    epi.caUnico?.trim() ? `CA: ${epi.caUnico.trim()}` : undefined,
+    epi.caPecaFacial?.trim() ? `CA da peça facial: ${epi.caPecaFacial.trim()}` : undefined,
+    epi.caFiltroCartucho?.trim()
+      ? `CA do cartucho/filtro: ${epi.caFiltroCartucho.trim()}`
+      : undefined,
+  ].filter((linha): linha is string => Boolean(linha))
+}
+
 /** Estrutura do preenchimento técnico guardada em Pericia.tecnico. */
 export interface TecnicoJson {
   apresentacao: string
@@ -170,31 +215,7 @@ export interface TecnicoJson {
     fim?: string
     descricaoAtividades?: string
   }[]
-  agentes: {
-    id: string
-    nome: string
-    cas?: string
-    anexoNr15?: string
-    referenciaNormativaId?: string
-    atividadeEnquadrada?: string
-    unidadeLimite?: string
-    limiteTolerancia?: string
-    medido?: string
-    valorMedido?: string
-    unidadeMedicao?: 'ppm' | 'mg/m³' | '% O₂ em volume'
-    epis?: {
-      catalogoId?: string
-      categoria: string
-      modelo: string
-      marca: string
-      caUnico?: string
-      caPecaFacial?: string
-      caFiltroCartucho?: string
-      observacao?: string
-    }[]
-    criterio: string
-    grau?: string
-  }[]
+  agentes: AgenteDocumento[]
   normasReferencias: string
   equipamentosAnalisados: string
   informacoesLevantadas: string

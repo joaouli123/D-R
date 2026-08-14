@@ -19,6 +19,8 @@ import {
   data,
   emParagrafos,
   extenso,
+  formatarCasEpi,
+  formatarMedicao,
   hoje,
   limiteComUnidade,
   ATUACAO,
@@ -213,7 +215,7 @@ export async function htmlDoParecer(
 
   const tabelaAgentes = t.agentes?.length
     ? `<table>
-        <thead><tr><th>Agente</th><th style="width:12%">CAS</th><th style="width:13%">Anexo NR-15</th><th style="width:12%">Critério</th><th style="width:14%">Grau</th><th style="width:20%">Limite de Tolerância</th></tr></thead>
+        <thead><tr><th>Agente</th><th>CAS</th><th>Anexo NR-15</th><th>Critério</th><th>Grau</th><th>Limite de Tolerância</th><th>Valor Medido</th><th>EPIs associados</th></tr></thead>
         <tbody>${t.agentes
           .map(
             (a) =>
@@ -225,7 +227,20 @@ export async function htmlDoParecer(
                 CRITERIO[a.criterio] ?? a.criterio,
               )}</td><td>${esc(a.grau ? (GRAU[a.grau] ?? a.grau) : '—')}</td><td>${esc(
                 limiteComUnidade(a.limiteTolerancia, a.unidadeLimite),
-              )}</td></tr>`,
+              )}</td><td>${esc(formatarMedicao(a))}</td><td>${
+                a.epis?.length
+                  ? `<ul>${a.epis
+                      .map((epi) => {
+                        const identificacao = [epi.categoria, epi.modelo, epi.marca]
+                          .map((parte) => parte.trim())
+                          .filter(Boolean)
+                          .join(' — ')
+                        const cas = formatarCasEpi(epi).map(esc).join('<br>')
+                        return `<li>${esc(identificacao)}${cas ? `<br>${cas}` : ''}</li>`
+                      })
+                      .join('')}</ul>`
+                  : ''
+              }</td></tr>`,
           )
           .join('')}</tbody>
       </table>`

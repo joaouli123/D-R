@@ -1,5 +1,5 @@
 import { Logo } from '@/components/Logo'
-import type { Empresa, Pericia, Usuario } from '@/types'
+import type { AgenteAvaliado, Empresa, EpiSelecionado, Pericia, Usuario } from '@/types'
 import { extenso, formatDate } from '@/lib/utils'
 import { labelAnexoNr15 } from '@/content/anexosNr15'
 import { dadosPapel } from '@/lib/participantes'
@@ -33,6 +33,23 @@ function limiteComUnidade(limite?: string, unidade?: string): string {
   return componentes.length > 0 && componentes.every((parte) => valor.includes(parte))
     ? valor
     : `${valor} (${medida})`
+}
+
+function formatarMedicao(agente: AgenteAvaliado): string {
+  if (agente.valorMedido && agente.unidadeMedicao) {
+    return `${agente.valorMedido.replace('.', ',')} ${agente.unidadeMedicao}`
+  }
+  return agente.medido?.trim() || '—'
+}
+
+function formatarCasEpi(epi: EpiSelecionado): string[] {
+  return [
+    epi.caUnico?.trim() ? `CA: ${epi.caUnico.trim()}` : undefined,
+    epi.caPecaFacial?.trim() ? `CA da peça facial: ${epi.caPecaFacial.trim()}` : undefined,
+    epi.caFiltroCartucho?.trim()
+      ? `CA do cartucho/filtro: ${epi.caFiltroCartucho.trim()}`
+      : undefined,
+  ].filter((linha): linha is string => Boolean(linha))
 }
 
 function Paragrafos({ texto }: { texto: string }) {
@@ -266,13 +283,33 @@ export function DocumentoPreview({
                       Atividade ou referência normativa: {a.atividadeEnquadrada}
                     </p>
                   )}
+                  {a.epis && a.epis.length > 0 && (
+                    <div className="mt-2 text-xs text-ink-600">
+                      <p className="font-bold">EPIs associados</p>
+                      <ul className="list-disc pl-4">
+                        {a.epis.map((epi, index) => (
+                          <li key={epi.catalogoId ?? `${epi.categoria}-${epi.modelo}-${index}`}>
+                            {[epi.categoria, epi.modelo, epi.marca]
+                              .map((parte) => parte.trim())
+                              .filter(Boolean)
+                              .join(' — ')}
+                            {formatarCasEpi(epi).map((ca) => (
+                              <span className="block" key={ca}>
+                                {ca}
+                              </span>
+                            ))}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </td>
                 <td>{a.cas || '—'}</td>
                 <td>{labelAnexoNr15(a.anexoNr15) || '—'}</td>
                 <td>{CRITERIO[a.criterio]}</td>
                 <td>{a.grau ? GRAU[a.grau] : '—'}</td>
                 <td>{limiteComUnidade(a.limiteTolerancia, a.unidadeLimite)}</td>
-                <td>{a.medido || '—'}</td>
+                <td>{formatarMedicao(a)}</td>
               </tr>
             ))}
           </tbody>

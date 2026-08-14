@@ -10,6 +10,7 @@
 // ============================================================
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import assert from 'node:assert/strict'
 import type { DocumentoGerado, Empresa, Usuario } from '@prisma/client'
 import type { PericiaCompleta } from '../src/mappers.js'
 import { montarHtml } from '../src/services/documento-html.js'
@@ -117,8 +118,52 @@ const pericia = {
         nome: 'Ruído contínuo',
         tipo: 'fisico',
         anexoNr15: 'Anexo 1',
+        medido: '85 dB(A)',
         criterio: 'quantitativo',
         grau: 'medio',
+      },
+      {
+        id: 'agn-medicao',
+        nome: 'Acetaldeído',
+        tipo: 'quimico',
+        cas: '75-07-0',
+        anexoNr15: 'Anexo 11',
+        unidadeLimite: 'ppm',
+        limiteTolerancia: '78 ppm',
+        medido: 'registro legado que não deve prevalecer',
+        valorMedido: '12.5',
+        unidadeMedicao: 'ppm',
+        epis: [
+          {
+            catalogoId: 'epi-duplo-historico',
+            categoria: 'Proteção respiratória',
+            modelo: 'Respirador reutilizável',
+            marca: 'Marca histórica',
+            caPecaFacial: '4115',
+            caFiltroCartucho: '5635',
+          },
+          {
+            catalogoId: 'epi-unico-historico',
+            categoria: 'Proteção respiratória',
+            modelo: 'PFF2',
+            marca: 'Marca histórica',
+            caUnico: '5657',
+          },
+        ],
+        criterio: 'quantitativo',
+        grau: 'medio',
+      },
+      {
+        id: 'agn-oxigenio',
+        nome: 'Oxigênio',
+        tipo: 'quimico',
+        anexoNr15: 'Anexo 11',
+        unidadeLimite: '% O₂ em volume',
+        limiteTolerancia: '18 % O₂ em volume',
+        valorMedido: '18',
+        unidadeMedicao: '% O₂ em volume',
+        criterio: 'quantitativo',
+        grau: 'nao_caracterizado',
       },
       {
         id: 'agn-11',
@@ -294,6 +339,16 @@ async function main() {
   }
 
   const htmlParecer = await fs.readFile(path.join(SAIDA, 'parecer.html'), 'utf8')
+
+  assert.match(htmlParecer, /12,5 ppm/)
+  assert.match(htmlParecer, /Limite de Tolerância.*78 ppm/s)
+  assert.match(htmlParecer, /CA da peça facial: 4115/)
+  assert.match(htmlParecer, /CA do cartucho\/filtro: 5635/)
+  assert.match(htmlParecer, /CA: 5657/)
+  assert.match(htmlParecer, /85 dB\(A\)/)
+  assert.match(htmlParecer, /18 % O₂ em volume/)
+  assert.doesNotMatch(htmlParecer, /registro legado que não deve prevalecer/)
+  assert.doesNotMatch(htmlParecer, /undefined|null/)
 
   // O escape precisa ter neutralizado a <tag> plantada em observacoesAdicionais.
   const escapou = htmlParecer.includes('&lt;tags&gt;') && !htmlParecer.includes('<tags>')

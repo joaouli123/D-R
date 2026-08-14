@@ -31,6 +31,8 @@ import {
   data,
   emParagrafos,
   extenso,
+  formatarCasEpi,
+  formatarMedicao,
   hoje,
   limiteComUnidade,
   ATUACAO,
@@ -380,6 +382,8 @@ function docParecer(
             celula('Critério', { cabecalho: true, largura: 14 }),
             celula('Grau', { cabecalho: true, largura: 16 }),
             celula('Limite de Tolerância', { cabecalho: true, largura: 20 }),
+            celula('Valor Medido', { cabecalho: true }),
+            celula('EPIs associados', { cabecalho: true }),
           ],
         }),
         ...t.agentes.map(
@@ -401,6 +405,20 @@ function docParecer(
                 celula(CRITERIO[a.criterio] ?? a.criterio),
                 celula(a.grau ? (GRAU[a.grau] ?? a.grau) : '—'),
                 celula(limiteComUnidade(a.limiteTolerancia, a.unidadeLimite)),
+                celula(formatarMedicao(a)),
+                celula(
+                  a.epis
+                    ?.map((epi) =>
+                      [
+                        [epi.categoria, epi.modelo, epi.marca]
+                          .map((parte) => parte.trim())
+                          .filter(Boolean)
+                          .join(' — '),
+                        ...formatarCasEpi(epi),
+                      ].join('\n'),
+                    )
+                    .join('\n\n') ?? '',
+                ),
               ],
             }),
         ),
