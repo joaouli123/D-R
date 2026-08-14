@@ -7,7 +7,7 @@ Otimizar a avaliação de agentes químicos da NR-15, principalmente do Anexo 11
 ## Fontes recebidas e limites dos dados
 
 - `nr-15-anexo-11_preenchido_completo.xlsx`: contém agentes, referências “vide”, limites em ppm e mg/m³ e alguns números CAS. Somente os CAS presentes no arquivo serão importados nesta etapa.
-- `ANEXOS 11. 12 e 13.Lista_Respiradores_Com_Mais_PFFs.xlsx`: contém 24 configurações válidas de respiradores, categorias, marca, CA, anexos aplicáveis e explicação para conjuntos com dois CAs.
+- As três planilhas de respiradores recebidas somam 61 linhas válidas e 34 configurações exatas únicas por marca, modelo e CA. Linhas repetidas representam aplicações ou categorias, não novos equipamentos.
 - Agentes sem CAS continuam pesquisáveis e selecionáveis. O CAS permanece vazio até o cliente fornecer arquivos complementares.
 - O sistema não pesquisará nem completará CAS usando fontes externas nesta etapa.
 
@@ -61,17 +61,25 @@ O CAS será tratado como identificador pesquisável, mas não obrigatório nem p
 
 Será criada uma entidade persistente de equipamento com:
 
-- categoria de proteção;
 - modelo/configuração;
 - marca;
 - CA da peça facial, quando aplicável;
 - CA do filtro/cartucho, quando aplicável;
 - CA único para PFF, quando aplicável;
-- anexos NR-15 relacionados;
 - explicação/observação;
 - estado ativo/inativo.
 
 Os valores `4115 / 5635`, por exemplo, serão armazenados como CA da peça facial e CA do cartucho, não como um único texto opaco.
+
+### Aplicações por anexo e categoria
+
+- O equipamento será cadastrado uma única vez, identificado por marca, modelo/configuração e conjunto de CAs.
+- Os Anexos 11, 12 e 13 serão vínculos independentes, não um texto agrupado como `Anexo 11, 13`.
+- Categorias como `Formaldeído`, `Mercúrio`, `Particulados / PFF2` e `Negro de Fumo` também serão vínculos independentes.
+- Um mesmo EPI poderá ter várias aplicações sem duplicar marca, modelo ou CA.
+- A interface filtrará as aplicações pelo anexo em uso, mantendo listas visualmente individualizadas.
+- A importação das três planilhas consolidará 61 linhas em 34 configurações exatas únicas e seus respectivos vínculos.
+- Nomes semelhantes, mas não idênticos, não serão unidos automaticamente; divergências serão registradas para conferência.
 
 ### Associação na perícia
 
@@ -86,7 +94,7 @@ O agente avaliado manterá:
 
 ## Regras de sugestão
 
-- Equipamentos serão filtrados primeiro pelo anexo da referência.
+- Equipamentos serão filtrados primeiro por um vínculo explícito com o anexo da referência.
 - Para agentes com categoria específica reconhecida, serão priorizadas categorias como vapores orgânicos, gases ácidos, amônia e aminas, formaldeído ou mercúrio.
 - `Multigases` poderá aparecer como alternativa compatível, nunca como escolha automática.
 - Para agentes sem mapeamento específico, o catálogo continuará pesquisável, mas não haverá recomendação técnica presumida.
@@ -108,11 +116,11 @@ Campos ausentes serão omitidos ou exibidos como `—`, sem inventar informaçõ
 
 ## Backend e importação
 
-- A planilha de respiradores será convertida em seed/migração idempotente do catálogo.
+- As três planilhas de respiradores serão consolidadas em seed/migração idempotente do catálogo e das aplicações.
 - Atualizações futuras poderão complementar o catálogo sem duplicar equipamentos.
 - A API validará valores numéricos, unidades permitidas e referências de EPI.
 - Alterações de catálogo não apagarão associações históricas.
-- A importação rejeitará linhas sem modelo e registrará duplicidades ou CAs malformados.
+- A importação rejeitará linhas sem modelo, deduplicará configurações exatas e registrará divergências ou CAs malformados.
 
 ## Compatibilidade e erros
 
@@ -129,7 +137,8 @@ Campos ausentes serão omitidos ou exibidos como `—`, sem inventar informaçõ
 - Agente sem CAS continua selecionável.
 - Valor medido rejeita texto e preserva decimais.
 - Unidade altera o limite exibido sem realizar conversão.
-- Importação idempotente dos 24 equipamentos válidos.
+- Importação idempotente das 61 linhas válidas em 34 configurações exatas únicas.
+- Vínculos independentes para Anexos 11, 12 e 13 e para cada categoria recebida.
 - Separação correta de CA único e CA duplo.
 - Sugestões por categoria sem seleção automática.
 - Associação manual de mais de um EPI.

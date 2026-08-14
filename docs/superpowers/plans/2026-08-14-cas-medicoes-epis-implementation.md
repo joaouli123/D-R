@@ -4,7 +4,7 @@
 
 **Goal:** Estruturar CAS e medições dos agentes do Anexo 11, importar o catálogo recebido de respiradores e permitir associação manual de EPI/CA com sugestões por categoria em tela, PDF e DOCX.
 
-**Architecture:** A base normativa permanece versionada no frontend, agora com CAS opcional e limites separados por unidade. O catálogo de EPIs será persistido no PostgreSQL e exposto por uma API somente leitura; a perícia guardará snapshots dos equipamentos selecionados dentro do JSON técnico para preservar documentos históricos. A interface sugerirá equipamentos, mas somente uma ação explícita do usuário os associará ao agente.
+**Architecture:** A base normativa permanece versionada no frontend, agora com CAS opcional e limites separados por unidade. O catálogo de EPIs será normalizado no PostgreSQL: cada configuração existe uma vez e possui vínculos independentes para anexos e categorias; a perícia guardará snapshots dos equipamentos selecionados dentro do JSON técnico para preservar documentos históricos. A interface filtrará por anexo e sugerirá equipamentos, mas somente uma ação explícita do usuário os associará ao agente.
 
 **Tech Stack:** React 18, TypeScript, Vite, Vitest, Node.js, Fastify, Zod, Prisma 5, PostgreSQL, Puppeteer/PDF e `docx`.
 
@@ -16,7 +16,8 @@
 - Não converter automaticamente ppm e mg/m³.
 - Valor medido deve ser numérico e a unidade deve ser armazenada separadamente.
 - Sugestão de EPI nunca equivale a seleção, fornecimento, validade, eficácia ou neutralização automática.
-- Importar exatamente as 24 linhas válidas da planilha de respiradores; ignorar a linha vazia final.
+- Consolidar as três planilhas recebidas: 61 linhas válidas, 34 configurações exatas únicas por marca, modelo e CA, com aplicações independentes por anexo e categoria.
+- Não duplicar equipamento para individualizar Anexos 11, 12 e 13; individualizar por vínculos e filtros.
 - Preservar perícias antigas e medições textuais ambíguas sem perda silenciosa.
 - Manter consistência entre tela, API, prévia, PDF e DOCX.
 - Todo task deve terminar em commit próprio e revisão antes do próximo task.
@@ -31,7 +32,7 @@
 - `src/lib/medicoes.ts`: parsing compatível e validação de valor/unidade.
 - `src/types/index.ts`: snapshots de medição e EPI usados no frontend.
 - `server/prisma/schema.prisma`: catálogo persistente de EPI.
-- `server/prisma/migrations/20260814_catalogo_epi/migration.sql`: estrutura e carga idempotente dos 24 equipamentos.
+- `server/prisma/migrations/20260814_catalogo_epi/migration.sql`: estrutura normalizada e carga idempotente das configurações e aplicações.
 - `server/src/routes/epis.ts`: consulta filtrável do catálogo.
 - `server/src/routes/pericias.ts`: validação dos novos snapshots dentro de `tecnico.agentes`.
 - `src/services/api.ts`: cliente da API de EPIs.
@@ -152,7 +153,7 @@ git commit -m "Estrutura CAS e medicoes do Anexo 11"
 
 ---
 
-### Task 2: Catálogo persistente dos 24 respiradores
+### Task 2: Catálogo normalizado de respiradores e aplicações
 
 **Files:**
 - Modify: `server/prisma/schema.prisma`
@@ -164,14 +165,14 @@ git commit -m "Estrutura CAS e medicoes do Anexo 11"
 - Modify: `server/package.json`
 
 **Interfaces:**
-- Produces: `GET /epis?q=&categoria=&anexo=` retornando `EpiCatalogo[]`.
+- Produces: `GET /epis?q=&categoria=&anexo=` retornando configurações únicas com aplicações filtradas.
 - Produces: `sugerirEpis(categoriaProtecao, anexoId, itens): EpiCatalogo[]` como função pura testável.
 
 - [ ] **Step 1: escrever smoke falho para catálogo e sugestões**
 
 ```ts
-assert.equal(EPIS_RECEBIDOS.length, 24)
-assert.equal(new Set(EPIS_RECEBIDOS.map((x) => x.modelo)).size, 24)
+assert.equal(LINHAS_EPI_RECEBIDAS.length, 61)
+assert.equal(configuracoesUnicas(LINHAS_EPI_RECEBIDAS).length, 34)
 assert.deepEqual(
   separarCas('4115 / 5635'),
   { caPecaFacial: '4115', caFiltroCartucho: '5635', caUnico: null },
@@ -193,34 +194,47 @@ Expected: FAIL porque o script, os dados e `separarCas` ainda não existem.
 ```prisma
 model EpiCatalogo {
   id                String   @id @default(uuid())
-  categoria         String
-  modelo            String   @unique
+  chave             String   @unique
+  modelo            String
   marca              String
   caUnico            String?
   caPecaFacial       String?
   caFiltroCartucho   String?
-  anexos             String[]
   observacao         String?
   ativo              Boolean  @default(true)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+  aplicacoes         EpiAplicacao[]
 
-  @@index([categoria])
   @@map("epis_catalogo")
+}
+
+model EpiAplicacao {
+  id          String @id @default(uuid())
+  epiId       String
+  anexo       String
+  categoria   String
+  epi         EpiCatalogo @relation(fields: [epiId], references: [id], onDelete: Cascade)
+
+  @@unique([epiId, anexo, categoria])
+  @@index([anexo, categoria])
+  @@map("epis_aplicacoes")
 }
 ```
 
-A migração deve criar a tabela e inserir as 24 linhas com `INSERT ... ON CONFLICT (modelo) DO UPDATE`, mantendo a carga idempotente.
+A migração deve criar as duas tabelas, consolidar cada configuração por marca + modelo + CAs e inserir aplicações independentes para cada combinação de anexo e categoria. `chave` será a concatenação normalizada e estável de marca, modelo e CAs; usar `ON CONFLICT (chave) DO UPDATE` e `ON CONFLICT (epiId, anexo, categoria) DO NOTHING` para manter idempotência mesmo quando algum CA for nulo.
 
 - [ ] **Step 4: criar catálogo tipado e regra de sugestão**
 
 ```ts
-export function sugerirEpis(categoria: string | undefined, anexo: string, itens: EpiCatalogo[]) {
+export function sugerirEpis(categoria: string | undefined, anexo: string, itens: EpiCatalogoComAplicacoes[]) {
   return itens
-    .filter((item) => item.ativo && item.anexos.includes(anexo))
+    .filter((item) => item.ativo && item.aplicacoes.some((a) => a.anexo === anexo))
     .sort((a, b) => {
-      const pa = a.categoria === categoria ? 0 : a.categoria === 'Multigases' ? 1 : 2
-      const pb = b.categoria === categoria ? 0 : b.categoria === 'Multigases' ? 1 : 2
+      const categoriasA = a.aplicacoes.filter((x) => x.anexo === anexo).map((x) => x.categoria)
+      const categoriasB = b.aplicacoes.filter((x) => x.anexo === anexo).map((x) => x.categoria)
+      const pa = categoriasA.includes(categoria ?? '') ? 0 : categoriasA.includes('Multigases') ? 1 : 2
+      const pb = categoriasB.includes(categoria ?? '') ? 0 : categoriasB.includes('Multigases') ? 1 : 2
       return pa - pb || a.modelo.localeCompare(b.modelo, 'pt-BR')
     })
 }
@@ -228,13 +242,13 @@ export function sugerirEpis(categoria: string | undefined, anexo: string, itens:
 
 - [ ] **Step 5: expor endpoint validado e registrá-lo no servidor**
 
-Aceitar `q`, `categoria` e `anexo` como strings opcionais; filtrar apenas registros ativos; limitar a 100 resultados; pesquisar `modelo`, `marca`, `categoria` e os três campos de CA sem interpolar SQL manual.
+Aceitar `q`, `categoria` e `anexo` como strings opcionais; filtrar apenas registros ativos; aplicar `anexo` e `categoria` sobre `EpiAplicacao`; limitar a 100 configurações únicas; pesquisar `modelo`, `marca`, categorias e os três campos de CA sem interpolar SQL manual.
 
 - [ ] **Step 6: executar Prisma, typecheck, build e smoke**
 
 Run: `cd server && npm.cmd run prisma:generate && npm.cmd run typecheck && npm.cmd run build && npm.cmd run smoke:epis`
 
-Expected: catálogo com 24 itens, 24 modelos únicos, 4 PFFs com CA único e separação correta dos CAs duplos.
+Expected: 61 linhas de origem consolidadas em 34 configurações exatas únicas, vínculos separados para Anexos 11, 12 e 13, duplicidades de categoria preservadas como aplicações e separação correta dos CAs duplos.
 
 - [ ] **Step 7: commit**
 
@@ -465,7 +479,7 @@ Expected: todos os comandos PASS.
 
 - [ ] **Step 2: validar migração em banco temporário PostgreSQL**
 
-Aplicar `prisma migrate deploy` em banco descartável, executar novamente e confirmar idempotência da carga com `SELECT count(*) FROM epis_catalogo` igual a 24.
+Aplicar `prisma migrate deploy` em banco descartável, executar novamente e confirmar idempotência da carga com `SELECT count(*) FROM epis_catalogo` igual a 34 e nenhuma duplicidade em `epis_aplicacoes` para `(epiId, anexo, categoria)`.
 
 - [ ] **Step 3: realizar teste manual da jornada**
 
