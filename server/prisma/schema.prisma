@@ -333,3 +333,32 @@ model DocumentoGerado {
   @@map("documentos")
 }
 
+model EpiCatalogo {
+  id                String   @id @default(uuid())
+  chave             String   @unique
+  modelo            String
+  marca             String
+  caUnico           String?
+  caPecaFacial      String?
+  caFiltroCartucho  String?
+  observacao        String?
+  ativo             Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  aplicacoes        EpiAplicacao[]
+
+  @@map("epis_catalogo")
+}
+
+model EpiAplicacao {
+  id        String @id @default(uuid())
+  epiId     String
+  anexo     String
+  categoria String
+  epi       EpiCatalogo @relation(fields: [epiId], references: [id], onDelete: Cascade)
+
+  @@unique([epiId, anexo, categoria])
+  @@index([anexo, categoria])
+  @@map("epis_aplicacoes")
+}
+

@@ -20,6 +20,7 @@ async function iniciar() {
     console.log(`  ▸ porta ........ ${env.PORT}`)
     console.log(`  ▸ ambiente ..... ${env.NODE_ENV}`)
     console.log(`  ▸ uploads ...... ${PASTA_UPLOADS}`)
+    console.log(`  ▸ catálogo EPI . /epis`)
     console.log(`  ▸ CORS ......... ${env.corsOrigins.join(', ')}\n`)
   })
 
