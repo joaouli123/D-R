@@ -9,6 +9,8 @@
 - Catálogo de EPI: 61 linhas, 34 configurações únicas e 57 aplicações; rota e filtros aprovados.
 - Documentos: quatro tipos gerados em HTML, PDF e DOCX; escaping, NR-15, unidades e seções aprovados.
 - `git diff --check`: aprovado antes da publicação.
+- Revisão final: priorização de EPI por categoria, unidade vazia e eficácia documental corrigidas e cobertas por regressão.
+- Jornada manual local aprovada no aplicativo real com API simulada, incluindo busca por CAS, unidade, valor numérico, associação manual de EPI/CA e eficácia independente; nenhum erro de console. O mock não mantém dados entre recarregamentos, portanto a persistência será confirmada na API e no banco de produção.
 
 ## Banco e produção
 

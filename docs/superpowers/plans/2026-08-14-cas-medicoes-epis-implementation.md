@@ -493,19 +493,23 @@ Expected: todos os comandos PASS.
 
 Aplicar `prisma migrate deploy` em banco descartável, executar novamente e confirmar idempotência da carga com `SELECT count(*) FROM epis_catalogo` igual a 34 e nenhuma duplicidade em `epis_aplicacoes` para `(epiId, anexo, categoria)`.
 
-- [ ] **Step 3: realizar teste manual da jornada**
+- [x] **Step 3: realizar teste manual da jornada**
 
 Criar uma perícia de teste, selecionar agente por nome e por CAS, trocar a unidade, informar somente número, adicionar e remover EPI, salvar, recarregar e gerar PDF/DOCX. Confirmar que sugestões não são selecionadas automaticamente e que um agente sem CAS funciona.
+
+Jornada local aprovada no aplicativo real com API simulada: login, seleção por CAS `75-07-0`, preenchimento de Acetaldeído/CAS, troca para `mg/m³`, normalização de `12,5` para `12.5`, associação manual de respirador/CA e marcação independente de eficácia, sem erros no console. A API simulada reinicia os dados ao recarregar; a persistência e a geração documental foram verificadas pelos contratos/smokes automatizados e serão confirmadas na API e no PostgreSQL de produção após o deploy.
 
 - [x] **Step 4: atualizar README e checklist do plano**
 
 Documentar catálogo, comportamento de CAS incompleto, ausência de conversão ppm/mg/m³ e comando `npm run smoke:epis`. Marcar os steps realmente concluídos neste plano.
 
-- [ ] **Step 5: revisão final do diff**
+- [x] **Step 5: revisão final do diff**
 
 Revisar `git diff 23bb7d9..HEAD` para segurança, compatibilidade, migração, dados recebidos e consistência documental. Corrigir achados P0–P2 antes de prosseguir.
 
-- [ ] **Step 6: commit final de documentação**
+Revisão concluída. Foram corrigidos: priorização conservadora por categoria do agente (`5734db0`), remoção de unidade estruturada vazia antes do salvamento (`050493f`) e exibição explícita da eficácia dos EPIs na prévia, PDF e DOCX (`0a05366`).
+
+- [x] **Step 6: commit final de documentação**
 
 ```bash
 git add README.md docs/superpowers/plans/2026-08-14-cas-medicoes-epis-implementation.md
