@@ -89,6 +89,11 @@ export function AgenteNr15Fields({ agente, onChange }: AgenteNr15FieldsProps) {
               aria-label="Unidade da medição"
               value={unidade}
               onChange={(evento) => {
+                if (!evento.target.value) {
+                  const { unidadeMedicao, unidadeLimite, limiteTolerancia, ...semUnidade } = agente
+                  onChange(semUnidade)
+                  return
+                }
                 const novaUnidade = evento.target.value as UnidadeMedicao
                 const novoLimite = referencia.limites?.[novaUnidade]
                 onChange({ ...agente, unidadeMedicao: novaUnidade, unidadeLimite: novaUnidade, limiteTolerancia: novoLimite ? `${novoLimite} ${novaUnidade}` : agente.limiteTolerancia })

@@ -337,6 +337,19 @@ describe('medição estruturada', () => {
     }))
   })
 
+  it('remove a unidade estruturada ao voltar para a opção vazia', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<Harness inicial={{ ...AGENTE_BASE, unidadeMedicao: 'ppm', unidadeLimite: 'ppm', limiteTolerancia: '78 ppm' }} onChange={onChange} />)
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Unidade da medição' }), '')
+
+    const atualizado = onChange.mock.calls[onChange.mock.calls.length - 1]?.[0] as AgenteAvaliado
+    expect(atualizado).not.toHaveProperty('unidadeMedicao')
+    expect(atualizado).not.toHaveProperty('unidadeLimite')
+    expect(atualizado).not.toHaveProperty('limiteTolerancia')
+  })
+
   it('oferece a unidade literal de oxigênio sem conversão', () => {
     render(<Harness inicial={{
       ...AGENTE_BASE,
