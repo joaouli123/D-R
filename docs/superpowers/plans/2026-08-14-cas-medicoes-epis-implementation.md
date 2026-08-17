@@ -48,6 +48,8 @@
 
 ### Task 1: Base do Anexo 11, CAS e medição estruturada
 
+**Status:** concluído e revisado (`f54a8ed` e `f2e0722`).
+
 **Files:**
 - Modify: `src/content/nr15/tipos.ts`
 - Modify: `src/content/nr15/anexo11.ts`
@@ -155,6 +157,8 @@ git commit -m "Estrutura CAS e medicoes do Anexo 11"
 
 ### Task 2: Catálogo normalizado de respiradores e aplicações
 
+**Status:** concluído e revisado (`114df2e`, `7b0f047` e `97f9cbd`); execução da migração no PostgreSQL será comprovada no deploy.
+
 **Files:**
 - Modify: `server/prisma/schema.prisma`
 - Create: `server/prisma/migrations/20260814_catalogo_epi/migration.sql`
@@ -261,6 +265,8 @@ git commit -m "Adiciona catalogo de respiradores e CAs"
 
 ### Task 3: Persistência compatível dos EPIs e medições na perícia
 
+**Status:** concluído e revisado (`976b3e8` e `21c7168`).
+
 **Files:**
 - Modify: `server/src/routes/pericias.ts`
 - Modify: `server/src/services/documento-comum.ts`
@@ -324,6 +330,8 @@ git commit -m "Persiste medicoes e EPIs dos agentes"
 ---
 
 ### Task 4: Interface de busca cruzada, unidades e seleção de EPI
+
+**Status:** concluído e revisado (`14ee70f`, `1f56d3d` e `3dc7fa1`).
 
 **Files:**
 - Modify: `src/services/api.ts`
@@ -396,6 +404,8 @@ git commit -m "Integra CAS unidades e EPIs ao editor"
 
 ### Task 5: Prévia, PDF e DOCX
 
+**Status:** concluído e revisado (`74609de`, `e2cc2ee` e `7454ff1`); PDF inspecionado visualmente e DOCX validado por estrutura OOXML.
+
 **Files:**
 - Modify: `src/components/DocumentoPreview.tsx`
 - Modify: `server/src/services/documento-comum.ts`
@@ -459,6 +469,8 @@ git commit -m "Exibe medicoes e CAs nos documentos"
 
 ### Task 6: Verificação integrada, documentação e deploy
 
+**Status:** em fechamento. Validações locais, revisão final, publicação e evidências de produção são registradas conforme executadas.
+
 **Files:**
 - Modify: `README.md`
 - Modify: `docs/superpowers/plans/2026-08-14-cas-medicoes-epis-implementation.md`
@@ -467,7 +479,7 @@ git commit -m "Exibe medicoes e CAs nos documentos"
 - Consumes: todos os contratos e rotas anteriores.
 - Produces: branch pronta para `main`, migração implantável e evidências de produção.
 
-- [ ] **Step 1: executar suíte completa local**
+- [x] **Step 1: executar suíte completa local**
 
 Run: `npm.cmd ci && npm.cmd run test -- --run && npm.cmd run build`
 
@@ -485,7 +497,7 @@ Aplicar `prisma migrate deploy` em banco descartável, executar novamente e conf
 
 Criar uma perícia de teste, selecionar agente por nome e por CAS, trocar a unidade, informar somente número, adicionar e remover EPI, salvar, recarregar e gerar PDF/DOCX. Confirmar que sugestões não são selecionadas automaticamente e que um agente sem CAS funciona.
 
-- [ ] **Step 4: atualizar README e checklist do plano**
+- [x] **Step 4: atualizar README e checklist do plano**
 
 Documentar catálogo, comportamento de CAS incompleto, ausência de conversão ppm/mg/m³ e comando `npm run smoke:epis`. Marcar os steps realmente concluídos neste plano.
 

@@ -50,6 +50,8 @@ npm run typecheck   # verificação de tipos
 cd server
 npm run smoke       # gera os 4 tipos de documento em PDF e DOCX
 npm run smoke:api   # verifica o contrato HTTP (sem banco)
+npm run smoke:pericia # valida o payload técnico e os snapshots salvos
+npm run smoke:epis  # valida a consolidação e a consulta do catálogo de EPIs
 npm run prisma:studio
 ```
 
@@ -131,6 +133,16 @@ Textos e modelos: `src/content/manifestacao.ts`.
 
 ---
 
+## Agentes químicos, medições e EPIs (NR-15)
+
+- O Anexo 11 permite localizar o agente pelo nome ou pelo número CAS. A base contém somente os CAS presentes nos arquivos recebidos; a ausência de CAS é aceita e não impede o cadastro.
+- Valor medido e unidade são armazenados separadamente. As unidades disponíveis são `ppm`, `mg/m³` e `% O₂ em volume`, conforme a referência selecionada. O sistema não converte automaticamente valores entre unidades.
+- O catálogo normalizado contém 34 configurações de respiradores, derivadas de 61 linhas recebidas, com aplicações independentes para os Anexos 11, 12 e 13. A mesma configuração não é duplicada quando atende mais de um anexo.
+- A busca de EPI filtra por anexo, categoria, marca, modelo e CA. Sugestões nunca são associadas automaticamente: o usuário precisa confirmar cada equipamento.
+- Ao salvar a perícia, os dados do equipamento e seus CAs são preservados como snapshot. Assim, a prévia, o PDF e o DOCX históricos não mudam se o catálogo for atualizado posteriormente.
+
+---
+
 ## API
 
 Toda a comunicação do frontend passa por `src/services/api.ts`. Nenhuma tela conhece o modo em uso.
@@ -143,6 +155,7 @@ GET    /empresas                POST   /empresas         DELETE /empresas/:id
 GET    /pericias                GET    /pericias/:id
 POST   /pericias                DELETE /pericias/:id
 POST   /pericias/:id/fotos      DELETE /pericias/:id/fotos/:fotoId
+GET    /epis?q=&categoria=&anexo=
 GET    /textos                  POST   /textos           DELETE /textos/:id
 POST   /textos/:id/uso
 GET    /quesitos                POST   /quesitos         DELETE /quesitos/:id
