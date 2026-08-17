@@ -57,6 +57,7 @@
 - Modify: `server/package.json`
 - Modify: `src/types/index.ts`
 - Modify: `src/mocks/db.ts`
+- Modify: `src/pages/Biblioteca.tsx`
 
 **Interfaces:**
 - Produces: `TIPOS_DOCUMENTO_BIBLIOTECA`, `tiposDocumentoSchema` e `normalizarTiposDocumento(tipos)`.
@@ -162,9 +163,54 @@ ADD COLUMN "tiposDocumento" "TipoDocumento"[] NOT NULL DEFAULT ARRAY[]::"TipoDoc
 
 Não atualizar linhas existentes: o padrão vazio materializa `Uso geral` de forma determinística.
 
-- [ ] **Step 6: integrar schema, rota, mapper e contratos do frontend**
+- [ ] **Step 6: gerar o cliente e escrever a segunda regressão falha**
 
-Em `server/src/routes/textos.ts`, importar `tiposDocumentoSchema`, acrescentar ao corpo:
+Run: `cd server && npm.cmd run prisma:generate`
+
+Ampliar `server/scripts/smoke-biblioteca.ts` antes de alterar rota e mapper:
+
+```ts
+import type { TextoBiblioteca } from '@prisma/client'
+import { textoParaApi } from '../src/mappers.js'
+import { textoBibliotecaCorpoSchema } from '../src/routes/textos.js'
+
+const payloadLegado = textoBibliotecaCorpoSchema.parse({
+  titulo: 'Trecho legado',
+  conteudo: 'Conteúdo técnico',
+})
+assert.deepEqual(payloadLegado.tiposDocumento, [])
+assert.equal(
+  textoBibliotecaCorpoSchema.safeParse({
+    titulo: 'Inválido',
+    conteudo: 'Conteúdo técnico',
+    tiposDocumento: ['contrato'],
+  }).success,
+  false,
+)
+
+const persistido: TextoBiblioteca = {
+  id: 'texto-1',
+  usuarioId: 'usuario-1',
+  titulo: 'Parecer e laudo',
+  secao: 'analise',
+  tiposDocumento: ['parecer', 'laudo'],
+  tags: [],
+  conteudo: 'Conteúdo técnico',
+  favorito: false,
+  usos: 0,
+  criadoEm: new Date('2026-08-17T00:00:00Z'),
+  atualizadoEm: new Date('2026-08-17T00:00:00Z'),
+}
+assert.deepEqual(textoParaApi(persistido).tiposDocumento, ['parecer', 'laudo'])
+```
+
+Run: `cd server && npm.cmd run smoke:biblioteca`
+
+Expected: FAIL porque `textoBibliotecaCorpoSchema` ainda não é exportado e o mapper ainda não devolve `tiposDocumento`.
+
+- [ ] **Step 7: integrar schema, rota, mapper e contratos do frontend**
+
+Em `server/src/routes/textos.ts`, importar `tiposDocumentoSchema`, exportar o schema como `textoBibliotecaCorpoSchema` e acrescentar ao corpo:
 
 ```ts
 tiposDocumento: tiposDocumentoSchema,
@@ -193,31 +239,13 @@ export interface TextoBiblioteca {
 
 Em cada item de `src/mocks/db.ts`, incluir `tiposDocumento`. Os modelos de Parecer/Laudo devem usar `['parecer', 'laudo']`; nenhum mock deve omitir a propriedade.
 
-- [ ] **Step 7: ampliar o smoke para verificar integração estática**
-
-Acrescentar ao smoke leitura dos arquivos e asserts:
-
-```ts
-import { readFileSync } from 'node:fs'
-
-const rota = readFileSync(new URL('../src/routes/textos.ts', import.meta.url), 'utf8')
-const mapper = readFileSync(new URL('../src/mappers.ts', import.meta.url), 'utf8')
-const migration = readFileSync(
-  new URL('../prisma/migrations/20260817_biblioteca_tipos_documento/migration.sql', import.meta.url),
-  'utf8',
-)
-
-assert.match(rota, /tiposDocumento:\s*tiposDocumentoSchema/)
-assert.match(rota, /usuarioId:\s*sessaoDe\(req\)\.id/)
-assert.match(mapper, /tiposDocumento:\s*t\.tiposDocumento/)
-assert.match(migration, /DEFAULT ARRAY\[\]::"TipoDocumento"\[\]/)
-```
+Em `src/pages/Biblioteca.tsx`, acrescentar `tiposDocumento: []` ao construtor `vazio()` para que novos textos permaneçam em `Uso geral` até a integração visual da Task 3.
 
 - [ ] **Step 8: verificar backend e frontend tipado**
 
 Run: `cd server && npm.cmd run prisma:generate && npm.cmd run smoke:biblioteca && npm.cmd run typecheck && npm.cmd run build`
 
-Expected: PASS.
+Expected: oito verificações comportamentais PASS, seguidas de typecheck e build aprovados.
 
 Run: `cd .. && npm.cmd run typecheck`
 
@@ -226,7 +254,7 @@ Expected: PASS após todos os mocks receberem `tiposDocumento`.
 - [ ] **Step 9: commit do contrato**
 
 ```bash
-git add server/prisma/schema.prisma server/prisma/migrations/20260817_biblioteca_tipos_documento/migration.sql server/src/biblioteca.ts server/src/routes/textos.ts server/src/mappers.ts server/scripts/smoke-biblioteca.ts server/package.json src/types/index.ts src/mocks/db.ts
+git add server/prisma/schema.prisma server/prisma/migrations/20260817_biblioteca_tipos_documento/migration.sql server/src/biblioteca.ts server/src/routes/textos.ts server/src/mappers.ts server/scripts/smoke-biblioteca.ts server/package.json src/types/index.ts src/mocks/db.ts src/pages/Biblioteca.tsx
 git commit -m "feat(biblioteca): persiste tipos de documento"
 ```
 
