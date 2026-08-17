@@ -1,6 +1,6 @@
 # Biblioteca organizada por tipos de documento
 
-**Data:** 17 de agosto de 2026  
+**Data:** 17 de agosto de 2026
 **Status:** aprovado para detalhamento técnico
 
 ## Objetivo
