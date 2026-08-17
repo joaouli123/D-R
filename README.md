@@ -52,6 +52,7 @@ npm run smoke       # gera os 4 tipos de documento em PDF e DOCX
 npm run smoke:api   # verifica o contrato HTTP (sem banco)
 npm run smoke:pericia # valida o payload técnico e os snapshots salvos
 npm run smoke:epis  # valida a consolidação e a consulta do catálogo de EPIs
+npm run smoke:biblioteca # valida tipos documentais e compatibilidade dos textos
 npm run prisma:studio
 ```
 
@@ -81,7 +82,7 @@ npm run prisma:studio
 | **C** | Processo, reclamadas ilimitadas, participantes, vistoria | `/pericias/:id` — passo 1 |
 | **D** | Preenchimento técnico estruturado | `/pericias/:id` — passos 2, 3 e 5 |
 | **E** | Fotografias organizadas por seção | `/pericias/:id` — passo 4 |
-| **F** | Biblioteca pessoal de textos | `/biblioteca` + inserção rápida no editor |
+| **F** | Biblioteca por documentos e seções | `/biblioteca` + inserção rápida no editor |
 | **G** | Rascunho, edição e título do documento | `/pericias/:id` — passo 6 |
 | **H** | Montagem automática, anexo de PDF externo, exportação | `/pericias/:id` — passo 6 |
 | **I** | Envio por e-mail | editor e `/documentos` |
@@ -98,6 +99,17 @@ Módulos A–J são o escopo da Cláusula 1ª da proposta.
 Tela de apoio: `/ajuda` — orientação de uso, prevista no item 7 da proposta.
 
 **Fora desta fase** (Cláusula 5ª): assinatura digital nativa e envio automático por WhatsApp, ambos dependentes de API paga de terceiro. O PDF sai pronto para assinatura na ferramenta que o Contratante já utiliza.
+
+---
+
+## Biblioteca por Documentos
+
+A Biblioteca pessoal separa os trechos por **Parecer Técnico, Laudo Técnico, Quesitos, Manifestação, Impugnação e Esclarecimentos**, além de `Uso geral`.
+
+- Um mesmo texto pode atender a vários documentos sem ser duplicado.
+- A classificação documental funciona em conjunto com seção, busca, tags, favoritos e contagem de usos.
+- Textos sem categoria ficam em `Uso geral`; esse também é o destino seguro dos registros criados antes da classificação.
+- Ao editar Parecer ou Laudo, a inserção rápida prioriza textos do tipo aberto e textos gerais. O usuário pode desativar o filtro e consultar toda a Biblioteca.
 
 ---
 

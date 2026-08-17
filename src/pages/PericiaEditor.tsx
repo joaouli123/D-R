@@ -1206,6 +1206,7 @@ export default function PericiaEditor() {
         open={!!bibliotecaPara}
         onClose={() => setBibliotecaPara(null)}
         secao={bibliotecaPara?.secao}
+        tipoDocumento={tipoDoc}
         onInserir={(conteudo) => {
           if (!bibliotecaPara) return
           const atual = (p.tecnico[bibliotecaPara.campo] as string) ?? ''

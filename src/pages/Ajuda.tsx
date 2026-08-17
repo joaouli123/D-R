@@ -15,7 +15,7 @@ const MODULOS = [
   { id: 'C', nome: 'Cadastro de Processo e Perícia', onde: '/pericias', desc: 'Processo, reclamadas ilimitadas, participantes, vistoria e modalidade.' },
   { id: 'D', nome: 'Preenchimento Técnico', onde: '/pericias', desc: 'Formulário estruturado seguindo o modelo em Word do Contratante.' },
   { id: 'E', nome: 'Fotografias', onde: '/pericias', desc: 'Imagens organizadas por seção do documento, com legenda.' },
-  { id: 'F', nome: 'Biblioteca Pessoal de Textos', onde: '/biblioteca', desc: 'Trechos técnicos reutilizáveis inseridos com um clique.' },
+  { id: 'F', nome: 'Biblioteca por Documentos', onde: '/biblioteca', desc: 'Trechos organizados por tipo documental e seção, com inserção contextual.' },
   { id: 'G', nome: 'Salvamento, Edição e Título', onde: '/pericias', desc: 'Rascunho, edição posterior e escolha entre Parecer e Laudo.' },
   { id: 'H', nome: 'Geração do Documento', onde: '/pericias', desc: 'Montagem automática, anexo de PDF externo e exportação PDF/DOCX.' },
   { id: 'I', nome: 'Envio por E-mail', onde: '/documentos', desc: 'Envio direto pela tela, sem baixar e anexar manualmente.' },
@@ -25,6 +25,10 @@ const MODULOS = [
 ]
 
 const FAQ = [
+  {
+    q: 'Como os textos são organizados na Biblioteca?',
+    a: 'A Biblioteca possui áreas para Parecer Técnico, Laudo Técnico, Quesitos, Manifestação, Impugnação e Esclarecimentos. Um trecho pode pertencer a mais de uma área sem ser duplicado. Textos sem classificação ficam em Uso geral e continuam disponíveis na inserção rápida. A busca e o filtro por seção funcionam dentro da biblioteca selecionada.',
+  },
   {
     q: 'Como o sistema monta a Manifestação ao Laudo automaticamente?',
     a: 'Em Manifestação ao Laudo você escolhe o posicionamento (18.1 Concordância, 18.2 Impugnação ao laudo ou 18.3 Impugnação ao esclarecimento) e o agente avaliado (Ruído, Calor, Biológico ou Periculosidade). Ao clicar em "Montar documento automaticamente", a fundamentação legal e os argumentos correspondentes são carregados prontos. Na concordância todos os blocos já vêm marcados — é o texto padrão pronto. Nas impugnações, você marca os argumentos que quiser e edita cada um livremente.',

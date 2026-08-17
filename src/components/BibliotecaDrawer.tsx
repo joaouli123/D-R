@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { BookOpen, Search, Star } from 'lucide-react'
 import { Badge, Button, Modal } from '@/components/ui'
 import { useApp } from '@/store/AppStore'
-import type { SecaoTexto } from '@/types'
+import type { SecaoTexto, TipoDocumento } from '@/types'
+import { textoDisponivelNoContexto } from '@/lib/biblioteca'
 import { cn } from '@/lib/utils'
 
 // ============================================================
@@ -13,25 +14,35 @@ export function BibliotecaDrawer({
   open,
   onClose,
   secao,
+  tipoDocumento,
   onInserir,
 }: {
   open: boolean
   onClose: () => void
   secao?: SecaoTexto
+  tipoDocumento?: TipoDocumento
   onInserir: (conteudo: string) => void
 }) {
   const { textos, salvarTexto } = useApp()
   const [busca, setBusca] = useState('')
-  const [apenasSecao, setApenasSecao] = useState(true)
+  const [apenasContexto, setApenasContexto] = useState(true)
   const [selecionados, setSelecionados] = useState<string[]>([])
 
   const lista = useMemo(() => {
     const q = busca.toLowerCase().trim()
     return textos
-      .filter((t) => (apenasSecao && secao ? t.secao === secao || t.secao === 'generico' : true))
+      .filter((t) =>
+        apenasContexto ? textoDisponivelNoContexto(t, tipoDocumento, secao) : true,
+      )
       .filter((t) => !q || [t.titulo, t.conteudo, ...t.tags].join(' ').toLowerCase().includes(q))
       .sort((a, b) => Number(b.favorito) - Number(a.favorito) || b.usos - a.usos)
-  }, [textos, busca, apenasSecao, secao])
+  }, [textos, busca, apenasContexto, tipoDocumento, secao])
+
+  const rotuloContexto = tipoDocumento
+    ? secao
+      ? 'Somente para este documento e seção'
+      : 'Somente para este documento'
+    : 'Somente desta seção'
 
   function inserir() {
     const escolhidos = textos.filter((t) => selecionados.includes(t.id))
@@ -76,15 +87,15 @@ export function BibliotecaDrawer({
             className="h-9 w-full rounded-lg border border-ink-300 pl-9 pr-3 text-sm focus:border-brand-600"
           />
         </div>
-        {secao && (
+        {(tipoDocumento || secao) && (
           <label className="flex cursor-pointer items-center gap-2 text-[13px] text-ink-600">
             <input
               type="checkbox"
-              checked={apenasSecao}
-              onChange={(e) => setApenasSecao(e.target.checked)}
+              checked={apenasContexto}
+              onChange={(e) => setApenasContexto(e.target.checked)}
               className="h-4 w-4 rounded border-ink-300 accent-brand-700"
             />
-            Somente desta seção
+            {rotuloContexto}
           </label>
         )}
       </div>
