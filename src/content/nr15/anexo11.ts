@@ -12,6 +12,7 @@ interface SubstanciaFonte {
   label: string
   sinonimos?: readonly string[]
   cas?: string
+  categoriaProtecao?: string
   ppm?: string
   mgM3?: string
   grau: GrauNormativo
@@ -26,7 +27,7 @@ interface SubstanciaFonte {
 // Para asfixiantes simples, "nao_caracterizado" representa o traço da
 // coluna de grau; o limite de 18% de oxigênio vem do item 3 do Anexo.
 const SUBSTANCIAS_FONTE: readonly SubstanciaFonte[] = [
-  { id: 'ACETALDEIDO', label: 'Acetaldeído', sinonimos: ['Aldeído acético', 'Etanol'], cas: '75-07-0', ppm: '78', mgM3: '140', grau: 'maximo' },
+  { id: 'ACETALDEIDO', label: 'Acetaldeído', sinonimos: ['Aldeído acético', 'Etanol'], cas: '75-07-0', categoriaProtecao: 'Vapores Orgânicos', ppm: '78', mgM3: '140', grau: 'maximo' },
   {
     id: 'ACETATO_DE_CELLOSOLVE',
     label: 'Acetato de cellosolve',
@@ -43,7 +44,7 @@ const SUBSTANCIAS_FONTE: readonly SubstanciaFonte[] = [
   { id: 'ACETONITRILA', label: 'Acetonitrila', sinonimos: ['Cianeto de metila'], cas: '75-05-8', ppm: '30', mgM3: '55', grau: 'maximo' },
   { id: 'ACIDO_ACETICO', label: 'Ácido acético', sinonimos: ['Ácido etanóico'], cas: '64-19-7', ppm: '8', mgM3: '20', grau: 'medio' },
   { id: 'ACIDO_CIANIDRICO', label: 'Ácido cianídrico', sinonimos: ['Gás cianídrico'], cas: '74-90-8', ppm: '8', mgM3: '9', grau: 'maximo', absorcaoPele: true },
-  { id: 'ACIDO_CLORIDRICO', label: 'Ácido clorídrico', sinonimos: ['Gás clorídrico'], cas: '7647-01-0', ppm: '4', mgM3: '5,5', grau: 'maximo', valorTeto: true },
+  { id: 'ACIDO_CLORIDRICO', label: 'Ácido clorídrico', sinonimos: ['Gás clorídrico'], cas: '7647-01-0', categoriaProtecao: 'Gases Ácidos', ppm: '4', mgM3: '5,5', grau: 'maximo', valorTeto: true },
   { id: 'ACIDO_CROMICO_NEVOA', label: 'Ácido crômico (névoa)', cas: '7738-94-5', mgM3: '0,04', grau: 'maximo' },
   { id: 'ACIDO_FLUORIDRICO', label: 'Ácido fluorídrico', cas: '7664-39-3', ppm: '2,5', mgM3: '1,5', grau: 'maximo' },
   { id: 'ACIDO_FORMICO', label: 'Ácido fórmico', sinonimos: ['Ácido metanóico'], cas: '64-18-6', ppm: '4', mgM3: '7', grau: 'medio' },
@@ -68,7 +69,7 @@ const SUBSTANCIAS_FONTE: readonly SubstanciaFonte[] = [
   { id: 'ALCOOL_METILICO', label: 'Álcool metílico', sinonimos: ['Metanol'], ppm: '156', mgM3: '200', grau: 'maximo', absorcaoPele: true },
   { id: 'ALCOOL_N_PROPILICO', label: 'Álcool n-propílico', sinonimos: ['n-Propanol'], ppm: '156', mgM3: '390', grau: 'medio', absorcaoPele: true },
   { id: 'ALCOOL_ISOPROPILICO', label: 'Álcool isopropílico', sinonimos: ['iso-Propanol'], ppm: '310', mgM3: '765', grau: 'medio', absorcaoPele: true },
-  { id: 'AMONIA', label: 'Amônia', sinonimos: ['Gás amoníaco'], ppm: '20', mgM3: '14', grau: 'medio' },
+  { id: 'AMONIA', label: 'Amônia', sinonimos: ['Gás amoníaco'], categoriaProtecao: 'Amônia e Aminas', ppm: '20', mgM3: '14', grau: 'medio' },
   { id: 'ANILINA', label: 'Anilina', ppm: '4', mgM3: '15', grau: 'maximo', absorcaoPele: true },
   { id: 'ARGONIO', label: 'Argônio', grau: 'nao_caracterizado', asfixianteSimples: true },
   { id: 'ARSINA', label: 'Arsina (arsenamina)', ppm: '0,04', mgM3: '0,16', grau: 'maximo' },
@@ -161,7 +162,7 @@ const SUBSTANCIAS_FONTE: readonly SubstanciaFonte[] = [
   { id: 'N_ETIL_MORFOLINA', label: 'n-Etil morfolina', ppm: '16', mgM3: '74', grau: 'medio', absorcaoPele: true },
   { id: 'FENOL', label: 'Fenol', ppm: '4', mgM3: '15', grau: 'maximo', absorcaoPele: true },
   { id: 'FLUORTRICLOROMETANO', label: 'Fluortriclorometano (freon 11)', sinonimos: ['Freon 11'], ppm: '780', mgM3: '4370', grau: 'medio' },
-  { id: 'FORMALDEIDO', label: 'Formaldeído (formol)', sinonimos: ['Aldeído fórmico'], ppm: '1,6', mgM3: '2,3', grau: 'maximo', valorTeto: true },
+  { id: 'FORMALDEIDO', label: 'Formaldeído (formol)', sinonimos: ['Aldeído fórmico'], categoriaProtecao: 'Formaldeído', ppm: '1,6', mgM3: '2,3', grau: 'maximo', valorTeto: true },
   { id: 'FOSFINA', label: 'Fosfina (fosfamina)', ppm: '0,23', mgM3: '0,3', grau: 'maximo' },
   { id: 'FOSGENIO', label: 'Fosgênio', sinonimos: ['Cloreto de carbonila'], ppm: '0,08', mgM3: '0,3', grau: 'maximo' },
   { id: 'GAS_SULFIDRICO', label: 'Gás sulfídrico', sinonimos: ['Sulfeto de hidrogênio'], ppm: '8', mgM3: '12', grau: 'maximo' },
@@ -169,7 +170,7 @@ const SUBSTANCIAS_FONTE: readonly SubstanciaFonte[] = [
   { id: 'HIDRAZINA', label: 'Hidrazina', sinonimos: ['Diamina'], ppm: '0,08', mgM3: '0,08', grau: 'maximo', absorcaoPele: true },
   { id: 'HIDROGENIO', label: 'Hidrogênio', grau: 'nao_caracterizado', asfixianteSimples: true },
   { id: 'ISOPROPILAMINA', label: 'Isopropilamina', ppm: '4', mgM3: '9,5', grau: 'medio' },
-  { id: 'MERCURIO', label: 'Mercúrio (todas as formas exceto orgânicas)', mgM3: '0,04', grau: 'maximo' },
+  { id: 'MERCURIO', label: 'Mercúrio (todas as formas exceto orgânicas)', categoriaProtecao: 'Mercúrio', mgM3: '0,04', grau: 'maximo' },
   { id: 'METACRILATO_DE_METILA', label: 'Metacrilato de metila', ppm: '78', mgM3: '320', grau: 'minimo' },
   { id: 'METANO', label: 'Metano', grau: 'nao_caracterizado', asfixianteSimples: true },
   { id: 'METILAMINA', label: 'Metilamina', ppm: '8', mgM3: '9,5', grau: 'maximo' },
@@ -273,6 +274,7 @@ export const SUBSTANCIAS_ANEXO_11: readonly ReferenciaNormativa[] = SUBSTANCIAS_
   label: item.label,
   sinonimos: item.sinonimos,
   cas: item.cas,
+  categoriaProtecao: item.categoriaProtecao,
   limites: {
     ...(item.ppm ? { ppm: item.ppm } : {}),
     ...(item.mgM3 ? { 'mg/m³': item.mgM3 } : {}),

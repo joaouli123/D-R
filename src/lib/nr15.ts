@@ -1,5 +1,5 @@
 import type { ReferenciaNormativa, UnidadeMedicao } from '@/content/nr15/tipos'
-import { anexoNr15PorId, SUBSTANCIAS_ANEXO_11 } from '@/content/anexosNr15'
+import { anexoNr15PorId, ATIVIDADES_ANEXO_13, ATIVIDADES_ANEXO_14, SUBSTANCIAS_ANEXO_11 } from '@/content/anexosNr15'
 import type { AgenteAvaliado } from '@/types'
 
 export function normalizarBuscaNr15(texto: string): string {
@@ -25,6 +25,19 @@ export function buscarReferencias<T extends ReferenciaNormativa>(
 
 export function buscarReferenciasNr15(consulta: string): ReferenciaNormativa[] {
   return buscarReferencias(SUBSTANCIAS_ANEXO_11, consulta)
+}
+
+const REFERENCIAS_NR15: readonly ReferenciaNormativa[] = [
+  ...SUBSTANCIAS_ANEXO_11,
+  ...ATIVIDADES_ANEXO_13,
+  ...ATIVIDADES_ANEXO_14,
+]
+
+export function categoriaProtecaoDoAgente(
+  agente: Pick<AgenteAvaliado, 'referenciaNormativaId'>,
+): string | undefined {
+  if (!agente.referenciaNormativaId) return undefined
+  return REFERENCIAS_NR15.find((referencia) => referencia.id === agente.referenciaNormativaId)?.categoriaProtecao
 }
 
 export function aplicarAnexo(agente: AgenteAvaliado, anexoId: string): AgenteAvaliado {

@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { Plus, Search, ShieldCheck, Trash2 } from 'lucide-react'
 
 import { Button, Input } from '@/components/ui'
+import { categoriaProtecaoDoAgente } from '@/lib/nr15'
 import * as api from '@/services/api'
 import type { AgenteAvaliado, EpiSelecionado } from '@/types'
 
@@ -49,6 +50,24 @@ function descricaoCas(epi: {
   ].filter((texto): texto is string => Boolean(texto))
 }
 
+function sugestoesPorCategoria(
+  itens: api.EpiCatalogo[],
+  categoria: string,
+  anexo: string | undefined,
+): api.EpiCatalogo[] {
+  return itens
+    .filter((item) => item.aplicacoes.some((aplicacao) =>
+      (!anexo || aplicacao.anexo === anexo)
+      && (aplicacao.categoria === categoria || aplicacao.categoria === 'Multigases'),
+    ))
+    .sort((a, b) => {
+      const prioridade = (item: api.EpiCatalogo) => item.aplicacoes.some((aplicacao) =>
+        (!anexo || aplicacao.anexo === anexo) && aplicacao.categoria === categoria,
+      ) ? 0 : 1
+      return prioridade(a) - prioridade(b) || a.modelo.localeCompare(b.modelo, 'pt-BR')
+    })
+}
+
 export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
   const tituloId = useId()
   const [consulta, setConsulta] = useState('')
@@ -60,18 +79,27 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
   const requisicaoAtual = useRef(0)
   const selecionados = agente.epis ?? []
   const limiteAtingido = selecionados.length >= 10
+  const categoriaProtecao = categoriaProtecaoDoAgente(agente)
 
   async function carregar(q = '', sinal?: AbortSignal) {
     const requisicao = ++requisicaoAtual.current
     setCarregando(true)
     setErro('')
+    const termo = q.trim()
+    if (!termo && !categoriaProtecao) {
+      setCatalogo([])
+      setCarregando(false)
+      return
+    }
     try {
       const anexo = anexoParaApi(agente.anexoNr15)
       const itens = await api.epis.listar({
-        ...(q.trim() ? { q: q.trim() } : {}),
+        ...(termo ? { q: termo } : {}),
         ...(anexo ? { anexo } : {}),
       })
-      if (!sinal?.aborted && requisicao === requisicaoAtual.current) setCatalogo(itens)
+      if (!sinal?.aborted && requisicao === requisicaoAtual.current) {
+        setCatalogo(termo || !categoriaProtecao ? itens : sugestoesPorCategoria(itens, categoriaProtecao, anexo))
+      }
     } catch {
       if (!sinal?.aborted && requisicao === requisicaoAtual.current) {
         setCatalogo([])
@@ -89,7 +117,7 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
       controle.abort()
       requisicaoAtual.current += 1
     }
-  }, [agente.anexoNr15])
+  }, [agente.anexoNr15, agente.referenciaNormativaId])
 
   function adicionar(epi: EpiSelecionado) {
     if (limiteAtingido) return
@@ -208,7 +236,11 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
           })}
         </ul>
       ) : !erro ? (
-        <p role="status" className="mt-3 text-xs text-ink-500">Nenhum EPI sugerido para este agente.</p>
+        <p role="status" className="mt-3 text-xs text-ink-500">
+          {!categoriaProtecao && !consulta.trim()
+            ? 'Pesquise o catálogo ou informe o EPI manualmente.'
+            : 'Nenhum EPI sugerido para este agente.'}
+        </p>
       ) : null}
 
       <details className="mt-3 rounded-md border border-dashed border-ink-300 bg-ink-50/40 p-2.5">

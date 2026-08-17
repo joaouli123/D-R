@@ -6,7 +6,7 @@ import { ATIVIDADES_ANEXO_13, ATIVIDADES_ANEXO_14, SUBSTANCIAS_ANEXO_11 } from '
 import { AgenteNr15Fields } from '@/components/AgenteNr15Fields'
 import { BuscaNormativa } from '@/components/BuscaNormativa'
 import type { ReferenciaNormativa } from '@/content/nr15/tipos'
-import { aplicarAnexo, aplicarReferencia, buscarReferencias, buscarReferenciasNr15, normalizarBuscaNr15 } from './nr15'
+import { aplicarAnexo, aplicarReferencia, buscarReferencias, buscarReferenciasNr15, categoriaProtecaoDoAgente, normalizarBuscaNr15 } from './nr15'
 
 function referenciaPorId(
   referencias: readonly ReferenciaNormativa[],
@@ -142,6 +142,28 @@ describe('buscarReferencias', () => {
 
   it('mantém agente sem CAS selecionável', () => {
     expect(SUBSTANCIAS_ANEXO_11.find((x) => x.label === 'Álcool terc-butílico')).toBeDefined()
+  })
+
+  it('expõe somente categorias de proteção reconhecidas para sugerir EPIs', () => {
+    expect(referenciaPorId(SUBSTANCIAS_ANEXO_11, 'ANEXO_11_ACETALDEIDO').categoriaProtecao)
+      .toBe('Vapores Orgânicos')
+    expect(referenciaPorId(SUBSTANCIAS_ANEXO_11, 'ANEXO_11_ACIDO_CLORIDRICO').categoriaProtecao)
+      .toBe('Gases Ácidos')
+    expect(referenciaPorId(SUBSTANCIAS_ANEXO_11, 'ANEXO_11_AMONIA').categoriaProtecao)
+      .toBe('Amônia e Aminas')
+    expect(referenciaPorId(SUBSTANCIAS_ANEXO_11, 'ANEXO_11_FORMALDEIDO').categoriaProtecao)
+      .toBe('Formaldeído')
+    expect(referenciaPorId(SUBSTANCIAS_ANEXO_11, 'ANEXO_11_MERCURIO').categoriaProtecao)
+      .toBe('Mercúrio')
+    expect(referenciaPorId(SUBSTANCIAS_ANEXO_11, 'ANEXO_11_ACETILENO').categoriaProtecao)
+      .toBeUndefined()
+  })
+
+  it('resolve a categoria pelo snapshot de referência do agente', () => {
+    expect(categoriaProtecaoDoAgente({ referenciaNormativaId: 'ANEXO_11_FORMALDEIDO' }))
+      .toBe('Formaldeído')
+    expect(categoriaProtecaoDoAgente({ referenciaNormativaId: 'ANEXO_11_ACETILENO' }))
+      .toBeUndefined()
   })
 
   it('encontra referencias por texto normalizado no rotulo, sinonimos e atividade', () => {

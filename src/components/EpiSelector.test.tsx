@@ -54,6 +54,24 @@ const EPI_7502 = {
   caPecaFacial: '12069',
 }
 
+const EPI_MULTIGASES = {
+  ...EPI_3M,
+  id: 'epi-3m-multigases',
+  chave: '3m|6200|4115|5640',
+  modelo: '3M 6200 + Cartucho 3M 60926',
+  caFiltroCartucho: '5640',
+  aplicacoes: [{ anexo: 'Anexo 11', categoria: 'Multigases' }],
+}
+
+const EPI_GASES_ACIDOS = {
+  ...EPI_3M,
+  id: 'epi-3m-gases-acidos',
+  chave: '3m|6200|4115|5636',
+  modelo: '3M 6200 + Cartucho 3M 6002',
+  caFiltroCartucho: '5636',
+  aplicacoes: [{ anexo: 'Anexo 11', categoria: 'Gases Ácidos' }],
+}
+
 function promessaControlada<T>() {
   let resolver!: (valor: T) => void
   const promise = new Promise<T>((resolve) => { resolver = resolve })
@@ -100,6 +118,7 @@ describe('EpiSelector', () => {
     render(<EpiSelector agente={AGENTE_BASE} onChange={onChange} />)
 
     const adicionar = await screen.findByRole('button', { name: /Adicionar 3M 6200/ })
+    expect(api.epis.listar).toHaveBeenCalledWith({ anexo: 'Anexo 11' })
     expect(onChange).not.toHaveBeenCalled()
 
     await user.click(adicionar)
@@ -112,6 +131,27 @@ describe('EpiSelector', () => {
         caFiltroCartucho: '5635',
       })],
     }))
+  })
+
+  it('prioriza a categoria reconhecida, mantém Multigases e não recomenda categorias incompatíveis', async () => {
+    vi.mocked(api.epis.listar).mockResolvedValue([EPI_GASES_ACIDOS, EPI_MULTIGASES, EPI_3M])
+
+    render(<EpiSelector agente={AGENTE_BASE} onChange={() => undefined} />)
+
+    const botoes = await screen.findAllByRole('button', { name: /^Adicionar 3M/ })
+    expect(botoes.map((botao) => botao.getAttribute('aria-label'))).toEqual([
+      `Adicionar ${EPI_3M.modelo}`,
+      `Adicionar ${EPI_MULTIGASES.modelo}`,
+    ])
+  })
+
+  it('não presume recomendação quando o agente não possui categoria reconhecida', async () => {
+    vi.mocked(api.epis.listar).mockResolvedValue([EPI_3M])
+
+    render(<EpiSelector agente={{ ...AGENTE_BASE, nome: 'Acetileno', referenciaNormativaId: ACETILENO.id }} onChange={() => undefined} />)
+
+    expect(await screen.findByText('Pesquise o catálogo ou informe o EPI manualmente.')).toBeDefined()
+    expect(api.epis.listar).not.toHaveBeenCalled()
   })
 
   it('pesquisa no catálogo e mantém a confirmação explícita', async () => {
