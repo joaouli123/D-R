@@ -133,7 +133,10 @@ function celula(conteudo: string, opcoes: { cabecalho?: boolean; largura?: numbe
   })
 }
 
-function episNaCelulaAgente(epis: TecnicoJson['agentes'][number]['epis']): string[] {
+function episNaCelulaAgente(
+  epis: TecnicoJson['agentes'][number]['epis'],
+  epiEficaz: TecnicoJson['agentes'][number]['epiEficaz'],
+): string[] {
   if (!epis?.length) return []
   return [
     'EPIs associados',
@@ -146,6 +149,7 @@ function episNaCelulaAgente(epis: TecnicoJson['agentes'][number]['epis']): strin
         ...formatarCasEpi(epi),
       ].join('\n'),
     ),
+    `Eficácia comprovada: ${epiEficaz ? 'Sim' : 'Não'}`,
   ]
 }
 
@@ -413,7 +417,7 @@ function docParecer(
                     a.atividadeEnquadrada?.trim()
                       ? `Atividade ou referência normativa: ${a.atividadeEnquadrada}`
                       : undefined,
-                    ...episNaCelulaAgente(a.epis),
+                    ...episNaCelulaAgente(a.epis, a.epiEficaz),
                   ]
                     .filter(Boolean)
                     .join('\n'),

@@ -303,6 +303,7 @@ export function DocumentoPreview({
                           </li>
                         ))}
                       </ul>
+                      <p className="mt-1 font-bold">Eficácia comprovada: {a.epiEficaz ? 'Sim' : 'Não'}</p>
                     </div>
                   )}
                 </td>

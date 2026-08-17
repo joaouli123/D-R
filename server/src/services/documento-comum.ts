@@ -178,6 +178,7 @@ export interface AgenteDocumento {
   valorMedido?: string
   unidadeMedicao?: 'ppm' | 'mg/m³' | '% O₂ em volume'
   epis?: EpiDocumento[]
+  epiEficaz?: boolean
   criterio: string
   grau?: string
 }

@@ -40,6 +40,7 @@ const pericia = {
         unidadeMedicao: 'ppm',
         criterio: 'quantitativo',
         grau: 'medio',
+        epiEficaz: true,
         epis: [
           {
             catalogoId: 'snapshot-duplo',
@@ -105,6 +106,7 @@ describe('DocumentoPreview', () => {
     expect(html).toContain('CA da peça facial: 4115')
     expect(html).toContain('CA do cartucho/filtro: 5635')
     expect(html).toContain('CA: 5657')
+    expect(html).toContain('Eficácia comprovada: Sim')
     expect(html).not.toContain('registro legado que não deve prevalecer')
     expect(html).not.toMatch(/undefined|null/)
   })
@@ -140,6 +142,7 @@ describe('DocumentoPreview', () => {
     expect(secaoAgentes.match(/<th(?:\s|>)/g) ?? []).toHaveLength(7)
     expect(secaoAgentes).not.toMatch(/<th[^>]*>EPIs associados<\/th>/)
     expect(secaoAgentes).toMatch(/<td><p>Acetaldeído<\/p>[\s\S]*EPIs associados[\s\S]*CA: 5657[\s\S]*<\/td><td>/)
+    expect(secaoAgentes).toContain('Eficácia comprovada: Sim')
     expect(secaoAgentes.match(/EPIs associados/g) ?? []).toHaveLength(1)
   })
 })

@@ -53,7 +53,10 @@ function paragrafos(texto?: string | null): string {
   return partes.map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('')
 }
 
-function episNaCelulaAgente(epis: TecnicoJson['agentes'][number]['epis']): string {
+function episNaCelulaAgente(
+  epis: TecnicoJson['agentes'][number]['epis'],
+  epiEficaz: TecnicoJson['agentes'][number]['epiEficaz'],
+): string {
   if (!epis?.length) return ''
   return `<div class="epis-associados"><strong>EPIs associados</strong><ul>${epis
     .map((epi) => {
@@ -64,7 +67,7 @@ function episNaCelulaAgente(epis: TecnicoJson['agentes'][number]['epis']): strin
       const cas = formatarCasEpi(epi).map(esc).join('<br>')
       return `<li>${esc(identificacao)}${cas ? `<br>${cas}` : ''}</li>`
     })
-    .join('')}</ul></div>`
+    .join('')}</ul><strong>Eficácia comprovada: ${epiEficaz ? 'Sim' : 'Não'}</strong></div>`
 }
 
 const linha = (rotulo: string, valor: string): string =>
@@ -245,7 +248,7 @@ export async function htmlDoParecer(
                 a.atividadeEnquadrada?.trim()
                   ? `<br><small>Atividade ou referência normativa: ${esc(a.atividadeEnquadrada).replace(/\n/g, '<br>')}</small>`
                   : ''
-              }${episNaCelulaAgente(a.epis)}</td><td>${esc(a.cas || '—')}</td><td>${esc(a.anexoNr15 || '—')}</td><td>${esc(
+              }${episNaCelulaAgente(a.epis, a.epiEficaz)}</td><td>${esc(a.cas || '—')}</td><td>${esc(a.anexoNr15 || '—')}</td><td>${esc(
                 CRITERIO[a.criterio] ?? a.criterio,
               )}</td><td>${esc(a.grau ? (GRAU[a.grau] ?? a.grau) : '—')}</td><td>${esc(
                 limiteComUnidade(a.limiteTolerancia, a.unidadeLimite),

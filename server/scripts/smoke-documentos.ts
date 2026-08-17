@@ -133,6 +133,7 @@ const pericia = {
         medido: 'registro legado que não deve prevalecer',
         valorMedido: '12.5',
         unidadeMedicao: 'ppm',
+        epiEficaz: true,
         epis: [
           {
             catalogoId: 'epi-duplo-historico',
@@ -354,6 +355,7 @@ async function main() {
   assert.match(htmlParecer, /CA da peça facial: 4115/)
   assert.match(htmlParecer, /CA do cartucho\/filtro: 5635/)
   assert.match(htmlParecer, /CA: 5657/)
+  assert.match(htmlParecer, /Eficácia comprovada: Sim/)
   assert.match(htmlParecer, /85 dB\(A\)/)
   assert.match(htmlParecer, /18 % O₂ em volume/)
   assert.match(htmlParecer, /7,25/)
