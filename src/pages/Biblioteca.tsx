@@ -41,6 +41,7 @@ const vazio = (): TextoBiblioteca => ({
   id: uid('txt'),
   titulo: '',
   secao: 'generico',
+  tiposDocumento: [],
   tags: [],
   conteudo: '',
   favorito: false,

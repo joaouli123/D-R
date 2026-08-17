@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { exigirSessao, sessaoDe } from '../auth.js'
+import { tiposDocumentoSchema } from '../biblioteca.js'
 import { naoEncontrado, parametro, rota } from '../erros.js'
 import { textoParaApi } from '../mappers.js'
 import { prisma } from '../prisma.js'
@@ -13,7 +14,7 @@ import { prisma } from '../prisma.js'
 export const textosRouter = Router()
 textosRouter.use(exigirSessao)
 
-const corpo = z.object({
+export const textoBibliotecaCorpoSchema = z.object({
   id: z.string().optional(),
   titulo: z.string().trim().min(1, 'Informe o título.'),
   secao: z
@@ -31,6 +32,7 @@ const corpo = z.object({
       'generico',
     ])
     .default('generico'),
+  tiposDocumento: tiposDocumentoSchema,
   tags: z.array(z.string().trim()).default([]),
   conteudo: z.string().trim().min(1, 'O texto não pode ficar vazio.'),
   favorito: z.boolean().default(false),
@@ -53,7 +55,7 @@ textosRouter.get(
 textosRouter.post(
   '/',
   rota(async (req, res) => {
-    const d = corpo.parse(req.body)
+    const d = textoBibliotecaCorpoSchema.parse(req.body)
     const usuarioId = sessaoDe(req).id
 
     const existente = d.id
@@ -63,6 +65,7 @@ textosRouter.post(
     const dados = {
       titulo: d.titulo,
       secao: d.secao,
+      tiposDocumento: d.tiposDocumento,
       tags: d.tags.filter(Boolean),
       conteudo: d.conteudo,
       favorito: d.favorito,

@@ -223,16 +223,17 @@ enum SecaoTexto {
 }
 
 model TextoBiblioteca {
-  id           String     @id @default(uuid())
-  usuarioId    String
-  titulo       String
-  secao        SecaoTexto @default(generico)
-  tags         String[]   @default([])
-  conteudo     String
-  favorito     Boolean    @default(false)
-  usos         Int        @default(0)
-  criadoEm     DateTime   @default(now())
-  atualizadoEm DateTime   @updatedAt
+  id             String          @id @default(uuid())
+  usuarioId      String
+  titulo         String
+  secao          SecaoTexto      @default(generico)
+  tiposDocumento TipoDocumento[] @default([])
+  tags           String[]        @default([])
+  conteudo       String
+  favorito       Boolean         @default(false)
+  usos           Int             @default(0)
+  criadoEm       DateTime        @default(now())
+  atualizadoEm   DateTime        @updatedAt
 
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 

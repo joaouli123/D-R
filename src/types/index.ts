@@ -205,6 +205,7 @@ export interface TextoBiblioteca {
   id: UUID
   titulo: string
   secao: SecaoTexto
+  tiposDocumento: TipoDocumento[]
   tags: string[]
   conteudo: string
   favorito: boolean
