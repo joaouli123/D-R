@@ -76,6 +76,13 @@ export function tiposIniciaisNovoTexto(biblioteca: BibliotecaAtiva): TipoDocumen
   return biblioteca === 'todas' || biblioteca === 'geral' ? [] : [biblioteca]
 }
 
+export function alternarTipoDocumento(
+  atuais: TipoDocumento[],
+  tipo: TipoDocumento,
+): TipoDocumento[] {
+  return atuais.includes(tipo) ? atuais.filter((item) => item !== tipo) : [...atuais, tipo]
+}
+
 export function textoDisponivelNoContexto(
   texto: TextoBiblioteca,
   tipo?: TipoDocumento,

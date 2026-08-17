@@ -4,6 +4,7 @@ import {
   Badge,
   Button,
   Card,
+  Checkbox,
   EmptyState,
   Input,
   Modal,
@@ -11,9 +12,18 @@ import {
   Textarea,
   useToast,
 } from '@/components/ui'
+import { BibliotecaCategorias } from '@/components/BibliotecaCategorias'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { useApp } from '@/store/AppStore'
 import type { SecaoTexto, TextoBiblioteca } from '@/types'
+import {
+  alternarTipoDocumento,
+  BIBLIOTECAS_DOCUMENTO,
+  contarTextosBiblioteca,
+  filtrarTextosBiblioteca,
+  tiposIniciaisNovoTexto,
+  type BibliotecaAtiva,
+} from '@/lib/biblioteca'
 import { cn, contarPalavras, uid } from '@/lib/utils'
 
 // ============================================================
@@ -54,17 +64,16 @@ export default function Biblioteca() {
   const toast = useToast()
   const [busca, setBusca] = useState('')
   const [secao, setSecao] = useState<'todas' | SecaoTexto>('todas')
+  const [biblioteca, setBiblioteca] = useState<BibliotecaAtiva>('todas')
   const [editando, setEditando] = useState<TextoBiblioteca | null>(null)
   const [tagsInput, setTagsInput] = useState('')
   const [salvando, setSalvando] = useState(false)
 
   const lista = useMemo(() => {
-    const q = busca.toLowerCase().trim()
-    return textos
-      .filter((t) => secao === 'todas' || t.secao === secao)
-      .filter((t) => !q || [t.titulo, t.conteudo, ...t.tags].join(' ').toLowerCase().includes(q))
-      .sort((a, b) => Number(b.favorito) - Number(a.favorito) || b.usos - a.usos)
-  }, [textos, busca, secao])
+    return filtrarTextosBiblioteca(textos, { biblioteca, secao, busca })
+  }, [textos, biblioteca, busca, secao])
+
+  const contagens = useMemo(() => contarTextosBiblioteca(textos), [textos])
 
   async function salvar() {
     if (!editando) return
@@ -109,13 +118,16 @@ export default function Biblioteca() {
     <>
       <PageHeader
         breadcrumb="Módulo F"
-        title="Biblioteca Pessoal de Textos"
-        description="Cadastre os trechos que você repete nos pareceres e insira-os com um clique nas seções correspondentes."
+        title="Biblioteca por Documentos"
+        description="Organize e reutilize seus textos técnicos em pareceres, laudos, quesitos e demais documentos periciais."
         action={
           <Button
             icon={<Plus size={16} />}
             onClick={() => {
-              setEditando(vazio())
+              setEditando({
+                ...vazio(),
+                tiposDocumento: tiposIniciaisNovoTexto(biblioteca),
+              })
               setTagsInput('')
             }}
           >
@@ -125,7 +137,12 @@ export default function Biblioteca() {
       />
 
       <Card className="mb-4 overflow-hidden">
-        <div className="grid gap-3 p-3 sm:grid-cols-[1fr_200px]">
+        <BibliotecaCategorias
+          ativa={biblioteca}
+          contagens={contagens}
+          onChange={setBiblioteca}
+        />
+        <div className="grid gap-3 border-t border-ink-200 p-3 sm:grid-cols-[1fr_200px]">
           <div className="relative">
             <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
             <input
@@ -151,7 +168,11 @@ export default function Biblioteca() {
           <EmptyState
             icon={<BookOpen size={22} />}
             title="Nenhum texto encontrado"
-            description="Cadastre trechos que você repete nos pareceres para inseri-los com um clique."
+            description={
+              busca || secao !== 'todas'
+                ? 'Ajuste a busca ou os filtros para localizar outros textos.'
+                : 'Cadastre o primeiro texto desta biblioteca documental.'
+            }
           />
         </Card>
       ) : (
@@ -171,7 +192,16 @@ export default function Biblioteca() {
                   </button>
                 </div>
                 <div className="mb-2 flex flex-wrap gap-1.5">
-                  <Badge tone="green">{SECOES.find((s) => s.value === t.secao)?.label}</Badge>
+                  {(t.tiposDocumento ?? []).length ? (
+                    t.tiposDocumento.map((tipo) => (
+                      <Badge key={tipo} tone="navy">
+                        {BIBLIOTECAS_DOCUMENTO.find((item) => item.value === tipo)?.curto ?? tipo}
+                      </Badge>
+                    ))
+                  ) : (
+                    <Badge tone="navy">Uso geral</Badge>
+                  )}
+                  <Badge tone="green">Seção: {SECOES.find((s) => s.value === t.secao)?.label}</Badge>
                   <Badge tone="gray">{t.usos} usos</Badge>
                   <Badge tone="navy">{contarPalavras(t.conteudo)} palavras</Badge>
                 </div>
@@ -236,6 +266,32 @@ export default function Biblioteca() {
       >
         {editando && (
           <div className="space-y-4">
+            <fieldset className="rounded-xl border border-ink-200 bg-ink-50/70 p-4">
+              <legend className="px-1 text-sm font-semibold text-ink-900">
+                Bibliotecas do documento
+              </legend>
+              <p className="mb-3 text-xs leading-relaxed text-ink-500">
+                Selecione uma ou mais bibliotecas. Sem seleção, este texto ficará disponível em Uso geral.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {BIBLIOTECAS_DOCUMENTO.map((item) => (
+                  <Checkbox
+                    key={item.value}
+                    label={item.label}
+                    checked={(editando.tiposDocumento ?? []).includes(item.value)}
+                    onChange={() =>
+                      setEditando({
+                        ...editando,
+                        tiposDocumento: alternarTipoDocumento(
+                          editando.tiposDocumento ?? [],
+                          item.value,
+                        ),
+                      })
+                    }
+                  />
+                ))}
+              </div>
+            </fieldset>
             <div className="grid gap-4 sm:grid-cols-[1fr_200px]">
               <Input
                 label="Título"

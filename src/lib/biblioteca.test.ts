@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { TextoBiblioteca } from '@/types'
 import {
+  alternarTipoDocumento,
   contarTextosBiblioteca,
   filtrarTextosBiblioteca,
   textoDisponivelNoContexto,
@@ -83,6 +84,11 @@ describe('biblioteca por documentos', () => {
     expect(tiposIniciaisNovoTexto('laudo')).toEqual(['laudo'])
     expect(tiposIniciaisNovoTexto('todas')).toEqual([])
     expect(tiposIniciaisNovoTexto('geral')).toEqual([])
+  })
+
+  it('adiciona e remove um tipo sem duplicar os demais', () => {
+    expect(alternarTipoDocumento(['parecer'], 'laudo')).toEqual(['parecer', 'laudo'])
+    expect(alternarTipoDocumento(['parecer', 'laudo'], 'parecer')).toEqual(['laudo'])
   })
 
   it('combina tipo atual com Uso geral e seção no drawer', () => {
