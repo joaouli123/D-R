@@ -5,15 +5,18 @@ import {
   Document,
   Footer,
   HeadingLevel,
+  ImageRun,
   PageNumber,
   Packer,
   Paragraph,
   Table,
   TableCell,
+  TableLayoutType,
   TableRow,
   TextRun,
   WidthType,
 } from 'docx'
+import sharp from 'sharp'
 import type { PericiaCompleta } from '../mappers.js'
 import {
   AGENTE_LABEL,
@@ -24,6 +27,7 @@ import {
   MODALIDADE_LABEL,
   ORIGEM_PONTO,
   PAPEL,
+  SECAO_FOTO,
   type TecnicoJson,
   VAZIO,
   data,
@@ -46,6 +50,10 @@ import {
 const FONTE = 'Arial'
 const CORPO = 22 // meio-pontos → 11pt
 const RECUO_PRIMEIRA_LINHA = 709 // 1,25cm em twips
+const LARGURA_UTIL_DXA = 9070
+const RECUO_TABELA_DXA = 120
+const LARGURA_TABELA_DXA = LARGURA_UTIL_DXA - RECUO_TABELA_DXA
+const COLUNAS_FICHA = [2864, 6086] as const
 
 const texto = (
   t: string,
@@ -87,6 +95,8 @@ const h1 = (t: string) =>
 const h2 = (t: string) =>
   new Paragraph({
     heading: HeadingLevel.HEADING_1,
+    keepNext: true,
+    keepLines: true,
     spacing: { before: 320, after: 140 },
     children: [texto(t.toUpperCase(), { negrito: true, tamanho: 28 })],
   })
@@ -94,6 +104,8 @@ const h2 = (t: string) =>
 const h3 = (t: string) =>
   new Paragraph({
     heading: HeadingLevel.HEADING_2,
+    keepNext: true,
+    keepLines: true,
     spacing: { before: 220, after: 100 },
     children: [texto(t, { negrito: true, tamanho: CORPO })],
   })
@@ -114,11 +126,11 @@ const blocos = (t?: string | null): Paragraph[] => {
 const borda = { style: BorderStyle.SINGLE, size: 4, color: MARCA.tinta400 }
 const BORDAS = { top: borda, bottom: borda, left: borda, right: borda }
 
-function celula(conteudo: string, opcoes: { cabecalho?: boolean; largura?: number } = {}) {
+function celula(conteudo: string, opcoes: { cabecalho?: boolean; larguraDxa?: number } = {}) {
   return new TableCell({
     borders: BORDAS,
     shading: opcoes.cabecalho ? { fill: MARCA.tinta100 } : undefined,
-    width: opcoes.largura ? { size: opcoes.largura, type: WidthType.PERCENTAGE } : undefined,
+    width: opcoes.larguraDxa ? { size: opcoes.larguraDxa, type: WidthType.DXA } : undefined,
     margins: { top: 60, bottom: 60, left: 120, right: 120 },
     children: [
       new Paragraph({
@@ -129,12 +141,111 @@ function celula(conteudo: string, opcoes: { cabecalho?: boolean; largura?: numbe
   })
 }
 
-const tabela = (linhas: TableRow[]) =>
-  new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: linhas })
+const tabela = (linhas: TableRow[], larguras: readonly number[] = COLUNAS_FICHA) =>
+  new Table({
+    width: { size: LARGURA_TABELA_DXA, type: WidthType.DXA },
+    indent: { size: RECUO_TABELA_DXA, type: WidthType.DXA },
+    columnWidths: larguras,
+    layout: TableLayoutType.FIXED,
+    rows: linhas,
+  })
 
 /** Tabela rótulo/valor, como as fichas de identificação do parecer. */
 const fichaLinha = (rotulo: string, valor: string) =>
-  new TableRow({ children: [celula(rotulo, { cabecalho: true, largura: 32 }), celula(valor)] })
+  new TableRow({
+    children: [
+      celula(rotulo, { cabecalho: true, larguraDxa: COLUNAS_FICHA[0] }),
+      celula(valor, { larguraDxa: COLUNAS_FICHA[1] }),
+    ],
+  })
+
+async function figuraDocx(
+  arquivo: string,
+  legenda: string | null,
+  numero: number,
+): Promise<(Paragraph | Table)[]> {
+  const titulo = `Figura ${numero}`
+  const descricao = legenda?.trim() || 'Sem legenda'
+
+  try {
+    // Carrega o armazenamento apenas quando há uma foto para embutir.
+    // Assim, documentos sem imagens continuam independentes da configuração
+    // completa do servidor (útil também para geração e testes offline).
+    const { lerUpload } = await import('./armazenamento.js')
+    const original = await lerUpload(arquivo)
+    const { data: imagem, info } = await sharp(original, { failOn: 'none' })
+      .rotate()
+      .flatten({ background: '#FFFFFF' })
+      .resize({ width: 1400, height: 1000, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 88, mozjpeg: true })
+      .toBuffer({ resolveWithObject: true })
+
+    const larguraMaxima = 540
+    const alturaMaxima = 390
+    const escala = Math.min(larguraMaxima / info.width, alturaMaxima / info.height, 1)
+    const largura = Math.max(1, Math.round(info.width * escala))
+    const altura = Math.max(1, Math.round(info.height * escala))
+
+    const semBorda = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
+    return [
+      new Table({
+        width: { size: LARGURA_TABELA_DXA, type: WidthType.DXA },
+        indent: { size: RECUO_TABELA_DXA, type: WidthType.DXA },
+        columnWidths: [LARGURA_TABELA_DXA],
+        layout: TableLayoutType.FIXED,
+        borders: { top: semBorda, bottom: semBorda, left: semBorda, right: semBorda, insideHorizontal: semBorda, insideVertical: semBorda },
+        rows: [
+          new TableRow({
+            cantSplit: true,
+            children: [
+              new TableCell({
+                width: { size: LARGURA_TABELA_DXA, type: WidthType.DXA },
+                borders: { top: semBorda, bottom: semBorda, left: semBorda, right: semBorda },
+                margins: { top: 120, bottom: 180, left: 0, right: 0 },
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    keepLines: true,
+                    spacing: { after: 50 },
+                    children: [
+                      new ImageRun({
+                        type: 'jpg',
+                        data: imagem,
+                        transformation: { width: largura, height: altura },
+                        altText: { title: titulo, description: descricao, name: titulo },
+                      }),
+                    ],
+                  }),
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    keepLines: true,
+                    spacing: { after: 0, line: 260 },
+                    children: [
+                      texto(`${titulo} — ${descricao}`, {
+                        italico: true,
+                        tamanho: 18,
+                        cor: MARCA.tinta600,
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+            ],
+          }),
+        ],
+      }),
+    ]
+  } catch {
+    return [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        keepLines: true,
+        spacing: { before: 120, after: 180 },
+        children: [texto(`${titulo} — imagem indisponível. ${descricao}`, { italico: true, tamanho: 18 })],
+      }),
+    ]
+  }
+}
 
 function cabecalhoMarca(perito: Usuario | null): Paragraph[] {
   const linhas: Paragraph[] = [
@@ -249,12 +360,12 @@ function montarDocumento(filhos: (Paragraph | Table)[]): Document {
 
 // ---------------- parecer / laudo ----------------
 
-function docParecer(
+async function docParecer(
   pericia: PericiaCompleta,
   empresas: Empresa[],
   perito: Usuario | null,
   titulo: string,
-): (Paragraph | Table)[] {
+): Promise<(Paragraph | Table)[]> {
   const t = pericia.tecnico as unknown as TecnicoJson
   const porId = new Map(empresas.map((e) => [e.id, e]))
   const principal = porId.get(pericia.reclamadas.find((r) => r.principal)?.empresaId ?? '')
@@ -311,22 +422,22 @@ function docParecer(
       tabela([
         new TableRow({
           children: [
-            celula('Nome do Participante', { cabecalho: true }),
-            celula('Qualificação / Representação', { cabecalho: true, largura: 32 }),
-            celula('Atuação no Ato', { cabecalho: true, largura: 38 }),
+            celula('Nome do Participante', { cabecalho: true, larguraDxa: 2685 }),
+            celula('Qualificação / Representação', { cabecalho: true, larguraDxa: 2864 }),
+            celula('Atuação no Ato', { cabecalho: true, larguraDxa: 3401 }),
           ],
         }),
         ...pericia.participantes.map(
           (pt) =>
             new TableRow({
               children: [
-                celula(pt.nome),
-                celula(PAPEL[pt.papel] ?? pt.papel),
-                celula(ATUACAO[pt.papel] ?? '—'),
+                celula(pt.nome, { larguraDxa: 2685 }),
+                celula(PAPEL[pt.papel] ?? pt.papel, { larguraDxa: 2864 }),
+                celula(ATUACAO[pt.papel] ?? '—', { larguraDxa: 3401 }),
               ],
             }),
         ),
-      ]),
+      ], [2685, 2864, 3401]),
     )
   }
 
@@ -344,24 +455,24 @@ function docParecer(
       tabela([
         new TableRow({
           children: [
-            celula('Função', { cabecalho: true, largura: 28 }),
-            celula('Setor', { cabecalho: true, largura: 18 }),
-            celula('Período', { cabecalho: true, largura: 24 }),
-            celula('Atividades', { cabecalho: true }),
+            celula('Função', { cabecalho: true, larguraDxa: 2506 }),
+            celula('Setor', { cabecalho: true, larguraDxa: 1611 }),
+            celula('Período', { cabecalho: true, larguraDxa: 2148 }),
+            celula('Atividades', { cabecalho: true, larguraDxa: 2685 }),
           ],
         }),
         ...t.periodos.map(
           (pr) =>
             new TableRow({
               children: [
-                celula(pr.funcao),
-                celula(pr.setor || '—'),
-                celula(`${data(pr.inicio)} a ${pr.fim ? data(pr.fim) : 'atual'}`),
-                celula(pr.descricaoAtividades || '—'),
+                celula(pr.funcao, { larguraDxa: 2506 }),
+                celula(pr.setor || '—', { larguraDxa: 1611 }),
+                celula(`${data(pr.inicio)} a ${pr.fim ? data(pr.fim) : 'atual'}`, { larguraDxa: 2148 }),
+                celula(pr.descricaoAtividades || '—', { larguraDxa: 2685 }),
               ],
             }),
         ),
-      ]),
+      ], [2506, 1611, 2148, 2685]),
     )
   }
 
@@ -373,7 +484,13 @@ function docParecer(
       filhos.push(
         h3(apresentacao.titulo),
         tabela([
-          new TableRow({ cantSplit: true, children: [celula('Propriedade', { cabecalho: true, largura: 32 }), celula('Informação', { cabecalho: true })] }),
+          new TableRow({
+            cantSplit: true,
+            children: [
+              celula('Propriedade', { cabecalho: true, larguraDxa: COLUNAS_FICHA[0] }),
+              celula('Informação', { cabecalho: true, larguraDxa: COLUNAS_FICHA[1] }),
+            ],
+          }),
           ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor)),
         ]),
       )
@@ -399,17 +516,22 @@ function docParecer(
     ...blocos(t.analiseTecnica),
   )
 
-  // As fotos ficam no PDF; no editável entra a remissão, para o
-  // arquivo não pesar dezenas de MB dentro do Word.
   if (pericia.fotos.length) {
-    filhos.push(
-      h2(`${secao()}. Relatório Fotográfico`),
-      p(
-        `O relatório fotográfico é composto por ${pericia.fotos.length} ${
-          pericia.fotos.length === 1 ? 'figura' : 'figuras'
-        }, organizadas por seção, e integra a versão em PDF deste documento.`,
-      ),
-    )
+    filhos.push(h2(`${secao()}. Relatório Fotográfico`))
+    const porSecao = new Map<string, typeof pericia.fotos>()
+    for (const foto of [...pericia.fotos].sort((a, b) => a.ordem - b.ordem)) {
+      const lista = porSecao.get(foto.secao) ?? []
+      lista.push(foto)
+      porSecao.set(foto.secao, lista)
+    }
+
+    let numeroFigura = 0
+    for (const [secaoFoto, fotos] of porSecao) {
+      filhos.push(h3(SECAO_FOTO[secaoFoto] ?? secaoFoto))
+      for (const foto of fotos) {
+        filhos.push(...(await figuraDocx(foto.arquivo, foto.legenda, ++numeroFigura)))
+      }
+    }
   }
 
   filhos.push(h2(`${secao()}. Conclusão`), ...blocos(t.conclusao))
@@ -592,7 +714,7 @@ export async function gerarDocx(
     case 'parecer':
     case 'laudo':
       filhos = pericia
-        ? docParecer(pericia, empresas, perito, doc.titulo)
+        ? await docParecer(pericia, empresas, perito, doc.titulo)
         : [...cabecalhoMarca(perito), h1(doc.titulo), p('[A perícia vinculada não existe mais.]')]
       break
     case 'quesitos':
