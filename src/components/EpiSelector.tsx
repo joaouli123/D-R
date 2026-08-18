@@ -3,6 +3,7 @@ import { Plus, Search, ShieldCheck, Trash2 } from 'lucide-react'
 
 import { Button, Input } from '@/components/ui'
 import { categoriaProtecaoDoAgente } from '@/lib/nr15'
+import { calcularProtecaoAuditiva } from '@/lib/protecaoAuditiva'
 import * as api from '@/services/api'
 import type { AgenteAvaliado, EpiSelecionado } from '@/types'
 
@@ -18,6 +19,7 @@ interface FormularioManual {
   caUnico: string
   caPecaFacial: string
   caFiltroCartucho: string
+  nivelProtecaoDb: string
 }
 
 const MANUAL_VAZIO: FormularioManual = {
@@ -27,6 +29,7 @@ const MANUAL_VAZIO: FormularioManual = {
   caUnico: '',
   caPecaFacial: '',
   caFiltroCartucho: '',
+  nivelProtecaoDb: '',
 }
 
 const FOCO_VISIVEL = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2'
@@ -80,6 +83,8 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
   const selecionados = agente.epis ?? []
   const limiteAtingido = selecionados.length >= 10
   const categoriaProtecao = categoriaProtecaoDoAgente(agente)
+  const ehRuidoContinuo = agente.anexoNr15 === 'ANEXO_01'
+  const medicaoRuido = agente.valorMedido == null ? null : Number(agente.valorMedido)
 
   async function carregar(q = '', sinal?: AbortSignal) {
     const requisicao = ++requisicaoAtual.current
@@ -140,6 +145,9 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
       ...(manual.caUnico.trim() ? { caUnico: manual.caUnico.trim() } : {}),
       ...(manual.caPecaFacial.trim() ? { caPecaFacial: manual.caPecaFacial.trim() } : {}),
       ...(manual.caFiltroCartucho.trim() ? { caFiltroCartucho: manual.caFiltroCartucho.trim() } : {}),
+      ...(manual.nivelProtecaoDb.trim()
+        ? { nivelProtecaoDb: Number(manual.nivelProtecaoDb), metodoAtenuacao: 'NRRsf' as const }
+        : { nivelProtecaoDb: null }),
     })
     setManual(MANUAL_VAZIO)
     setErroManual('')
@@ -154,7 +162,9 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
         <div className="min-w-0">
           <h4 id={tituloId} className="text-sm font-semibold text-ink-900">Proteção associada</h4>
           <p className="mt-0.5 text-xs leading-5 text-ink-500">
-            Selecione o equipamento usado. A eficácia é registrada separadamente.
+            {ehRuidoContinuo
+              ? 'Selecione o protetor. O sistema desconta o NRRsf da medição e avalia cada CA separadamente.'
+              : 'Selecione o equipamento usado. A eficácia é registrada separadamente.'}
           </p>
         </div>
       </div>
@@ -167,6 +177,16 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
                 <p className="text-sm font-semibold text-ink-900">{epi.modelo}</p>
                 <p className="text-xs text-ink-600">{epi.marca} · {epi.categoria}</p>
                 {descricaoCas(epi).map((ca) => <p key={ca} className="text-xs text-ink-500">{ca}</p>)}
+                {ehRuidoContinuo && medicaoRuido != null && Number.isFinite(medicaoRuido) && (() => {
+                  const resultado = calcularProtecaoAuditiva(medicaoRuido, epi.nivelProtecaoDb)
+                  return (
+                    <div className={`mt-2 rounded-md border px-2.5 py-2 ${resultado.eficaz ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-red-200 bg-red-50 text-red-900'}`}>
+                      <p className="text-xs font-semibold">{resultado.medicaoDbA} - {resultado.atenuacaoDb} = {resultado.resultadoDbA} dB(A)</p>
+                      <p className="text-xs font-bold">{resultado.eficaz ? 'Proteção eficaz' : 'Proteção ineficaz'}</p>
+                      {!resultado.nivelInformado && <p className="mt-1 text-[11px]">NRRsf não informado; considerado 0 dB.</p>}
+                    </div>
+                  )
+                })()}
               </div>
               <Button
                 type="button"
@@ -218,6 +238,7 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
                   <p className="text-sm font-semibold text-ink-900">{item.modelo}</p>
                   <p className="text-xs text-ink-600">{item.marca} · {snapshot.categoria}</p>
                   {descricaoCas(item).map((ca) => <p key={ca} className="text-xs text-ink-500">{ca}</p>)}
+                  {item.nivelProtecaoDb != null && <p className="mt-1 text-xs font-semibold text-navy-700">NRRsf: {item.nivelProtecaoDb} dB</p>}
                 </div>
                 <Button
                   type="button"
@@ -254,6 +275,7 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
           <Input aria-label="CA único" placeholder="CA único" value={manual.caUnico} onChange={(evento) => setManual({ ...manual, caUnico: evento.target.value })} />
           <Input aria-label="CA da peça facial" placeholder="CA da peça facial" value={manual.caPecaFacial} onChange={(evento) => setManual({ ...manual, caPecaFacial: evento.target.value })} />
           <Input aria-label="CA do cartucho ou filtro" placeholder="CA do cartucho/filtro" value={manual.caFiltroCartucho} onChange={(evento) => setManual({ ...manual, caFiltroCartucho: evento.target.value })} />
+          {ehRuidoContinuo && <Input type="number" min="0" max="100" step="0.1" aria-label="NRRsf em dB" placeholder="NRRsf (dB)" value={manual.nivelProtecaoDb} onChange={(evento) => setManual({ ...manual, nivelProtecaoDb: evento.target.value })} />}
         </div>
         {erroManual && <p role="alert" className="mt-2 text-xs text-red-700">{erroManual}</p>}
         <Button type="button" size="sm" className={`mt-3 ${FOCO_VISIVEL}`} disabled={limiteAtingido} onClick={adicionarManual}>

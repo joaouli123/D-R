@@ -4,6 +4,7 @@ import { anexoNr15PorId, ATIVIDADES_ANEXO_13, ATIVIDADES_ANEXO_14, SUBSTANCIAS_A
 import type { ReferenciaNormativa, UnidadeMedicao } from '@/content/nr15/tipos'
 import { normalizarNumeroMedido, unidadesDisponiveis } from '@/lib/medicoes'
 import { aplicarReferencia } from '@/lib/nr15'
+import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
 import type { AgenteAvaliado } from '@/types'
 import { Input, Select } from './ui'
 import { BuscaNormativa } from './BuscaNormativa'
@@ -121,28 +122,78 @@ function CamposGenericos({
   referenciaLegadaAusente,
 }: AgenteNr15FieldsProps & { referenciaLegadaAusente: boolean }) {
   const anexo = anexoNr15PorId(agente.anexoNr15)
-  const medicaoExibida = agente.medido ?? [agente.valorMedido, agente.unidadeMedicao].filter(Boolean).join(' ')
+  const regra = obterRegraAnexo(agente.anexoNr15)
+  const [valorDigitado, setValorDigitado] = useState(agente.valorMedido ?? '')
+  const [erroValor, setErroValor] = useState('')
+
+  useEffect(() => setValorDigitado(agente.valorMedido ?? ''), [agente.valorMedido])
+
+  function confirmarValor() {
+    if (!valorDigitado.trim()) {
+      const { valorMedido, ...semValor } = agente
+      setErroValor('')
+      onChange(semValor)
+      return
+    }
+    const normalizado = normalizarNumeroMedido(valorDigitado)
+    if (!normalizado) {
+      setErroValor('Informe um valor numérico, usando ponto ou vírgula para decimais.')
+      return
+    }
+    const { medido, ...semLegado } = agente
+    setErroValor('')
+    setValorDigitado(normalizado)
+    onChange({
+      ...semLegado,
+      valorMedido: normalizado,
+      ...(regra?.unidadePadrao ? { unidadeMedicao: regra.unidadePadrao } : {}),
+    })
+  }
 
   return (
     <div className="mt-3 rounded-lg border border-ink-200 bg-ink-50/60 p-3">
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         <Input
           label="Limite de tolerância"
           aria-label="Limite de tolerância"
           value={agente.limiteTolerancia ?? ''}
-          disabled={Boolean(anexo && !anexo.limiteEditavel)}
+          readOnly={Boolean(anexo && !anexo.limiteEditavel)}
           placeholder={anexo?.dica}
           hint={anexo && !anexo.limiteEditavel ? 'Valor fixo em lei para o anexo selecionado.' : anexo?.dica}
           onChange={(evento) => onChange({ ...agente, limiteTolerancia: evento.target.value })}
         />
-        <Input
-          label="Medição registrada"
-          aria-label="Medição registrada"
-          value={medicaoExibida}
-          hint="Registro livre preservado para anexos sem unidades estruturadas."
-          onChange={(evento) => onChange({ ...agente, medido: evento.target.value })}
-        />
+        {regra?.exibeMedicao && (
+          <>
+            <Input
+              label="Medição registrada"
+              aria-label="Medição registrada"
+              inputMode="decimal"
+              value={valorDigitado}
+              error={erroValor}
+              hint="Informe apenas o valor numérico."
+              onChange={(evento) => { setValorDigitado(evento.target.value); setErroValor('') }}
+              onBlur={confirmarValor}
+            />
+            {regra.unidadePadrao && (
+              <Input label="Unidade" aria-label="Unidade da medição" value={regra.unidadePadrao} readOnly hint="Definida pelo anexo selecionado." />
+            )}
+          </>
+        )}
+        {!regra && (
+          <Input
+            label="Medição registrada"
+            aria-label="Medição registrada"
+            value={agente.medido ?? ''}
+            hint="Registro livre preservado para conteúdo legado."
+            onChange={(evento) => onChange({ ...agente, medido: evento.target.value })}
+          />
+        )}
       </div>
+      {agente.medido && regra?.exibeMedicao && !agente.valorMedido && (
+        <p role="alert" className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
+          Medição legada preservada: “{agente.medido}”. Informe um valor numérico para substituí-la explicitamente.
+        </p>
+      )}
       {referenciaLegadaAusente && <AvisoReferenciaLegada className="mt-2" />}
     </div>
   )

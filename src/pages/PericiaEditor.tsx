@@ -48,9 +48,17 @@ import type {
   Usuario,
 } from '@/types'
 import { ANEXOS_NR15 } from '@/content/anexosNr15'
+import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
 import { aplicarAnexo } from '@/lib/nr15'
 import { dadosPapel, PAPEIS } from '@/lib/participantes'
 import { maskProcesso, uid } from '@/lib/utils'
+
+const ROTULOS_GRAU: Record<NonNullable<AgenteAvaliado['grau']>, string> = {
+  minimo: 'Mínimo 10%',
+  medio: 'Médio 20%',
+  maximo: 'Máximo 40%',
+  nao_caracterizado: 'Não caracterizado',
+}
 
 // ============================================================
 // MÓDULOS C · D · E · F · G · H · I
@@ -783,6 +791,9 @@ export default function PericiaEditor() {
             <div className="space-y-3 p-5">
               {p.tecnico.agentes.map((a) => {
                 const referenciaNormativaSelecionada = Boolean(a.referenciaNormativaId)
+                const regraAnexo = obterRegraAnexo(a.anexoNr15)
+                const agenteFixo = Boolean(regraAnexo?.agenteFixo)
+                const grauFixo = regraAnexo?.grausPermitidos.length === 1
                 return (
                 <div key={a.id} className="rounded-lg border border-ink-200 border-l-4 border-l-navy-700 p-3">
                   <ol aria-label="Fluxo técnico do agente" className="mb-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
@@ -792,7 +803,7 @@ export default function PericiaEditor() {
                     <Input
                       label="Agente"
                       value={a.nome}
-                      disabled={referenciaNormativaSelecionada}
+                      readOnly={referenciaNormativaSelecionada || agenteFixo}
                       onChange={(e) =>
                         setT({
                           agentes: p.tecnico.agentes.map((x) =>
@@ -801,7 +812,7 @@ export default function PericiaEditor() {
                         })
                       }
                     />
-                    <Input
+                    {(regraAnexo?.exibeCas ?? true) && <Input
                       label="CAS"
                       value={a.cas ?? ''}
                       disabled={referenciaNormativaSelecionada}
@@ -812,7 +823,7 @@ export default function PericiaEditor() {
                           ),
                         })
                       }
-                    />
+                    />}
                     <Select
                       label="Anexo NR-15"
                       value={a.anexoNr15 ?? ''}
@@ -832,7 +843,7 @@ export default function PericiaEditor() {
                     <Select
                       label="Grau"
                       value={a.grau ?? ''}
-                      disabled={referenciaNormativaSelecionada}
+                      disabled={referenciaNormativaSelecionada || grauFixo}
                       onChange={(e) =>
                         setT({
                           agentes: p.tecnico.agentes.map((x) =>
@@ -842,10 +853,9 @@ export default function PericiaEditor() {
                       }
                     >
                       <option value="">— selecione —</option>
-                      <option value="minimo">Mínimo 10%</option>
-                      <option value="medio">Médio 20%</option>
-                      <option value="maximo">Máximo 40%</option>
-                      <option value="nao_caracterizado">Não caracterizado</option>
+                      {(regraAnexo?.grausPermitidos ?? ['minimo', 'medio', 'maximo', 'nao_caracterizado']).map((grau) => (
+                        <option key={grau} value={grau}>{ROTULOS_GRAU[grau]}</option>
+                      ))}
                     </Select>
                     <Button
                       variant="ghost"
@@ -865,7 +875,7 @@ export default function PericiaEditor() {
                     <Select
                       label="Natureza"
                       value={a.tipo}
-                      disabled={referenciaNormativaSelecionada}
+                      disabled={referenciaNormativaSelecionada || Boolean(regraAnexo?.tipoFixo)}
                       onChange={(e) =>
                         setT({
                           agentes: p.tecnico.agentes.map((x) =>
@@ -882,7 +892,7 @@ export default function PericiaEditor() {
                     <Select
                       label="Critério"
                       value={a.criterio}
-                      disabled={referenciaNormativaSelecionada}
+                      disabled={referenciaNormativaSelecionada || Boolean(regraAnexo?.criterioFixo)}
                       onChange={(e) =>
                         setT({
                           agentes: p.tecnico.agentes.map((x) =>
@@ -899,13 +909,13 @@ export default function PericiaEditor() {
                     </Select>
                   </div>
                   <EpiSelector agente={a} onChange={(agenteAtualizado) => setT({ agentes: p.tecnico.agentes.map((x) => x.id === a.id ? agenteAtualizado : x) })} />
-                  <Checkbox
+                  {a.anexoNr15 !== 'ANEXO_01' && <Checkbox
                     className="mt-3 rounded-md px-1 py-1 focus-within:ring-2 focus-within:ring-brand-600"
                     label="EPI comprovadamente eficaz para este agente"
                     description="Adicionar equipamento não altera automaticamente esta conclusão técnica."
                     checked={a.epiEficaz ?? false}
                     onChange={(e) => setT({ agentes: p.tecnico.agentes.map((x) => x.id === a.id ? { ...x, epiEficaz: e.target.checked } : x) })}
-                  />
+                  />}
                 </div>
               )})}
               {p.tecnico.agentes.length === 0 && (

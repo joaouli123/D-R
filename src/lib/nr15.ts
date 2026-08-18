@@ -35,8 +35,10 @@ const REFERENCIAS_NR15: readonly ReferenciaNormativa[] = [
 ]
 
 export function categoriaProtecaoDoAgente(
-  agente: Pick<AgenteAvaliado, 'referenciaNormativaId'>,
+  agente: Pick<AgenteAvaliado, 'referenciaNormativaId' | 'anexoNr15'>,
 ): string | undefined {
+  const categoriaDoAnexo = obterRegraAnexo(agente.anexoNr15)?.categoriaProtecao
+  if (categoriaDoAnexo) return categoriaDoAnexo
   if (!agente.referenciaNormativaId) return undefined
   return REFERENCIAS_NR15.find((referencia) => referencia.id === agente.referenciaNormativaId)?.categoriaProtecao
 }

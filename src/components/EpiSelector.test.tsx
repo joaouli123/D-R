@@ -110,6 +110,52 @@ describe('busca cruzada do agente', () => {
 })
 
 describe('EpiSelector', () => {
+  it('sugere proteção auditiva e calcula cada CA de forma independente', async () => {
+    vi.mocked(api.epis.listar).mockResolvedValue([])
+    const agente: AgenteAvaliado = {
+      id: 'ruido-1',
+      nome: 'Ruído',
+      tipo: 'fisico',
+      criterio: 'quantitativo',
+      anexoNr15: 'ANEXO_01',
+      valorMedido: '90',
+      unidadeMedicao: 'dB(A)',
+      epis: [
+        { categoria: 'Proteção auditiva', modelo: 'CA 11882', marca: 'Não informada', caUnico: '11882', nivelProtecaoDb: 17, metodoAtenuacao: 'NRRsf' },
+        { categoria: 'Proteção auditiva', modelo: 'Sem NRRsf', marca: 'Não informada', caUnico: '00000', nivelProtecaoDb: null },
+      ],
+    }
+
+    render(<EpiSelector agente={agente} onChange={() => undefined} />)
+
+    expect(api.epis.listar).toHaveBeenCalledWith({ anexo: 'Anexo 1' })
+    expect(screen.getByText('90 - 17 = 73 dB(A)')).toBeDefined()
+    expect(screen.getByText('Proteção eficaz')).toBeDefined()
+    expect(screen.getByText('90 - 0 = 90 dB(A)')).toBeDefined()
+    expect(screen.getByText(/NRRsf não informado; considerado 0 dB/)).toBeDefined()
+  })
+
+  it('permite informar NRRsf ao cadastrar proteção auditiva manual', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    vi.mocked(api.epis.listar).mockResolvedValue([])
+    const agente: AgenteAvaliado = {
+      id: 'ruido-1', nome: 'Ruído', tipo: 'fisico', criterio: 'quantitativo', anexoNr15: 'ANEXO_01',
+    }
+    render(<EpiSelector agente={agente} onChange={onChange} />)
+
+    await user.click(screen.getByText('Informar EPI manualmente'))
+    await user.type(screen.getByRole('textbox', { name: 'Categoria do EPI' }), 'Proteção auditiva')
+    await user.type(screen.getByRole('textbox', { name: 'Modelo do EPI' }), 'Protetor tipo concha')
+    await user.type(screen.getByRole('textbox', { name: 'Marca do EPI' }), 'Marca teste')
+    await user.type(screen.getByRole('spinbutton', { name: 'NRRsf em dB' }), '13')
+    await user.click(screen.getByRole('button', { name: 'Adicionar EPI manual' }))
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      epis: [expect.objectContaining({ nivelProtecaoDb: 13, metodoAtenuacao: 'NRRsf' })],
+    }))
+  })
+
   it('carrega sugestões sem selecionar e adiciona o snapshot somente pelo botão', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
@@ -262,8 +308,7 @@ describe('compatibilidade de agentes sem referencia especializada', () => {
     return <AgenteNr15Fields agente={agente} onChange={(atualizado) => { setAgente(atualizado); onChange(atualizado) }} />
   }
 
-  it('mantem limite, medicao e aviso legado editaveis fora dos anexos especializados', async () => {
-    const user = userEvent.setup()
+  it('preserva o registro legado sem pedir medição em anexo qualitativo', () => {
     const onChange = vi.fn()
     render(<Harness inicial={{
       id: 'agente-7',
@@ -277,14 +322,10 @@ describe('compatibilidade de agentes sem referencia especializada', () => {
     }} onChange={onChange} />)
 
     const limite = screen.getByRole('textbox', { name: 'Limite de tolerância' }) as HTMLInputElement
-    const medicao = screen.getByRole('textbox', { name: 'Medição registrada' }) as HTMLInputElement
     expect(limite.value).toBe('Exposicao habitual')
-    expect(medicao.value).toBe('Registro legado')
+    expect(screen.queryByRole('textbox', { name: 'Medição registrada' })).toBeNull()
     expect(screen.getByRole('alert').textContent).toContain('referência normativa salva')
-
-    await user.clear(medicao)
-    await user.type(medicao, 'Sem quantificacao instrumental')
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ medido: 'Sem quantificacao instrumental' }))
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('remove unidade estruturada ao limpar a referencia', async () => {
