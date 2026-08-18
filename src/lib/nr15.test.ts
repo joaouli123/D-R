@@ -6,6 +6,7 @@ import { ATIVIDADES_ANEXO_13, ATIVIDADES_ANEXO_14, SUBSTANCIAS_ANEXO_11 } from '
 import { AgenteNr15Fields } from '@/components/AgenteNr15Fields'
 import { BuscaNormativa } from '@/components/BuscaNormativa'
 import type { ReferenciaNormativa } from '@/content/nr15/tipos'
+import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
 import { aplicarAnexo, aplicarReferencia, buscarReferencias, buscarReferenciasNr15, categoriaProtecaoDoAgente, normalizarBuscaNr15 } from './nr15'
 
 function referenciaPorId(
@@ -208,6 +209,44 @@ describe('buscarReferencias', () => {
 })
 
 describe('aplicarAnexo', () => {
+  it('aplica a regra fechada de ruído contínuo sem preservar CAS químico', () => {
+    expect(aplicarAnexo({
+      id: 'a1',
+      nome: 'Produto químico legado',
+      tipo: 'quimico',
+      criterio: 'qualitativo',
+      cas: '75-07-0',
+      grau: 'maximo',
+    }, 'ANEXO_01')).toMatchObject({
+      anexoNr15: 'ANEXO_01',
+      nome: 'Ruído',
+      tipo: 'fisico',
+      criterio: 'quantitativo',
+      limiteTolerancia: '85 dB(A) para jornada de 8h/dia (q=5)',
+      grau: 'medio',
+      unidadeMedicao: 'dB(A)',
+    })
+
+    expect(aplicarAnexo({
+      id: 'a1', nome: 'Legado', tipo: 'quimico', criterio: 'qualitativo', cas: '75-07-0',
+    }, 'ANEXO_01')).not.toHaveProperty('cas')
+  })
+
+  it('expõe apenas os campos, unidade e grau aplicáveis ao Anexo 1', () => {
+    expect(obterRegraAnexo('ANEXO_01')).toMatchObject({
+      agenteFixo: 'Ruído',
+      tipoFixo: 'fisico',
+      criterioFixo: 'quantitativo',
+      limiteFixo: '85 dB(A) para jornada de 8h/dia (q=5)',
+      grausPermitidos: ['medio'],
+      unidades: ['dB(A)'],
+      unidadePadrao: 'dB(A)',
+      exibeCas: false,
+      exibeMedicao: true,
+      calculo: 'ruido_nrrsf',
+    })
+  })
+
   it('preserva medicao, EPI e observacao ao trocar para o Anexo 7', () => {
     expect(aplicarAnexo({
       id: 'a1',

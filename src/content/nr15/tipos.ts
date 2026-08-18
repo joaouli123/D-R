@@ -1,6 +1,17 @@
 import type { AgenteAvaliado } from '@/types'
 
-export type UnidadeMedicao = 'ppm' | 'mg/m³' | '% O₂ em volume'
+export type UnidadeMedicao =
+  | 'ppm'
+  | 'mg/m³'
+  | '% O₂ em volume'
+  | 'dB(A)'
+  | 'dB(C)'
+  | 'dB(Linear)'
+  | 'IBUTG °C'
+  | 'mSv/ano'
+  | 'm/s²'
+  | 'm/s¹·⁷⁵'
+  | 'fibras/cm³'
 
 export type LimitesPorUnidade = Partial<Record<UnidadeMedicao, string>>
 

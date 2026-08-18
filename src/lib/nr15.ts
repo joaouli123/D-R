@@ -1,6 +1,7 @@
 import type { ReferenciaNormativa, UnidadeMedicao } from '@/content/nr15/tipos'
 import { anexoNr15PorId, ATIVIDADES_ANEXO_13, ATIVIDADES_ANEXO_14, SUBSTANCIAS_ANEXO_11 } from '@/content/anexosNr15'
 import type { AgenteAvaliado } from '@/types'
+import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
 
 export function normalizarBuscaNr15(texto: string): string {
   return texto
@@ -42,9 +43,12 @@ export function categoriaProtecaoDoAgente(
 
 export function aplicarAnexo(agente: AgenteAvaliado, anexoId: string): AgenteAvaliado {
   const anexo = anexoNr15PorId(anexoId)
+  const regra = obterRegraAnexo(anexoId)
   const mudouAnexo = agente.anexoNr15 !== anexoId
   const { referenciaNormativaId, atividadeEnquadrada, unidadeLimite, unidadeMedicao, ...agenteSemReferencia } = agente
-  const base = mudouAnexo ? agenteSemReferencia : agente
+  const baseComReferencia = mudouAnexo ? agenteSemReferencia : agente
+  const { cas, ...baseSemCas } = baseComReferencia
+  const base = regra?.exibeCas === false ? baseSemCas : baseComReferencia
 
   if (!anexo) return { ...base, anexoNr15: anexoId }
 
@@ -53,9 +57,11 @@ export function aplicarAnexo(agente: AgenteAvaliado, anexoId: string): AgenteAva
   return {
     ...base,
     anexoNr15: anexo.id,
+    nome: regra?.agenteFixo ?? base.nome,
     tipo: anexoSemGrau.tipo,
     criterio: anexoSemGrau.criterio,
     limiteTolerancia: anexoSemGrau.limiteTolerancia,
+    ...(regra?.unidadePadrao ? { unidadeMedicao: regra.unidadePadrao } : {}),
     ...(grau ? { grau } : { grau: undefined }),
   }
 }
