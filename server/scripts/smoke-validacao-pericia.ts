@@ -38,6 +38,8 @@ const epiSelecionado = {
   caPecaFacial: '4115',
   caFiltroCartucho: '5635',
   observacao: 'Conjunto respiratório',
+  nivelProtecaoDb: 17,
+  metodoAtenuacao: 'NRRsf',
 }
 
 const agenteComMedicaoEEpi = {
@@ -54,7 +56,10 @@ const agenteComValorMedidoInvalido = {
   unidadeMedicao: 'ppm',
 }
 
-const medicoesPorUnidade = ['ppm', 'mg/m³', '% O₂ em volume'].map((unidadeMedicao) =>
+const medicoesPorUnidade = [
+  'ppm', 'mg/m³', '% O₂ em volume', 'dB(A)', 'dB(C)', 'dB(Linear)',
+  'IBUTG °C', 'mSv/ano', 'm/s²', 'm/s¹·⁷⁵', 'fibras/cm³',
+].map((unidadeMedicao) =>
   agenteSchema.safeParse({ ...agenteLegado, valorMedido: '1.5', unidadeMedicao }),
 )
 
@@ -115,14 +120,16 @@ const resultados = [
       medicaoEEpi.data.epis[0]?.catalogoId === 'epi-1' &&
       medicaoEEpi.data.epis[0]?.caPecaFacial === '4115' &&
       medicaoEEpi.data.epis[0]?.caFiltroCartucho === '5635' &&
-      medicaoEEpi.data.epis[0]?.observacao === 'Conjunto respiratório',
+      medicaoEEpi.data.epis[0]?.observacao === 'Conjunto respiratório' &&
+      medicaoEEpi.data.epis[0]?.nivelProtecaoDb === 17 &&
+      medicaoEEpi.data.epis[0]?.metodoAtenuacao === 'NRRsf',
   },
   {
     nome: 'valor medido não numérico é rejeitado',
     ok: !valorMedidoInvalido.success,
   },
   {
-    nome: 'todas as unidades estruturadas são aceitas',
+    nome: 'todas as unidades estruturadas dos anexos são aceitas',
     ok: medicoesPorUnidade.every((resultado) => resultado.success),
   },
   {

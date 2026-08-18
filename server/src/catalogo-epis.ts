@@ -26,6 +26,8 @@ export type EpiCatalogoComAplicacoes = {
   caUnico: string | null
   caPecaFacial: string | null
   caFiltroCartucho: string | null
+  nivelProtecaoDb: number | null
+  metodoAtenuacao: 'NRRsf' | null
   observacao: string | null
   ativo: boolean
   aplicacoes: AplicacaoEpi[]
@@ -154,6 +156,8 @@ export function configuracoesUnicas(linhas: LinhaEpiRecebida[]): EpiCatalogoComA
       modelo: linhaRecebida.modelo,
       marca: linhaRecebida.marca,
       ...cas,
+      nivelProtecaoDb: null,
+      metodoAtenuacao: null,
       observacao: linhaRecebida.observacao,
       ativo: true,
       aplicacoes: [],

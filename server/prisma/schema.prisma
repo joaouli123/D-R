@@ -342,6 +342,8 @@ model EpiCatalogo {
   caUnico           String?
   caPecaFacial      String?
   caFiltroCartucho  String?
+  nivelProtecaoDb   Float?
+  metodoAtenuacao   String?
   observacao        String?
   ativo             Boolean  @default(true)
   createdAt         DateTime @default(now())

@@ -136,6 +136,8 @@ export interface EpiCatalogo {
   caUnico: string | null
   caPecaFacial: string | null
   caFiltroCartucho: string | null
+  nivelProtecaoDb?: number | null
+  metodoAtenuacao?: 'NRRsf' | null
   observacao: string | null
   ativo: boolean
   aplicacoes: AplicacaoEpiCatalogo[]
@@ -173,6 +175,8 @@ export function snapshotEpi(item: EpiCatalogo): EpiSelecionado {
     ...(item.caUnico ? { caUnico: item.caUnico } : {}),
     ...(item.caPecaFacial ? { caPecaFacial: item.caPecaFacial } : {}),
     ...(item.caFiltroCartucho ? { caFiltroCartucho: item.caFiltroCartucho } : {}),
+    nivelProtecaoDb: item.nivelProtecaoDb ?? null,
+    metodoAtenuacao: item.metodoAtenuacao ?? null,
     ...(item.observacao ? { observacao: item.observacao } : {}),
   }
 }

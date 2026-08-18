@@ -162,6 +162,8 @@ export interface EpiDocumento {
   caUnico?: string
   caPecaFacial?: string
   caFiltroCartucho?: string
+  nivelProtecaoDb?: number | null
+  metodoAtenuacao?: 'NRRsf' | null
   observacao?: string
 }
 

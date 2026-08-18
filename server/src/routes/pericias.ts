@@ -35,6 +35,8 @@ const epiSelecionadoSchema = z.object({
   caUnico: texto.optional(),
   caPecaFacial: texto.optional(),
   caFiltroCartucho: texto.optional(),
+  nivelProtecaoDb: z.number().min(0).max(100).nullable().optional(),
+  metodoAtenuacao: z.enum(['NRRsf']).nullable().optional(),
   observacao: texto.optional(),
 })
 
@@ -50,7 +52,10 @@ export const agenteSchema = z.object({
   limiteTolerancia: texto.optional(),
   medido: texto.optional(),
   valorMedido: z.string().regex(/^-?\d+(\.\d+)?$/).optional(),
-  unidadeMedicao: z.enum(['ppm', 'mg/m³', '% O₂ em volume']).optional(),
+  unidadeMedicao: z.enum([
+    'ppm', 'mg/m³', '% O₂ em volume', 'dB(A)', 'dB(C)', 'dB(Linear)',
+    'IBUTG °C', 'mSv/ano', 'm/s²', 'm/s¹·⁷⁵', 'fibras/cm³',
+  ]).optional(),
   epis: z.array(epiSelecionadoSchema).max(10).default([]),
   criterio: z.enum(['qualitativo', 'quantitativo', 'nao_aplicavel']),
   grau: z.enum(['minimo', 'medio', 'maximo', 'nao_caracterizado']).optional(),
