@@ -45,7 +45,7 @@ const REGRAS_ESPECIFICAS: Record<string, Partial<RegraAnexoNr15>> = {
   ANEXO_12_MANGANES: { agenteFixo: 'Manganês', unidades: ['mg/m³'], unidadePadrao: 'mg/m³' },
   ANEXO_12_SILICA: { agenteFixo: 'Sílica livre cristalizada', unidades: ['mg/m³'], unidadePadrao: 'mg/m³' },
   ANEXO_13: { exibeMedicao: false },
-  ANEXO_14: { exibeMedicao: false },
+  ANEXO_14: { grausPermitidos: ['medio', 'maximo'], exibeMedicao: false },
 }
 
 export function obterRegraAnexo(anexoId: string | undefined): RegraAnexoNr15 | undefined {

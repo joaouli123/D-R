@@ -180,6 +180,7 @@ export const ANEXOS_NR15: AnexoNr15Info[] = [
     id: 'ANEXO_06',
     label: 'Anexo 6 — Trabalho sob Condições Hiperbáricas',
     tipo: 'fisico',
+    grau: 'maximo',
     criterio: 'nao_aplicavel',
     limiteTolerancia: '',
     limiteEditavel: true,

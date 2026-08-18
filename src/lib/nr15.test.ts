@@ -209,6 +209,11 @@ describe('buscarReferencias', () => {
 })
 
 describe('aplicarAnexo', () => {
+  it('restringe os graus fixos e variáveis conforme os anexos aprovados', () => {
+    expect(obterRegraAnexo('ANEXO_06')?.grausPermitidos).toEqual(['maximo'])
+    expect(obterRegraAnexo('ANEXO_14')?.grausPermitidos).toEqual(['medio', 'maximo'])
+  })
+
   it('aplica a regra fechada de ruído contínuo sem preservar CAS químico', () => {
     expect(aplicarAnexo({
       id: 'a1',

@@ -137,6 +137,13 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
       setErroManual('Preencha categoria, modelo e marca para adicionar o EPI manual.')
       return
     }
+    const nivelProtecaoDb = manual.nivelProtecaoDb.trim()
+      ? Number(manual.nivelProtecaoDb)
+      : null
+    if (nivelProtecaoDb != null && (!Number.isFinite(nivelProtecaoDb) || nivelProtecaoDb < 0 || nivelProtecaoDb > 100)) {
+      setErroManual('Informe um NRRsf entre 0 e 100 dB.')
+      return
+    }
 
     adicionar({
       categoria,
@@ -145,8 +152,8 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
       ...(manual.caUnico.trim() ? { caUnico: manual.caUnico.trim() } : {}),
       ...(manual.caPecaFacial.trim() ? { caPecaFacial: manual.caPecaFacial.trim() } : {}),
       ...(manual.caFiltroCartucho.trim() ? { caFiltroCartucho: manual.caFiltroCartucho.trim() } : {}),
-      ...(manual.nivelProtecaoDb.trim()
-        ? { nivelProtecaoDb: Number(manual.nivelProtecaoDb), metodoAtenuacao: 'NRRsf' as const }
+      ...(nivelProtecaoDb != null
+        ? { nivelProtecaoDb, metodoAtenuacao: 'NRRsf' as const }
         : { nivelProtecaoDb: null }),
     })
     setManual(MANUAL_VAZIO)

@@ -156,6 +156,26 @@ describe('EpiSelector', () => {
     }))
   })
 
+  it('rejeita NRRsf manual fora do intervalo aceito', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    vi.mocked(api.epis.listar).mockResolvedValue([])
+    const agente: AgenteAvaliado = {
+      id: 'ruido-1', nome: 'Ruído', tipo: 'fisico', criterio: 'quantitativo', anexoNr15: 'ANEXO_01',
+    }
+    render(<EpiSelector agente={agente} onChange={onChange} />)
+
+    await user.click(screen.getByText('Informar EPI manualmente'))
+    await user.type(screen.getByRole('textbox', { name: 'Categoria do EPI' }), 'Proteção auditiva')
+    await user.type(screen.getByRole('textbox', { name: 'Modelo do EPI' }), 'Protetor')
+    await user.type(screen.getByRole('textbox', { name: 'Marca do EPI' }), 'Marca')
+    await user.type(screen.getByRole('spinbutton', { name: 'NRRsf em dB' }), '101')
+    await user.click(screen.getByRole('button', { name: 'Adicionar EPI manual' }))
+
+    expect(screen.getByRole('alert').textContent).toContain('entre 0 e 100 dB')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
   it('carrega sugestões sem selecionar e adiciona o snapshot somente pelo botão', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()

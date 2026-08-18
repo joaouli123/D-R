@@ -162,6 +162,17 @@ const pericia = {
         grau: 'medio',
       },
       {
+        id: 'agn-vibracao',
+        nome: 'Vibração em mãos e braços',
+        tipo: 'fisico',
+        anexoNr15: 'ANEXO_08_VMB',
+        limiteTolerancia: 'aren = 5,0 m/s²',
+        valorMedido: '4.2',
+        unidadeMedicao: 'm/s²',
+        criterio: 'quantitativo',
+        grau: 'medio',
+      },
+      {
         id: 'agn-oxigenio',
         nome: 'Oxigênio',
         tipo: 'quimico',
@@ -365,6 +376,7 @@ async function main() {
   assert.match(htmlParecer, /Eficácia comprovada<\/th><td[^>]*>Sim/)
   assert.match(htmlParecer, /90 - 17 = 73 dB\(A\)/)
   assert.match(htmlParecer, /Proteção eficaz/)
+  assert.match(htmlParecer, /Anexo 8 — Vibrações em Mãos e Braços \(VMB\)/)
   assert.match(htmlParecer, /85 dB\(A\)/)
   assert.match(htmlParecer, /18 % O₂ em volume/)
   assert.match(htmlParecer, /7,25/)

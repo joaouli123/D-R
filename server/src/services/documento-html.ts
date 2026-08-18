@@ -75,16 +75,16 @@ const CSS = `
     padding-bottom: 14px;
     margin-bottom: 32px;
   }
-  .logo { font-family: Inter, Arial, sans-serif; font-weight: 800; font-size: 32pt; letter-spacing: -1px; line-height: 1; }
+  .logo { font-family: Arial, sans-serif; font-weight: 800; font-size: 32pt; letter-spacing: -1px; line-height: 1; }
   .logo .primaria { color: ${css(MARCA.primaria)}; }
   .logo .neutra { color: ${css(MARCA.tinta900)}; }
   .regua {
-    font-family: Inter, Arial, sans-serif;
+    font-family: Arial, sans-serif;
     font-size: 8pt; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.42em; color: ${css(MARCA.primaria)}; margin-top: 2px;
   }
   .tagline {
-    font-family: Inter, Arial, sans-serif;
+    font-family: Arial, sans-serif;
     font-size: 8pt; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.2em; color: ${css(MARCA.credencial)}; margin-top: 10px;
   }
