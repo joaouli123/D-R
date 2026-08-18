@@ -1,58 +1,14 @@
 import { Logo } from '@/components/Logo'
-import type { AgenteAvaliado, Empresa, EpiSelecionado, Pericia, Usuario } from '@/types'
+import type { Empresa, Pericia, Usuario } from '@/types'
 import { extenso, formatDate } from '@/lib/utils'
-import { labelAnexoNr15 } from '@/content/anexosNr15'
 import { dadosPapel } from '@/lib/participantes'
+import { montarApresentacaoAgente } from '@/lib/apresentacaoAgente'
 
 // ============================================================
 // MÓDULO H — Montagem automática do documento
 // Reproduz a identidade visual D&R e a estrutura do modelo
 // em Word fornecido pelo Contratante.
 // ============================================================
-
-const CRITERIO: Record<string, string> = {
-  qualitativo: 'Qualitativo',
-  quantitativo: 'Quantitativo',
-  nao_aplicavel: 'Não aplicável',
-}
-
-const GRAU: Record<string, string> = {
-  minimo: 'Mínimo (10%)',
-  medio: 'Médio (20%)',
-  maximo: 'Máximo (40%)',
-  nao_caracterizado: 'Não caracterizado',
-}
-
-function limiteComUnidade(limite?: string, unidade?: string): string {
-  const valor = limite?.trim() ?? ''
-  const medida = unidade?.trim() ?? ''
-  if (!medida) return valor || '—'
-  if (!valor) return medida
-
-  const componentes = medida.split('|').map((parte) => parte.trim()).filter(Boolean)
-  return componentes.length > 0 && componentes.every((parte) => valor.includes(parte))
-    ? valor
-    : `${valor} (${medida})`
-}
-
-function formatarMedicao(agente: AgenteAvaliado): string {
-  const valor = agente.valorMedido?.trim()
-  if (valor) {
-    const formatado = valor.replace('.', ',')
-    return agente.unidadeMedicao ? `${formatado} ${agente.unidadeMedicao}` : formatado
-  }
-  return agente.medido?.trim() || '—'
-}
-
-function formatarCasEpi(epi: EpiSelecionado): string[] {
-  return [
-    epi.caUnico?.trim() ? `CA: ${epi.caUnico.trim()}` : undefined,
-    epi.caPecaFacial?.trim() ? `CA da peça facial: ${epi.caPecaFacial.trim()}` : undefined,
-    epi.caFiltroCartucho?.trim()
-      ? `CA do cartucho/filtro: ${epi.caFiltroCartucho.trim()}`
-      : undefined,
-  ].filter((linha): linha is string => Boolean(linha))
-}
 
 function Paragrafos({ texto }: { texto: string }) {
   if (!texto?.trim()) {
@@ -263,60 +219,32 @@ export function DocumentoPreview({
       {t.agentes.length === 0 ? (
         <p className="italic text-ink-400">[Nenhum agente cadastrado]</p>
       ) : (
-        <table className="agentes-table table-fixed">
-          <thead>
-            <tr>
-              <th className="w-[28%]">Agente</th>
-              <th className="w-[9%]">CAS</th>
-              <th className="w-[11%]">Anexo NR-15</th>
-              <th className="w-[13%]">Critério</th>
-              <th className="w-[13%]">Grau</th>
-              <th className="w-[15%]">Limite de Tolerância</th>
-              <th className="w-[11%]">Valor Medido</th>
-            </tr>
-          </thead>
-          <tbody>
-            {t.agentes.map((a) => (
-              <tr key={a.id}>
-                <td>
-                  <p>{a.nome}</p>
-                  {a.atividadeEnquadrada && (
-                    <p className="mt-1 text-xs text-ink-500">
-                      Atividade ou referência normativa: {a.atividadeEnquadrada}
-                    </p>
-                  )}
-                  {a.epis && a.epis.length > 0 && (
-                    <div className="mt-2 text-xs text-ink-600">
-                      <p className="font-bold">EPIs associados</p>
-                      <ul className="list-disc pl-4">
-                        {a.epis.map((epi, index) => (
-                          <li key={epi.catalogoId ?? `${epi.categoria}-${epi.modelo}-${index}`}>
-                            {[epi.categoria, epi.modelo, epi.marca]
-                              .map((parte) => parte.trim())
-                              .filter(Boolean)
-                              .join(' — ')}
-                            {formatarCasEpi(epi).map((ca) => (
-                              <span className="block" key={ca}>
-                                {ca}
-                              </span>
-                            ))}
-                          </li>
-                        ))}
-                      </ul>
-                      <p className="mt-1 font-bold">Eficácia comprovada: {a.epiEficaz ? 'Sim' : 'Não'}</p>
-                    </div>
-                  )}
-                </td>
-                <td>{a.cas || '—'}</td>
-                <td>{labelAnexoNr15(a.anexoNr15) || '—'}</td>
-                <td>{CRITERIO[a.criterio]}</td>
-                <td>{a.grau ? GRAU[a.grau] : '—'}</td>
-                <td>{limiteComUnidade(a.limiteTolerancia, a.unidadeLimite)}</td>
-                <td>{formatarMedicao(a)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="space-y-4">
+          {t.agentes.map((agente) => {
+            const apresentacao = montarApresentacaoAgente(agente)
+            return (
+              <section key={agente.id} className="agente-bloco">
+                <h3>{apresentacao.titulo}</h3>
+                <table className="agente-propriedades">
+                  <thead><tr><th>Propriedade</th><th>Informação</th></tr></thead>
+                  <tbody>{apresentacao.linhas.map((linha) => (
+                    <tr key={linha.rotulo}><th>{linha.rotulo}</th><td>{linha.valor}</td></tr>
+                  ))}</tbody>
+                </table>
+                {apresentacao.protecoes.map((protecao) => (
+                  <div key={protecao.titulo} className="protecao-bloco">
+                    <h4>{protecao.titulo}</h4>
+                    <table>
+                      <tbody>{protecao.linhas.map((linha) => (
+                        <tr key={linha.rotulo}><th>{linha.rotulo}</th><td className={linha.destaque ? `resultado-${linha.destaque}` : ''}>{linha.valor}</td></tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                ))}
+              </section>
+            )
+          })}
+        </div>
       )}
 
       {/* Normas */}

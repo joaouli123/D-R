@@ -170,6 +170,7 @@ export interface EpiDocumento {
 export interface AgenteDocumento {
   id: string
   nome: string
+  tipo?: string
   cas?: string
   anexoNr15?: string
   referenciaNormativaId?: string
@@ -178,7 +179,7 @@ export interface AgenteDocumento {
   limiteTolerancia?: string
   medido?: string
   valorMedido?: string
-  unidadeMedicao?: 'ppm' | 'mg/m³' | '% O₂ em volume'
+  unidadeMedicao?: 'ppm' | 'mg/m³' | '% O₂ em volume' | 'dB(A)' | 'dB(C)' | 'dB(Linear)' | 'IBUTG °C' | 'mSv/ano' | 'm/s²' | 'm/s¹·⁷⁵' | 'fibras/cm³'
   epis?: EpiDocumento[]
   epiEficaz?: boolean
   criterio: string
@@ -202,6 +203,99 @@ export function formatarCasEpi(epi: EpiDocumento): string[] {
       ? `CA do cartucho/filtro: ${epi.caFiltroCartucho.trim()}`
       : undefined,
   ].filter((linha): linha is string => Boolean(linha))
+}
+
+export interface LinhaApresentacaoAgente {
+  rotulo: string
+  valor: string
+  destaque?: 'positivo' | 'negativo' | 'aviso'
+}
+
+export interface ApresentacaoAgenteDocumento {
+  titulo: string
+  linhas: LinhaApresentacaoAgente[]
+  protecoes: { titulo: string; linhas: LinhaApresentacaoAgente[] }[]
+}
+
+const NATUREZA_AGENTE: Record<string, string> = {
+  quimico: 'Químico', fisico: 'Físico', biologico: 'Biológico', periculosidade: 'Periculosidade',
+}
+
+function numeroDocumento(valor: number | string): string {
+  return String(valor).replace('.', ',')
+}
+
+function anexoLegivel(anexo?: string): string {
+  const rotulos: Record<string, string> = {
+    ANEXO_01: 'Anexo 1 — Ruído Contínuo ou Intermitente',
+    ANEXO_02: 'Anexo 2 — Ruído de Impacto',
+    ANEXO_03: 'Anexo 3 — Exposição ao Calor',
+    ANEXO_11: 'Anexo 11 — Agentes Químicos com Limite',
+    ANEXO_13: 'Anexo 13 — Agentes Químicos (Atividades)',
+    ANEXO_14: 'Anexo 14 — Agentes Biológicos',
+  }
+  return anexo ? (rotulos[anexo] ?? anexo) : ''
+}
+
+function protecaoDocumento(
+  agente: AgenteDocumento,
+  epi: EpiDocumento,
+  indice: number,
+): ApresentacaoAgenteDocumento['protecoes'][number] {
+  const linhas: LinhaApresentacaoAgente[] = [
+    { rotulo: 'Categoria', valor: epi.categoria },
+    { rotulo: 'Modelo', valor: epi.modelo },
+    { rotulo: 'Marca', valor: epi.marca },
+    ...[
+      epi.caUnico?.trim() ? { rotulo: 'CA', valor: epi.caUnico.trim() } : undefined,
+      epi.caPecaFacial?.trim() ? { rotulo: 'CA da peça facial', valor: epi.caPecaFacial.trim() } : undefined,
+      epi.caFiltroCartucho?.trim() ? { rotulo: 'CA do cartucho/filtro', valor: epi.caFiltroCartucho.trim() } : undefined,
+    ].filter((linha): linha is LinhaApresentacaoAgente => Boolean(linha)),
+  ]
+
+  if (agente.anexoNr15 === 'ANEXO_01') {
+    const medicao = agente.valorMedido == null ? Number.NaN : Number(agente.valorMedido)
+    const atenuacao = epi.nivelProtecaoDb ?? 0
+    const resultado = Number.isFinite(medicao) ? Number((medicao - atenuacao).toFixed(2)) : null
+    linhas.push({
+      rotulo: 'NRRsf',
+      valor: epi.nivelProtecaoDb == null ? 'Não informado — considerado 0 dB' : `${numeroDocumento(epi.nivelProtecaoDb)} dB`,
+      ...(epi.nivelProtecaoDb == null ? { destaque: 'aviso' as const } : {}),
+    })
+    if (resultado == null) {
+      linhas.push({ rotulo: 'Cálculo', valor: 'Medição registrada não informada', destaque: 'aviso' })
+    } else {
+      const eficaz = resultado <= 85
+      linhas.push(
+        { rotulo: 'Cálculo', valor: `${numeroDocumento(medicao)} - ${numeroDocumento(atenuacao)} = ${numeroDocumento(resultado)} dB(A)` },
+        { rotulo: 'Conclusão', valor: eficaz ? 'Proteção eficaz' : 'Proteção ineficaz', destaque: eficaz ? 'positivo' : 'negativo' },
+      )
+    }
+  } else {
+    linhas.push({ rotulo: 'Eficácia comprovada', valor: agente.epiEficaz ? 'Sim' : 'Não', destaque: agente.epiEficaz ? 'positivo' : 'negativo' })
+  }
+
+  return { titulo: `Proteção ${indice + 1}`, linhas }
+}
+
+export function montarApresentacaoAgente(agente: AgenteDocumento): ApresentacaoAgenteDocumento {
+  const ruido = agente.anexoNr15 === 'ANEXO_01'
+  const qualitativo = agente.criterio === 'qualitativo'
+  const linhas: LinhaApresentacaoAgente[] = [
+    ...(agente.anexoNr15 ? [{ rotulo: 'Anexo NR-15', valor: anexoLegivel(agente.anexoNr15) }] : []),
+    ...(agente.tipo ? [{ rotulo: 'Natureza', valor: NATUREZA_AGENTE[agente.tipo] ?? agente.tipo }] : []),
+    { rotulo: 'Critério', valor: CRITERIO[agente.criterio] ?? agente.criterio },
+    ...(agente.grau ? [{ rotulo: 'Grau', valor: GRAU[agente.grau] ?? agente.grau }] : []),
+    ...(!ruido && agente.cas?.trim() ? [{ rotulo: 'CAS', valor: agente.cas.trim() }] : []),
+    ...(agente.atividadeEnquadrada?.trim() ? [{ rotulo: 'Atividade ou referência normativa', valor: agente.atividadeEnquadrada.trim() }] : []),
+    ...(agente.limiteTolerancia?.trim() ? [{ rotulo: 'Limite de tolerância', valor: limiteComUnidade(agente.limiteTolerancia, agente.unidadeLimite) }] : []),
+    ...(!qualitativo && (agente.valorMedido || agente.medido) ? [{ rotulo: 'Medição registrada', valor: formatarMedicao(agente) }] : []),
+  ]
+  return {
+    titulo: agente.nome || 'Agente não informado',
+    linhas,
+    protecoes: (agente.epis ?? []).map((epi, indice) => protecaoDocumento(agente, epi, indice)),
+  }
 }
 
 /** Estrutura do preenchimento técnico guardada em Pericia.tecnico. */

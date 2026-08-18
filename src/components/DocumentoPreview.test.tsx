@@ -67,6 +67,19 @@ const pericia = {
         criterio: 'quantitativo',
       },
       {
+        id: 'ruido-calculado',
+        nome: 'Ruído',
+        tipo: 'fisico',
+        anexoNr15: 'ANEXO_01',
+        cas: 'não aplicável',
+        limiteTolerancia: '85 dB(A) para jornada de 8h/dia (q=5)',
+        valorMedido: '90',
+        unidadeMedicao: 'dB(A)',
+        criterio: 'quantitativo',
+        grau: 'medio',
+        epis: [{ categoria: 'Proteção auditiva', modelo: 'CA 11882', marca: 'Marca', caUnico: '11882', nivelProtecaoDb: 17, metodoAtenuacao: 'NRRsf' }],
+      },
+      {
         id: 'agente-oxigenio',
         nome: 'Oxigênio',
         tipo: 'quimico',
@@ -103,10 +116,10 @@ describe('DocumentoPreview', () => {
 
     expect(html).toContain('12,5 ppm')
     expect(html).toContain('78 ppm')
-    expect(html).toContain('CA da peça facial: 4115')
-    expect(html).toContain('CA do cartucho/filtro: 5635')
-    expect(html).toContain('CA: 5657')
-    expect(html).toContain('Eficácia comprovada: Sim')
+    expect(html).toMatch(/CA da peça facial<\/th><td[^>]*>4115/)
+    expect(html).toMatch(/CA do cartucho\/filtro<\/th><td[^>]*>5635/)
+    expect(html).toMatch(/CA<\/th><td[^>]*>5657/)
+    expect(html).toMatch(/Eficácia comprovada<\/th><td[^>]*>Sim/)
     expect(html).not.toContain('registro legado que não deve prevalecer')
     expect(html).not.toMatch(/undefined|null/)
   })
@@ -118,7 +131,8 @@ describe('DocumentoPreview', () => {
 
     expect(html).toContain('85 dB(A)')
     expect(html).toContain('18 % O₂ em volume')
-    expect(html.match(/EPIs associados/g) ?? []).toHaveLength(1)
+    expect(html).toContain('90 - 17 = 73 dB(A)')
+    expect(html).toContain('Proteção eficaz')
   })
 
   it('preserva valor medido estruturado mesmo quando a unidade não foi informada', () => {
@@ -130,7 +144,7 @@ describe('DocumentoPreview', () => {
     expect(html).not.toContain('legado sem unidade que não deve prevalecer')
   })
 
-  it('mantém sete colunas e incorpora os EPIs somente na célula do agente', () => {
+  it('organiza cada agente em bloco compacto de propriedades aplicáveis', () => {
     const html = renderToStaticMarkup(
       <DocumentoPreview pericia={pericia} empresas={[]} titulo="Parecer de teste" />,
     )
@@ -138,11 +152,11 @@ describe('DocumentoPreview', () => {
     const fim = html.indexOf('Normas e Referências Técnicas Utilizadas')
     const secaoAgentes = html.slice(inicio, fim)
 
-    expect(secaoAgentes).toContain('<table class="agentes-table table-fixed">')
-    expect(secaoAgentes.match(/<th(?:\s|>)/g) ?? []).toHaveLength(7)
-    expect(secaoAgentes).not.toMatch(/<th[^>]*>EPIs associados<\/th>/)
-    expect(secaoAgentes).toMatch(/<td><p>Acetaldeído<\/p>[\s\S]*EPIs associados[\s\S]*CA: 5657[\s\S]*<\/td><td>/)
-    expect(secaoAgentes).toContain('Eficácia comprovada: Sim')
-    expect(secaoAgentes.match(/EPIs associados/g) ?? []).toHaveLength(1)
+    expect(secaoAgentes).toContain('class="agente-bloco"')
+    expect(secaoAgentes).not.toContain('class="agentes-table table-fixed"')
+    expect(secaoAgentes).toContain('<th>Propriedade</th><th>Informação</th>')
+    expect(secaoAgentes).toContain('CA da peça facial')
+    expect(secaoAgentes).toContain('90 - 17 = 73 dB(A)')
+    expect(secaoAgentes).toMatch(/Eficácia comprovada<\/th><td[^>]*>Sim/)
   })
 })

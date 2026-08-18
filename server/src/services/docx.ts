@@ -20,8 +20,6 @@ import {
   type ConteudoEsclarecimento,
   type ConteudoManifestacao,
   type ConteudoQuesitos,
-  CRITERIO,
-  GRAU,
   MARCA,
   MODALIDADE_LABEL,
   ORIGEM_PONTO,
@@ -31,10 +29,8 @@ import {
   data,
   emParagrafos,
   extenso,
-  formatarCasEpi,
-  formatarMedicao,
+  montarApresentacaoAgente,
   hoje,
-  limiteComUnidade,
   ATUACAO,
 } from './documento-comum.js'
 
@@ -47,8 +43,8 @@ import {
 // emaranhado de HTML importado que o perito não consegue editar.
 // ============================================================
 
-const FONTE = 'Times New Roman'
-const CORPO = 23 // meio-pontos → 11,5pt
+const FONTE = 'Arial'
+const CORPO = 22 // meio-pontos → 11pt
 const RECUO_PRIMEIRA_LINHA = 709 // 1,25cm em twips
 
 const texto = (
@@ -85,14 +81,14 @@ const h1 = (t: string) =>
   new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { before: 240, after: 240 },
-    children: [texto(t.toUpperCase(), { negrito: true, tamanho: 28 })],
+    children: [texto(t.toUpperCase(), { negrito: true, tamanho: 36 })],
   })
 
 const h2 = (t: string) =>
   new Paragraph({
     heading: HeadingLevel.HEADING_1,
     spacing: { before: 320, after: 140 },
-    children: [texto(t.toUpperCase(), { negrito: true, tamanho: 24 })],
+    children: [texto(t.toUpperCase(), { negrito: true, tamanho: 28 })],
   })
 
 const h3 = (t: string) =>
@@ -131,26 +127,6 @@ function celula(conteudo: string, opcoes: { cabecalho?: boolean; largura?: numbe
       }),
     ],
   })
-}
-
-function episNaCelulaAgente(
-  epis: TecnicoJson['agentes'][number]['epis'],
-  epiEficaz: TecnicoJson['agentes'][number]['epiEficaz'],
-): string[] {
-  if (!epis?.length) return []
-  return [
-    'EPIs associados',
-    ...epis.map((epi) =>
-      [
-        [epi.categoria, epi.modelo, epi.marca]
-          .map((parte) => parte.trim())
-          .filter(Boolean)
-          .join(' — '),
-        ...formatarCasEpi(epi),
-      ].join('\n'),
-    ),
-    `Eficácia comprovada: ${epiEficaz ? 'Sim' : 'Não'}`,
-  ]
 }
 
 const tabela = (linhas: TableRow[]) =>
@@ -392,47 +368,22 @@ function docParecer(
   filhos.push(h2(`${secao()}. Agentes e Riscos Avaliados`))
 
   if (t.agentes?.length) {
-    filhos.push(
-      tabela([
-        new TableRow({
-          cantSplit: true,
-          children: [
-            celula('Agente', { cabecalho: true, largura: 28 }),
-            celula('CAS', { cabecalho: true, largura: 9 }),
-            celula('Anexo NR-15', { cabecalho: true, largura: 11 }),
-            celula('Critério', { cabecalho: true, largura: 13 }),
-            celula('Grau', { cabecalho: true, largura: 13 }),
-            celula('Limite de Tolerância', { cabecalho: true, largura: 15 }),
-            celula('Valor Medido', { cabecalho: true, largura: 11 }),
-          ],
-        }),
-        ...t.agentes.map(
-          (a) =>
-            new TableRow({
-              cantSplit: true,
-              children: [
-                celula(
-                  [
-                    a.nome,
-                    a.atividadeEnquadrada?.trim()
-                      ? `Atividade ou referência normativa: ${a.atividadeEnquadrada}`
-                      : undefined,
-                    ...episNaCelulaAgente(a.epis, a.epiEficaz),
-                  ]
-                    .filter(Boolean)
-                    .join('\n'),
-                ),
-                celula(a.cas || '—'),
-                celula(a.anexoNr15 || '—'),
-                celula(CRITERIO[a.criterio] ?? a.criterio),
-                celula(a.grau ? (GRAU[a.grau] ?? a.grau) : '—'),
-                celula(limiteComUnidade(a.limiteTolerancia, a.unidadeLimite)),
-                celula(formatarMedicao(a)),
-              ],
-            }),
-        ),
-      ]),
-    )
+    for (const agente of t.agentes) {
+      const apresentacao = montarApresentacaoAgente(agente)
+      filhos.push(
+        h3(apresentacao.titulo),
+        tabela([
+          new TableRow({ cantSplit: true, children: [celula('Propriedade', { cabecalho: true, largura: 32 }), celula('Informação', { cabecalho: true })] }),
+          ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor)),
+        ]),
+      )
+      for (const protecao of apresentacao.protecoes) {
+        filhos.push(
+          new Paragraph({ spacing: { before: 140, after: 60 }, children: [texto(protecao.titulo, { negrito: true, tamanho: 20 })] }),
+          tabela(protecao.linhas.map((item) => fichaLinha(item.rotulo, item.valor))),
+        )
+      }
+    }
   } else {
     filhos.push(new Paragraph({ children: [texto('[Nenhum agente cadastrado]', { italico: true })] }))
   }

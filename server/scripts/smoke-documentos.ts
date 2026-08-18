@@ -115,10 +115,17 @@ const pericia = {
       },
       {
         id: 'agn-2',
-        nome: 'Ruído contínuo',
+        nome: 'Ruído',
         tipo: 'fisico',
-        anexoNr15: 'Anexo 1',
-        medido: '85 dB(A)',
+        anexoNr15: 'ANEXO_01',
+        cas: 'não aplicável',
+        limiteTolerancia: '85 dB(A) para jornada de 8h/dia (q=5)',
+        valorMedido: '90',
+        unidadeMedicao: 'dB(A)',
+        epis: [{
+          categoria: 'Proteção auditiva', modelo: 'Protetor auditivo CA 11882', marca: 'Não informada',
+          caUnico: '11882', nivelProtecaoDb: 17, metodoAtenuacao: 'NRRsf',
+        }],
         criterio: 'quantitativo',
         grau: 'medio',
       },
@@ -351,11 +358,13 @@ async function main() {
   const htmlParecer = await fs.readFile(path.join(SAIDA, 'parecer.html'), 'utf8')
 
   assert.match(htmlParecer, /12,5 ppm/)
-  assert.match(htmlParecer, /Limite de Tolerância.*78 ppm/s)
-  assert.match(htmlParecer, /CA da peça facial: 4115/)
-  assert.match(htmlParecer, /CA do cartucho\/filtro: 5635/)
-  assert.match(htmlParecer, /CA: 5657/)
-  assert.match(htmlParecer, /Eficácia comprovada: Sim/)
+  assert.match(htmlParecer, /Limite de tolerância.*78 ppm/s)
+  assert.match(htmlParecer, /CA da peça facial<\/th><td[^>]*>4115/)
+  assert.match(htmlParecer, /CA do cartucho\/filtro<\/th><td[^>]*>5635/)
+  assert.match(htmlParecer, /CA<\/th><td[^>]*>5657/)
+  assert.match(htmlParecer, /Eficácia comprovada<\/th><td[^>]*>Sim/)
+  assert.match(htmlParecer, /90 - 17 = 73 dB\(A\)/)
+  assert.match(htmlParecer, /Proteção eficaz/)
   assert.match(htmlParecer, /85 dB\(A\)/)
   assert.match(htmlParecer, /18 % O₂ em volume/)
   assert.match(htmlParecer, /7,25/)
@@ -363,17 +372,20 @@ async function main() {
   assert.doesNotMatch(htmlParecer, /legado sem unidade que não deve prevalecer/)
   assert.doesNotMatch(htmlParecer, /undefined|null/)
 
-  const corpoTabelaAgentes = htmlParecer.match(
-    /<h2>\d+\. Agentes e Riscos Avaliados<\/h2>\s*<table[^>]*>([\s\S]*?)<\/table>/,
+  const secaoAgentes = htmlParecer.match(
+    /<h2>\d+\. Agentes e Riscos Avaliados<\/h2>([\s\S]*?)<h2>\d+\. Normas/,
   )?.[1]
-  assert.ok(corpoTabelaAgentes, 'tabela de agentes não encontrada')
-  assert.equal((corpoTabelaAgentes.match(/<th(?:\s|>)/g) ?? []).length, 7)
-  assert.doesNotMatch(corpoTabelaAgentes, /<th[^>]*>EPIs associados<\/th>/)
-  assert.match(
-    corpoTabelaAgentes,
-    /<td><strong>Acetaldeído<\/strong>[\s\S]*EPIs associados[\s\S]*CA: 5657[\s\S]*<\/td><td>/,
-  )
-  assert.equal((corpoTabelaAgentes.match(/EPIs associados/g) ?? []).length, 1)
+  assert.ok(secaoAgentes, 'seção de agentes não encontrada')
+  assert.match(secaoAgentes, /class="agente-bloco"/)
+  assert.doesNotMatch(secaoAgentes, /class="tabela-agentes"/)
+  assert.match(secaoAgentes, /<th>Propriedade<\/th><th>Informação<\/th>/)
+  assert.doesNotMatch(secaoAgentes, /<th>CAS<\/th><td>não aplicável<\/td>/)
+
+  assert.match(htmlParecer, /font-family: Arial, sans-serif/)
+  assert.match(htmlParecer, /h1 \{ font-size: 18pt/)
+  assert.match(htmlParecer, /h2 \{ font-size: 14pt/)
+  assert.match(htmlParecer, /body \{[\s\S]*font-size: 11pt/)
+  assert.match(htmlParecer, /table \{[\s\S]*font-size: 10pt/)
 
   // O escape precisa ter neutralizado a <tag> plantada em observacoesAdicionais.
   const escapou = htmlParecer.includes('&lt;tags&gt;') && !htmlParecer.includes('<tags>')

@@ -32,22 +32,23 @@
   }
   /* Folha de documento (preview A4) */
   .doc-sheet {
-    @apply bg-white text-ink-900 font-serif leading-relaxed;
-    font-size: 11.5pt;
+    @apply bg-white text-ink-900 leading-relaxed;
+    font-family: Arial, sans-serif;
+    font-size: 11pt;
     text-align: justify;
   }
   .doc-sheet h1 {
     @apply font-bold text-center uppercase mb-4;
-    font-size: 14pt;
+    font-size: 18pt;
   }
   .doc-sheet h2 {
     @apply font-bold mt-6 mb-2 uppercase;
-    font-size: 12pt;
+    font-size: 14pt;
     text-align: left;
   }
   .doc-sheet h3 {
     @apply font-bold mt-4 mb-1;
-    font-size: 11.5pt;
+    font-size: 11pt;
     text-align: left;
   }
   .doc-sheet p {
@@ -60,9 +61,6 @@
   .doc-sheet table {
     @apply w-full border-collapse my-3 text-[10pt];
   }
-  .doc-sheet .agentes-table {
-    table-layout: fixed;
-  }
   .doc-sheet th,
   .doc-sheet td {
     @apply border border-ink-400 px-2 py-1 align-top text-left;
@@ -71,6 +69,30 @@
   .doc-sheet th {
     @apply bg-ink-100 font-bold;
   }
+  .doc-sheet .agente-bloco {
+    @apply mb-4 border-t-[3px] border-navy-600;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .doc-sheet .agente-bloco > h3 {
+    @apply m-0 bg-navy-600 px-2.5 py-2 text-white;
+  }
+  .doc-sheet .agente-bloco table {
+    @apply my-0;
+  }
+  .doc-sheet .agente-bloco th {
+    width: 32%;
+  }
+  .doc-sheet .protecao-bloco {
+    @apply ml-3 mt-2;
+  }
+  .doc-sheet .protecao-bloco h4 {
+    @apply mb-1 font-bold text-navy-700;
+    font-size: 10pt;
+  }
+  .doc-sheet .resultado-positivo { @apply font-bold text-emerald-700; }
+  .doc-sheet .resultado-negativo { @apply font-bold text-red-700; }
+  .doc-sheet .resultado-aviso { @apply font-bold text-amber-800; }
 }
 
 /* Scrollbar discreta */
@@ -98,17 +120,7 @@
     margin: 0 !important;
     padding: 0 !important;
   }
-  .doc-sheet .agentes-table {
-    break-inside: auto;
-    page-break-inside: auto;
-  }
-  .doc-sheet .agentes-table thead {
-    display: table-header-group;
-  }
-  .doc-sheet .agentes-table tr {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
+  .doc-sheet .agente-bloco { break-inside: avoid; page-break-inside: avoid; }
   @page {
     size: A4;
     margin: 2.5cm 2cm 2cm 3cm;

@@ -6,8 +6,6 @@ import {
   type ConteudoEsclarecimento,
   type ConteudoManifestacao,
   type ConteudoQuesitos,
-  CRITERIO,
-  GRAU,
   MARCA,
   MODALIDADE_LABEL,
   ORIGEM_PONTO,
@@ -19,10 +17,8 @@ import {
   data,
   emParagrafos,
   extenso,
-  formatarCasEpi,
-  formatarMedicao,
+  montarApresentacaoAgente,
   hoje,
-  limiteComUnidade,
   ATUACAO,
 } from './documento-comum.js'
 
@@ -53,23 +49,6 @@ function paragrafos(texto?: string | null): string {
   return partes.map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('')
 }
 
-function episNaCelulaAgente(
-  epis: TecnicoJson['agentes'][number]['epis'],
-  epiEficaz: TecnicoJson['agentes'][number]['epiEficaz'],
-): string {
-  if (!epis?.length) return ''
-  return `<div class="epis-associados"><strong>EPIs associados</strong><ul>${epis
-    .map((epi) => {
-      const identificacao = [epi.categoria, epi.modelo, epi.marca]
-        .map((parte) => parte.trim())
-        .filter(Boolean)
-        .join(' — ')
-      const cas = formatarCasEpi(epi).map(esc).join('<br>')
-      return `<li>${esc(identificacao)}${cas ? `<br>${cas}` : ''}</li>`
-    })
-    .join('')}</ul><strong>Eficácia comprovada: ${epiEficaz ? 'Sim' : 'Não'}</strong></div>`
-}
-
 const linha = (rotulo: string, valor: string): string =>
   `<tr><th>${esc(rotulo)}</th><td>${valor}</td></tr>`
 
@@ -84,8 +63,8 @@ const CSS = `
   body {
     margin: 0;
     background: #ffffff;
-    font-family: "Liberation Serif", Georgia, "Times New Roman", serif;
-    font-size: 11.5pt;
+    font-family: Arial, sans-serif;
+    font-size: 11pt;
     line-height: 1.6;
     color: ${css(MARCA.tinta900)};
     text-align: justify;
@@ -110,22 +89,25 @@ const CSS = `
     letter-spacing: 0.2em; color: ${css(MARCA.credencial)}; margin-top: 10px;
   }
   .perito-cabecalho { font-size: 8.5pt; color: ${css(MARCA.tinta500)}; margin-top: 6px; }
-  h1 { font-size: 14pt; font-weight: 700; text-align: center; text-transform: uppercase; margin: 0 0 18px; }
-  h2 { font-size: 12pt; font-weight: 700; text-transform: uppercase; text-align: left; margin: 22px 0 8px; page-break-after: avoid; }
-  h3 { font-size: 11.5pt; font-weight: 700; text-align: left; margin: 14px 0 4px; page-break-after: avoid; }
+  h1 { font-size: 18pt; font-weight: 700; text-align: center; text-transform: uppercase; margin: 0 0 18px; }
+  h2 { font-size: 14pt; font-weight: 700; text-transform: uppercase; text-align: left; margin: 22px 0 8px; page-break-after: avoid; }
+  h3 { font-size: 11pt; font-weight: 700; text-align: left; margin: 14px 0 4px; page-break-after: avoid; }
+  h4 { font-size: 10pt; font-weight: 700; margin: 10px 0 4px; page-break-after: avoid; }
   p { margin: 0 0 10px; text-indent: 1.25cm; }
   p.sem-recuo { text-indent: 0; }
   p.vazio { font-style: italic; color: ${css(MARCA.tinta400)}; text-indent: 0; }
   table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 10pt; page-break-inside: avoid; }
   th, td { border: 1px solid ${css(MARCA.tinta400)}; padding: 4px 8px; vertical-align: top; text-align: left; text-indent: 0; }
   th { background: ${css(MARCA.tinta100)}; font-weight: 700; }
-  table.tabela-agentes { table-layout: fixed; page-break-inside: auto; font-size: 8.5pt; }
-  table.tabela-agentes thead { display: table-header-group; }
-  table.tabela-agentes tr { break-inside: avoid; page-break-inside: avoid; }
-  table.tabela-agentes th, table.tabela-agentes td { padding: 3px 5px; overflow-wrap: break-word; word-break: normal; }
-  .epis-associados { margin-top: 6px; font-size: 8.5pt; line-height: 1.35; }
-  .epis-associados ul { margin: 2px 0 0; padding-left: 14px; }
-  .epis-associados li { margin-bottom: 3px; }
+  .box { font-size: 11pt; }
+  .agente-bloco { page-break-inside: avoid; break-inside: avoid; margin: 0 0 16px; border-top: 3px solid ${css(MARCA.credencial)}; }
+  .agente-bloco h3 { margin: 0; padding: 7px 9px; color: #fff; background: ${css(MARCA.credencial)}; }
+  .agente-bloco table { margin: 0; page-break-inside: avoid; }
+  .agente-bloco th { width: 32%; }
+  .protecao-bloco { margin: 8px 0 0 14px; }
+  .resultado-positivo { color: #166534; font-weight: 700; }
+  .resultado-negativo { color: #991B1B; font-weight: 700; }
+  .resultado-aviso { color: #92400E; font-weight: 700; }
   .fotos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
   figure { margin: 0; text-align: center; page-break-inside: avoid; }
   figure img { width: 100%; height: 180px; object-fit: cover; border: 1px solid ${css(MARCA.tinta300)}; display: block; }
@@ -237,25 +219,19 @@ export async function htmlDoParecer(
       </table>`
     : ''
 
+  const tabelaLinhasAgente = (linhas: ReturnType<typeof montarApresentacaoAgente>['linhas'], cabecalho = false) =>
+    `<table>${cabecalho ? '<thead><tr><th>Propriedade</th><th>Informação</th></tr></thead>' : ''}<tbody>${linhas
+      .map((item) => `<tr><th>${esc(item.rotulo)}</th><td${item.destaque ? ` class="resultado-${item.destaque}"` : ''}>${esc(item.valor).replace(/\n/g, '<br>')}</td></tr>`)
+      .join('')}</tbody></table>`
+
   const tabelaAgentes = t.agentes?.length
-    ? `<table class="tabela-agentes">
-        <colgroup><col style="width:28%"><col style="width:9%"><col style="width:11%"><col style="width:13%"><col style="width:13%"><col style="width:15%"><col style="width:11%"></colgroup>
-        <thead><tr><th>Agente</th><th>CAS</th><th>Anexo NR-15</th><th>Critério</th><th>Grau</th><th>Limite de Tolerância</th><th>Valor Medido</th></tr></thead>
-        <tbody>${t.agentes
-          .map(
-            (a) =>
-              `<tr><td><strong>${esc(a.nome)}</strong>${
-                a.atividadeEnquadrada?.trim()
-                  ? `<br><small>Atividade ou referência normativa: ${esc(a.atividadeEnquadrada).replace(/\n/g, '<br>')}</small>`
-                  : ''
-              }${episNaCelulaAgente(a.epis, a.epiEficaz)}</td><td>${esc(a.cas || '—')}</td><td>${esc(a.anexoNr15 || '—')}</td><td>${esc(
-                CRITERIO[a.criterio] ?? a.criterio,
-              )}</td><td>${esc(a.grau ? (GRAU[a.grau] ?? a.grau) : '—')}</td><td>${esc(
-                limiteComUnidade(a.limiteTolerancia, a.unidadeLimite),
-              )}</td><td>${esc(formatarMedicao(a))}</td></tr>`,
-          )
-          .join('')}</tbody>
-      </table>`
+    ? t.agentes.map((agente) => {
+        const apresentacao = montarApresentacaoAgente(agente)
+        const protecoes = apresentacao.protecoes.map((protecao) =>
+          `<div class="protecao-bloco"><h4>${esc(protecao.titulo)}</h4>${tabelaLinhasAgente(protecao.linhas)}</div>`,
+        ).join('')
+        return `<section class="agente-bloco"><h3>${esc(apresentacao.titulo)}</h3>${tabelaLinhasAgente(apresentacao.linhas, true)}${protecoes}</section>`
+      }).join('')
     : '<p class="vazio">[Nenhum agente cadastrado]</p>'
 
   // Fotos viram data URI: o Chromium roda com a rede bloqueada.
