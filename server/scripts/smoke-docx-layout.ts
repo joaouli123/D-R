@@ -41,6 +41,8 @@ async function main() {
   await imagemDeTeste('foto-detalhe.png', 1250, 900, '#5B3F8C', 'FOTO DETALHE')
 
   const { gerarDocx } = await import('../src/services/docx.js')
+  const { montarHtml } = await import('../src/services/documento-html.js')
+  const { encerrarBrowser, gerarPdf } = await import('../src/services/pdf.js')
 
   const pericia = {
     id: 'per-layout',
@@ -169,12 +171,35 @@ async function main() {
 
   const buffer = await gerarDocx(documento, pericia, [empresa], perito)
   await fs.writeFile(path.join(SAIDA, 'parecer-layout.docx'), buffer)
+  const html = await montarHtml(documento, pericia, [empresa], perito)
+  const pdf = await gerarPdf(html)
+  await fs.writeFile(path.join(SAIDA, 'parecer-layout.pdf'), pdf)
+  await encerrarBrowser()
 
   const zip = await JSZip.loadAsync(buffer)
   const xml = await zip.file('word/document.xml')!.async('string')
   const imagens = Object.entries(zip.files)
     .filter(([nome, entrada]) => /^word\/media\/.+/.test(nome) && !entrada.dir)
     .map(([nome]) => nome)
+
+  assert.doesNotMatch(
+    xml,
+    /PLATAFORMA INTELIGENTE DE PERÍCIA TRABALHISTA|— P E R Í C I A —/,
+    'parecer e laudo não devem ter a capa da plataforma',
+  )
+  const ordemAbertura = [
+    'EXCELENTÍSSIMO',
+    'Processo',
+    'PARECER TÉCNICO PERICIAL',
+    'APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA',
+    '1. OBJETO DA PERÍCIA E DADOS CONTRATUAIS',
+    '2. DA DILIGÊNCIA TÉCNICA PERICIAL',
+  ].map((trecho) => xml.indexOf(trecho))
+  assert.ok(
+    ordemAbertura.every((indice) => indice >= 0) &&
+      ordemAbertura.every((indice, i) => i === 0 || indice > ordemAbertura[i - 1]),
+    `abertura do DOCX fora da estrutura aprovada: ${ordemAbertura.join(', ')}`,
+  )
 
   assert.equal((xml.match(/<wp:inline\b/g) ?? []).length, 6, 'todas as fotos devem ser incluídas inline')
   assert.doesNotMatch(xml, /<wp:anchor\b/, 'imagens flutuantes não são permitidas')
@@ -192,6 +217,7 @@ async function main() {
 
   console.log('DOCX layout: 6 imagens inline, legendas vinculadas e tabelas em DXA — ok')
   console.log(`arquivo de inspeção: ${path.join(SAIDA, 'parecer-layout.docx')}`)
+  console.log(`PDF de inspeção: ${path.join(SAIDA, 'parecer-layout.pdf')}`)
 }
 
 main().catch((erro) => {

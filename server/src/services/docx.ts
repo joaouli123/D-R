@@ -89,7 +89,7 @@ const h1 = (t: string) =>
   new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { before: 240, after: 240 },
-    children: [texto(t.toUpperCase(), { negrito: true, tamanho: 36 })],
+    children: [texto(t.toUpperCase(), { negrito: true, tamanho: 36, cor: MARCA.primaria })],
   })
 
 const h2 = (t: string) =>
@@ -98,7 +98,7 @@ const h2 = (t: string) =>
     keepNext: true,
     keepLines: true,
     spacing: { before: 320, after: 140 },
-    children: [texto(t.toUpperCase(), { negrito: true, tamanho: 28 })],
+    children: [texto(t.toUpperCase(), { negrito: true, tamanho: 28, cor: MARCA.primaria })],
   })
 
 const h3 = (t: string) =>
@@ -107,7 +107,7 @@ const h3 = (t: string) =>
     keepNext: true,
     keepLines: true,
     spacing: { before: 220, after: 100 },
-    children: [texto(t, { negrito: true, tamanho: CORPO })],
+    children: [texto(t, { negrito: true, tamanho: CORPO, cor: MARCA.primaria })],
   })
 
 const blocos = (t?: string | null): Paragraph[] => {
@@ -323,6 +323,27 @@ const enderecamento = (vara?: string | null): Paragraph[] => [
   pSemRecuo((vara ?? '').toUpperCase(), true),
 ]
 
+const enderecamentoDoParecer = (
+  vara?: string | null,
+  comarca?: string | null,
+  personalizado?: string | null,
+): Paragraph[] => {
+  const informados = emParagrafos(personalizado)
+  const destino = [vara, comarca].filter(Boolean).join(' — ').toUpperCase()
+  const linhas = informados.length
+    ? informados
+    : [`EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA ${destino}`]
+
+  return linhas.map(
+    (linha, indice) =>
+      new Paragraph({
+        alignment: AlignmentType.JUSTIFIED,
+        spacing: { after: indice === linhas.length - 1 ? 420 : 80, line: 340 },
+        children: [texto(linha, { negrito: true })],
+      }),
+  )
+}
+
 function rodape(): Footer {
   return new Footer({
     children: [
@@ -378,38 +399,31 @@ async function docParecer(
   const secao = () => ++n
 
   const filhos: (Paragraph | Table)[] = [
-    ...cabecalhoMarca(perito),
-    h1(titulo),
-    ...enderecamento(pericia.vara),
-    ...(t.enderecamento?.trim() ? blocos(t.enderecamento) : []),
-
-    h2(`${secao()}. Identificação do Processo`),
+    ...enderecamentoDoParecer(pericia.vara, pericia.comarca, t.enderecamento),
     tabela([
       fichaLinha('Processo nº', pericia.numeroProcesso),
-      fichaLinha('Vara / Comarca', `${pericia.vara} — ${pericia.comarca}`),
+      fichaLinha('Tramitação', MODALIDADE_LABEL[pericia.modalidade] ?? pericia.modalidade),
       fichaLinha(
         'Reclamante',
         `${pericia.reclamante}${pericia.funcaoReclamante ? ` — ${pericia.funcaoReclamante}` : ''}`,
       ),
       fichaLinha(
-        'Reclamada principal',
+        'Reclamada',
         principal ? `${principal.razaoSocial} — CNPJ ${principal.cnpj}` : '—',
       ),
-      ...solidarias.map((e) => fichaLinha('Reclamada solidária', `${e.razaoSocial} — CNPJ ${e.cnpj}`)),
-      fichaLinha(
-        'Período contratual',
-        `${data(pericia.admissao)} a ${pericia.demissao ? data(pericia.demissao) : 'atual'}`,
-      ),
-      fichaLinha('Modalidade da perícia', MODALIDADE_LABEL[pericia.modalidade] ?? pericia.modalidade),
+      ...solidarias.map((e) => fichaLinha('Reclamada', `${e.razaoSocial} — CNPJ ${e.cnpj}`)),
     ]),
-
-    h2(`${secao()}. Apresentação`),
+    h1(titulo),
+    h3('APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA'),
     ...blocos(t.apresentacao),
-
-    h2(`${secao()}. Objetivo da Perícia`),
+    h2(`${secao()}. OBJETO DA PERÍCIA E DADOS CONTRATUAIS`),
     ...blocos(t.objetivoPericia),
-
-    h2(`${secao()}. Da Vistoria`),
+    tabela([
+      fichaLinha('Função / Cargo', pericia.funcaoReclamante || '—'),
+      fichaLinha('Data de admissão', data(pericia.admissao)),
+      fichaLinha('Data de desligamento', pericia.demissao ? data(pericia.demissao) : 'Contrato vigente'),
+    ]),
+    h2(`${secao()}. DA DILIGÊNCIA TÉCNICA PERICIAL`),
     p(
       `A vistoria técnica foi realizada em ${extenso(pericia.dataVistoria)}${
         pericia.horaVistoria ? `, às ${pericia.horaVistoria}` : ''
@@ -442,11 +456,12 @@ async function docParecer(
   }
 
   filhos.push(
-    h2(`${secao()}. Descrição da Empresa`),
+    h2(`${secao()}. DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA`),
     ...blocos(t.descricaoEmpresa),
-    h2(`${secao()}. Descrição do Ambiente de Trabalho`),
+    h3('3.1. Instalações Físicas'),
     ...blocos(t.descricaoAmbiente),
-    h2(`${secao()}. Atividades e Funções Exercidas`),
+    h2(`${secao()}. DESCRIÇÃO DO POSTO DE TRABALHO, MÁQUINAS, FERRAMENTAS E PRODUTOS`),
+    h3('4.1. Atividades e Funções Exercidas'),
     ...blocos(t.atividadesFuncoes),
   )
 
@@ -476,7 +491,7 @@ async function docParecer(
     )
   }
 
-  filhos.push(h2(`${secao()}. Agentes e Riscos Avaliados`))
+  filhos.push(h2(`${secao()}. AGENTES E RISCOS AVALIADOS`))
 
   if (t.agentes?.length) {
     for (const agente of t.agentes) {
@@ -506,18 +521,18 @@ async function docParecer(
   }
 
   filhos.push(
-    h2(`${secao()}. Normas e Referências Técnicas Utilizadas`),
+    h2(`${secao()}. NORMAS E REFERÊNCIAS TÉCNICAS UTILIZADAS`),
     ...blocos(t.normasReferencias),
-    h2(`${secao()}. Equipamentos e Procedimentos Analisados`),
+    h2(`${secao()}. EQUIPAMENTOS E PROCEDIMENTOS ANALISADOS`),
     ...blocos(t.equipamentosAnalisados),
-    h2(`${secao()}. Informações Levantadas na Vistoria`),
+    h2(`${secao()}. INFORMAÇÕES LEVANTADAS NA VISTORIA`),
     ...blocos(t.informacoesLevantadas),
-    h2(`${secao()}. Análise Técnica`),
+    h2(`${secao()}. ANÁLISE TÉCNICA`),
     ...blocos(t.analiseTecnica),
   )
 
   if (pericia.fotos.length) {
-    filhos.push(h2(`${secao()}. Relatório Fotográfico`))
+    filhos.push(h2(`${secao()}. RELATÓRIO FOTOGRÁFICO`))
     const porSecao = new Map<string, typeof pericia.fotos>()
     for (const foto of [...pericia.fotos].sort((a, b) => a.ordem - b.ordem)) {
       const lista = porSecao.get(foto.secao) ?? []
@@ -534,10 +549,10 @@ async function docParecer(
     }
   }
 
-  filhos.push(h2(`${secao()}. Conclusão`), ...blocos(t.conclusao))
+  filhos.push(h2(`${secao()}. CONCLUSÃO`), ...blocos(t.conclusao))
 
   if (t.observacoesAdicionais?.trim()) {
-    filhos.push(h2(`${secao()}. Observações Adicionais`), ...blocos(t.observacoesAdicionais))
+    filhos.push(h2(`${secao()}. OBSERVAÇÕES ADICIONAIS`), ...blocos(t.observacoesAdicionais))
   }
 
   filhos.push(

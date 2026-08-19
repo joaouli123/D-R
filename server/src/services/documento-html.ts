@@ -102,15 +102,38 @@ const CSS = `
   .box { font-size: 11pt; }
   .agente-bloco { page-break-inside: avoid; break-inside: avoid; margin: 0 0 16px; border-top: 3px solid ${css(MARCA.credencial)}; }
   .agente-bloco h3 { margin: 0; padding: 7px 9px; color: #fff; background: ${css(MARCA.credencial)}; }
+  .parecer-manual .agente-bloco h3.agente-titulo { color: #fff; }
   .agente-bloco table { margin: 0; page-break-inside: avoid; }
   .agente-bloco th { width: 32%; }
   .protecao-bloco { margin: 8px 0 0 14px; }
   .resultado-positivo { color: #166534; font-weight: 700; }
   .resultado-negativo { color: #991B1B; font-weight: 700; }
   .resultado-aviso { color: #92400E; font-weight: 700; }
-  .fotos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
-  figure { margin: 0; text-align: center; page-break-inside: avoid; }
-  figure img { width: 100%; height: 180px; object-fit: cover; border: 1px solid ${css(MARCA.tinta300)}; display: block; }
+  .parecer-manual h1,
+  .parecer-manual h2,
+  .parecer-manual h3 { color: ${css(MARCA.primaria)}; }
+  .parecer-manual .enderecamento-judicial { margin: 0 0 34px; font-weight: 700; }
+  .parecer-manual .ficha-processual { margin: 0 0 34px; }
+  .parecer-manual .ficha-processual th { width: 25%; background: transparent; }
+  .parecer-manual .titulo-qualificacao {
+    margin: 0 0 8px;
+    color: ${css(MARCA.primaria)};
+    font-size: 11pt;
+    font-weight: 700;
+    text-transform: none;
+  }
+  .fotos { display: block; margin-bottom: 14px; }
+  figure { margin: 0 0 18px; text-align: center; page-break-inside: avoid; break-inside: avoid; }
+  figure img {
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    max-height: 19cm;
+    object-fit: contain;
+    border: 1px solid ${css(MARCA.tinta300)};
+    display: block;
+    margin: 0 auto;
+  }
   figcaption { font-size: 9pt; font-style: italic; color: ${css(MARCA.tinta600)}; margin-top: 4px; }
   .local-data { text-align: center; text-indent: 0; margin-top: 36px; }
   .assinatura { margin-top: 56px; text-align: center; page-break-inside: avoid; }
@@ -120,23 +143,34 @@ const CSS = `
   .assinatura .dado { font-size: 10pt; }
 `
 
-function moldura(titulo: string, perito: Usuario | null, corpo: string): string {
+function moldura(
+  titulo: string,
+  perito: Usuario | null,
+  corpo: string,
+  opcoes: { comMarca?: boolean; classeCorpo?: string } = {},
+): string {
   const credencial = perito
     ? `<p class="perito-cabecalho">${esc(perito.nome)}${perito.titulo ? ` — ${esc(perito.titulo)}` : ''}${
         perito.registroProfissional ? ` · ${esc(perito.registroProfissional)}` : ''
       }</p>`
     : ''
 
-  return `<!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>${CSS}</style></head>
-<body>
-  <header class="marca">
+  const comMarca = opcoes.comMarca !== false
+  const cabecalho = comMarca
+    ? `<header class="marca">
     <div class="logo"><span class="primaria">D</span><span class="neutra">&amp;</span><span class="primaria">R</span></div>
     <div class="regua">— Perícia —</div>
     <div class="tagline">Plataforma Inteligente de Perícia Trabalhista</div>
     ${credencial}
-  </header>
-  ${corpo}
+  </header>`
+    : ''
+  const classe = opcoes.classeCorpo ? ` class="${opcoes.classeCorpo}"` : ''
+
+  return `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>${CSS}</style></head>
+<body>
+  ${cabecalho}
+  <main${classe}>${corpo}</main>
 </body></html>`
 }
 
@@ -156,6 +190,22 @@ function enderecamento(vara?: string | null): string {
   return `
   <p class="sem-recuo"><strong>EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO</strong></p>
   <p class="sem-recuo"><strong>${esc((vara ?? '').toUpperCase())}</strong></p>`
+}
+
+function enderecamentoDoParecer(
+  vara?: string | null,
+  comarca?: string | null,
+  personalizado?: string | null,
+): string {
+  const linhas = emParagrafos(personalizado)
+  if (linhas.length) {
+    return linhas
+      .map((texto) => `<p class="sem-recuo enderecamento-judicial">${esc(texto).replace(/\n/g, '<br>')}</p>`)
+      .join('')
+  }
+
+  const destino = [vara, comarca].filter(Boolean).join(' — ')
+  return `<p class="sem-recuo enderecamento-judicial">EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA ${esc(destino.toUpperCase())}</p>`
 }
 
 // ---------------- parecer / laudo ----------------
@@ -179,14 +229,19 @@ export async function htmlDoParecer(
   const secao = () => ++n
 
   const identificacao = `
-  <table><tbody>
+  <table class="ficha-processual"><tbody>
     ${linha('Processo nº', esc(pericia.numeroProcesso))}
-    ${linha('Vara / Comarca', `${esc(pericia.vara)} — ${esc(pericia.comarca)}`)}
+    ${linha('Tramitação', esc(MODALIDADE_LABEL[pericia.modalidade] ?? pericia.modalidade))}
     ${linha('Reclamante', `${esc(pericia.reclamante)}${pericia.funcaoReclamante ? ` — ${esc(pericia.funcaoReclamante)}` : ''}`)}
-    ${linha('Reclamada principal', principal ? `${esc(principal.razaoSocial)} — CNPJ ${esc(principal.cnpj)}` : '—')}
-    ${solidarias.map((e) => linha('Reclamada solidária', `${esc(e.razaoSocial)} — CNPJ ${esc(e.cnpj)}`)).join('')}
-    ${linha('Período contratual', `${data(pericia.admissao)} a ${pericia.demissao ? data(pericia.demissao) : 'atual'}`)}
-    ${linha('Modalidade da perícia', esc(MODALIDADE_LABEL[pericia.modalidade] ?? pericia.modalidade))}
+    ${linha('Reclamada', principal ? `${esc(principal.razaoSocial)} — CNPJ ${esc(principal.cnpj)}` : '—')}
+    ${solidarias.map((e) => linha('Reclamada', `${esc(e.razaoSocial)} — CNPJ ${esc(e.cnpj)}`)).join('')}
+  </tbody></table>`
+
+  const dadosContratuais = `
+  <table><tbody>
+    ${linha('Função / Cargo', esc(pericia.funcaoReclamante || '—'))}
+    ${linha('Data de admissão', data(pericia.admissao))}
+    ${linha('Data de desligamento', pericia.demissao ? data(pericia.demissao) : 'Contrato vigente')}
   </tbody></table>`
 
   const tabelaParticipantes = pericia.participantes.length
@@ -230,7 +285,7 @@ export async function htmlDoParecer(
         const protecoes = apresentacao.protecoes.map((protecao) =>
           `<div class="protecao-bloco"><h4>${esc(protecao.titulo)}</h4>${tabelaLinhasAgente(protecao.linhas)}</div>`,
         ).join('')
-        return `<section class="agente-bloco"><h3>${esc(apresentacao.titulo)}</h3>${tabelaLinhasAgente(apresentacao.linhas, true)}${protecoes}</section>`
+        return `<section class="agente-bloco"><h3 class="agente-titulo">${esc(apresentacao.titulo)}</h3>${tabelaLinhasAgente(apresentacao.linhas, true)}${protecoes}</section>`
       }).join('')
     : '<p class="vazio">[Nenhum agente cadastrado]</p>'
 
@@ -245,14 +300,16 @@ export async function htmlDoParecer(
   let blocoFotos = ''
   if (pericia.fotos.length) {
     const partes: string[] = []
+    let numeroFigura = 0
     for (const [sec, fotos] of porSecao) {
       const figuras = await Promise.all(
-        fotos.map(async (f, i) => {
+        fotos.map(async (f) => {
+          const numeroAtual = ++numeroFigura
           const uri = await comoDataUri(f.arquivo)
           const img = uri
             ? `<img src="${uri}" alt="${esc(f.legenda)}">`
             : `<div style="height:180px;border:1px solid ${css(MARCA.tinta300)};display:flex;align-items:center;justify-content:center;font-size:9pt;color:${css(MARCA.tinta400)}">imagem indisponível</div>`
-          return `<figure>${img}<figcaption>Figura ${i + 1} — ${esc(f.legenda || 'sem legenda')}</figcaption></figure>`
+          return `<figure>${img}<figcaption>Figura ${numeroAtual} — ${esc(f.legenda || 'sem legenda')}</figcaption></figure>`
         }),
       )
       partes.push(`<h3>${esc(SECAO_FOTO[sec] ?? sec)}</h3><div class="fotos">${figuras.join('')}</div>`)
@@ -263,46 +320,46 @@ export async function htmlDoParecer(
   // Montado em sequência: cada chamada de secao() acontece na ordem
   // em que a seção aparece no documento, e a numeração sai contínua.
   const partes: string[] = [
-    `<h1>${esc(titulo)}</h1>`,
-    enderecamento(pericia.vara),
-    t.enderecamento?.trim() ? paragrafos(t.enderecamento) : '',
-    `<h2>${secao()}. Identificação do Processo</h2>`,
+    enderecamentoDoParecer(pericia.vara, pericia.comarca, t.enderecamento),
     identificacao,
-    `<h2>${secao()}. Apresentação</h2>`,
+    `<h1>${esc(titulo)}</h1>`,
+    '<h3 class="titulo-qualificacao">APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA</h3>',
     paragrafos(t.apresentacao),
-    `<h2>${secao()}. Objetivo da Perícia</h2>`,
+    `<h2>${secao()}. OBJETO DA PERÍCIA E DADOS CONTRATUAIS</h2>`,
     paragrafos(t.objetivoPericia),
-    `<h2>${secao()}. Da Vistoria</h2>`,
+    dadosContratuais,
+    `<h2>${secao()}. DA DILIGÊNCIA TÉCNICA PERICIAL</h2>`,
     textoVistoria,
     tabelaParticipantes,
-    `<h2>${secao()}. Descrição da Empresa</h2>`,
+    `<h2>${secao()}. DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA</h2>`,
     paragrafos(t.descricaoEmpresa),
-    `<h2>${secao()}. Descrição do Ambiente de Trabalho</h2>`,
+    '<h3>3.1. Instalações Físicas</h3>',
     paragrafos(t.descricaoAmbiente),
-    `<h2>${secao()}. Atividades e Funções Exercidas</h2>`,
+    `<h2>${secao()}. DESCRIÇÃO DO POSTO DE TRABALHO, MÁQUINAS, FERRAMENTAS E PRODUTOS</h2>`,
+    `<h3>4.1. Atividades e Funções Exercidas</h3>`,
     paragrafos(t.atividadesFuncoes),
     tabelaPeriodos,
-    `<h2>${secao()}. Agentes e Riscos Avaliados</h2>`,
+    `<h2>${secao()}. AGENTES E RISCOS AVALIADOS</h2>`,
     tabelaAgentes,
-    `<h2>${secao()}. Normas e Referências Técnicas Utilizadas</h2>`,
+    `<h2>${secao()}. NORMAS E REFERÊNCIAS TÉCNICAS UTILIZADAS</h2>`,
     paragrafos(t.normasReferencias),
-    `<h2>${secao()}. Equipamentos e Procedimentos Analisados</h2>`,
+    `<h2>${secao()}. EQUIPAMENTOS E PROCEDIMENTOS ANALISADOS</h2>`,
     paragrafos(t.equipamentosAnalisados),
-    `<h2>${secao()}. Informações Levantadas na Vistoria</h2>`,
+    `<h2>${secao()}. INFORMAÇÕES LEVANTADAS NA VISTORIA</h2>`,
     paragrafos(t.informacoesLevantadas),
-    `<h2>${secao()}. Análise Técnica</h2>`,
+    `<h2>${secao()}. ANÁLISE TÉCNICA</h2>`,
     paragrafos(t.analiseTecnica),
   ]
 
   if (blocoFotos) {
-    partes.push(`<h2>${secao()}. Relatório Fotográfico</h2>`, blocoFotos)
+    partes.push(`<h2>${secao()}. RELATÓRIO FOTOGRÁFICO</h2>`, blocoFotos)
   }
 
-  partes.push(`<h2>${secao()}. Conclusão</h2>`, paragrafos(t.conclusao))
+  partes.push(`<h2>${secao()}. CONCLUSÃO</h2>`, paragrafos(t.conclusao))
 
   if (t.observacoesAdicionais?.trim()) {
     partes.push(
-      `<h2>${secao()}. Observações Adicionais</h2>`,
+      `<h2>${secao()}. OBSERVAÇÕES ADICIONAIS</h2>`,
       paragrafos(t.observacoesAdicionais),
     )
   }
@@ -312,7 +369,10 @@ export async function htmlDoParecer(
     assinatura(perito, pericia.comarca),
   )
 
-  return moldura(titulo, perito, partes.join('\n'))
+  return moldura(titulo, perito, partes.join('\n'), {
+    comMarca: false,
+    classeCorpo: 'parecer-manual',
+  })
 }
 
 // ---------------- quesitos (Módulo K) ----------------

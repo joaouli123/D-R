@@ -385,10 +385,15 @@ async function main() {
   assert.doesNotMatch(htmlParecer, /undefined|null/)
 
   const secaoAgentes = htmlParecer.match(
-    /<h2>\d+\. Agentes e Riscos Avaliados<\/h2>([\s\S]*?)<h2>\d+\. Normas/,
+    /<h2>\d+\. Agentes e Riscos Avaliados<\/h2>([\s\S]*?)<h2>\d+\. Normas/i,
   )?.[1]
   assert.ok(secaoAgentes, 'seção de agentes não encontrada')
   assert.match(secaoAgentes, /class="agente-bloco"/)
+  assert.match(
+    secaoAgentes,
+    /<h3 class="agente-titulo">/,
+    'o nome do agente precisa usar o estilo de alto contraste da faixa',
+  )
   assert.doesNotMatch(secaoAgentes, /class="tabela-agentes"/)
   assert.match(secaoAgentes, /<th>Propriedade<\/th><th>Informação<\/th>/)
   assert.doesNotMatch(secaoAgentes, /<th>CAS<\/th><td>não aplicável<\/td>/)
@@ -398,6 +403,36 @@ async function main() {
   assert.match(htmlParecer, /h2 \{ font-size: 14pt/)
   assert.match(htmlParecer, /body \{[\s\S]*font-size: 11pt/)
   assert.match(htmlParecer, /table \{[\s\S]*font-size: 10pt/)
+  assert.match(
+    htmlParecer,
+    /\.fotos \{[^}]*display:\s*block/s,
+    'o relatório fotográfico deve usar uma fotografia por faixa',
+  )
+  assert.match(
+    htmlParecer,
+    /figure img \{[^}]*object-fit:\s*contain/s,
+    'as fotografias do PDF devem preservar a proporção sem corte',
+  )
+
+  const corpoParecer = htmlParecer.match(/<body>([\s\S]*?)<\/body>/)?.[1] ?? ''
+  assert.doesNotMatch(
+    corpoParecer,
+    /<header class="marca">/,
+    'parecer e laudo devem iniciar pelo endereçamento, sem capa da plataforma',
+  )
+  const ordemAbertura = [
+    'EXCELENTÍSSIMO',
+    'class="ficha-processual"',
+    '<h1>Parecer Técnico Pericial — Insalubridade</h1>',
+    'APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA',
+    '1. OBJETO DA PERÍCIA E DADOS CONTRATUAIS',
+    '2. DA DILIGÊNCIA TÉCNICA PERICIAL',
+  ].map((trecho) => corpoParecer.indexOf(trecho))
+  assert.ok(
+    ordemAbertura.every((indice) => indice >= 0) &&
+      ordemAbertura.every((indice, i) => i === 0 || indice > ordemAbertura[i - 1]),
+    `abertura do parecer fora da estrutura aprovada: ${ordemAbertura.join(', ')}`,
+  )
 
   // O escape precisa ter neutralizado a <tag> plantada em observacoesAdicionais.
   const escapou = htmlParecer.includes('&lt;tags&gt;') && !htmlParecer.includes('<tags>')
