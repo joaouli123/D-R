@@ -158,7 +158,8 @@ export interface EpiDocumento {
   catalogoId?: string
   categoria: string
   modelo: string
-  marca: string
+  marca?: string
+  validadeCa?: string
   caUnico?: string
   caPecaFacial?: string
   caFiltroCartucho?: string
@@ -253,16 +254,19 @@ function protecaoDocumento(
   epi: EpiDocumento,
   indice: number,
 ): ApresentacaoAgenteDocumento['protecoes'][number] {
+  const manualAtual = Boolean(epi.validadeCa?.trim())
   const linhas: LinhaApresentacaoAgente[] = [
-    { rotulo: 'Categoria', valor: epi.categoria },
-    { rotulo: 'Modelo', valor: epi.modelo },
-    { rotulo: 'Marca', valor: epi.marca },
+    { rotulo: manualAtual ? 'Equipamento' : 'Categoria', valor: epi.categoria },
+    { rotulo: manualAtual ? 'Descrição' : 'Modelo', valor: epi.modelo },
+    manualAtual
+      ? { rotulo: 'Validade do CA', valor: epi.validadeCa!.trim() }
+      : epi.marca?.trim() ? { rotulo: 'Marca', valor: epi.marca.trim() } : undefined,
     ...[
       epi.caUnico?.trim() ? { rotulo: 'CA', valor: epi.caUnico.trim() } : undefined,
       epi.caPecaFacial?.trim() ? { rotulo: 'CA da peça facial', valor: epi.caPecaFacial.trim() } : undefined,
       epi.caFiltroCartucho?.trim() ? { rotulo: 'CA do cartucho/filtro', valor: epi.caFiltroCartucho.trim() } : undefined,
     ].filter((linha): linha is LinhaApresentacaoAgente => Boolean(linha)),
-  ]
+  ].filter((linha): linha is LinhaApresentacaoAgente => Boolean(linha))
 
   if (agente.anexoNr15 === 'ANEXO_01') {
     const medicao = agente.valorMedido == null ? Number.NaN : Number(agente.valorMedido)

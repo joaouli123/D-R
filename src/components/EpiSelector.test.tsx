@@ -145,14 +145,24 @@ describe('EpiSelector', () => {
     render(<EpiSelector agente={agente} onChange={onChange} />)
 
     await user.click(screen.getByText('Informar EPI manualmente'))
-    await user.type(screen.getByRole('textbox', { name: 'Categoria do EPI' }), 'Proteção auditiva')
-    await user.type(screen.getByRole('textbox', { name: 'Modelo do EPI' }), 'Protetor tipo concha')
-    await user.type(screen.getByRole('textbox', { name: 'Marca do EPI' }), 'Marca teste')
+    await user.type(screen.getByRole('textbox', { name: 'Equipamento' }), 'Protetor auditivo')
+    await user.type(screen.getByRole('textbox', { name: 'Descrição' }), 'Protetor tipo concha')
+    await user.type(screen.getByRole('textbox', { name: 'Validade do CA' }), '31/12/2028')
+    await user.type(screen.getByRole('textbox', { name: 'CA único' }), '11882')
     await user.type(screen.getByRole('spinbutton', { name: 'NRRsf em dB' }), '13')
+    expect(screen.queryByRole('textbox', { name: 'CA da peça facial' })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'CA do cartucho ou filtro' })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Adicionar EPI manual' }))
 
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
-      epis: [expect.objectContaining({ nivelProtecaoDb: 13, metodoAtenuacao: 'NRRsf' })],
+      epis: [expect.objectContaining({
+        categoria: 'Protetor auditivo',
+        modelo: 'Protetor tipo concha',
+        validadeCa: '31/12/2028',
+        caUnico: '11882',
+        nivelProtecaoDb: 13,
+        metodoAtenuacao: 'NRRsf',
+      })],
     }))
   })
 
@@ -166,14 +176,60 @@ describe('EpiSelector', () => {
     render(<EpiSelector agente={agente} onChange={onChange} />)
 
     await user.click(screen.getByText('Informar EPI manualmente'))
-    await user.type(screen.getByRole('textbox', { name: 'Categoria do EPI' }), 'Proteção auditiva')
-    await user.type(screen.getByRole('textbox', { name: 'Modelo do EPI' }), 'Protetor')
-    await user.type(screen.getByRole('textbox', { name: 'Marca do EPI' }), 'Marca')
+    await user.type(screen.getByRole('textbox', { name: 'Equipamento' }), 'Protetor auditivo')
+    await user.type(screen.getByRole('textbox', { name: 'Descrição' }), 'Protetor')
+    await user.type(screen.getByRole('textbox', { name: 'Validade do CA' }), '31/12/2028')
     await user.type(screen.getByRole('spinbutton', { name: 'NRRsf em dB' }), '101')
     await user.click(screen.getByRole('button', { name: 'Adicionar EPI manual' }))
 
     expect(screen.getByRole('alert').textContent).toContain('entre 0 e 100 dB')
     expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('usa dois CAs no cadastro manual de proteção para agente químico', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    vi.mocked(api.epis.listar).mockResolvedValue([])
+
+    render(<EpiSelector agente={AGENTE_BASE} onChange={onChange} />)
+    await user.click(screen.getByText('Informar EPI manualmente'))
+
+    expect(screen.queryByRole('textbox', { name: 'CA único' })).toBeNull()
+    expect(screen.queryByRole('spinbutton', { name: 'NRRsf em dB' })).toBeNull()
+    await user.type(screen.getByRole('textbox', { name: 'Equipamento' }), 'Respirador semifacial')
+    await user.type(screen.getByRole('textbox', { name: 'Descrição' }), 'Conjunto com filtro para vapores orgânicos')
+    await user.type(screen.getByRole('textbox', { name: 'Validade do CA' }), '08/2029')
+    await user.type(screen.getByRole('textbox', { name: 'CA da peça facial' }), '4115')
+    await user.type(screen.getByRole('textbox', { name: 'CA do cartucho ou filtro' }), '5635')
+    await user.click(screen.getByRole('button', { name: 'Adicionar EPI manual' }))
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      epis: [expect.objectContaining({
+        categoria: 'Respirador semifacial',
+        modelo: 'Conjunto com filtro para vapores orgânicos',
+        validadeCa: '08/2029',
+        caPecaFacial: '4115',
+        caFiltroCartucho: '5635',
+      })],
+    }))
+    expect(onChange.mock.calls[0]?.[0].epis[0]).not.toHaveProperty('caUnico')
+  })
+
+  it('usa CA único e omite NRRsf no cadastro manual dos demais agentes', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    vi.mocked(api.epis.listar).mockResolvedValue([])
+    const agente: AgenteAvaliado = {
+      id: 'vibracao-1', nome: 'Vibração', tipo: 'fisico', criterio: 'quantitativo', anexoNr15: 'ANEXO_08_VMB',
+    }
+
+    render(<EpiSelector agente={agente} onChange={onChange} />)
+    await user.click(screen.getByText('Informar EPI manualmente'))
+
+    expect(screen.getByRole('textbox', { name: 'CA único' })).toBeDefined()
+    expect(screen.queryByRole('textbox', { name: 'CA da peça facial' })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'CA do cartucho ou filtro' })).toBeNull()
+    expect(screen.queryByRole('spinbutton', { name: 'NRRsf em dB' })).toBeNull()
   })
 
   it('carrega sugestões sem selecionar e adiciona o snapshot somente pelo botão', async () => {
@@ -307,16 +363,16 @@ describe('EpiSelector', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Não foi possível carregar o catálogo')
 
     await user.click(screen.getByText('Informar EPI manualmente'))
-    await user.type(screen.getByRole('textbox', { name: 'Categoria do EPI' }), 'Respirador manual')
-    await user.type(screen.getByRole('textbox', { name: 'Modelo do EPI' }), 'Modelo informado')
-    await user.type(screen.getByRole('textbox', { name: 'Marca do EPI' }), 'Marca informada')
+    await user.type(screen.getByRole('textbox', { name: 'Equipamento' }), 'Respirador manual')
+    await user.type(screen.getByRole('textbox', { name: 'Descrição' }), 'Modelo informado')
+    await user.type(screen.getByRole('textbox', { name: 'Validade do CA' }), '31/12/2028')
     await user.click(screen.getByRole('button', { name: 'Adicionar EPI manual' }))
 
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
       epis: [expect.objectContaining({
         categoria: 'Respirador manual',
         modelo: 'Modelo informado',
-        marca: 'Marca informada',
+        validadeCa: '31/12/2028',
       })],
     }))
   })

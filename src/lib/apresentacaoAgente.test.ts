@@ -15,7 +15,7 @@ const ruido: AgenteAvaliado = {
   unidadeMedicao: 'dB(A)',
   grau: 'medio',
   epis: [
-    { categoria: 'Proteção auditiva', modelo: 'Protetor CA 11882', marca: 'Marca', caUnico: '11882', nivelProtecaoDb: 17, metodoAtenuacao: 'NRRsf' },
+    { categoria: 'Proteção auditiva', modelo: 'Protetor CA 11882', marca: 'Marca', validadeCa: '31/12/2028', caUnico: '11882', nivelProtecaoDb: 17, metodoAtenuacao: 'NRRsf' },
     { categoria: 'Proteção auditiva', modelo: 'CA sem nível', marca: 'Marca', caUnico: '00000', nivelProtecaoDb: null },
   ],
 }
@@ -26,6 +26,9 @@ describe('montarApresentacaoAgente', () => {
 
     expect(apresentacao.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'CAS' }))
     expect(apresentacao.linhas).toContainEqual({ rotulo: 'Medição registrada', valor: '90 dB(A)' })
+    expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'Equipamento', valor: 'Proteção auditiva' })
+    expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'Descrição', valor: 'Protetor CA 11882' })
+    expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'Validade do CA', valor: '31/12/2028' })
     expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'Cálculo', valor: '90 - 17 = 73 dB(A)' })
     expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'Conclusão', valor: 'Proteção eficaz', destaque: 'positivo' })
     expect(apresentacao.protecoes[1]?.linhas).toContainEqual({ rotulo: 'NRRsf', valor: 'Não informado — considerado 0 dB', destaque: 'aviso' })

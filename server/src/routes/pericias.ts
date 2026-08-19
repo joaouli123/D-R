@@ -31,13 +31,17 @@ const epiSelecionadoSchema = z.object({
   catalogoId: texto.optional(),
   categoria: textoObrigatorio,
   modelo: textoObrigatorio,
-  marca: textoObrigatorio,
+  marca: texto.optional(),
+  validadeCa: texto.optional(),
   caUnico: texto.optional(),
   caPecaFacial: texto.optional(),
   caFiltroCartucho: texto.optional(),
   nivelProtecaoDb: z.number().min(0).max(100).nullable().optional(),
   metodoAtenuacao: z.enum(['NRRsf']).nullable().optional(),
   observacao: texto.optional(),
+}).refine((epi) => Boolean(epi.marca?.trim() || epi.validadeCa?.trim()), {
+  message: 'Informe a marca do catálogo ou a validade do CA no cadastro manual.',
+  path: ['validadeCa'],
 })
 
 export const agenteSchema = z.object({

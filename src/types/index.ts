@@ -117,7 +117,8 @@ export interface EpiSelecionado {
   catalogoId?: string
   categoria: string
   modelo: string
-  marca: string
+  marca?: string
+  validadeCa?: string
   caUnico?: string
   caPecaFacial?: string
   caFiltroCartucho?: string

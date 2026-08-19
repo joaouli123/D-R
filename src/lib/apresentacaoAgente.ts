@@ -54,12 +54,15 @@ function linhasProtecao(
   epi: EpiSelecionado,
   indice: number,
 ): BlocoProtecaoAgente {
+  const manualAtual = Boolean(epi.validadeCa?.trim())
   const linhas: LinhaAgente[] = [
-    { rotulo: 'Categoria', valor: epi.categoria },
-    { rotulo: 'Modelo', valor: epi.modelo },
-    { rotulo: 'Marca', valor: epi.marca },
+    { rotulo: manualAtual ? 'Equipamento' : 'Categoria', valor: epi.categoria },
+    { rotulo: manualAtual ? 'Descrição' : 'Modelo', valor: epi.modelo },
+    manualAtual
+      ? { rotulo: 'Validade do CA', valor: epi.validadeCa!.trim() }
+      : epi.marca?.trim() ? { rotulo: 'Marca', valor: epi.marca.trim() } : undefined,
     ...formatarCasEpi(epi),
-  ]
+  ].filter((linha): linha is LinhaAgente => Boolean(linha))
 
   if (agente.anexoNr15 === 'ANEXO_01') {
     const medicao = agente.valorMedido == null ? Number.NaN : Number(agente.valorMedido)

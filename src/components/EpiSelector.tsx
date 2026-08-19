@@ -15,7 +15,7 @@ interface EpiSelectorProps {
 interface FormularioManual {
   categoria: string
   modelo: string
-  marca: string
+  validadeCa: string
   caUnico: string
   caPecaFacial: string
   caFiltroCartucho: string
@@ -25,7 +25,7 @@ interface FormularioManual {
 const MANUAL_VAZIO: FormularioManual = {
   categoria: '',
   modelo: '',
-  marca: '',
+  validadeCa: '',
   caUnico: '',
   caPecaFacial: '',
   caFiltroCartucho: '',
@@ -84,6 +84,7 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
   const limiteAtingido = selecionados.length >= 10
   const categoriaProtecao = categoriaProtecaoDoAgente(agente)
   const ehRuidoContinuo = agente.anexoNr15 === 'ANEXO_01'
+  const ehProdutoQuimico = agente.tipo === 'quimico'
   const medicaoRuido = agente.valorMedido == null ? null : Number(agente.valorMedido)
 
   async function carregar(q = '', sinal?: AbortSignal) {
@@ -132,9 +133,9 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
   function adicionarManual() {
     const categoria = manual.categoria.trim()
     const modelo = manual.modelo.trim()
-    const marca = manual.marca.trim()
-    if (!categoria || !modelo || !marca) {
-      setErroManual('Preencha categoria, modelo e marca para adicionar o EPI manual.')
+    const validadeCa = manual.validadeCa.trim()
+    if (!categoria || !modelo || !validadeCa) {
+      setErroManual('Preencha equipamento, descrição e validade do CA para adicionar o EPI manual.')
       return
     }
     const nivelProtecaoDb = manual.nivelProtecaoDb.trim()
@@ -148,13 +149,13 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
     adicionar({
       categoria,
       modelo,
-      marca,
-      ...(manual.caUnico.trim() ? { caUnico: manual.caUnico.trim() } : {}),
-      ...(manual.caPecaFacial.trim() ? { caPecaFacial: manual.caPecaFacial.trim() } : {}),
-      ...(manual.caFiltroCartucho.trim() ? { caFiltroCartucho: manual.caFiltroCartucho.trim() } : {}),
-      ...(nivelProtecaoDb != null
+      validadeCa,
+      ...(!ehProdutoQuimico && manual.caUnico.trim() ? { caUnico: manual.caUnico.trim() } : {}),
+      ...(ehProdutoQuimico && manual.caPecaFacial.trim() ? { caPecaFacial: manual.caPecaFacial.trim() } : {}),
+      ...(ehProdutoQuimico && manual.caFiltroCartucho.trim() ? { caFiltroCartucho: manual.caFiltroCartucho.trim() } : {}),
+      ...(ehRuidoContinuo && nivelProtecaoDb != null
         ? { nivelProtecaoDb, metodoAtenuacao: 'NRRsf' as const }
-        : { nivelProtecaoDb: null }),
+        : ehRuidoContinuo ? { nivelProtecaoDb: null } : {}),
     })
     setManual(MANUAL_VAZIO)
     setErroManual('')
@@ -181,8 +182,11 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
           {selecionados.map((epi, indice) => (
             <li key={`${epi.catalogoId ?? 'manual'}-${indice}`} className="flex flex-col gap-2 rounded-md border border-brand-100 bg-brand-50/50 p-2.5 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-ink-900">{epi.modelo}</p>
-                <p className="text-xs text-ink-600">{epi.marca} · {epi.categoria}</p>
+                <p className="text-sm font-semibold text-ink-900">{epi.validadeCa ? epi.categoria : epi.modelo}</p>
+                <p className="text-xs text-ink-600">
+                  {epi.validadeCa ? `Descrição: ${epi.modelo}` : `${epi.marca ?? 'Marca não informada'} · ${epi.categoria}`}
+                </p>
+                {epi.validadeCa && <p className="text-xs text-ink-600">Validade do CA: {epi.validadeCa}</p>}
                 {descricaoCas(epi).map((ca) => <p key={ca} className="text-xs text-ink-500">{ca}</p>)}
                 {ehRuidoContinuo && medicaoRuido != null && Number.isFinite(medicaoRuido) && (() => {
                   const resultado = calcularProtecaoAuditiva(medicaoRuido, epi.nivelProtecaoDb)
@@ -276,12 +280,12 @@ export function EpiSelector({ agente, onChange }: EpiSelectorProps) {
           Informar EPI manualmente
         </summary>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          <Input aria-label="Categoria do EPI" placeholder="Categoria" value={manual.categoria} onChange={(evento) => setManual({ ...manual, categoria: evento.target.value })} />
-          <Input aria-label="Modelo do EPI" placeholder="Modelo" value={manual.modelo} onChange={(evento) => setManual({ ...manual, modelo: evento.target.value })} />
-          <Input aria-label="Marca do EPI" placeholder="Marca" value={manual.marca} onChange={(evento) => setManual({ ...manual, marca: evento.target.value })} />
-          <Input aria-label="CA único" placeholder="CA único" value={manual.caUnico} onChange={(evento) => setManual({ ...manual, caUnico: evento.target.value })} />
-          <Input aria-label="CA da peça facial" placeholder="CA da peça facial" value={manual.caPecaFacial} onChange={(evento) => setManual({ ...manual, caPecaFacial: evento.target.value })} />
-          <Input aria-label="CA do cartucho ou filtro" placeholder="CA do cartucho/filtro" value={manual.caFiltroCartucho} onChange={(evento) => setManual({ ...manual, caFiltroCartucho: evento.target.value })} />
+          <Input aria-label="Equipamento" placeholder="Equipamento" value={manual.categoria} onChange={(evento) => setManual({ ...manual, categoria: evento.target.value })} />
+          <Input aria-label="Descrição" placeholder="Descrição" value={manual.modelo} onChange={(evento) => setManual({ ...manual, modelo: evento.target.value })} />
+          <Input aria-label="Validade do CA" placeholder="Validade do CA" value={manual.validadeCa} onChange={(evento) => setManual({ ...manual, validadeCa: evento.target.value })} />
+          {!ehProdutoQuimico && <Input aria-label="CA único" placeholder="CA único" value={manual.caUnico} onChange={(evento) => setManual({ ...manual, caUnico: evento.target.value })} />}
+          {ehProdutoQuimico && <Input aria-label="CA da peça facial" placeholder="CA da peça facial" value={manual.caPecaFacial} onChange={(evento) => setManual({ ...manual, caPecaFacial: evento.target.value })} />}
+          {ehProdutoQuimico && <Input aria-label="CA do cartucho ou filtro" placeholder="CA do cartucho/filtro" value={manual.caFiltroCartucho} onChange={(evento) => setManual({ ...manual, caFiltroCartucho: evento.target.value })} />}
           {ehRuidoContinuo && <Input type="number" min="0" max="100" step="0.1" aria-label="NRRsf em dB" placeholder="NRRsf (dB)" value={manual.nivelProtecaoDb} onChange={(evento) => setManual({ ...manual, nivelProtecaoDb: evento.target.value })} />}
         </div>
         {erroManual && <p role="alert" className="mt-2 text-xs text-red-700">{erroManual}</p>}

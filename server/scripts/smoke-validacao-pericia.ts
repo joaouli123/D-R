@@ -83,6 +83,18 @@ const agenteComEpiMinimo = {
   epis: [{ categoria: 'Vapores Orgânicos', modelo: '3M 6200', marca: '3M' }],
 }
 
+const agenteComEpiManual = {
+  ...agenteLegado,
+  epis: [{
+    categoria: 'Protetor auditivo',
+    modelo: 'Protetor tipo concha',
+    validadeCa: '31/12/2028',
+    caUnico: '11882',
+    nivelProtecaoDb: 13,
+    metodoAtenuacao: 'NRRsf',
+  }],
+}
+
 const legado = agenteSchema.safeParse(agenteLegado)
 const completo = agenteSchema.safeParse(agenteCompleto)
 const enumInvalido = agenteSchema.safeParse(agenteComEnumInvalido)
@@ -92,6 +104,7 @@ const muitosEpis = agenteSchema.safeParse(agenteComMuitosEpis)
 const epiSemCamposObrigatorios = agenteSchema.safeParse(agenteComEpiSemCamposObrigatorios)
 const epiComCamposObrigatoriosVazios = agenteSchema.safeParse(agenteComEpiComCamposObrigatoriosVazios)
 const epiMinimo = agenteSchema.safeParse(agenteComEpiMinimo)
+const epiManual = agenteSchema.safeParse(agenteComEpiManual)
 
 const resultados = [
   {
@@ -139,6 +152,10 @@ const resultados = [
   {
     nome: 'snapshot de EPI incompleto ou vazio é rejeitado sem exigir campos opcionais',
     ok: !epiSemCamposObrigatorios.success && !epiComCamposObrigatoriosVazios.success && epiMinimo.success,
+  },
+  {
+    nome: 'cadastro manual preserva a validade do CA sem exigir marca',
+    ok: epiManual.success && epiManual.data.epis[0]?.validadeCa === '31/12/2028',
   },
 ]
 
