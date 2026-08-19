@@ -57,13 +57,20 @@ const COLUNAS_FICHA = [2864, 6086] as const
 
 const texto = (
   t: string,
-  opcoes: { negrito?: boolean; italico?: boolean; tamanho?: number; cor?: string } = {},
+  opcoes: {
+    negrito?: boolean
+    italico?: boolean
+    tamanho?: number
+    cor?: string
+    quebraAntes?: number
+  } = {},
 ) =>
   new TextRun({
     text: t,
+    break: opcoes.quebraAntes,
     bold: opcoes.negrito,
     italics: opcoes.italico,
-    color: opcoes.cor,
+    color: opcoes.cor ?? MARCA.documentoTexto,
     font: FONTE,
     size: opcoes.tamanho ?? CORPO,
   })
@@ -85,12 +92,31 @@ const pSemRecuo = (t: string, negrito = false) =>
     children: [texto(t, { negrito })],
   })
 
-const h1 = (t: string) =>
-  new Paragraph({
-    alignment: AlignmentType.CENTER,
+const h1 = (t: string, centralizado = false, quebrarNoTravessao = false) => {
+  const titulo = t.toUpperCase()
+  const indiceTravessao = quebrarNoTravessao ? titulo.lastIndexOf(' — ') : -1
+  const estilo = { negrito: true, tamanho: 36, cor: MARCA.documentoTitulo }
+
+  return new Paragraph({
+    alignment: centralizado ? AlignmentType.CENTER : AlignmentType.LEFT,
+    border: {
+      bottom: {
+        style: BorderStyle.SINGLE,
+        size: 12,
+        color: MARCA.documentoTitulo,
+        space: 6,
+      },
+    },
     spacing: { before: 240, after: 240 },
-    children: [texto(t.toUpperCase(), { negrito: true, tamanho: 36, cor: MARCA.primaria })],
+    children:
+      indiceTravessao >= 0
+        ? [
+            texto(titulo.slice(0, indiceTravessao), estilo),
+            texto(titulo.slice(indiceTravessao + 1), { ...estilo, quebraAntes: 1 }),
+          ]
+        : [texto(titulo, estilo)],
   })
+}
 
 const h2 = (t: string) =>
   new Paragraph({
@@ -98,7 +124,7 @@ const h2 = (t: string) =>
     keepNext: true,
     keepLines: true,
     spacing: { before: 320, after: 140 },
-    children: [texto(t.toUpperCase(), { negrito: true, tamanho: 28, cor: MARCA.primaria })],
+    children: [texto(t.toUpperCase(), { negrito: true, tamanho: 28, cor: MARCA.documentoSecao })],
   })
 
 const h3 = (t: string) =>
@@ -107,7 +133,7 @@ const h3 = (t: string) =>
     keepNext: true,
     keepLines: true,
     spacing: { before: 220, after: 100 },
-    children: [texto(t, { negrito: true, tamanho: CORPO, cor: MARCA.primaria })],
+    children: [texto(t, { negrito: true, tamanho: CORPO, cor: MARCA.documentoSecao })],
   })
 
 const blocos = (t?: string | null): Paragraph[] => {
@@ -123,13 +149,13 @@ const blocos = (t?: string | null): Paragraph[] => {
   return partes.map(p)
 }
 
-const borda = { style: BorderStyle.SINGLE, size: 4, color: MARCA.tinta400 }
+const borda = { style: BorderStyle.SINGLE, size: 4, color: MARCA.documentoBorda }
 const BORDAS = { top: borda, bottom: borda, left: borda, right: borda }
 
 function celula(conteudo: string, opcoes: { cabecalho?: boolean; larguraDxa?: number } = {}) {
   return new TableCell({
     borders: BORDAS,
-    shading: opcoes.cabecalho ? { fill: MARCA.tinta100 } : undefined,
+    shading: { fill: opcoes.cabecalho ? MARCA.documentoTabela : MARCA.documentoFundo },
     width: opcoes.larguraDxa ? { size: opcoes.larguraDxa, type: WidthType.DXA } : undefined,
     margins: { top: 60, bottom: 60, left: 120, right: 120 },
     children: [
@@ -247,52 +273,6 @@ async function figuraDocx(
   }
 }
 
-function cabecalhoMarca(perito: Usuario | null): Paragraph[] {
-  const linhas: Paragraph[] = [
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 40 },
-      children: [
-        texto('D', { negrito: true, tamanho: 56, cor: MARCA.primaria }),
-        texto('&', { negrito: true, tamanho: 56, cor: MARCA.tinta900 }),
-        texto('R', { negrito: true, tamanho: 56, cor: MARCA.primaria }),
-      ],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 60 },
-      children: [texto('— P E R Í C I A —', { negrito: true, tamanho: 18, cor: MARCA.primaria })],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 60 },
-      children: [
-        texto('PLATAFORMA INTELIGENTE DE PERÍCIA TRABALHISTA', {
-          negrito: true,
-          tamanho: 16,
-          cor: MARCA.credencial,
-        }),
-      ],
-    }),
-  ]
-
-  if (perito) {
-    const credencial = [perito.nome, perito.titulo, perito.registroProfissional]
-      .filter(Boolean)
-      .join(' · ')
-    linhas.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: MARCA.primaria } },
-        spacing: { after: 360 },
-        children: [texto(credencial, { tamanho: 17, cor: MARCA.tinta500 })],
-      }),
-    )
-  }
-
-  return linhas
-}
-
 function assinatura(perito: Usuario | null, comarca?: string | null): Paragraph[] {
   return [
     new Paragraph({
@@ -349,6 +329,8 @@ function rodape(): Footer {
     children: [
       new Paragraph({
         alignment: AlignmentType.CENTER,
+        border: { top: { style: BorderStyle.SINGLE, size: 6, color: MARCA.documentoTitulo } },
+        spacing: { before: 80 },
         children: [
           texto('D&R Perícia — Página ', { tamanho: 16 }),
           new TextRun({ children: [PageNumber.CURRENT], font: FONTE, size: 16 }),
@@ -413,7 +395,7 @@ async function docParecer(
       ),
       ...solidarias.map((e) => fichaLinha('Reclamada', `${e.razaoSocial} — CNPJ ${e.cnpj}`)),
     ]),
-    h1(titulo),
+    h1(titulo, true),
     h3('APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA'),
     ...blocos(t.apresentacao),
     h2(`${secao()}. OBJETO DA PERÍCIA E DADOS CONTRATUAIS`),
@@ -435,6 +417,7 @@ async function docParecer(
     filhos.push(
       tabela([
         new TableRow({
+          tableHeader: true,
           children: [
             celula('Nome do Participante', { cabecalho: true, larguraDxa: 2685 }),
             celula('Qualificação / Representação', { cabecalho: true, larguraDxa: 2864 }),
@@ -469,6 +452,7 @@ async function docParecer(
     filhos.push(
       tabela([
         new TableRow({
+          tableHeader: true,
           children: [
             celula('Função', { cabecalho: true, larguraDxa: 2506 }),
             celula('Setor', { cabecalho: true, larguraDxa: 1611 }),
@@ -500,6 +484,7 @@ async function docParecer(
         h3(apresentacao.titulo),
         tabela([
           new TableRow({
+            tableHeader: true,
             cantSplit: true,
             children: [
               celula('Propriedade', { cabecalho: true, larguraDxa: COLUNAS_FICHA[0] }),
@@ -575,7 +560,7 @@ function docQuesitos(
 ): (Paragraph | Table)[] {
   const itens = ((doc.conteudo ?? {}) as ConteudoQuesitos).quesitos ?? []
 
-  const filhos: (Paragraph | Table)[] = [...cabecalhoMarca(perito), h1('Quesitos Técnicos')]
+  const filhos: (Paragraph | Table)[] = [h1('Quesitos Técnicos')]
 
   if (pericia) {
     filhos.push(
@@ -624,7 +609,7 @@ function docManifestacao(
   const c = (doc.conteudo ?? {}) as ConteudoManifestacao
   const ehConcordancia = c.posicionamento === 'concordancia'
 
-  const filhos: (Paragraph | Table)[] = [...cabecalhoMarca(perito), h1(doc.titulo)]
+  const filhos: (Paragraph | Table)[] = [h1(doc.titulo, false, !ehConcordancia)]
 
   if (pericia) {
     filhos.push(
@@ -668,7 +653,7 @@ function docEsclarecimento(
 ): (Paragraph | Table)[] {
   const c = (doc.conteudo ?? {}) as ConteudoEsclarecimento
 
-  const filhos: (Paragraph | Table)[] = [...cabecalhoMarca(perito), h1('Esclarecimentos Técnicos')]
+  const filhos: (Paragraph | Table)[] = [h1('Esclarecimentos Técnicos')]
 
   if (pericia) {
     const linhas = [
@@ -730,7 +715,7 @@ export async function gerarDocx(
     case 'laudo':
       filhos = pericia
         ? await docParecer(pericia, empresas, perito, doc.titulo)
-        : [...cabecalhoMarca(perito), h1(doc.titulo), p('[A perícia vinculada não existe mais.]')]
+        : [h1(doc.titulo), p('[A perícia vinculada não existe mais.]')]
       break
     case 'quesitos':
       filhos = docQuesitos(doc, pericia, principal, perito)

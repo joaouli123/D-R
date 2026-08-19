@@ -49,6 +49,8 @@ function paragrafos(texto?: string | null): string {
   return partes.map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('')
 }
 
+const blocoConteudo = (conteudo: string): string => `<div class="bloco-conteudo">${conteudo}</div>`
+
 const linha = (rotulo: string, valor: string): string =>
   `<tr><th>${esc(rotulo)}</th><td>${valor}</td></tr>`
 
@@ -56,6 +58,14 @@ const linha = (rotulo: string, valor: string): string =>
 
 const CSS = `
   @page { size: A4; margin: 2.5cm 2cm 2cm 3cm; }
+  :root {
+    --documento-titulo: ${css(MARCA.documentoTitulo)};
+    --documento-secao: ${css(MARCA.documentoSecao)};
+    --documento-texto: ${css(MARCA.documentoTexto)};
+    --documento-borda: ${css(MARCA.documentoBorda)};
+    --documento-fundo: ${css(MARCA.documentoFundo)};
+    --documento-tabela: ${css(MARCA.documentoTabela)};
+  }
   * { box-sizing: border-box; }
   /* Fixa o esquema claro: sem isto, um servidor com preferência
      dark faz o Chromium imprimir o documento com fundo escuro. */
@@ -65,8 +75,8 @@ const CSS = `
     background: #ffffff;
     font-family: Arial, sans-serif;
     font-size: 11pt;
-    line-height: 1.6;
-    color: ${css(MARCA.tinta900)};
+    line-height: 1.5;
+    color: var(--documento-texto);
     text-align: justify;
   }
   header.marca {
@@ -89,19 +99,39 @@ const CSS = `
     letter-spacing: 0.2em; color: ${css(MARCA.credencial)}; margin-top: 10px;
   }
   .perito-cabecalho { font-size: 8.5pt; color: ${css(MARCA.tinta500)}; margin-top: 6px; }
-  h1 { font-size: 18pt; font-weight: 700; text-align: center; text-transform: uppercase; margin: 0 0 18px; }
-  h2 { font-size: 14pt; font-weight: 700; text-transform: uppercase; text-align: left; margin: 22px 0 8px; page-break-after: avoid; }
-  h3 { font-size: 11pt; font-weight: 700; text-align: left; margin: 14px 0 4px; page-break-after: avoid; }
+  h1 {
+    color: var(--documento-titulo);
+    font-size: 18pt;
+    font-weight: 700;
+    text-align: left;
+    margin: 0 0 12px;
+    padding: 0 0 6px;
+    border-bottom: 2px solid var(--documento-titulo);
+  }
+  h2 { color: var(--documento-secao); font-size: 14pt; font-weight: 700; text-align: left; margin: 16px 0 7px; page-break-after: avoid; }
+  h3 { color: var(--documento-secao); font-size: 11pt; font-weight: 700; text-align: left; margin: 12px 0 4px; page-break-after: avoid; }
   h4 { font-size: 10pt; font-weight: 700; margin: 10px 0 4px; page-break-after: avoid; }
-  p { margin: 0 0 10px; text-indent: 1.25cm; }
+  p { margin: 0 0 8px; text-indent: 1.25cm; }
   p.sem-recuo { text-indent: 0; }
   p.vazio { font-style: italic; color: ${css(MARCA.tinta400)}; text-indent: 0; }
-  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 10pt; page-break-inside: avoid; }
-  th, td { border: 1px solid ${css(MARCA.tinta400)}; padding: 4px 8px; vertical-align: top; text-align: left; text-indent: 0; }
-  th { background: ${css(MARCA.tinta100)}; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10pt; page-break-inside: avoid; }
+  th, td { border: 1px solid var(--documento-borda); padding: 6px 9px; vertical-align: top; text-align: left; text-indent: 0; }
+  th { background: var(--documento-tabela); color: var(--documento-titulo); font-weight: 700; }
+  td { background: var(--documento-fundo); }
   .box { font-size: 11pt; }
-  .agente-bloco { page-break-inside: avoid; break-inside: avoid; margin: 0 0 16px; border-top: 3px solid ${css(MARCA.credencial)}; }
-  .agente-bloco h3 { margin: 0; padding: 7px 9px; color: #fff; background: ${css(MARCA.credencial)}; }
+  .bloco-conteudo {
+    margin: 0 0 12px;
+    padding: 10px 14px;
+    background: var(--documento-fundo);
+    border: 1px solid var(--documento-borda);
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+  .bloco-conteudo > :first-child { margin-top: 0; }
+  .bloco-conteudo > :last-child { margin-bottom: 0; }
+  .agente-bloco { page-break-inside: auto; break-inside: auto; margin: 0 0 16px; border-top: 3px solid ${css(MARCA.credencial)}; }
+  .agente-resumo { page-break-inside: avoid; break-inside: avoid; }
+  .agente-bloco h3 { margin: 0; padding: 7px 9px; color: #fff; background: ${css(MARCA.credencial)}; page-break-after: avoid; break-after: avoid; }
   .parecer-manual .agente-bloco h3.agente-titulo { color: #fff; }
   .agente-bloco table { margin: 0; page-break-inside: avoid; }
   .agente-bloco th { width: 32%; }
@@ -109,15 +139,15 @@ const CSS = `
   .resultado-positivo { color: #166534; font-weight: 700; }
   .resultado-negativo { color: #991B1B; font-weight: 700; }
   .resultado-aviso { color: #92400E; font-weight: 700; }
-  .parecer-manual h1,
+  .parecer-manual h1 { color: var(--documento-titulo); text-align: center; }
   .parecer-manual h2,
-  .parecer-manual h3 { color: ${css(MARCA.primaria)}; }
+  .parecer-manual h3 { color: var(--documento-secao); }
   .parecer-manual .enderecamento-judicial { margin: 0 0 34px; font-weight: 700; }
   .parecer-manual .ficha-processual { margin: 0 0 34px; }
   .parecer-manual .ficha-processual th { width: 25%; background: transparent; }
   .parecer-manual .titulo-qualificacao {
     margin: 0 0 8px;
-    color: ${css(MARCA.primaria)};
+    color: var(--documento-secao);
     font-size: 11pt;
     font-weight: 700;
     text-transform: none;
@@ -135,8 +165,8 @@ const CSS = `
     margin: 0 auto;
   }
   figcaption { font-size: 9pt; font-style: italic; color: ${css(MARCA.tinta600)}; margin-top: 4px; }
-  .local-data { text-align: center; text-indent: 0; margin-top: 36px; }
-  .assinatura { margin-top: 56px; text-align: center; page-break-inside: avoid; }
+  .local-data { text-align: center; text-indent: 0; margin-top: 20px; }
+  .assinatura { margin-top: 24px; margin-bottom: 12px; text-align: center; page-break-inside: avoid; }
   .assinatura .traco { width: 280px; margin: 0 auto; border-top: 1px solid ${css(MARCA.tinta800)}; padding-top: 6px; }
   .assinatura p { text-indent: 0; margin: 0; }
   .assinatura .nome { font-weight: 700; }
@@ -155,7 +185,7 @@ function moldura(
       }</p>`
     : ''
 
-  const comMarca = opcoes.comMarca !== false
+  const comMarca = opcoes.comMarca === true
   const cabecalho = comMarca
     ? `<header class="marca">
     <div class="logo"><span class="primaria">D</span><span class="neutra">&amp;</span><span class="primaria">R</span></div>
@@ -285,7 +315,7 @@ export async function htmlDoParecer(
         const protecoes = apresentacao.protecoes.map((protecao) =>
           `<div class="protecao-bloco"><h4>${esc(protecao.titulo)}</h4>${tabelaLinhasAgente(protecao.linhas)}</div>`,
         ).join('')
-        return `<section class="agente-bloco"><h3 class="agente-titulo">${esc(apresentacao.titulo)}</h3>${tabelaLinhasAgente(apresentacao.linhas, true)}${protecoes}</section>`
+        return `<section class="agente-bloco"><div class="agente-resumo"><h3 class="agente-titulo">${esc(apresentacao.titulo)}</h3>${tabelaLinhasAgente(apresentacao.linhas, true)}</div>${protecoes}</section>`
       }).join('')
     : '<p class="vazio">[Nenhum agente cadastrado]</p>'
 
@@ -324,48 +354,50 @@ export async function htmlDoParecer(
     identificacao,
     `<h1>${esc(titulo)}</h1>`,
     '<h3 class="titulo-qualificacao">APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA</h3>',
-    paragrafos(t.apresentacao),
+    blocoConteudo(paragrafos(t.apresentacao)),
     `<h2>${secao()}. OBJETO DA PERÍCIA E DADOS CONTRATUAIS</h2>`,
-    paragrafos(t.objetivoPericia),
-    dadosContratuais,
+    blocoConteudo(paragrafos(t.objetivoPericia) + dadosContratuais),
     `<h2>${secao()}. DA DILIGÊNCIA TÉCNICA PERICIAL</h2>`,
-    textoVistoria,
-    tabelaParticipantes,
+    blocoConteudo(textoVistoria + tabelaParticipantes),
     `<h2>${secao()}. DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA</h2>`,
-    paragrafos(t.descricaoEmpresa),
-    '<h3>3.1. Instalações Físicas</h3>',
-    paragrafos(t.descricaoAmbiente),
+    blocoConteudo(
+      paragrafos(t.descricaoEmpresa) +
+        '<h3>3.1. Instalações Físicas</h3>' +
+        paragrafos(t.descricaoAmbiente),
+    ),
     `<h2>${secao()}. DESCRIÇÃO DO POSTO DE TRABALHO, MÁQUINAS, FERRAMENTAS E PRODUTOS</h2>`,
-    `<h3>4.1. Atividades e Funções Exercidas</h3>`,
-    paragrafos(t.atividadesFuncoes),
-    tabelaPeriodos,
+    blocoConteudo(
+      '<h3>4.1. Atividades e Funções Exercidas</h3>' +
+        paragrafos(t.atividadesFuncoes) +
+        tabelaPeriodos,
+    ),
     `<h2>${secao()}. AGENTES E RISCOS AVALIADOS</h2>`,
     tabelaAgentes,
     `<h2>${secao()}. NORMAS E REFERÊNCIAS TÉCNICAS UTILIZADAS</h2>`,
-    paragrafos(t.normasReferencias),
+    blocoConteudo(paragrafos(t.normasReferencias)),
     `<h2>${secao()}. EQUIPAMENTOS E PROCEDIMENTOS ANALISADOS</h2>`,
-    paragrafos(t.equipamentosAnalisados),
+    blocoConteudo(paragrafos(t.equipamentosAnalisados)),
     `<h2>${secao()}. INFORMAÇÕES LEVANTADAS NA VISTORIA</h2>`,
-    paragrafos(t.informacoesLevantadas),
+    blocoConteudo(paragrafos(t.informacoesLevantadas)),
     `<h2>${secao()}. ANÁLISE TÉCNICA</h2>`,
-    paragrafos(t.analiseTecnica),
+    blocoConteudo(paragrafos(t.analiseTecnica)),
   ]
 
   if (blocoFotos) {
     partes.push(`<h2>${secao()}. RELATÓRIO FOTOGRÁFICO</h2>`, blocoFotos)
   }
 
-  partes.push(`<h2>${secao()}. CONCLUSÃO</h2>`, paragrafos(t.conclusao))
+  partes.push(`<h2>${secao()}. CONCLUSÃO</h2>`, blocoConteudo(paragrafos(t.conclusao)))
 
   if (t.observacoesAdicionais?.trim()) {
     partes.push(
       `<h2>${secao()}. OBSERVAÇÕES ADICIONAIS</h2>`,
-      paragrafos(t.observacoesAdicionais),
+      blocoConteudo(paragrafos(t.observacoesAdicionais)),
     )
   }
 
   partes.push(
-    '<p class="sem-recuo" style="margin-top:36px">Sendo o que se apresenta para o momento, o signatário coloca-se à disposição deste MM. Juízo para os esclarecimentos que se fizerem necessários.</p>',
+    '<p class="sem-recuo" style="margin-top:24px">Sendo o que se apresenta para o momento, o signatário coloca-se à disposição deste MM. Juízo para os esclarecimentos que se fizerem necessários.</p>',
     assinatura(perito, pericia.comarca),
   )
 
@@ -399,10 +431,10 @@ function htmlDosQuesitos(
     ? itens
         .map(
           (q, i) => `
-          <div style="margin-bottom:16px">
+          <section class="bloco-conteudo">
             <p class="sem-recuo"><strong>${i + 1}. ${esc(q.pergunta)}</strong></p>
             <p><strong>Resposta: </strong>${esc(q.resposta || '[resposta não preenchida]')}</p>
-          </div>`,
+          </section>`,
         )
         .join('')
     : '<p class="vazio">[Nenhum quesito respondido]</p>'
@@ -441,7 +473,7 @@ function htmlDaManifestacao(
 
   const argumentos = c.blocos?.length
     ? c.blocos
-        .map((b, i) => `<h3>${i + 1}. ${esc(b.titulo)}</h3>${paragrafos(b.conteudo)}`)
+        .map((b, i) => blocoConteudo(`<h3>${i + 1}. ${esc(b.titulo)}</h3>${paragrafos(b.conteudo)}`))
         .join('')
     : '<p class="vazio">[Nenhum argumento selecionado]</p>'
 
@@ -451,11 +483,11 @@ function htmlDaManifestacao(
     `<h1>${esc(doc.titulo)}</h1>
      ${identificacao}
      <h2>I — Fundamentação Técnica</h2>
-     ${paragrafos(c.fundamentacao)}
+     ${blocoConteudo(paragrafos(c.fundamentacao))}
      <h2>II — ${ehConcordancia ? 'Razões da Concordância' : 'Razões da Impugnação'}</h2>
      ${argumentos}
      <h2>III — Requerimento</h2>
-     ${paragrafos(c.encerramento)}
+     ${blocoConteudo(paragrafos(c.encerramento))}
      ${assinatura(perito, pericia?.comarca)}`,
   )
 }
@@ -485,9 +517,9 @@ function htmlDoEsclarecimento(
     ? c.pontos
         .map(
           (p, i) => `
-          <h3>${i + 1}. Questionamento ${esc(ORIGEM_PONTO[p.origem] ?? p.origem)}</h3>
+          <section class="bloco-conteudo"><h3>${i + 1}. Questionamento ${esc(ORIGEM_PONTO[p.origem] ?? p.origem)}</h3>
           <p style="font-style:italic">${esc(p.questionamento || '[questionamento não informado]')}</p>
-          <p><strong>Esclarecimento: </strong>${esc(p.resposta || '[esclarecimento não preenchido]')}</p>`,
+          <p><strong>Esclarecimento: </strong>${esc(p.resposta || '[esclarecimento não preenchido]')}</p></section>`,
         )
         .join('')
     : '<p class="vazio">[Nenhum ponto informado]</p>'
@@ -498,11 +530,11 @@ function htmlDoEsclarecimento(
     `<h1>Esclarecimentos Técnicos</h1>
      ${identificacao}
      <h2>I — Da Intimação</h2>
-     ${paragrafos(c.introducao)}
+     ${blocoConteudo(paragrafos(c.introducao))}
      <h2>II — Dos Esclarecimentos Prestados</h2>
      ${pontos}
      <h2>III — Conclusão</h2>
-     ${paragrafos(c.conclusao)}
+     ${blocoConteudo(paragrafos(c.conclusao))}
      ${assinatura(perito, pericia?.comarca)}`,
   )
 }

@@ -12,6 +12,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import assert from 'node:assert/strict'
 import type { DocumentoGerado, Empresa, Usuario } from '@prisma/client'
+import JSZip from 'jszip'
+import { PDFDocument } from 'pdf-lib'
 import type { PericiaCompleta } from '../src/mappers.js'
 import { montarHtml } from '../src/services/documento-html.js'
 import { gerarDocx } from '../src/services/docx.js'
@@ -285,6 +287,10 @@ const CASOS = [
     doc: doc('parecer', 'Parecer Técnico Pericial — Insalubridade', null),
   },
   {
+    nome: 'laudo',
+    doc: doc('laudo', 'Laudo Técnico Pericial — Insalubridade', null),
+  },
+  {
     nome: 'quesitos',
     doc: doc('quesitos', 'Quesitos Técnicos — Agentes Químicos', {
       quesitos: [
@@ -324,6 +330,22 @@ const CASOS = [
     }),
   },
   {
+    nome: 'manifestacao',
+    doc: doc('manifestacao', 'Manifestação ao Laudo Pericial — Ruído', {
+      agente: 'ruido',
+      posicionamento: 'concordancia',
+      fundamentacao:
+        'A avaliação da exposição ao ruído rege-se pelo Anexo 1 da NR-15 e pela NHO-01 da FUNDACENTRO.',
+      blocos: [
+        {
+          titulo: 'Metodologia tecnicamente adequada',
+          conteudo: 'A avaliação considerou período representativo da jornada e equipamento calibrado.',
+        },
+      ],
+      encerramento: 'Ante o exposto, manifesta concordância com as conclusões técnicas apresentadas.',
+    }),
+  },
+  {
     nome: 'esclarecimento',
     doc: doc('esclarecimento', 'Esclarecimentos Técnicos — Ruído', {
       agente: 'ruido',
@@ -345,6 +367,7 @@ const CASOS = [
 async function main() {
   await fs.mkdir(SAIDA, { recursive: true })
   const resumo: string[] = []
+  const saidasVisuais: { nome: string; html: string; xml: string; paginasPdf: number }[] = []
 
   for (const caso of CASOS) {
     const html = await montarHtml(caso.doc, pericia, [empresa], perito)
@@ -355,6 +378,10 @@ async function main() {
 
     const docx = await gerarDocx(caso.doc, pericia, [empresa], perito)
     await fs.writeFile(path.join(SAIDA, `${caso.nome}.docx`), docx)
+    const pacoteDocx = await JSZip.loadAsync(docx)
+    const xml = await pacoteDocx.file('word/document.xml')!.async('string')
+    const paginasPdf = (await PDFDocument.load(pdf)).getPageCount()
+    saidasVisuais.push({ nome: caso.nome, html, xml, paginasPdf })
 
     const assinaturaPdf = pdf.subarray(0, 5).toString('latin1')
     const assinaturaDocx = docx.subarray(0, 2).toString('latin1')
@@ -367,6 +394,74 @@ async function main() {
   }
 
   const htmlParecer = await fs.readFile(path.join(SAIDA, 'parecer.html'), 'utf8')
+
+  for (const saida of saidasVisuais) {
+    assert.doesNotMatch(
+      saida.html,
+      /<header class="marca">/,
+      `${saida.nome}: o padrão visual deve usar abertura limpa, sem capa gráfica`,
+    )
+    assert.match(
+      saida.html,
+      /--documento-titulo:\s*#2C3E50/,
+      `${saida.nome}: título deve usar o grafite do padrão de referência`,
+    )
+    assert.match(
+      saida.html,
+      /--documento-secao:\s*#2980B9/,
+      `${saida.nome}: seções devem usar o azul do padrão de referência`,
+    )
+    assert.match(
+      saida.html,
+      /h1\s*\{[^}]*border-bottom:\s*2px solid var\(--documento-titulo\)/s,
+      `${saida.nome}: título principal deve ter a linha inferior do padrão`,
+    )
+    assert.match(
+      saida.html,
+      /th\s*\{[^}]*background:\s*var\(--documento-tabela\)/s,
+      `${saida.nome}: cabeçalhos das tabelas devem ter fundo padronizado`,
+    )
+    assert.doesNotMatch(
+      saida.xml,
+      /PLATAFORMA INTELIGENTE DE PERÍCIA TRABALHISTA|— P E R Í C I A —/,
+      `${saida.nome}: DOCX deve usar abertura limpa, sem capa gráfica`,
+    )
+    assert.match(
+      saida.xml,
+      /<w:bottom[^>]*w:color="2C3E50"/,
+      `${saida.nome}: título do DOCX deve ter linha inferior grafite`,
+    )
+    assert.match(
+      saida.xml,
+      /<w:color w:val="2980B9"/,
+      `${saida.nome}: títulos de seção do DOCX devem usar o azul de referência`,
+    )
+    assert.match(
+      saida.xml,
+      /<w:shd[^>]*w:fill="EEF4F8"/,
+      `${saida.nome}: tabelas do DOCX devem usar o fundo azul-cinza padronizado`,
+    )
+  }
+
+  assert.equal(
+    saidasVisuais.find((saida) => saida.nome === 'impugnacao')?.paginasPdf,
+    1,
+    'a assinatura da impugnação não deve ficar órfã em uma segunda página',
+  )
+  assert.ok(
+    (saidasVisuais.find((saida) => saida.nome === 'parecer')?.paginasPdf ?? Infinity) <= 7,
+    'o parecer de teste não deve criar uma página exclusiva para a assinatura',
+  )
+  assert.match(
+    saidasVisuais.find((saida) => saida.nome === 'parecer')?.xml ?? '',
+    /<w:tblHeader\s*\/?>/,
+    'cabeçalhos de tabelas técnicas devem se repetir quando houver quebra de página',
+  )
+  assert.match(
+    saidasVisuais.find((saida) => saida.nome === 'impugnacao')?.xml ?? '',
+    /<w:br\s*\/?>/,
+    'títulos longos do DOCX devem quebrar dentro das margens da página',
+  )
 
   assert.match(htmlParecer, /12,5 ppm/)
   assert.match(htmlParecer, /Limite de tolerância.*78 ppm/s)
@@ -391,16 +486,16 @@ async function main() {
   assert.match(secaoAgentes, /class="agente-bloco"/)
   assert.match(
     secaoAgentes,
-    /<h3 class="agente-titulo">/,
-    'o nome do agente precisa usar o estilo de alto contraste da faixa',
+    /<div class="agente-resumo"><h3 class="agente-titulo">[\s\S]*?<table>/,
+    'o título e a tabela principal do agente precisam formar um bloco indivisível',
   )
   assert.doesNotMatch(secaoAgentes, /class="tabela-agentes"/)
   assert.match(secaoAgentes, /<th>Propriedade<\/th><th>Informação<\/th>/)
   assert.doesNotMatch(secaoAgentes, /<th>CAS<\/th><td>não aplicável<\/td>/)
 
   assert.match(htmlParecer, /font-family: Arial, sans-serif/)
-  assert.match(htmlParecer, /h1 \{ font-size: 18pt/)
-  assert.match(htmlParecer, /h2 \{ font-size: 14pt/)
+  assert.match(htmlParecer, /h1 \{[^}]*font-size: 18pt/s)
+  assert.match(htmlParecer, /h2 \{[^}]*font-size: 14pt/s)
   assert.match(htmlParecer, /body \{[\s\S]*font-size: 11pt/)
   assert.match(htmlParecer, /table \{[\s\S]*font-size: 10pt/)
   assert.match(

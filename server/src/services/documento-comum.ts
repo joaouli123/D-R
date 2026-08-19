@@ -22,6 +22,13 @@ export const MARCA = {
   tinta400: '94A0B2',
   tinta300: 'C3CBD6',
   tinta100: 'EEF1F5',
+  /** Sistema visual dos documentos, baseado no modelo aprovado pelo cliente. */
+  documentoTitulo: '2C3E50',
+  documentoSecao: '2980B9',
+  documentoTexto: '333333',
+  documentoBorda: 'D9DEE5',
+  documentoFundo: 'F8FAFC',
+  documentoTabela: 'EEF4F8',
 } as const
 
 /** A mesma paleta com o "#", para uso em CSS. */
