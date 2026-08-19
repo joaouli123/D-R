@@ -183,7 +183,15 @@ export default function PericiaEditor() {
   }, [docsDaPericia, documentoId, tipoDoc])
 
   async function salvarRascunho(silencioso = false): Promise<Pericia | null> {
-    const atualizado = { ...p, atualizadoEm: new Date().toISOString().slice(0, 10) }
+    const agentes = p.tecnico.agentes.map((agente) => {
+      const nomeFixo = obterRegraAnexo(agente.anexoNr15)?.agenteFixo
+      return nomeFixo ? { ...agente, nome: nomeFixo } : agente
+    })
+    const atualizado = {
+      ...p,
+      tecnico: { ...p.tecnico, agentes },
+      atualizadoEm: new Date().toISOString().slice(0, 10),
+    }
     try {
       const salva = await salvarPericia(atualizado)
       setP(salva)
@@ -799,10 +807,10 @@ export default function PericiaEditor() {
                   <ol aria-label="Fluxo técnico do agente" className="mb-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                     <li className="text-navy-700">Agente</li><li aria-hidden="true">→</li><li>Medição</li><li aria-hidden="true">→</li><li>Proteção</li>
                   </ol>
-                  <div className="grid gap-3 sm:grid-cols-[1.4fr_120px_130px_130px_auto]">
+                  <div className="grid gap-3 md:grid-cols-[1.4fr_120px_130px_130px_auto]">
                     <Input
                       label="Agente"
-                      value={a.nome}
+                      value={regraAnexo?.agenteFixo ?? a.nome}
                       readOnly={referenciaNormativaSelecionada || agenteFixo}
                       onChange={(e) =>
                         setT({
@@ -871,7 +879,7 @@ export default function PericiaEditor() {
                       agentes: p.tecnico.agentes.map((x) => x.id === a.id ? agenteAtualizado : x),
                     })}
                   />
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <Select
                       label="Natureza"
                       value={a.tipo}

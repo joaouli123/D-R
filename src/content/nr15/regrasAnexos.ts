@@ -23,7 +23,7 @@ const GRAUS_VARIAVEIS = ['minimo', 'medio', 'maximo'] as const
 
 const REGRAS_ESPECIFICAS: Record<string, Partial<RegraAnexoNr15>> = {
   ANEXO_01: {
-    agenteFixo: 'Ruído',
+    agenteFixo: 'Ruído contínuo ou intermitente',
     grausPermitidos: ['medio'],
     unidades: ['dB(A)'],
     unidadePadrao: 'dB(A)',

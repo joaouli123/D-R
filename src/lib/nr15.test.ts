@@ -224,7 +224,7 @@ describe('aplicarAnexo', () => {
       grau: 'maximo',
     }, 'ANEXO_01')).toMatchObject({
       anexoNr15: 'ANEXO_01',
-      nome: 'Ruído',
+      nome: 'Ruído contínuo ou intermitente',
       tipo: 'fisico',
       criterio: 'quantitativo',
       limiteTolerancia: '85 dB(A) para jornada de 8h/dia (q=5)',
@@ -239,7 +239,7 @@ describe('aplicarAnexo', () => {
 
   it('expõe apenas os campos, unidade e grau aplicáveis ao Anexo 1', () => {
     expect(obterRegraAnexo('ANEXO_01')).toMatchObject({
-      agenteFixo: 'Ruído',
+      agenteFixo: 'Ruído contínuo ou intermitente',
       tipoFixo: 'fisico',
       criterioFixo: 'quantitativo',
       limiteFixo: '85 dB(A) para jornada de 8h/dia (q=5)',

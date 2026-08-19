@@ -152,7 +152,7 @@ function CamposGenericos({
 
   return (
     <div className="mt-3 rounded-lg border border-ink-200 bg-ink-50/60 p-3">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-[minmax(220px,1.2fr)_minmax(180px,1fr)_minmax(112px,0.55fr)]">
         <Input
           label="Limite de tolerância"
           aria-label="Limite de tolerância"
