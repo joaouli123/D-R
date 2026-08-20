@@ -2,7 +2,7 @@
 
 import { act, cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
 
 import { AgenteNr15Fields } from '@/components/AgenteNr15Fields'
@@ -14,7 +14,13 @@ import type { AgenteAvaliado } from '@/types'
 
 vi.mock('@/services/api', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/services/api')>()
-  return { ...original, epis: { listar: vi.fn() } }
+  return {
+    ...original,
+    epis: { listar: vi.fn() },
+    // snapshotCa fica o original de propósito: é ele que decide o que
+    // do CA vai para o laudo, e é isso que os testes precisam checar.
+    caepi: { consultar: vi.fn(), buscar: vi.fn(), salvarNrrsf: vi.fn(), status: vi.fn() },
+  }
 })
 
 const ACETALDEIDO = SUBSTANCIAS_ANEXO_11.find((item) => item.label === 'Acetaldeído')!
@@ -77,6 +83,12 @@ function promessaControlada<T>() {
   const promise = new Promise<T>((resolve) => { resolver = resolve })
   return { promise, resolver }
 }
+
+// O seletor pergunta o status da base ao montar. Sem um padrão aqui,
+// `vi.fn()` devolveria undefined e o await quebraria toda montagem.
+beforeEach(() => {
+  vi.mocked(api.caepi.status).mockResolvedValue(null)
+})
 
 afterEach(() => {
   cleanup()
@@ -375,6 +387,221 @@ describe('EpiSelector', () => {
         validadeCa: '31/12/2028',
       })],
     }))
+  })
+})
+
+describe('consulta ao CAEPI', () => {
+  const AGENTE_RUIDO: AgenteAvaliado = {
+    id: 'ruido-1',
+    nome: 'Ruído',
+    tipo: 'fisico',
+    criterio: 'quantitativo',
+    anexoNr15: 'ANEXO_01',
+    valorMedido: '90',
+    unidadeMedicao: 'dB(A)',
+  }
+
+  // CA real: venceu em 23/03/2024, mas valia em 01/05/2022 — que é a
+  // data do período periciado. É esse o caso que o módulo existe para
+  // acertar.
+  const HOMOLOGACAO: api.HomologacaoCa = {
+    numeroCa: '11882',
+    processo: '19980.011882/2015-11',
+    dataValidade: '2024-03-23',
+    situacao: 'VENCIDO',
+    equipamento: 'PROTETOR AUDITIVO',
+    descricao: 'Protetor auditivo de inserção, moldável, com cordão.',
+    marca: '3M',
+    referencia: '3M Millenium',
+    cor: null,
+    cnpj: null,
+    razaoSocial: '3M DO BRASIL LTDA',
+    natureza: null,
+    aprovadoParaLaudo: null,
+    restricaoLaudo: null,
+    observacaoLaudo: null,
+    normas: ['ANSI S3.19-1974'],
+    categoria: 'Proteção auditiva',
+    anexos: ['Anexo 1', 'Anexo 2'],
+    exigeNrrsf: true,
+    descontinuado: false,
+    validade: {
+      situacao: 'VALIDO',
+      valido: true,
+      motivo: 'Válido em 01/05/2022 — o CA vencia em 23/03/2024.',
+      incerto: false,
+    },
+  }
+
+  function ficha(ajustes: Partial<api.FichaCa> = {}): api.FichaCa {
+    return {
+      numeroCa: '11882',
+      dataReferencia: '2022-05-01',
+      exigeNrrsf: true,
+      temHistorico: false,
+      vigente: HOMOLOGACAO,
+      homologacoes: [HOMOLOGACAO],
+      atenuacao: { nrrsfDb: 17, fonte: 'PERITO', bandas: null, observacao: null, fichaConsultadaEm: null },
+      ...ajustes,
+    }
+  }
+
+  async function consultar(props: Partial<Parameters<typeof EpiSelector>[0]> = {}) {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    vi.mocked(api.epis.listar).mockResolvedValue([])
+
+    render(
+      <EpiSelector
+        agente={AGENTE_RUIDO}
+        dataReferencia="2022-05-01"
+        onChange={onChange}
+        {...props}
+      />,
+    )
+    await user.type(screen.getByLabelText('Número do CA'), '11882')
+    await user.click(screen.getByRole('button', { name: 'Consultar CA' }))
+    return { user, onChange }
+  }
+
+  it('julga a validade na data da vistoria, não em hoje', async () => {
+    vi.mocked(api.caepi.consultar).mockResolvedValue(ficha())
+    await consultar()
+
+    expect(api.caepi.consultar).toHaveBeenCalledWith('11882', '2022-05-01')
+    expect(await screen.findByText('Válido em 01/05/2022')).toBeDefined()
+    expect(screen.getByText(/o CA vencia em 23\/03\/2024/)).toBeDefined()
+    expect(screen.getByText(/CA 11882 · PROTETOR AUDITIVO/)).toBeDefined()
+    expect(screen.getByText(/Anexo 1, Anexo 2/)).toBeDefined()
+  })
+
+  it('avisa quando o CA teve mais de uma homologação', async () => {
+    vi.mocked(api.caepi.consultar).mockResolvedValue(
+      ficha({ temHistorico: true, homologacoes: [HOMOLOGACAO, { ...HOMOLOGACAO, processo: 'P-2009' }] }),
+    )
+    await consultar()
+
+    expect(await screen.findByText(/homologado 2 vezes, com validades diferentes/)).toBeDefined()
+  })
+
+  it('leva CA, validade e NRRsf para o laudo ao adicionar', async () => {
+    vi.mocked(api.caepi.consultar).mockResolvedValue(ficha())
+    const { user, onChange } = await consultar()
+
+    await user.click(await screen.findByRole('button', { name: 'Adicionar ao laudo' }))
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      epis: [expect.objectContaining({
+        categoria: 'PROTETOR AUDITIVO',
+        modelo: 'Protetor auditivo de inserção, moldável, com cordão.',
+        marca: '3M',
+        caUnico: '11882',
+        validadeCa: '23/03/2024',
+        nivelProtecaoDb: 17,
+        metodoAtenuacao: 'NRRsf',
+      })],
+    }))
+  })
+
+  it('pede o NRRsf quando não consta na base e o grava como do perito', async () => {
+    vi.mocked(api.caepi.consultar).mockResolvedValue(ficha({ atenuacao: null }))
+    vi.mocked(api.caepi.salvarNrrsf).mockResolvedValue({
+      numeroCa: '11882',
+      nrrsfDb: 17,
+      fonte: 'PERITO',
+      observacao: null,
+      atualizadoEm: '2026-08-20T12:00:00.000Z',
+    })
+    const { user } = await consultar()
+
+    expect(await screen.findByText(/Não consta na base do MTE/)).toBeDefined()
+    await user.type(screen.getByLabelText('NRRsf (atenuação do protetor)'), '17')
+    await user.click(screen.getByRole('button', { name: 'Salvar NRRsf' }))
+
+    expect(api.caepi.salvarNrrsf).toHaveBeenCalledWith('11882', { nrrsfDb: 17 })
+    expect(await screen.findByText(/NRRsf de 17 dB salvo/)).toBeDefined()
+    // 90 − 17 = 73 dB(A): abaixo dos 85 dB(A), proteção eficaz.
+    expect(screen.getByText(/90 − 17 = 73 dB\(A\).*proteção eficaz/)).toBeDefined()
+  })
+
+  it('recusa NRRsf fora da faixa sem chamar o servidor', async () => {
+    vi.mocked(api.caepi.consultar).mockResolvedValue(ficha({ atenuacao: null }))
+    const { user } = await consultar()
+
+    await user.type(await screen.findByLabelText('NRRsf (atenuação do protetor)'), '99')
+    await user.click(screen.getByRole('button', { name: 'Salvar NRRsf' }))
+
+    expect(api.caepi.salvarNrrsf).not.toHaveBeenCalled()
+    expect(screen.getByText(/entre 0 e 50/)).toBeDefined()
+  })
+
+  it('manda para o cadastro manual quando o CA não existe na base', async () => {
+    vi.mocked(api.caepi.consultar).mockResolvedValue(null)
+    await consultar()
+
+    const aviso = await screen.findByRole('alert')
+    expect(aviso.textContent).toContain('não consta na base do Ministério do Trabalho')
+    expect(aviso.textContent).toContain('informe o EPI manualmente')
+    expect(screen.queryByRole('button', { name: 'Adicionar ao laudo' })).toBeNull()
+  })
+
+  it('com a base ainda não carregada, culpa o servidor e não o número do CA', async () => {
+    vi.mocked(api.caepi.status).mockResolvedValue({
+      ultimaSincronizacao: null,
+      totais: { homologacoes: 0, cas: 0, validosHoje: 0, protetoresAuditivos: 0, comNrrsf: 0, nrrsfDoPerito: 0 },
+    })
+    vi.mocked(api.caepi.consultar).mockResolvedValue(null)
+    await consultar()
+
+    const aviso = await screen.findByRole('alert')
+    expect(aviso.textContent).toContain('ainda não foi carregada neste servidor')
+    // O número digitado está certo: dizer que ele "não consta" seria mentira.
+    expect(aviso.textContent).not.toContain('Confira o número na etiqueta')
+  })
+
+  it('mostra o tamanho e a data da base quando ela está carregada', async () => {
+    vi.mocked(api.caepi.status).mockResolvedValue({
+      ultimaSincronizacao: {
+        iniciadoEm: '2026-08-20T10:00:00.000Z',
+        concluidoEm: '2026-08-20T10:04:00.000Z',
+        status: 'CONCLUIDA',
+        origem: 'manual',
+        registrosLidos: 42343,
+        registrosNovos: 42343,
+        registrosAtualizados: 0,
+        fichasConsultadas: 0,
+        erro: null,
+      },
+      totais: { homologacoes: 42343, cas: 42321, validosHoje: 14903, protetoresAuditivos: 543, comNrrsf: 2, nrrsfDoPerito: 2 },
+    })
+    vi.mocked(api.caepi.consultar).mockResolvedValue(ficha())
+    await consultar()
+
+    expect(await screen.findByText(/42\.321 CAs, atualizada em 20\/08\/2026/)).toBeDefined()
+  })
+
+  it('deixa o perito dizer se o CA é da peça facial ou do cartucho', async () => {
+    vi.mocked(api.caepi.consultar).mockResolvedValue(
+      ficha({ exigeNrrsf: false, atenuacao: null, vigente: { ...HOMOLOGACAO, exigeNrrsf: false } }),
+    )
+    const { user, onChange } = await consultar({ agente: AGENTE_BASE })
+
+    await user.click(await screen.findByRole('radio', { name: 'Cartucho / filtro' }))
+    await user.click(screen.getByRole('button', { name: 'Adicionar ao laudo' }))
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      epis: [expect.objectContaining({ caFiltroCartucho: '11882' })],
+    }))
+    expect(onChange.mock.calls[0]?.[0].epis[0].caUnico).toBeUndefined()
+  })
+
+  it('sem data de vistoria, consulta em hoje e avisa o perito', async () => {
+    vi.mocked(api.caepi.consultar).mockResolvedValue(ficha())
+    await consultar({ dataReferencia: undefined })
+
+    expect(api.caepi.consultar).toHaveBeenCalledWith('11882', undefined)
+    expect(screen.getByText('Validade conferida em hoje')).toBeDefined()
+    expect(screen.getByText(/Preencha a data da vistoria/)).toBeDefined()
   })
 })
 

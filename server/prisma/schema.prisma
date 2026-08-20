@@ -365,3 +365,107 @@ model EpiAplicacao {
   @@map("epis_aplicacoes")
 }
 
+
+
+// ---------------- Módulo L — Espelho oficial do CAEPI/MTE ----------------
+//
+// Três tabelas com donos diferentes, e é essa separação que sustenta
+// a promessa feita ao perito:
+//
+//   · cas_oficiais   → cópia do que o MTE publica. A sincronização
+//                      reescreve à vontade;
+//   · cas_atenuacao  → o NRRsf. A sincronização do CSV não escreve
+//                      nesta tabela em momento nenhum, então nenhuma
+//                      atualização do MTE consegue apagar o que foi
+//                      preenchido à mão;
+//   · epis_catalogo  → curadoria do perito, o que ele escolheu usar
+//                      nas perícias. A sincronização nunca toca.
+//
+// Grão de cas_oficiais: (numeroCa, processo), não o número do CA
+// sozinho. A base repete o mesmo CA uma vez por norma técnica —
+// 124.067 linhas para 42.321 CAs — mas 22 CAs têm de fato mais de um
+// processo de homologação, com validades diferentes. Como a perícia
+// pergunta "esse CA valia na data X", esses 22 casos precisam existir
+// separados; as normas repetidas viram lista.
+
+model CaOficial {
+  numeroCa String
+  processo String
+
+  dataValidade String?
+  situacao     String
+  cnpj         String?
+  razaoSocial  String?
+  natureza     String?
+  equipamento  String
+  descricao    String?
+  marca        String?
+  referencia   String?
+  cor          String?
+
+  aprovadoParaLaudo String?
+  restricaoLaudo    String?
+  observacaoLaudo   String?
+
+  /// Normas técnicas de ensaio, agregadas das linhas repetidas do CSV.
+  normas String[]
+  /// [{ numero, cnpjLaboratorio, razaoLaboratorio }]
+  laudos Json     @default("[]")
+
+  // De-para para a NR-15, derivado de "equipamento"
+  categoria     String
+  anexos        String[]
+  exigeNrrsf    Boolean  @default(false)
+  descontinuado Boolean  @default(false)
+
+  sincronizadoEm DateTime @default(now())
+  atualizadoEm   DateTime @updatedAt
+
+  @@id([numeroCa, processo])
+  @@index([numeroCa])
+  @@index([equipamento])
+  @@index([situacao])
+  @@index([marca])
+  @@index([exigeNrrsf])
+  @@map("cas_oficiais")
+}
+
+// Atenuação sonora do CA. Fica fora de cas_oficiais por dois motivos:
+// é atributo do número do CA (não da homologação), e é o único dado
+// do módulo que pode vir do perito. Tabela separada = a sincronização
+// não tem como sobrescrever, nem por engano.
+model CaAtenuacao {
+  numeroCa String @id
+
+  /// NRR subject fit, em dB. Não existe no CSV: sai da ficha individual.
+  nrrsfDb Float?
+  /// "CAEPI" quando veio da ficha do MTE, "PERITO" quando foi digitado.
+  fonte      String
+  /// Atenuação por banda de oitava: { "125": 12.4, "250": 15.1, ... }
+  bandas     Json?
+  observacao String?
+
+  fichaConsultadaEm DateTime?
+  atualizadoEm      DateTime  @updatedAt
+
+  @@index([fonte])
+  @@map("cas_atenuacao")
+}
+
+model CaepiSincronizacao {
+  id          String    @id @default(uuid())
+  iniciadoEm  DateTime  @default(now())
+  concluidoEm DateTime?
+  status      String
+  origem      String    @default("agendada")
+
+  registrosLidos       Int @default(0)
+  registrosNovos       Int @default(0)
+  registrosAtualizados Int @default(0)
+  fichasConsultadas    Int @default(0)
+
+  erro String?
+
+  @@index([iniciadoEm])
+  @@map("caepi_sincronizacoes")
+}

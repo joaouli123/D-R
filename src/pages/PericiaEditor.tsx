@@ -916,7 +916,11 @@ export default function PericiaEditor() {
                       <option value="nao_aplicavel">Não aplicável</option>
                     </Select>
                   </div>
-                  <EpiSelector agente={a} onChange={(agenteAtualizado) => setT({ agentes: p.tecnico.agentes.map((x) => x.id === a.id ? agenteAtualizado : x) })} />
+                  <EpiSelector
+                    agente={a}
+                    dataReferencia={p.dataVistoria}
+                    onChange={(agenteAtualizado) => setT({ agentes: p.tecnico.agentes.map((x) => x.id === a.id ? agenteAtualizado : x) })}
+                  />
                   {a.anexoNr15 !== 'ANEXO_01' && <Checkbox
                     className="mt-3 rounded-md px-1 py-1 focus-within:ring-2 focus-within:ring-brand-600"
                     label="EPI comprovadamente eficaz para este agente"

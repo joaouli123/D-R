@@ -23,7 +23,10 @@
     "smoke:pericia": "tsx scripts/smoke-validacao-pericia.ts",
     "smoke:epis": "tsx scripts/smoke-epis.ts",
     "smoke:biblioteca": "tsx scripts/smoke-biblioteca.ts",
-    "smoke:docx-layout": "tsx scripts/smoke-docx-layout.ts"
+    "smoke:docx-layout": "tsx scripts/smoke-docx-layout.ts",
+    "smoke:caepi": "tsx scripts/smoke-caepi.ts",
+    "sync:caepi": "tsx scripts/sync-caepi.ts",
+    "validar:caepi": "tsx scripts/validar-caepi.ts"
   },
   "prisma": {
     "seed": "tsx src/seed.ts"

@@ -4,6 +4,7 @@ import express, { type Express } from 'express'
 import { env } from './env.js'
 import { ErroHttp, tratarErros } from './erros.js'
 import { authRouter } from './routes/auth.js'
+import { caepiRouter } from './routes/caepi.js'
 import { documentosRouter } from './routes/documentos.js'
 import { episRouter } from './routes/epis.js'
 import { empresasRouter } from './routes/empresas.js'
@@ -70,6 +71,7 @@ export function criarApp(): Express {
   app.use('/quesitos', quesitosRouter)
   app.use('/documentos', documentosRouter)
   app.use('/epis', episRouter)
+  app.use('/caepi', caepiRouter)
 
   app.use((req, _res, next) => {
     next(new ErroHttp(404, `Rota não encontrada: ${req.method} ${req.path}`))

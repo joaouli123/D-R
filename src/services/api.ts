@@ -11,6 +11,7 @@ import type {
   Usuario,
 } from '@/types'
 import { QUESITOS } from '@/content/quesitos'
+import { formatDate } from '@/lib/utils'
 
 // ============================================================
 // CAMADA DE API — ponto único de integração com o backend.
@@ -178,6 +179,203 @@ export function snapshotEpi(item: EpiCatalogo): EpiSelecionado {
     nivelProtecaoDb: item.nivelProtecaoDb ?? null,
     metodoAtenuacao: item.metodoAtenuacao ?? null,
     ...(item.observacao ? { observacao: item.observacao } : {}),
+  }
+}
+
+// ---------------- Módulo L — Espelho oficial do CAEPI ----------------
+//
+// Toda resposta traz `dataReferencia` e o parecer de validade NAQUELA
+// data — nunca "está válido hoje". A perícia examina um período
+// passado: um CA vencido em 2024 valia normalmente em 2022, e é isso
+// que precisa ir para o laudo.
+
+export type FonteNrrsf = 'CAEPI' | 'PERITO'
+
+export interface ValidadeNaData {
+  situacao: string
+  valido: boolean
+  /** Frase pronta para o laudo, já com a data avaliada por extenso. */
+  motivo: string
+  /** A base não publica a data da decisão de cancelamento/suspensão. */
+  incerto: boolean
+}
+
+export interface HomologacaoCa {
+  numeroCa: string
+  processo: string
+  dataValidade: string | null
+  situacao: string
+  equipamento: string
+  descricao: string | null
+  marca: string | null
+  referencia: string | null
+  cor: string | null
+  cnpj: string | null
+  razaoSocial: string | null
+  natureza: string | null
+  aprovadoParaLaudo: string | null
+  restricaoLaudo: string | null
+  observacaoLaudo: string | null
+  normas: string[]
+  categoria: string
+  anexos: string[]
+  exigeNrrsf: boolean
+  /** Tipo de equipamento que o MTE marcou como layout descontinuado. */
+  descontinuado: boolean
+  validade: ValidadeNaData
+}
+
+export interface AtenuacaoCa {
+  nrrsfDb: number | null
+  fonte: FonteNrrsf
+  bandas: Record<string, string> | null
+  observacao: string | null
+  fichaConsultadaEm: string | null
+}
+
+export interface FichaCa {
+  numeroCa: string
+  dataReferencia: string
+  exigeNrrsf: boolean
+  /** O CA foi renovado com validades diferentes — muda a resposta do laudo. */
+  temHistorico: boolean
+  vigente: HomologacaoCa | null
+  homologacoes: HomologacaoCa[]
+  atenuacao: AtenuacaoCa | null
+}
+
+export interface ResultadoCa extends HomologacaoCa {
+  nrrsfDb: number | null
+  fonteNrrsf: FonteNrrsf | null
+}
+
+export interface StatusCaepi {
+  ultimaSincronizacao: {
+    iniciadoEm: string
+    concluidoEm: string | null
+    status: string
+    origem: string
+    registrosLidos: number
+    registrosNovos: number
+    registrosAtualizados: number
+    fichasConsultadas: number
+    erro: string | null
+  } | null
+  totais: {
+    homologacoes: number
+    cas: number
+    validosHoje: number
+    protetoresAuditivos: number
+    comNrrsf: number
+    nrrsfDoPerito: number
+  }
+}
+
+interface FiltrosCa {
+  q?: string
+  numero?: string
+  categoria?: string
+  anexo?: string
+  auditivo?: boolean
+  descontinuados?: boolean
+  /** Data da perícia (aaaa-mm-dd). Sem ela, a referência é hoje. */
+  em?: string
+  limite?: number
+}
+
+const CAEPI_SEM_BACKEND = 'A consulta ao CAEPI exige o backend ativo. Informe o EPI manualmente.'
+
+function parametrosCa(filtros: FiltrosCa): string {
+  const parametros = new URLSearchParams()
+  for (const [chave, valor] of Object.entries(filtros)) {
+    if (valor === undefined || valor === null || valor === '' || valor === false) continue
+    parametros.set(chave, valor === true ? '1' : String(valor))
+  }
+  const consulta = parametros.toString()
+  return consulta ? `?${consulta}` : ''
+}
+
+export const caepi = {
+  /**
+   * Ficha de um CA na data da perícia. Devolve null quando o número não
+   * consta na base: isso é resposta, não falha — o perito segue pelo
+   * cadastro manual.
+   */
+  async consultar(numeroCa: string, em?: string): Promise<FichaCa | null> {
+    if (!ehRest) {
+      await delay(null, 200)
+      throw new ErroApi(503, CAEPI_SEM_BACKEND)
+    }
+    try {
+      return await http<FichaCa>(`/caepi/cas/${encodeURIComponent(numeroCa)}${parametrosCa({ em })}`)
+    } catch (e) {
+      if (e instanceof ErroApi && e.status === 404) return null
+      throw e
+    }
+  },
+
+  async buscar(filtros: FiltrosCa = {}) {
+    if (!ehRest) {
+      await delay(null, 200)
+      throw new ErroApi(503, CAEPI_SEM_BACKEND)
+    }
+    return http<{ dataReferencia: string; total: number; itens: ResultadoCa[] }>(
+      `/caepi/cas${parametrosCa(filtros)}`,
+    )
+  },
+
+  /**
+   * NRRsf conferido pelo perito — o único dado do módulo que ele
+   * preenche. Grava com fonte PERITO, que é o que impede a atualização
+   * do MTE de sobrescrever. `null` apaga (erro de digitação acontece).
+   */
+  async salvarNrrsf(numeroCa: string, dados: { nrrsfDb: number | null; observacao?: string | null }) {
+    if (!ehRest) {
+      await delay(null, 200)
+      throw new ErroApi(503, CAEPI_SEM_BACKEND)
+    }
+    return http<{
+      numeroCa: string
+      nrrsfDb: number | null
+      fonte: FonteNrrsf
+      observacao: string | null
+      atualizadoEm: string
+    }>(`/caepi/cas/${encodeURIComponent(numeroCa)}/atenuacao`, {
+      method: 'PATCH',
+      body: JSON.stringify(dados),
+    })
+  },
+
+  /** Null no modo demonstração: não há espelho local para relatar. */
+  async status(): Promise<StatusCaepi | null> {
+    if (!ehRest) return null
+    return http<StatusCaepi>('/caepi/status')
+  },
+}
+
+/** Converte a ficha oficial no EPI que vai para o laudo. */
+export function snapshotCa(
+  ficha: FichaCa,
+  campoCa: 'caUnico' | 'caPecaFacial' | 'caFiltroCartucho' = 'caUnico',
+): EpiSelecionado {
+  const registro = ficha.vigente ?? ficha.homologacoes[0]
+  const nrrsfDb = ficha.atenuacao?.nrrsfDb ?? null
+  const numero = { [campoCa]: ficha.numeroCa } as Pick<
+    EpiSelecionado,
+    'caUnico' | 'caPecaFacial' | 'caFiltroCartucho'
+  >
+
+  return {
+    categoria: registro?.equipamento ?? 'Equipamento',
+    modelo: registro?.descricao || registro?.referencia || registro?.equipamento || '',
+    ...(registro?.marca ? { marca: registro.marca } : {}),
+    ...(registro?.dataValidade ? { validadeCa: formatDate(registro.dataValidade) } : {}),
+    ...numero,
+    nivelProtecaoDb: nrrsfDb,
+    metodoAtenuacao: nrrsfDb == null ? null : 'NRRsf',
+    // Restrição do laudo do CA é informação que precisa aparecer no
+    // documento — é ela que limita para que o EPI foi aprovado.
+    ...(registro?.restricaoLaudo ? { observacao: registro.restricaoLaudo } : {}),
   }
 }
 

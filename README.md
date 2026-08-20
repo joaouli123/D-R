@@ -53,8 +53,11 @@ npm run smoke:api   # verifica o contrato HTTP (sem banco)
 npm run smoke:pericia # valida o payload técnico e os snapshots salvos
 npm run smoke:epis  # valida a consolidação e a consulta do catálogo de EPIs
 npm run smoke:biblioteca # valida tipos documentais e compatibilidade dos textos
+npm run smoke:caepi # valida o espelho do CAEPI de ponta a ponta (sem banco)
 npm run prisma:studio
 ```
+
+Para carregar a base oficial de CAs, veja [Espelho oficial do CAEPI](#espelho-oficial-do-caepi-módulo-l).
 
 ---
 
@@ -95,6 +98,7 @@ Módulos A–J são o escopo da Cláusula 1ª da proposta.
 |---|---|---|
 | **17** | Quesitos Técnicos | `/quesitos` |
 | **18** | Manifestação, Impugnação e Esclarecimento | `/manifestacao/:posicionamento` e `/esclarecimentos` |
+| **L** | Espelho oficial do CAEPI — consulta de CA pelo número | passo 3 do editor, dentro do seletor de EPIs |
 
 Tela de apoio: `/ajuda` — orientação de uso, prevista no item 7 da proposta.
 
@@ -155,6 +159,42 @@ Textos e modelos: `src/content/manifestacao.ts`.
 
 ---
 
+## Espelho oficial do CAEPI (Módulo L)
+
+Cópia local da base de Certificados de Aprovação do MTE, para que o perito digite o número do CA e receba o equipamento pronto — em vez de cadastrar tudo à mão.
+
+**A validade é julgada na data da vistoria, nunca em "hoje".** É a regra central do módulo. Um CA vencido em 2024 valia normalmente no período de um processo de 2022, e é essa a pergunta que o laudo responde. O editor passa `dataVistoria` ao seletor de EPIs; sem ela, a consulta cai em hoje e a tela avisa.
+
+- **Grão `(CA, processo)`.** Um mesmo CA pode ter mais de uma homologação ao longo do tempo — na base recebida, 22 CAs têm esse histórico. Guardar só a última apagaria justamente a informação que interessa a um processo antigo, então cada homologação é uma linha e a tela avisa quando existe mais de uma.
+- **Três situações, não duas.** Além de válido e vencido existe o **incerto**: a base do MTE não publica a data em que um CA foi cancelado ou suspenso, então para esses o sistema pede confirmação em vez de afirmar.
+- **NRRsf.** O atributo de atenuação não vem no CSV — só na ficha individual do portal. O que o perito digitar na mão fica em `cas_atenuacao`, tabela separada, com `fonte = 'PERITO'`. **A atualização do Ministério nunca sobrescreve o que é do perito**: o upsert do CSV não toca nessa tabela, e o `UPDATE` das fichas tem `WHERE fonte <> 'PERITO'`.
+- **Enquadramento NR-15** derivado do equipamento (de-para em `classificar.ts`), com cobertura de 100% da base recebida — nenhum registro fica sem anexo.
+- A busca usa índice GIN sobre `to_tsvector('portuguese', …)`; texto livre é sanitizado em `montarTsQuery` antes de virar `to_tsquery`, então uma expressão malformada nunca chega ao Postgres.
+
+**Carregar a base:**
+
+```bash
+npm run sync:caepi -- --arquivo ~/Downloads/RelatorioCA.csv.gz
+```
+
+Aceita `.csv` e `.csv.gz`. O caminho por arquivo é o principal: o portal do MTE fica atrás do Cloudflare e responde com o desafio *"Just a moment…"*, que exige navegador de verdade — quando isso acontece, `npm run sync:caepi` sem `--arquivo` falha com `ErroDesafioCloudflare` e a mensagem manda baixar o arquivo pelo navegador. O CSV oficial sai de `caepi.trabalho.gov.br`, atualizado diariamente às 20h.
+
+O `.gz` do portal vem com HTML da própria página colado depois do fim do membro gzip — `createGunzip` lê a base inteira e só então estoura `incorrect header check`, descartando tudo em arquivos pequenos. Por isso `arquivo.ts` remove o cabeçalho gzip na mão e infla o corpo com `inflateRaw`, que termina no bloco final e ignora o resto. Arquivo corrompido ou download cortado no meio continuam falhando, de propósito: importar meia base seria pior que não importar.
+
+`--fichas <n>` busca o NRRsf de até *n* protetores auditivos pendentes; `--so-fichas` pula o CSV. `npm run sync:caepi -- --ajuda` lista o resto.
+
+**Conferir:**
+
+```bash
+npm run validar:caepi -- ~/Downloads/RelatorioCA.csv.gz
+```
+
+Roda 9 premissas do modelo contra a base real e sai com código 1 se alguma falhar. Na base de 20/08/2026: 42.343 registros, 27.361 vencidos e 14.903 válidos, 543 protetores auditivos (205 válidos na data), 0 linhas ignoradas.
+
+`npm run smoke:caepi` cobre os 13 blocos do módulo — parser, de-para, agregação, SQL da sincronização, busca, histórico, rotas HTTP e o pipeline completo de sincronização — sem precisar de banco.
+
+---
+
 ## API
 
 Toda a comunicação do frontend passa por `src/services/api.ts`. Nenhuma tela conhece o modo em uso.
@@ -168,6 +208,8 @@ GET    /pericias                GET    /pericias/:id
 POST   /pericias                DELETE /pericias/:id
 POST   /pericias/:id/fotos      DELETE /pericias/:id/fotos/:fotoId
 GET    /epis?q=&categoria=&anexo=
+GET    /caepi/status              GET    /caepi/cas?q=&categoria=&anexo=&em=
+GET    /caepi/cas/:numero?em=     PATCH  /caepi/cas/:numero/atenuacao
 GET    /textos                  POST   /textos           DELETE /textos/:id
 POST   /textos/:id/uso
 GET    /quesitos                POST   /quesitos         DELETE /quesitos/:id
@@ -215,6 +257,8 @@ Defina no painel do Coolify, nunca no repositório:
 
 O volume `uploads` guarda as fotos das vistorias e os anexos em PDF — **perdê-lo significa perder o relatório fotográfico dos laudos.**
 
+**Primeira subida com o Módulo L:** depois do `prisma migrate deploy`, a tabela do CAEPI sobe vazia e a consulta por CA responde "base não carregada" até a primeira carga. Rode uma vez, no container da API, `npm run sync:caepi -- --arquivo <caepi.csv.gz>` com o arquivo baixado do portal. A partir daí a atualização é periódica, e o que o perito preencheu de NRRsf sobrevive a todas elas.
+
 ---
 
 ## Estrutura
@@ -257,7 +301,17 @@ server/
         ├── pdf.ts                Puppeteer + concatenação do anexo
         ├── docx.ts               Exportação editável
         ├── email.ts              Envio com PDF anexado (Módulo I)
-        └── armazenamento.ts      Uploads de fotos e anexos
+        ├── armazenamento.ts      Uploads de fotos e anexos
+        └── caepi/                Espelho da base do MTE (Módulo L)
+            ├── arquivo.ts        Leitura do .csv/.csv.gz baixado do portal
+            ├── csv.ts            Parser do CSV oficial (19 colunas)
+            ├── mapear.ts         Linha → registro, no grão (CA, processo)
+            ├── normalizar.ts     Situação, datas e validade na data
+            ├── classificar.ts    De-para equipamento → anexo da NR-15
+            ├── portal.ts         Ficha individual (NRRsf) e Cloudflare
+            ├── sync.ts           Upsert em lote e busca de fichas
+            ├── repositorio.ts    Consultas Prisma/SQL
+            └── consulta.ts       Montagem da ficha entregue ao front
 ```
 
 ---
