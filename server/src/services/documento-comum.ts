@@ -22,13 +22,17 @@ export const MARCA = {
   tinta400: '94A0B2',
   tinta300: 'C3CBD6',
   tinta100: 'EEF1F5',
-  /** Sistema visual dos documentos, baseado no modelo aprovado pelo cliente. */
+  /**
+   * Sistema visual dos documentos. Uma única cor de destaque — um azul-ardósia
+   * sóbrio — em todos os títulos, para um visual padrão de peça técnica, sem
+   * excesso de cores. Tabelas ficam com cabeçalho cinza-claro e corpo branco.
+   */
   documentoTitulo: '2C3E50',
-  documentoSecao: '2980B9',
+  documentoSecao: '2C3E50',
   documentoTexto: '333333',
   documentoBorda: 'D9DEE5',
-  documentoFundo: 'F8FAFC',
-  documentoTabela: 'EEF4F8',
+  documentoFundo: 'FFFFFF',
+  documentoTabela: 'EFF1F4',
 } as const
 
 /** A mesma paleta com o "#", para uso em CSS. */
@@ -132,6 +136,39 @@ export function extenso(iso?: string | null): string {
 }
 
 export const hoje = (): string => new Date().toISOString().slice(0, 10)
+
+// ---- Máscaras de documentos e contatos ----------------------------------
+// Formatam apenas quando a contagem de dígitos bate; caso contrário devolvem
+// o valor original limpo (ou "—"), para nunca inventar um número inválido.
+
+/** "12345678000190" → "12.345.678/0001-90" */
+export function mascaraCnpj(valor?: string | null): string {
+  const d = (valor ?? '').replace(/\D/g, '')
+  if (d.length !== 14) return (valor ?? '').trim() || '—'
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
+}
+
+/** "12345678900" → "123.456.789-00" */
+export function mascaraCpf(valor?: string | null): string {
+  const d = (valor ?? '').replace(/\D/g, '')
+  if (d.length !== 11) return (valor ?? '').trim() || '—'
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`
+}
+
+/** "06000000" → "06000-000" */
+export function mascaraCep(valor?: string | null): string {
+  const d = (valor ?? '').replace(/\D/g, '')
+  if (d.length !== 8) return (valor ?? '').trim() || '—'
+  return `${d.slice(0, 5)}-${d.slice(5)}`
+}
+
+/** "11987654321" → "(11) 98765-4321"; "1133334444" → "(11) 3333-4444" */
+export function mascaraTelefone(valor?: string | null): string {
+  const d = (valor ?? '').replace(/\D/g, '')
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
+  return (valor ?? '').trim() || '—'
+}
 
 /** Texto livre → parágrafos, quebrando nas linhas em branco. */
 export function emParagrafos(texto?: string | null): string[] {

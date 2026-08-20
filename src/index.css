@@ -38,18 +38,22 @@
     text-align: justify;
   }
   .doc-sheet h1 {
-    @apply font-bold text-center uppercase mb-4;
+    @apply font-bold text-center uppercase mb-4 pb-1.5 border-b-2;
     font-size: 18pt;
+    color: #2c3e50;
+    border-color: #2c3e50;
   }
   .doc-sheet h2 {
     @apply font-bold mt-6 mb-2 uppercase;
     font-size: 14pt;
     text-align: left;
+    color: #2c3e50;
   }
   .doc-sheet h3 {
     @apply font-bold mt-4 mb-1;
     font-size: 11pt;
     text-align: left;
+    color: #2c3e50;
   }
   .doc-sheet p {
     @apply mb-3;
@@ -70,12 +74,12 @@
     @apply bg-ink-100 font-bold;
   }
   .doc-sheet .agente-bloco {
-    @apply mb-4 border-t-[3px] border-navy-600;
+    @apply mb-4;
     break-inside: avoid;
     page-break-inside: avoid;
   }
   .doc-sheet .agente-bloco > h3 {
-    @apply m-0 bg-navy-600 px-2.5 py-2 text-white;
+    @apply mt-3 mb-1.5 pb-1 border-b border-ink-300;
   }
   .doc-sheet .agente-bloco table {
     @apply my-0;
@@ -87,12 +91,14 @@
     @apply ml-3 mt-2;
   }
   .doc-sheet .protecao-bloco h4 {
-    @apply mb-1 font-bold text-navy-700;
+    @apply mb-1 font-bold;
     font-size: 10pt;
+    color: #2c3e50;
   }
-  .doc-sheet .resultado-positivo { @apply font-bold text-emerald-700; }
-  .doc-sheet .resultado-negativo { @apply font-bold text-red-700; }
-  .doc-sheet .resultado-aviso { @apply font-bold text-amber-800; }
+  /* Sem verde/vermelho/âmbar: o resultado se destaca só pelo negrito. */
+  .doc-sheet .resultado-positivo,
+  .doc-sheet .resultado-negativo,
+  .doc-sheet .resultado-aviso { @apply font-bold; }
 }
 
 /* Scrollbar discreta */

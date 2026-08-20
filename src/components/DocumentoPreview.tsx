@@ -1,6 +1,6 @@
 import { Logo } from '@/components/Logo'
 import type { Empresa, Pericia, Usuario } from '@/types'
-import { extenso, formatDate } from '@/lib/utils'
+import { extenso, formatDate, maskCNPJ } from '@/lib/utils'
 import { dadosPapel } from '@/lib/participantes'
 import { montarApresentacaoAgente } from '@/lib/apresentacaoAgente'
 
@@ -113,7 +113,7 @@ export function DocumentoPreview({
             <th>Reclamada principal</th>
             <td>
               {empresaPrincipal
-                ? `${empresaPrincipal.razaoSocial} — CNPJ ${empresaPrincipal.cnpj}`
+                ? `${empresaPrincipal.razaoSocial} — CNPJ ${maskCNPJ(empresaPrincipal.cnpj)}`
                 : '—'}
             </td>
           </tr>
@@ -121,7 +121,7 @@ export function DocumentoPreview({
             <tr key={e.id}>
               <th>Reclamada solidária</th>
               <td>
-                {e.razaoSocial} — CNPJ {e.cnpj}
+                {e.razaoSocial} — CNPJ {maskCNPJ(e.cnpj)}
               </td>
             </tr>
           ))}

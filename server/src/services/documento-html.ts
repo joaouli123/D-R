@@ -17,6 +17,7 @@ import {
   data,
   emParagrafos,
   extenso,
+  mascaraCnpj,
   montarApresentacaoAgente,
   hoje,
   ATUACAO,
@@ -119,29 +120,23 @@ const CSS = `
   th { background: var(--documento-tabela); color: var(--documento-titulo); font-weight: 700; }
   td { background: var(--documento-fundo); }
   .box { font-size: 11pt; }
-  .bloco-conteudo {
-    margin: 0 0 12px;
-    padding: 10px 14px;
-    background: var(--documento-fundo);
-    border: 1px solid var(--documento-borda);
-    box-decoration-break: clone;
-    -webkit-box-decoration-break: clone;
-  }
-  .bloco-conteudo > :first-child { margin-top: 0; }
-  .bloco-conteudo > :last-child { margin-bottom: 0; }
-  .agente-bloco { page-break-inside: auto; break-inside: auto; margin: 0 0 16px; border-top: 3px solid ${css(MARCA.credencial)}; }
+  /* Sem caixa: o texto corre em parágrafos justificados, como uma peça
+     técnica padrão. A classe segue existindo só para agrupar o conteúdo. */
+  .bloco-conteudo { margin: 0 0 8px; }
+  .agente-bloco { page-break-inside: auto; break-inside: auto; margin: 0 0 16px; }
   .agente-resumo { page-break-inside: avoid; break-inside: avoid; }
-  .agente-bloco h3 { margin: 0; padding: 7px 9px; color: #fff; background: ${css(MARCA.credencial)}; page-break-after: avoid; break-after: avoid; }
-  .parecer-manual .agente-bloco h3.agente-titulo { color: #fff; }
+  .agente-bloco h3 { margin: 12px 0 6px; padding: 0 0 4px; color: var(--documento-titulo); border-bottom: 1px solid var(--documento-borda); page-break-after: avoid; break-after: avoid; }
+  .parecer-manual .agente-bloco h3.agente-titulo { color: var(--documento-titulo); }
   .agente-bloco table { margin: 0; page-break-inside: avoid; }
   .agente-bloco th { width: 32%; }
   .protecao-bloco { margin: 8px 0 0 14px; }
-  .resultado-positivo { color: #166534; font-weight: 700; }
-  .resultado-negativo { color: #991B1B; font-weight: 700; }
-  .resultado-aviso { color: #92400E; font-weight: 700; }
+  /* Sem verde/vermelho/âmbar: o resultado se destaca só pelo negrito. */
+  .resultado-positivo,
+  .resultado-negativo,
+  .resultado-aviso { font-weight: 700; }
   .parecer-manual h1 { color: var(--documento-titulo); text-align: center; }
   .parecer-manual h2,
-  .parecer-manual h3 { color: var(--documento-secao); }
+  .parecer-manual h3 { color: var(--documento-titulo); }
   .parecer-manual .enderecamento-judicial { margin: 0 0 34px; font-weight: 700; }
   .parecer-manual .ficha-processual { margin: 0 0 34px; }
   .parecer-manual .ficha-processual th { width: 25%; background: transparent; }
@@ -263,8 +258,8 @@ export async function htmlDoParecer(
     ${linha('Processo nº', esc(pericia.numeroProcesso))}
     ${linha('Tramitação', esc(MODALIDADE_LABEL[pericia.modalidade] ?? pericia.modalidade))}
     ${linha('Reclamante', `${esc(pericia.reclamante)}${pericia.funcaoReclamante ? ` — ${esc(pericia.funcaoReclamante)}` : ''}`)}
-    ${linha('Reclamada', principal ? `${esc(principal.razaoSocial)} — CNPJ ${esc(principal.cnpj)}` : '—')}
-    ${solidarias.map((e) => linha('Reclamada', `${esc(e.razaoSocial)} — CNPJ ${esc(e.cnpj)}`)).join('')}
+    ${linha('Reclamada', principal ? `${esc(principal.razaoSocial)} — CNPJ ${esc(mascaraCnpj(principal.cnpj))}` : '—')}
+    ${solidarias.map((e) => linha('Reclamada', `${esc(e.razaoSocial)} — CNPJ ${esc(mascaraCnpj(e.cnpj))}`)).join('')}
   </tbody></table>`
 
   const dadosContratuais = `
