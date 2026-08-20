@@ -42,7 +42,12 @@ jobs:
           set -euo pipefail
           # POST, não GET: esta versão do Coolify responde 405 ao GET,
           # ainda que a documentação da API mostre o verbo antigo.
+          # --connect-timeout + --retry: às vezes o painel fica alguns
+          # segundos inacessível a partir do runner (curl 28). Em vez de
+          # falhar o job e disparar e-mail de alarme, tenta de novo —
+          # cada tentativa desiste em 20s no lugar de travar ~135s.
           resposta=$(curl -sS --fail-with-body -X POST \
+            --connect-timeout 20 --retry 5 --retry-delay 10 --retry-all-errors \
             -H "Authorization: Bearer $COOLIFY_TOKEN" \
             "$COOLIFY_URL/api/v1/deploy?uuid=$APP_UUID")
 
@@ -62,13 +67,15 @@ jobs:
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
           UUID: ${{ steps.disparar.outputs.uuid }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           # ~20 min de teto: o build da imagem leva 3-5 min, e o resto
           # é margem para fila quando dois pushes saem juntos.
+          # Sem "-e": um blip de rede numa consulta não derruba o job;
+          # a leitura que falhar vira "desconhecido" e o laço tenta de novo.
           for _ in $(seq 1 120); do
-            estado=$(curl -sS \
+            estado=$(curl -sS --connect-timeout 15 --retry 3 --retry-delay 5 --retry-all-errors \
               -H "Authorization: Bearer $COOLIFY_TOKEN" \
-              "$COOLIFY_URL/api/v1/deployments/$UUID" | jq -r '.status // "desconhecido"')
+              "$COOLIFY_URL/api/v1/deployments/$UUID" 2>/dev/null | jq -r '.status // "desconhecido"' 2>/dev/null || echo "desconhecido")
 
             case "$estado" in
               finished)
