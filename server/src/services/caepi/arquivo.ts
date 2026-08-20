@@ -1,8 +1,9 @@
 // ============================================================
-// Abertura do CSV do CAEPI a partir do disco.
+// Leitura do CSV do CAEPI, venha ele de onde vier.
 //
 // Isolado num módulo só porque o `.gz` do portal tem uma armadilha
-// que os dois scripts (sync e validar) precisam tratar igual.
+// que todo mundo que lê a base precisa tratar igual: os dois scripts
+// (sync e validar), o download do portal e o upload pelo painel.
 // ============================================================
 
 import { createReadStream } from 'node:fs'
@@ -90,18 +91,36 @@ class SemCabecalhoGzip extends Transform {
   }
 }
 
-/** Abre o CSV do CAEPI, descomprimindo quando o nome termina em `.gz`. */
-export function abrirCsvCaepi(caminho: string): NodeJS.ReadableStream {
-  const bruto = createReadStream(caminho)
+/** O nome indica um arquivo comprimido? Mesma regra em todo lugar. */
+export function pareceComprimido(nome: string): boolean {
+  return /\.gz$/i.test(nome.trim())
+}
 
-  if (!/\.gz$/i.test(caminho)) {
-    bruto.setEncoding('utf8')
-    return bruto
+/**
+ * Entrega o CSV como texto, descomprimindo quando `comprimido`.
+ *
+ * Serve para qualquer origem: arquivo no disco, resposta do portal ou
+ * corpo de um upload. Quem chama diz se está comprimido — deduzir
+ * pelos bytes seria pior, porque um `.gz` corrompido passaria batido
+ * como se fosse texto puro em vez de estourar.
+ */
+export function descomprimirCsvCaepi(
+  entrada: NodeJS.ReadableStream,
+  comprimido: boolean,
+): NodeJS.ReadableStream {
+  if (!comprimido) {
+    entrada.setEncoding('utf8')
+    return entrada
   }
 
   const saida = new PassThrough({ encoding: 'utf8' })
-  pipeline(bruto, new SemCabecalhoGzip(), createInflateRaw(), saida, (erro) => {
+  pipeline(entrada, new SemCabecalhoGzip(), createInflateRaw(), saida, (erro) => {
     if (erro) saida.destroy(erro)
   })
   return saida
+}
+
+/** Abre o CSV do CAEPI, descomprimindo quando o nome termina em `.gz`. */
+export function abrirCsvCaepi(caminho: string): NodeJS.ReadableStream {
+  return descomprimirCsvCaepi(createReadStream(caminho), pareceComprimido(caminho))
 }

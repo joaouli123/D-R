@@ -1,0 +1,106 @@
+# ============================================================
+# Sobe a API para produção a cada push na main.
+#
+# O frontend já é redeployado sozinho pelo webhook do Coolify; a
+# aplicação da API, não — mesmo com auto-deploy ligado no painel, os
+# push events nunca chegaram nela. O resultado era o pior estado
+# possível: front novo falando com API velha, sem ninguém perceber.
+#
+# Aqui o disparo é explícito e o job só passa quando o deploy termina
+# de verdade, então uma falha aparece como X no commit em vez de
+# silêncio. As migrations rodam no docker-entrypoint.sh do container.
+#
+# Roda em todo push da main de propósito, sem filtro de caminho:
+# alguns minutos de build a mais valem menos que um filtro errado
+# deixando a produção defasada de novo.
+# ============================================================
+
+name: Deploy da API
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Disparar o deploy no Coolify
+        id: disparar
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          APP_UUID: ${{ secrets.COOLIFY_API_APP_UUID }}
+        run: |
+          set -euo pipefail
+          resposta=$(curl -sS --fail-with-body \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "$COOLIFY_URL/api/v1/deploy?uuid=$APP_UUID")
+
+          uuid=$(printf '%s' "$resposta" | jq -r '.deployments[0].deployment_uuid // empty')
+          if [ -z "$uuid" ]; then
+            echo "O Coolify não devolveu um deployment. Resposta:"
+            printf '%s\n' "$resposta"
+            exit 1
+          fi
+
+          echo "uuid=$uuid" >> "$GITHUB_OUTPUT"
+          echo "Deployment $uuid enfileirado para ${GITHUB_SHA:0:7}."
+
+      - name: Aguardar o deploy terminar
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          UUID: ${{ steps.disparar.outputs.uuid }}
+        run: |
+          set -euo pipefail
+          # ~20 min de teto: o build da imagem leva 3-5 min, e o resto
+          # é margem para fila quando dois pushes saem juntos.
+          for _ in $(seq 1 120); do
+            estado=$(curl -sS \
+              -H "Authorization: Bearer $COOLIFY_TOKEN" \
+              "$COOLIFY_URL/api/v1/deployments/$UUID" | jq -r '.status // "desconhecido"')
+
+            case "$estado" in
+              finished)
+                echo "Deploy concluído."
+                exit 0
+                ;;
+              failed|cancelled-by-user)
+                echo "Deploy terminou como \"$estado\". Veja os logs no painel do Coolify."
+                exit 1
+                ;;
+              *)
+                echo "  $estado…"
+                sleep 10
+                ;;
+            esac
+          done
+
+          echo "O deploy não terminou dentro do tempo previsto. Confira o painel."
+          exit 1
+
+      - name: Conferir se a API voltou no ar
+        run: |
+          set -euo pipefail
+          # O container troca depois do build; a primeira resposta pode
+          # cair no intervalo em que o antigo já saiu e o novo não subiu.
+          for tentativa in $(seq 1 12); do
+            codigo=$(curl -s -o /dev/null -w '%{http_code}' https://drpericiatrabalhista.com.br/api/saude || echo 000)
+            if [ "$codigo" = "200" ]; then
+              echo "API respondendo (tentativa $tentativa)."
+              exit 0
+            fi
+            echo "  /api/saude devolveu $codigo…"
+            sleep 10
+          done
+
+          echo "A API não voltou a responder 200 em /api/saude."
+          exit 1

@@ -271,6 +271,15 @@ export interface StatusCaepi {
   }
 }
 
+export interface ResultadoImportacaoCaepi {
+  id: string
+  linhasLidas: number
+  registros: number
+  novos: number
+  atualizados: number
+  linhasIgnoradas: number
+}
+
 interface FiltrosCa {
   q?: string
   numero?: string
@@ -350,6 +359,27 @@ export const caepi = {
   async status(): Promise<StatusCaepi | null> {
     if (!ehRest) return null
     return http<StatusCaepi>('/caepi/status')
+  },
+
+  /**
+   * Sobe o arquivo do portal do MTE e refaz o espelho.
+   *
+   * O arquivo vai cru no corpo, sem multipart: são ~21 MB e não há
+   * outro campo para mandar junto. O nome vai na query porque é ele
+   * que diz ao servidor se o conteúdo está comprimido.
+   *
+   * Restrito a admin — a checagem que vale é a do servidor.
+   */
+  async importar(arquivo: File): Promise<ResultadoImportacaoCaepi> {
+    if (!ehRest) {
+      await delay(null, 200)
+      throw new ErroApi(503, CAEPI_SEM_BACKEND)
+    }
+    return http<ResultadoImportacaoCaepi>(`/caepi/importar?nome=${encodeURIComponent(arquivo.name)}`, {
+      method: 'POST',
+      body: arquivo,
+      headers: { 'Content-Type': 'application/octet-stream' },
+    })
   },
 }
 

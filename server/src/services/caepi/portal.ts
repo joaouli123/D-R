@@ -14,8 +14,8 @@
 // A ficha individual é a única fonte do NRRsf: ele NÃO existe no CSV.
 // ============================================================
 
-import { createGunzip, constants as zlibConstants } from 'node:zlib'
 import { Readable } from 'node:stream'
+import { descomprimirCsvCaepi } from './arquivo.js'
 
 export const URL_CONSULTA = 'https://caepi.trabalho.gov.br/internet/ConsultaCAInternet.aspx'
 
@@ -200,10 +200,6 @@ async function postar(sessao: Sessao, corpo: URLSearchParams, sinal?: AbortSigna
 /**
  * Baixa o export completo e devolve um stream de texto já
  * descompactado, linha a linha — nunca o arquivo inteiro em memória.
- *
- * `Z_SYNC_FLUSH` no finishFlush é o que impede o erro de "dados
- * inesperados após o fim do stream" causado pelo HTML que o portal
- * anexa depois do gzip.
  */
 export async function baixarBaseCaepi(sinal?: AbortSignal): Promise<NodeJS.ReadableStream> {
   const sessao = new Sessao()
@@ -247,8 +243,12 @@ export async function baixarBaseCaepi(sinal?: AbortSignal): Promise<NodeJS.Reada
     )
   }
 
-  const gunzip = createGunzip({ finishFlush: zlibConstants.Z_SYNC_FLUSH })
-  return Readable.fromWeb(resposta.body as Parameters<typeof Readable.fromWeb>[0]).pipe(gunzip)
+  // Mesmo descompressor do upload e dos scripts: o HTML que o portal
+  // cola depois do gzip precisa ser ignorado sem engolir o arquivo.
+  return descomprimirCsvCaepi(
+    Readable.fromWeb(resposta.body as Parameters<typeof Readable.fromWeb>[0]),
+    true,
+  )
 }
 
 // ---------------- Ficha individual (NRRsf) ----------------

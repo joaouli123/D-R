@@ -1,10 +1,12 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { exigirSessao } from '../auth.js'
+import { exigirPerfil, exigirSessao, sessaoDe } from '../auth.js'
 import { ErroHttp, parametro, rota } from '../erros.js'
+import { descomprimirCsvCaepi, pareceComprimido } from '../services/caepi/arquivo.js'
 import { avaliar, escolherHomologacao, hojeIso } from '../services/caepi/consulta.js'
 import { normalizarNumeroCa, normalizarNrrsf } from '../services/caepi/normalizar.js'
 import { repositorioPrisma, type RepositorioCaepi } from '../services/caepi/repositorio.js'
+import { sincronizar } from '../services/caepi/sync.js'
 
 // ============================================================
 // Consulta ao espelho oficial do CAEPI.
@@ -36,6 +38,13 @@ const consultaSchema = z.object({
 
 const referenciaSchema = z.object({ em: dataIso.optional() })
 
+const importacaoSchema = z.object({
+  // O nome do arquivo é o que diz se veio comprimido — a mesma regra
+  // do CLI. Cheirar os bytes seria pior: um .gz corrompido passaria
+  // como texto puro em vez de estourar na cara de quem enviou.
+  nome: z.string().trim().min(1).max(200),
+})
+
 const atenuacaoSchema = z.object({
   // null é apagar o valor. O front manda null quando o perito limpa
   // o campo, e apagar precisa ser possível — senão um erro de
@@ -59,6 +68,44 @@ export function criarCaepiRouter(repositorio: RepositorioCaepi = repositorioPris
     '/status',
     rota(async (_req, res) => {
       res.json(await repositorio.status(hojeIso()))
+    }),
+  )
+
+  // Carga da base a partir do arquivo do MTE, enviado pelo painel.
+  //
+  // Existe porque o download automático não é confiável: o portal fica
+  // atrás do Cloudflare e responde com desafio de navegador. Em vez de
+  // depender de alguém com acesso ao servidor rodando um script, quem
+  // tem o arquivo sobe por aqui e o resto é igual ao do CLI — mesmo
+  // descompressor, mesmo parser, mesmo histórico de sincronização.
+  //
+  // O corpo é o arquivo cru, em fluxo. Nada de multipart: são 21 MB
+  // que não têm por que passar por buffer intermediário.
+  caepiRouter.post(
+    '/importar',
+    exigirPerfil('admin'),
+    rota(async (req, res) => {
+      const { nome } = importacaoSchema.parse(req.query)
+      if (!/\.(csv|gz)$/i.test(nome)) {
+        throw new ErroHttp(422, 'Envie o arquivo .csv ou .csv.gz baixado do portal do MTE.')
+      }
+
+      const resultado = await sincronizar({
+        fonte: descomprimirCsvCaepi(req, pareceComprimido(nome)),
+        origem: `painel:${sessaoDe(req).email}`,
+      }).catch((erro: unknown) => {
+        const detalhe = erro instanceof Error ? erro.message : String(erro)
+        throw new ErroHttp(422, `Não foi possível ler o arquivo do MTE. ${detalhe}`)
+      })
+
+      res.json({
+        id: resultado.id,
+        linhasLidas: resultado.linhasLidas,
+        registros: resultado.registros,
+        novos: resultado.novos,
+        atualizados: resultado.atualizados,
+        linhasIgnoradas: resultado.linhasIgnoradas,
+      })
     }),
   )
 

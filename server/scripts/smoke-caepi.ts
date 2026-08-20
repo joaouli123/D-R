@@ -566,10 +566,41 @@ try {
   // 12.8 — status
   const status = (await (await pedir('/caepi/status')).json()) as { totais: { cas: number } }
   assert.equal(status.totais.cas, 42321)
+
+  // 12.9 — carga da base pelo painel: quem pode e o que é aceito.
+  //
+  // Só as recusas são exercitadas aqui, e de propósito: todas param
+  // antes de `sincronizar`, que precisa de banco. A carga em si é o
+  // bloco 13, que roda o pipeline inteiro com gravador falso.
+  assert.equal(
+    (await fetch(`${base}/caepi/importar?nome=RelatorioCA.csv.gz`, { method: 'POST' })).status,
+    401,
+    'importar sem sessão não passa',
+  )
+
+  const tokenPerito = jwt.sign(
+    { id: 'smoke-perito', email: 'perito@example.test', perfil: 'perito' },
+    process.env.JWT_SECRET as string,
+  )
+  const comoPerito = await fetch(`${base}/caepi/importar?nome=RelatorioCA.csv.gz`, {
+    method: 'POST',
+    headers: { cookie: `dr_sessao=${tokenPerito}` },
+  })
+  assert.equal(comoPerito.status, 403, 'trocar a base oficial é ação de admin, não de perito')
+
+  const semNome = await pedir('/caepi/importar', { method: 'POST' })
+  assert.equal(semNome.status, 422, 'sem o nome do arquivo não dá para saber se veio comprimido')
+
+  const extensaoErrada = await pedir('/caepi/importar?nome=planilha.xlsx', { method: 'POST' })
+  assert.equal(extensaoErrada.status, 422)
+  assert.ok(
+    ((await extensaoErrada.json()) as { erro: string }).erro.includes('.csv.gz'),
+    'a recusa diz qual arquivo o portal entrega',
+  )
 } finally {
   await new Promise<void>((resolver, rejeitar) => servidor.close((erro) => (erro ? rejeitar(erro) : resolver())))
 }
-marcar('rotas exigem sessão, respondem na data de referência e validam o NRRsf do perito')
+marcar('rotas exigem sessão, respondem na data de referência, validam NRRsf e só deixam admin trocar a base')
 
 // ------------------------------------------------------------
 // 13. Sincronização de ponta a ponta (sem banco)

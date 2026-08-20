@@ -12,6 +12,7 @@ import {
   useToast,
 } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
+import { BaseCaepiCard } from '@/components/BaseCaepiCard'
 import { Logo, SeloCredenciado } from '@/components/Logo'
 import { useApp } from '@/store/AppStore'
 import * as api from '@/services/api'
@@ -287,6 +288,8 @@ export default function Configuracoes() {
       {/* ---------- Sistema ---------- */}
       {aba === 'sistema' && (
         <div className="grid gap-4 lg:grid-cols-2">
+          <BaseCaepiCard podeAtualizar={ehAdmin} />
+
           <Card>
             <CardHeader title="Ambiente" icon={<Server size={18} />} />
             <dl className="divide-y divide-ink-100 text-[13.5px]">

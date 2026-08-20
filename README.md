@@ -171,15 +171,21 @@ Cópia local da base de Certificados de Aprovação do MTE, para que o perito di
 - **Enquadramento NR-15** derivado do equipamento (de-para em `classificar.ts`), com cobertura de 100% da base recebida — nenhum registro fica sem anexo.
 - A busca usa índice GIN sobre `to_tsvector('portuguese', …)`; texto livre é sanitizado em `montarTsQuery` antes de virar `to_tsquery`, então uma expressão malformada nunca chega ao Postgres.
 
-**Carregar a base:**
+**Carregar a base — pelo painel (é o caminho normal):**
+
+*Configurações → Sistema → Base oficial do CAEPI*. O administrador arrasta o `RelatorioCA.csv.gz` baixado do portal e o servidor faz o resto; o card mostra quantos CAs há na base, quando foi a última carga e avisa em amarelo depois de 30 dias sem atualizar. Por baixo é `POST /api/caepi/importar?nome=<arquivo>` com o arquivo cru no corpo — sem multipart, porque são ~21 MB e não há outro campo. A rota exige perfil **admin**.
+
+**Ou pela linha de comando**, quando se tem acesso ao container:
 
 ```bash
 npm run sync:caepi -- --arquivo ~/Downloads/RelatorioCA.csv.gz
 ```
 
-Aceita `.csv` e `.csv.gz`. O caminho por arquivo é o principal: o portal do MTE fica atrás do Cloudflare e responde com o desafio *"Just a moment…"*, que exige navegador de verdade — quando isso acontece, `npm run sync:caepi` sem `--arquivo` falha com `ErroDesafioCloudflare` e a mensagem manda baixar o arquivo pelo navegador. O CSV oficial sai de `caepi.trabalho.gov.br`, atualizado diariamente às 20h.
+Aceita `.csv` e `.csv.gz`, e usa exatamente o mesmo parser, o mesmo histórico e a mesma proteção do NRRsf que a rota do painel.
 
-O `.gz` do portal vem com HTML da própria página colado depois do fim do membro gzip — `createGunzip` lê a base inteira e só então estoura `incorrect header check`, descartando tudo em arquivos pequenos. Por isso `arquivo.ts` remove o cabeçalho gzip na mão e infla o corpo com `inflateRaw`, que termina no bloco final e ignora o resto. Arquivo corrompido ou download cortado no meio continuam falhando, de propósito: importar meia base seria pior que não importar.
+**Por que não há download automático.** O portal do MTE fica atrás do Cloudflare. Em 20/08/2026 ele responde `403` com `cf-mitigated: challenge` a `fetch` do Node — e responde `403` também a um `curl` comum; o que passa é uma requisição com User-Agent de navegador, ou seja, fingir ser um browser para furar bot-detection. **Este projeto não faz isso**, então `npm run sync:caepi` sem `--arquivo` falha com `ErroDesafioCloudflare` e a mensagem manda baixar o arquivo pelo navegador. O CSV oficial é publicado em `caepi.trabalho.gov.br`, atualizado diariamente às 20h; na prática a base muda pouco de um dia para o outro, e o card de Sistema deixa visível há quanto tempo ela não é atualizada.
+
+O `.gz` do portal vem com HTML da própria página colado depois do fim do membro gzip — `createGunzip` lê a base inteira e só então estoura `incorrect header check`, descartando tudo em arquivos pequenos. Por isso `arquivo.ts` remove o cabeçalho gzip na mão e infla o corpo com `inflateRaw`, que termina no bloco final e ignora o resto. Arquivo corrompido ou download cortado no meio continuam falhando, de propósito: importar meia base seria pior que não importar. Os três caminhos de leitura — arquivo local, upload do painel e download do portal — passam pelo mesmo `descomprimirCsvCaepi`.
 
 `--fichas <n>` busca o NRRsf de até *n* protetores auditivos pendentes; `--so-fichas` pula o CSV. `npm run sync:caepi -- --ajuda` lista o resto.
 
@@ -191,7 +197,7 @@ npm run validar:caepi -- ~/Downloads/RelatorioCA.csv.gz
 
 Roda 9 premissas do modelo contra a base real e sai com código 1 se alguma falhar. Na base de 20/08/2026: 42.343 registros, 27.361 vencidos e 14.903 válidos, 543 protetores auditivos (205 válidos na data), 0 linhas ignoradas.
 
-`npm run smoke:caepi` cobre os 13 blocos do módulo — parser, de-para, agregação, SQL da sincronização, busca, histórico, rotas HTTP e o pipeline completo de sincronização — sem precisar de banco.
+`npm run smoke:caepi` cobre os 14 blocos do módulo — parser, de-para, agregação, SQL da sincronização, busca, histórico, rotas HTTP (incluindo quem pode trocar a base), leitura do `.gz` e o pipeline completo de sincronização — sem precisar de banco.
 
 ---
 
@@ -210,6 +216,7 @@ POST   /pericias/:id/fotos      DELETE /pericias/:id/fotos/:fotoId
 GET    /epis?q=&categoria=&anexo=
 GET    /caepi/status              GET    /caepi/cas?q=&categoria=&anexo=&em=
 GET    /caepi/cas/:numero?em=     PATCH  /caepi/cas/:numero/atenuacao
+POST   /caepi/importar?nome=      (admin — carga da base oficial)
 GET    /textos                  POST   /textos           DELETE /textos/:id
 POST   /textos/:id/uso
 GET    /quesitos                POST   /quesitos         DELETE /quesitos/:id
@@ -257,7 +264,24 @@ Defina no painel do Coolify, nunca no repositório:
 
 O volume `uploads` guarda as fotos das vistorias e os anexos em PDF — **perdê-lo significa perder o relatório fotográfico dos laudos.**
 
-**Primeira subida com o Módulo L:** depois do `prisma migrate deploy`, a tabela do CAEPI sobe vazia e a consulta por CA responde "base não carregada" até a primeira carga. Rode uma vez, no container da API, `npm run sync:caepi -- --arquivo <caepi.csv.gz>` com o arquivo baixado do portal. A partir daí a atualização é periódica, e o que o perito preencheu de NRRsf sobrevive a todas elas.
+**Primeira subida com o Módulo L:** depois do `prisma migrate deploy`, a tabela do CAEPI sobe vazia e a consulta por CA responde "base não carregada" até a primeira carga. Faça a carga em *Configurações → Sistema*, arrastando o arquivo do portal — não é preciso acesso ao container. O que o perito preencheu de NRRsf sobrevive a todas as cargas seguintes.
+
+### Quem redeploya o quê
+
+| Aplicação | Como sobe | Por quê |
+|---|---|---|
+| Frontend | webhook do Coolify, automático | funciona desde sempre |
+| API | GitHub Actions — [`deploy-api.yml`](.github/workflows/deploy-api.yml) | o webhook do Coolify nunca chegou nesta aplicação, mesmo com auto-deploy ligado |
+
+A API ficou uma vez em produção com o frontend novo apontando para a versão velha — todas as consultas de CA respondiam 404 e nada avisava. O workflow existe para fechar esse buraco: dispara o deploy pela API do Coolify a cada push na `main`, **espera o deploy terminar** e depois confere `GET /api/saude`, então uma falha vira X vermelho no commit em vez de silêncio.
+
+Os três segredos ficam em *Settings → Secrets and variables → Actions* do repositório (que é público — nada de credencial em arquivo):
+
+| Secret | Conteúdo |
+|---|---|
+| `COOLIFY_URL` | URL do painel do Coolify |
+| `COOLIFY_TOKEN` | token de API com permissão de deploy |
+| `COOLIFY_API_APP_UUID` | UUID da aplicação da API |
 
 ---
 
@@ -303,7 +327,7 @@ server/
         ├── email.ts              Envio com PDF anexado (Módulo I)
         ├── armazenamento.ts      Uploads de fotos e anexos
         └── caepi/                Espelho da base do MTE (Módulo L)
-            ├── arquivo.ts        Leitura do .csv/.csv.gz baixado do portal
+            ├── arquivo.ts        Leitura do .csv/.csv.gz, venha de onde vier
             ├── csv.ts            Parser do CSV oficial (19 colunas)
             ├── mapear.ts         Linha → registro, no grão (CA, processo)
             ├── normalizar.ts     Situação, datas e validade na data
