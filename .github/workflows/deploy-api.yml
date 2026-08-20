@@ -40,7 +40,9 @@ jobs:
           APP_UUID: ${{ secrets.COOLIFY_API_APP_UUID }}
         run: |
           set -euo pipefail
-          resposta=$(curl -sS --fail-with-body \
+          # POST, não GET: esta versão do Coolify responde 405 ao GET,
+          # ainda que a documentação da API mostre o verbo antigo.
+          resposta=$(curl -sS --fail-with-body -X POST \
             -H "Authorization: Bearer $COOLIFY_TOKEN" \
             "$COOLIFY_URL/api/v1/deploy?uuid=$APP_UUID")
 
