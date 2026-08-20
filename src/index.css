@@ -88,7 +88,7 @@
     width: 32%;
   }
   .doc-sheet .protecao-bloco {
-    @apply ml-3 mt-2;
+    @apply mt-2.5;
   }
   .doc-sheet .protecao-bloco h4 {
     @apply mb-1 font-bold;

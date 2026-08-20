@@ -129,7 +129,7 @@ const CSS = `
   .parecer-manual .agente-bloco h3.agente-titulo { color: var(--documento-titulo); }
   .agente-bloco table { margin: 0; page-break-inside: avoid; }
   .agente-bloco th { width: 32%; }
-  .protecao-bloco { margin: 8px 0 0 14px; }
+  .protecao-bloco { margin: 10px 0 0; }
   /* Sem verde/vermelho/âmbar: o resultado se destaca só pelo negrito. */
   .resultado-positivo,
   .resultado-negativo,
