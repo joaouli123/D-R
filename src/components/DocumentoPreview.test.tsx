@@ -14,7 +14,7 @@ const pericia = {
   participantes: [],
   dataVistoria: '2026-08-14',
   localVistoria: 'Local da vistoria',
-  modalidade: 'insalubridade',
+  modalidade: 'ambas',
   status: 'em_andamento',
   responsavelId: 'usuario-1',
   criadoEm: '2026-08-14T00:00:00.000Z',
@@ -25,6 +25,9 @@ const pericia = {
     objetivoPericia: '',
     descricaoEmpresa: '',
     descricaoAmbiente: '',
+    descricaoPostoTrabalho: 'Posto de trabalho descrito',
+    maquinasFerramentas: 'Máquinas descritas',
+    produtosUtilizados: 'Produtos descritos',
     atividadesFuncoes: '',
     periodos: [],
     agentes: [
@@ -101,11 +104,25 @@ const pericia = {
     normasReferencias: '',
     equipamentosAnalisados: '',
     informacoesLevantadas: '',
+    divergenciasFaticas: 'Divergências registradas',
+    protecoesColetivas: 'Exaustão localizada',
     analiseTecnica: '',
     conclusao: '',
+    conclusaoInsalubridade: 'Conclusão de NR-15',
+    conclusaoPericulosidade: 'Conclusão de NR-16',
+    respostasQuesitos: 'Respostas técnicas consolidadas',
+    encerramento: 'Parecer elaborado em observância aos critérios técnicos.',
     observacoesAdicionais: '',
   },
-  fotos: [],
+  fotos: [
+    {
+      id: 'foto-epi',
+      secao: 'epi',
+      url: '/foto-epi.jpg',
+      legenda: 'EPI reconhecido na diligência',
+      ordem: 1,
+    },
+  ],
 } satisfies Pericia
 
 describe('DocumentoPreview', () => {
@@ -144,19 +161,55 @@ describe('DocumentoPreview', () => {
     expect(html).not.toContain('legado sem unidade que não deve prevalecer')
   })
 
-  it('organiza cada agente em bloco compacto de propriedades aplicáveis', () => {
+  it('organiza agentes e EPIs em seções próprias sem duplicação', () => {
     const html = renderToStaticMarkup(
       <DocumentoPreview pericia={pericia} empresas={[]} titulo="Parecer de teste" />,
     )
-    const inicio = html.indexOf('Agentes e Riscos Avaliados')
-    const fim = html.indexOf('Normas e Referências Técnicas Utilizadas')
+    const inicio = html.indexOf('7.2. NR-15')
+    const fim = html.indexOf('8. Dos Equipamentos de Proteção Individual')
     const secaoAgentes = html.slice(inicio, fim)
+    const inicioEpis = fim
+    const fimEpis = html.indexOf('9. Das Proteções Coletivas')
+    const secaoEpis = html.slice(inicioEpis, fimEpis)
 
     expect(secaoAgentes).toContain('class="agente-bloco"')
     expect(secaoAgentes).not.toContain('class="agentes-table table-fixed"')
     expect(secaoAgentes).toContain('<th>Propriedade</th><th>Informação</th>')
-    expect(secaoAgentes).toContain('CA da peça facial')
-    expect(secaoAgentes).toContain('90 - 17 = 73 dB(A)')
-    expect(secaoAgentes).toMatch(/Eficácia comprovada<\/th><td[^>]*>Sim/)
+    expect(secaoAgentes).not.toContain('CA da peça facial')
+    expect(secaoEpis).toContain('CA da peça facial')
+    expect(secaoEpis).toContain('90 - 17 = 73 dB(A)')
+    expect(secaoEpis).toMatch(/Eficácia comprovada<\/th><td[^>]*>Sim/)
+    expect(secaoEpis).toContain('EPI reconhecido na diligência')
+  })
+
+  it('segue a estrutura enxuta aprovada com numeração jurídica fixa de 1 a 14', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={pericia} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    const titulos = [
+      '1. Objeto da Perícia e Dados Contratuais',
+      '2. Da Diligência Técnica Pericial',
+      '3. Descrição das Instalações da Reclamada',
+      '4. Critérios Técnicos para Avaliação Pericial',
+      '5. Metodologia de Avaliação',
+      '6. Descrição do Posto de Trabalho, Máquinas, Ferramentas e Produtos',
+      '7. Histórico Laboral, Períodos e Atividades Habituais Exercidas',
+      '8. Dos Equipamentos de Proteção Individual (NR-06)',
+      '9. Das Proteções Coletivas',
+      '10. Análise Técnica dos Agentes Identificados',
+      '11. NR-15 — Conclusão e Fundamentação',
+      '12. NR-16 — Conclusão e Fundamentação',
+      '13. Respostas aos Quesitos Técnicos',
+      '14. Encerramento',
+    ]
+
+    let posicaoAnterior = -1
+    for (const titulo of titulos) {
+      const posicao = html.indexOf(titulo)
+      expect(posicao, titulo).toBeGreaterThan(posicaoAnterior)
+      posicaoAnterior = posicao
+    }
+    expect(html).not.toContain('Relatório Fotográfico')
   })
 })

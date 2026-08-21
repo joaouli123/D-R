@@ -637,6 +637,9 @@ export default function PericiaEditor() {
               { campo: 'objetivoPericia', secao: 'objetivo', label: 'Objetivo da perícia', rows: 4 },
               { campo: 'descricaoEmpresa', secao: 'empresa', label: 'Descrição da empresa', rows: 5 },
               { campo: 'descricaoAmbiente', secao: 'ambiente', label: 'Descrição do ambiente de trabalho', rows: 6 },
+              { campo: 'descricaoPostoTrabalho', secao: 'ambiente', label: 'Descrição do posto de trabalho', rows: 6 },
+              { campo: 'maquinasFerramentas', secao: 'atividades', label: 'Máquinas, equipamentos e ferramentas', rows: 5 },
+              { campo: 'produtosUtilizados', secao: 'atividades', label: 'Produtos utilizados', rows: 5 },
               { campo: 'atividadesFuncoes', secao: 'atividades', label: 'Atividades e funções exercidas', rows: 6 },
             ] as const
           ).map((f) => (
@@ -658,7 +661,7 @@ export default function PericiaEditor() {
               <div className="p-5">
                 <Textarea
                   rows={f.rows}
-                  value={p.tecnico[f.campo] as string}
+                  value={(p.tecnico[f.campo] as string | undefined) ?? ''}
                   onChange={(e) => setT({ [f.campo]: e.target.value } as never)}
                   placeholder="Digite ou insira um texto da sua biblioteca pessoal…"
                 />
@@ -1046,11 +1049,17 @@ export default function PericiaEditor() {
           {(
             [
               { campo: 'normasReferencias', secao: 'generico', label: 'Normas e referências utilizadas', rows: 4 },
-              { campo: 'equipamentosAnalisados', secao: 'generico', label: 'Equipamentos e procedimentos analisados', rows: 4 },
-              { campo: 'informacoesLevantadas', secao: 'generico', label: 'Informações levantadas na vistoria', rows: 5 },
-              { campo: 'analiseTecnica', secao: 'analise', label: 'Análise técnica', rows: 8 },
-              { campo: 'conclusao', secao: 'conclusao', label: 'Conclusão', rows: 6 },
-              { campo: 'observacoesAdicionais', secao: 'generico', label: 'Observações adicionais', rows: 3 },
+              { campo: 'equipamentosAnalisados', secao: 'generico', label: 'Metodologia, equipamentos e procedimentos analisados', rows: 4 },
+              { campo: 'informacoesLevantadas', secao: 'generico', label: 'Histórico laboral e informações levantadas na vistoria', rows: 5 },
+              { campo: 'divergenciasFaticas', secao: 'generico', label: 'Divergências fáticas', rows: 5 },
+              { campo: 'protecoesColetivas', secao: 'analise', label: 'Proteções coletivas', rows: 5 },
+              { campo: 'analiseTecnica', secao: 'analise', label: 'Análise técnica dos agentes', rows: 8 },
+              { campo: 'conclusaoInsalubridade', secao: 'conclusao', label: 'Conclusão — NR-15 (Insalubridade)', rows: 6 },
+              { campo: 'conclusaoPericulosidade', secao: 'conclusao', label: 'Conclusão — NR-16 (Periculosidade)', rows: 6 },
+              { campo: 'respostasQuesitos', secao: 'conclusao', label: 'Respostas aos quesitos', rows: 8 },
+              { campo: 'encerramento', secao: 'conclusao', label: 'Encerramento', rows: 5 },
+              { campo: 'conclusao', secao: 'conclusao', label: 'Conclusão geral (compatibilidade com documentos anteriores)', rows: 6 },
+              { campo: 'observacoesAdicionais', secao: 'generico', label: 'Observações adicionais (compatibilidade)', rows: 3 },
             ] as const
           ).map((f) => (
             <Card key={f.campo}>
@@ -1071,7 +1080,7 @@ export default function PericiaEditor() {
               <div className="p-5">
                 <Textarea
                   rows={f.rows}
-                  value={p.tecnico[f.campo] as string}
+                  value={(p.tecnico[f.campo] as string | undefined) ?? ''}
                   onChange={(e) => setT({ [f.campo]: e.target.value } as never)}
                 />
               </div>

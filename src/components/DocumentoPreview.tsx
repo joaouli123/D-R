@@ -1,23 +1,22 @@
-import { Logo } from '@/components/Logo'
-import type { Empresa, Pericia, Usuario } from '@/types'
+import type { Empresa, Pericia, SecaoFoto, Usuario } from '@/types'
 import { extenso, formatDate, maskCNPJ } from '@/lib/utils'
 import { dadosPapel } from '@/lib/participantes'
 import { montarApresentacaoAgente } from '@/lib/apresentacaoAgente'
 
 // ============================================================
-// MÓDULO H — Montagem automática do documento
-// Reproduz a identidade visual D&R e a estrutura do modelo
-// em Word fornecido pelo Contratante.
+// MÓDULO H — Prévia fiel do Parecer/Laudo.
+// A ordem abaixo é compartilhada conceitualmente com os geradores
+// de PDF e DOCX e segue o modelo enxuto aprovado pelo cliente.
 // ============================================================
 
-function Paragrafos({ texto }: { texto: string }) {
+function Paragrafos({ texto }: { texto?: string | null }) {
   if (!texto?.trim()) {
     return <p className="italic text-ink-400">[Seção não preenchida]</p>
   }
   return (
     <>
-      {texto.split(/\n{2,}/).map((p, i) => (
-        <p key={i}>{p.trim()}</p>
+      {texto.split(/\n{2,}/).map((paragrafo, indice) => (
+        <p key={indice}>{paragrafo.trim()}</p>
       ))}
     </>
   )
@@ -35,62 +34,100 @@ export function DocumentoPreview({
   titulo: string
 }) {
   const t = pericia.tecnico
-  const principal = pericia.reclamadas.find((r) => r.principal)
-  const empresaPrincipal = empresas.find((e) => e.id === principal?.empresaId)
+  const principal = pericia.reclamadas.find((reclamada) => reclamada.principal)
+  const empresaPrincipal = empresas.find((empresa) => empresa.id === principal?.empresaId)
   const outras = pericia.reclamadas
-    .filter((r) => !r.principal)
-    .map((r) => empresas.find((e) => e.id === r.empresaId))
+    .filter((reclamada) => !reclamada.principal)
+    .map((reclamada) => empresas.find((empresa) => empresa.id === reclamada.empresaId))
     .filter(Boolean) as Empresa[]
 
-  const fotosPorSecao = pericia.fotos.reduce<Record<string, typeof pericia.fotos>>((acc, f) => {
-    ;(acc[f.secao] ??= []).push(f)
-    return acc
-  }, {})
+  const fotosOrdenadas = [...pericia.fotos].sort((a, b) => a.ordem - b.ordem)
+  const numeroDaFoto = new Map(fotosOrdenadas.map((foto, indice) => [foto.id, indice + 1]))
+  const fotosDasSecoes = (secoes: SecaoFoto[]) => {
+    const fotos = fotosOrdenadas.filter((foto) => secoes.includes(foto.secao))
+    if (!fotos.length) return null
 
-  const SECAO_LABEL: Record<string, string> = {
-    ambiente: 'Ambiente de Trabalho',
-    atividades: 'Atividades Desenvolvidas',
-    equipamentos: 'Equipamentos e Máquinas',
-    epi: 'Equipamentos de Proteção Individual',
-    produtos: 'Produtos Químicos Utilizados',
-    documentos: 'Documentos Apresentados',
+    return (
+      <div className="fotos space-y-4">
+        {fotos.map((foto) => (
+          <figure key={foto.id} className="break-inside-avoid text-center">
+            <div className="flex items-center justify-center overflow-hidden border border-ink-300 bg-white p-2">
+              {foto.url ? (
+                <img
+                  src={foto.url}
+                  alt={foto.legenda}
+                  className="max-h-[19cm] max-w-full object-contain"
+                />
+              ) : (
+                <span className="py-20 text-[9pt] text-ink-400">Imagem indisponível</span>
+              )}
+            </div>
+            <figcaption className="mt-1 text-[9pt] italic text-ink-600">
+              Figura {numeroDaFoto.get(foto.id)} — {foto.legenda || 'sem legenda'}
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+    )
   }
 
-  let secao = 0
-  const n = () => ++secao
+  const agentesNr15 = t.agentes.filter((agente) => agente.tipo !== 'periculosidade')
+  const agentesNr16 = t.agentes.filter((agente) => agente.tipo === 'periculosidade')
+  const temInsalubridade = pericia.modalidade !== 'periculosidade'
+  const temPericulosidade = pericia.modalidade !== 'insalubridade'
+  const conclusaoNr15 =
+    t.conclusaoInsalubridade?.trim() ||
+    (pericia.modalidade === 'insalubridade' || !t.conclusaoPericulosidade?.trim()
+      ? t.conclusao
+      : '')
+  const conclusaoNr16 =
+    t.conclusaoPericulosidade?.trim() ||
+    (pericia.modalidade === 'periculosidade' ? t.conclusao : '')
+  const encerramento = t.encerramento?.trim() || t.observacoesAdicionais
+
+  const agentesSemProtecoes = (agentes: typeof t.agentes) =>
+    agentes.length ? (
+      <div className="space-y-4">
+        {agentes.map((agente) => {
+          const apresentacao = montarApresentacaoAgente(agente)
+          return (
+            <section key={agente.id} className="agente-bloco">
+              <h3>{apresentacao.titulo}</h3>
+              <table className="agente-propriedades">
+                <thead><tr><th>Propriedade</th><th>Informação</th></tr></thead>
+                <tbody>
+                  {apresentacao.linhas.map((linha) => (
+                    <tr key={linha.rotulo}><th>{linha.rotulo}</th><td>{linha.valor}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )
+        })}
+      </div>
+    ) : (
+      <p className="italic text-ink-400">[Nenhum agente cadastrado]</p>
+    )
+
+  const protecoes = t.agentes.flatMap((agente) => {
+    const apresentacao = montarApresentacaoAgente(agente)
+    return apresentacao.protecoes.length ? [{ agente, apresentacao }] : []
+  })
 
   return (
     <article className="doc-sheet mx-auto w-full max-w-[820px] bg-white px-10 py-12 shadow-card print-area sm:px-14">
-      {/* Cabeçalho com identidade visual */}
-      <header className="mb-10 border-b-2 border-brand-700 pb-5 text-center">
-        <Logo size="lg" />
-        <p className="mt-3 text-[9pt] font-bold uppercase tracking-[0.2em] text-navy-600">
-          Plataforma Inteligente de Perícia Trabalhista
-        </p>
-        {perito && (
-          <p className="mt-2 text-[9pt] text-ink-500">
-            {perito.nome} — {perito.titulo}
-            {perito.registroProfissional ? ` · ${perito.registroProfissional}` : ''}
-          </p>
-        )}
-      </header>
-
-      <h1>{titulo}</h1>
-
-      {/* Endereçamento */}
       <section className="mb-8">
-        <p className="no-indent font-bold">EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO</p>
-        <p className="no-indent font-bold uppercase">{pericia.vara}</p>
-        {t.enderecamento && (
-          <div className="mt-4">
-            <Paragrafos texto={t.enderecamento} />
-          </div>
+        {t.enderecamento?.trim() ? (
+          <Paragrafos texto={t.enderecamento} />
+        ) : (
+          <p className="no-indent font-bold uppercase">
+            EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA{' '}
+            {[pericia.vara, pericia.comarca].filter(Boolean).join(' — ')}
+          </p>
         )}
       </section>
 
-      {/* Identificação */}
-      <h2>{n()}. Identificação do Processo</h2>
-      <table>
+      <table className="ficha-processual">
         <tbody>
           <tr>
             <th className="w-[32%]">Processo nº</th>
@@ -101,6 +138,10 @@ export function DocumentoPreview({
             <td>
               {pericia.vara} — {pericia.comarca}
             </td>
+          </tr>
+          <tr>
+            <th>Tramitação</th>
+            <td>{pericia.modalidade === 'ambas' ? 'Insalubridade e Periculosidade' : pericia.modalidade}</td>
           </tr>
           <tr>
             <th>Reclamante</th>
@@ -125,33 +166,24 @@ export function DocumentoPreview({
               </td>
             </tr>
           ))}
-          <tr>
-            <th>Período contratual</th>
-            <td>
-              {formatDate(pericia.admissao)} a {pericia.demissao ? formatDate(pericia.demissao) : 'atual'}
-            </td>
-          </tr>
-          <tr>
-            <th>Modalidade da perícia</th>
-            <td className="capitalize">
-              {pericia.modalidade === 'ambas'
-                ? 'Insalubridade e Periculosidade'
-                : pericia.modalidade}
-            </td>
-          </tr>
         </tbody>
       </table>
 
-      {/* Apresentação */}
-      <h2>{n()}. Apresentação</h2>
+      <h1>{titulo}</h1>
+      <h3>APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA</h3>
       <Paragrafos texto={t.apresentacao} />
 
-      {/* Objetivo */}
-      <h2>{n()}. Objetivo da Perícia</h2>
+      <h2>1. Objeto da Perícia e Dados Contratuais</h2>
       <Paragrafos texto={t.objetivoPericia} />
+      <table>
+        <tbody>
+          <tr><th>Função / Cargo</th><td>{pericia.funcaoReclamante || '—'}</td></tr>
+          <tr><th>Data de admissão</th><td>{formatDate(pericia.admissao)}</td></tr>
+          <tr><th>Data de desligamento</th><td>{pericia.demissao ? formatDate(pericia.demissao) : 'Contrato vigente'}</td></tr>
+        </tbody>
+      </table>
 
-      {/* Vistoria */}
-      <h2>{n()}. Da Vistoria</h2>
+      <h2>2. Da Diligência Técnica Pericial</h2>
       <p>
         A vistoria técnica foi realizada em {extenso(pericia.dataVistoria)}
         {pericia.horaVistoria ? `, às ${pericia.horaVistoria}` : ''}, no endereço{' '}
@@ -159,162 +191,99 @@ export function DocumentoPreview({
       </p>
       {pericia.participantes.length > 0 && (
         <table>
-          <thead>
-            <tr>
-              <th>Nome do Participante</th>
-              <th className="w-[32%]">Qualificação / Representação</th>
-              <th className="w-[38%]">Atuação no Ato</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Nome do Participante</th><th className="w-[32%]">Qualificação / Representação</th><th className="w-[38%]">Atuação no Ato</th></tr></thead>
           <tbody>
-            {pericia.participantes.map((p) => (
-              <tr key={p.id}>
-                <td>{p.nome}</td>
-                <td>{dadosPapel(p.papel).label}</td>
-                <td>{dadosPapel(p.papel).atuacao}</td>
+            {pericia.participantes.map((participante) => (
+              <tr key={participante.id}>
+                <td>{participante.nome}</td>
+                <td>{dadosPapel(participante.papel).label}</td>
+                <td>{dadosPapel(participante.papel).atuacao}</td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
 
-      {/* Empresa */}
-      <h2>{n()}. Descrição da Empresa</h2>
+      <h2>3. Descrição das Instalações da Reclamada</h2>
       <Paragrafos texto={t.descricaoEmpresa} />
-
-      {/* Ambiente */}
-      <h2>{n()}. Descrição do Ambiente de Trabalho</h2>
+      <h3>3.1. Instalações Físicas</h3>
       <Paragrafos texto={t.descricaoAmbiente} />
+      {fotosDasSecoes(['ambiente'])}
 
-      {/* Atividades */}
-      <h2>{n()}. Atividades e Funções Exercidas</h2>
-      <Paragrafos texto={t.atividadesFuncoes} />
-      {t.periodos.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th className="w-[28%]">Função</th>
-              <th className="w-[18%]">Setor</th>
-              <th className="w-[24%]">Período</th>
-              <th>Atividades</th>
-            </tr>
-          </thead>
-          <tbody>
-            {t.periodos.map((p) => (
-              <tr key={p.id}>
-                <td>{p.funcao}</td>
-                <td>{p.setor || '—'}</td>
-                <td>
-                  {formatDate(p.inicio)} a {p.fim ? formatDate(p.fim) : 'atual'}
-                </td>
-                <td>{p.descricaoAtividades || '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {/* Agentes */}
-      <h2>{n()}. Agentes e Riscos Avaliados</h2>
-      {t.agentes.length === 0 ? (
-        <p className="italic text-ink-400">[Nenhum agente cadastrado]</p>
-      ) : (
-        <div className="space-y-4">
-          {t.agentes.map((agente) => {
-            const apresentacao = montarApresentacaoAgente(agente)
-            return (
-              <section key={agente.id} className="agente-bloco">
-                <h3>{apresentacao.titulo}</h3>
-                <table className="agente-propriedades">
-                  <thead><tr><th>Propriedade</th><th>Informação</th></tr></thead>
-                  <tbody>{apresentacao.linhas.map((linha) => (
-                    <tr key={linha.rotulo}><th>{linha.rotulo}</th><td>{linha.valor}</td></tr>
-                  ))}</tbody>
-                </table>
-                {apresentacao.protecoes.map((protecao) => (
-                  <div key={protecao.titulo} className="protecao-bloco">
-                    <h4>{protecao.titulo}</h4>
-                    <table>
-                      <tbody>{protecao.linhas.map((linha) => (
-                        <tr key={linha.rotulo}><th>{linha.rotulo}</th><td className={linha.destaque ? `resultado-${linha.destaque}` : ''}>{linha.valor}</td></tr>
-                      ))}</tbody>
-                    </table>
-                  </div>
-                ))}
-              </section>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Normas */}
-      <h2>{n()}. Normas e Referências Técnicas Utilizadas</h2>
+      <h2>4. Critérios Técnicos para Avaliação Pericial</h2>
       <Paragrafos texto={t.normasReferencias} />
 
-      {/* Equipamentos */}
-      <h2>{n()}. Equipamentos e Procedimentos Analisados</h2>
+      <h2>5. Metodologia de Avaliação</h2>
       <Paragrafos texto={t.equipamentosAnalisados} />
 
-      {/* Informações levantadas */}
-      <h2>{n()}. Informações Levantadas na Vistoria</h2>
+      <h2>6. Descrição do Posto de Trabalho, Máquinas, Ferramentas e Produtos</h2>
+      <h3>6.1. Características do Posto de Trabalho</h3>
+      <Paragrafos texto={t.descricaoPostoTrabalho || t.descricaoAmbiente} />
+      {fotosDasSecoes(['atividades'])}
+      <h3>6.2. Máquinas, Ferramentas e Equipamentos Utilizados</h3>
+      <Paragrafos texto={t.maquinasFerramentas} />
+      {fotosDasSecoes(['equipamentos'])}
+      <h3>6.3. Constatações da Vistoria Pericial</h3>
       <Paragrafos texto={t.informacoesLevantadas} />
+      <h3>6.4. Produtos Utilizados Habitualmente nas Atividades</h3>
+      <Paragrafos texto={t.produtosUtilizados} />
+      {fotosDasSecoes(['produtos'])}
 
-      {/* Análise */}
-      <h2>{n()}. Análise Técnica</h2>
-      <Paragrafos texto={t.analiseTecnica} />
+      <h2>7. Histórico Laboral, Períodos e Atividades Habituais Exercidas</h2>
+      {t.periodos.length > 0 && (
+        <table>
+          <thead><tr><th className="w-[28%]">Função</th><th className="w-[18%]">Setor</th><th className="w-[24%]">Período</th><th>Atividades</th></tr></thead>
+          <tbody>
+            {t.periodos.map((periodo) => (
+              <tr key={periodo.id}>
+                <td>{periodo.funcao}</td><td>{periodo.setor || '—'}</td>
+                <td>{formatDate(periodo.inicio)} a {periodo.fim ? formatDate(periodo.fim) : 'atual'}</td>
+                <td>{periodo.descricaoAtividades || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <h3>7.1. Atividades Efetivamente Exercidas</h3>
+      <Paragrafos texto={t.atividadesFuncoes} />
+      {temInsalubridade && <><h3>7.2. NR-15 — Avaliação da Exposição Ocupacional</h3>{agentesSemProtecoes(agentesNr15)}</>}
+      {temPericulosidade && <><h3>7.3. NR-16 — Avaliação das Atividades e Operações Perigosas</h3>{agentesSemProtecoes(agentesNr16)}</>}
+      {t.divergenciasFaticas?.trim() && <><h3>7.4. Divergências Fáticas</h3><Paragrafos texto={t.divergenciasFaticas} /></>}
+      {fotosDasSecoes(['documentos'])}
 
-      {/* Fotos */}
-      {pericia.fotos.length > 0 && (
-        <>
-          <h2>{n()}. Relatório Fotográfico</h2>
-          {Object.entries(fotosPorSecao).map(([sec, fotos]) => (
-            <div key={sec} className="mb-4">
-              <h3>{SECAO_LABEL[sec] ?? sec}</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {fotos
-                  .sort((a, b) => a.ordem - b.ordem)
-                  .map((f, i) => (
-                    <figure key={f.id} className="text-center">
-                      <div className="flex aspect-[4/3] items-center justify-center overflow-hidden border border-ink-300 bg-ink-100">
-                        {f.url ? (
-                          <img src={f.url} alt={f.legenda} className="h-full w-full object-cover" />
-                        ) : (
-                          <span className="text-[9pt] text-ink-400">Foto {i + 1}</span>
-                        )}
-                      </div>
-                      <figcaption className="mt-1 text-[9pt] italic text-ink-600">
-                        Figura {i + 1} — {f.legenda || 'sem legenda'}
-                      </figcaption>
-                    </figure>
-                  ))}
-              </div>
+      <h2>8. Dos Equipamentos de Proteção Individual (NR-06)</h2>
+      {protecoes.length ? protecoes.map(({ agente, apresentacao }) => (
+        <section key={agente.id} className="agente-bloco">
+          <h3>{apresentacao.titulo}</h3>
+          {apresentacao.protecoes.map((protecao) => (
+            <div key={protecao.titulo} className="protecao-bloco">
+              <h4>{protecao.titulo}</h4>
+              <table><tbody>{protecao.linhas.map((linha) => (
+                <tr key={linha.rotulo}><th>{linha.rotulo}</th><td className={linha.destaque ? `resultado-${linha.destaque}` : ''}>{linha.valor}</td></tr>
+              ))}</tbody></table>
             </div>
           ))}
-        </>
-      )}
+        </section>
+      )) : <p className="italic text-ink-400">[Nenhum EPI associado aos agentes]</p>}
+      {fotosDasSecoes(['epi'])}
 
-      {/* Conclusão */}
-      <h2>{n()}. Conclusão</h2>
-      <Paragrafos texto={t.conclusao} />
+      <h2>9. Das Proteções Coletivas</h2>
+      <Paragrafos texto={t.protecoesColetivas} />
 
-      {/* Observações */}
-      {t.observacoesAdicionais?.trim() && (
-        <>
-          <h2>{n()}. Observações Adicionais</h2>
-          <Paragrafos texto={t.observacoesAdicionais} />
-        </>
-      )}
+      <h2>10. Análise Técnica dos Agentes Identificados</h2>
+      <Paragrafos texto={t.analiseTecnica} />
 
-      {/* Encerramento e assinatura */}
-      <p className="mt-10 no-indent">
+      {temInsalubridade && <><h2>11. NR-15 — Conclusão e Fundamentação</h2><Paragrafos texto={conclusaoNr15} /></>}
+      {temPericulosidade && <><h2>12. NR-16 — Conclusão e Fundamentação</h2><Paragrafos texto={conclusaoNr16} /></>}
+      {t.respostasQuesitos?.trim() && <><h2>13. Respostas aos Quesitos Técnicos</h2><Paragrafos texto={t.respostasQuesitos} /></>}
+
+      <h2>14. Encerramento</h2>
+      <Paragrafos texto={encerramento} />
+      <p className="mt-6 no-indent">
         Sendo o que se apresenta para o momento, o signatário coloca-se à disposição deste MM. Juízo
         para os esclarecimentos que se fizerem necessários.
       </p>
-
-      <p className="mt-8 no-indent text-center">
-        {pericia.comarca}, {extenso(new Date().toISOString().slice(0, 10))}.
-      </p>
-
+      <p className="mt-8 no-indent text-center">{pericia.comarca}, {extenso(new Date().toISOString().slice(0, 10))}.</p>
       <div className="mt-14 text-center">
         <div className="mx-auto w-72 border-t border-ink-800 pt-1.5">
           <p className="no-indent font-bold">{perito?.nome ?? '—'}</p>
