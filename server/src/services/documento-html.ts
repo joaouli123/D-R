@@ -10,7 +10,6 @@ import {
   MODALIDADE_LABEL,
   ORIGEM_PONTO,
   PAPEL,
-  SECAO_FOTO,
   type TecnicoJson,
   VAZIO,
   css,
@@ -250,9 +249,6 @@ export async function htmlDoParecer(
     .map((r) => porId.get(r.empresaId))
     .filter((e): e is Empresa => Boolean(e))
 
-  let n = 0
-  const secao = () => ++n
-
   const identificacao = `
   <table class="ficha-processual"><tbody>
     ${linha('Processo nº', esc(pericia.numeroProcesso))}
@@ -304,94 +300,129 @@ export async function htmlDoParecer(
       .map((item) => `<tr><th>${esc(item.rotulo)}</th><td${item.destaque ? ` class="resultado-${item.destaque}"` : ''}>${esc(item.valor).replace(/\n/g, '<br>')}</td></tr>`)
       .join('')}</tbody></table>`
 
-  const tabelaAgentes = t.agentes?.length
-    ? t.agentes.map((agente) => {
+  const agentes = t.agentes ?? []
+  const agentesNr15 = agentes.filter((agente) => agente.tipo !== 'periculosidade')
+  const agentesNr16 = agentes.filter((agente) => agente.tipo === 'periculosidade')
+  const temInsalubridade = pericia.modalidade !== 'periculosidade'
+  const temPericulosidade = pericia.modalidade !== 'insalubridade'
+
+  const tabelaAgentes = (lista: typeof agentes) => lista.length
+    ? lista.map((agente) => {
         const apresentacao = montarApresentacaoAgente(agente)
-        const protecoes = apresentacao.protecoes.map((protecao) =>
-          `<div class="protecao-bloco"><h4>${esc(protecao.titulo)}</h4>${tabelaLinhasAgente(protecao.linhas)}</div>`,
-        ).join('')
-        return `<section class="agente-bloco"><div class="agente-resumo"><h3 class="agente-titulo">${esc(apresentacao.titulo)}</h3>${tabelaLinhasAgente(apresentacao.linhas, true)}</div>${protecoes}</section>`
+        return `<section class="agente-bloco"><div class="agente-resumo"><h3 class="agente-titulo">${esc(apresentacao.titulo)}</h3>${tabelaLinhasAgente(apresentacao.linhas, true)}</div></section>`
       }).join('')
     : '<p class="vazio">[Nenhum agente cadastrado]</p>'
 
-  // Fotos viram data URI: o Chromium roda com a rede bloqueada.
-  const porSecao = new Map<string, typeof pericia.fotos>()
-  for (const f of [...pericia.fotos].sort((a, b) => a.ordem - b.ordem)) {
-    const lista = porSecao.get(f.secao) ?? []
-    lista.push(f)
-    porSecao.set(f.secao, lista)
-  }
+  const blocoProtecoes = agentes.flatMap((agente) => {
+    const apresentacao = montarApresentacaoAgente(agente)
+    if (!apresentacao.protecoes.length) return []
+    return [
+      `<section class="agente-bloco"><h3 class="agente-titulo">${esc(apresentacao.titulo)}</h3>${apresentacao.protecoes
+        .map((protecao) =>
+          `<div class="protecao-bloco"><h4>${esc(protecao.titulo)}</h4>${tabelaLinhasAgente(protecao.linhas)}</div>`,
+        )
+        .join('')}</section>`,
+    ]
+  }).join('') || '<p class="vazio">[Nenhum EPI associado aos agentes]</p>'
 
-  let blocoFotos = ''
-  if (pericia.fotos.length) {
-    const partes: string[] = []
-    let numeroFigura = 0
-    for (const [sec, fotos] of porSecao) {
-      const figuras = await Promise.all(
-        fotos.map(async (f) => {
-          const numeroAtual = ++numeroFigura
+  // Fotos viram data URI: o Chromium roda com a rede bloqueada.
+  const fotosOrdenadas = [...pericia.fotos].sort((a, b) => a.ordem - b.ordem)
+  const numeroDaFoto = new Map(fotosOrdenadas.map((foto, indice) => [foto.id, indice + 1]))
+  const fotosDasSecoes = async (secoes: string[]) => {
+    const fotos = fotosOrdenadas.filter((foto) => secoes.includes(foto.secao))
+    if (!fotos.length) return ''
+    const figuras = await Promise.all(
+      fotos.map(async (f) => {
+          const numeroAtual = numeroDaFoto.get(f.id)
           const uri = await comoDataUri(f.arquivo)
           const img = uri
             ? `<img src="${uri}" alt="${esc(f.legenda)}">`
             : `<div style="height:180px;border:1px solid ${css(MARCA.tinta300)};display:flex;align-items:center;justify-content:center;font-size:9pt;color:${css(MARCA.tinta400)}">imagem indisponível</div>`
           return `<figure>${img}<figcaption>Figura ${numeroAtual} — ${esc(f.legenda || 'sem legenda')}</figcaption></figure>`
-        }),
-      )
-      partes.push(`<h3>${esc(SECAO_FOTO[sec] ?? sec)}</h3><div class="fotos">${figuras.join('')}</div>`)
-    }
-    blocoFotos = partes.join('')
+      }),
+    )
+    return `<div class="fotos">${figuras.join('')}</div>`
   }
 
-  // Montado em sequência: cada chamada de secao() acontece na ordem
-  // em que a seção aparece no documento, e a numeração sai contínua.
+  const fotosAmbiente = await fotosDasSecoes(['ambiente'])
+  const fotosAtividades = await fotosDasSecoes(['atividades'])
+  const fotosEquipamentos = await fotosDasSecoes(['equipamentos'])
+  const fotosProdutos = await fotosDasSecoes(['produtos'])
+  const fotosDocumentos = await fotosDasSecoes(['documentos'])
+  const fotosEpis = await fotosDasSecoes(['epi'])
+  const conclusaoNr15 =
+    t.conclusaoInsalubridade?.trim() ||
+    (pericia.modalidade === 'insalubridade' || !t.conclusaoPericulosidade?.trim() ? t.conclusao : '')
+  const conclusaoNr16 =
+    t.conclusaoPericulosidade?.trim() || (pericia.modalidade === 'periculosidade' ? t.conclusao : '')
+  const encerramento = t.encerramento?.trim() || t.observacoesAdicionais
+
   const partes: string[] = [
     enderecamentoDoParecer(pericia.vara, pericia.comarca, t.enderecamento),
     identificacao,
     `<h1>${esc(titulo)}</h1>`,
     '<h3 class="titulo-qualificacao">APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA</h3>',
     blocoConteudo(paragrafos(t.apresentacao)),
-    `<h2>${secao()}. OBJETO DA PERÍCIA E DADOS CONTRATUAIS</h2>`,
+    '<h2>1. OBJETO DA PERÍCIA E DADOS CONTRATUAIS</h2>',
     blocoConteudo(paragrafos(t.objetivoPericia) + dadosContratuais),
-    `<h2>${secao()}. DA DILIGÊNCIA TÉCNICA PERICIAL</h2>`,
+    '<h2>2. DA DILIGÊNCIA TÉCNICA PERICIAL</h2>',
     blocoConteudo(textoVistoria + tabelaParticipantes),
-    `<h2>${secao()}. DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA</h2>`,
+    '<h2>3. DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA</h2>',
     blocoConteudo(
       paragrafos(t.descricaoEmpresa) +
         '<h3>3.1. Instalações Físicas</h3>' +
-        paragrafos(t.descricaoAmbiente),
+        paragrafos(t.descricaoAmbiente) +
+        fotosAmbiente,
     ),
-    `<h2>${secao()}. DESCRIÇÃO DO POSTO DE TRABALHO, MÁQUINAS, FERRAMENTAS E PRODUTOS</h2>`,
-    blocoConteudo(
-      '<h3>4.1. Atividades e Funções Exercidas</h3>' +
-        paragrafos(t.atividadesFuncoes) +
-        tabelaPeriodos,
-    ),
-    `<h2>${secao()}. AGENTES E RISCOS AVALIADOS</h2>`,
-    tabelaAgentes,
-    `<h2>${secao()}. NORMAS E REFERÊNCIAS TÉCNICAS UTILIZADAS</h2>`,
+    '<h2>4. CRITÉRIOS TÉCNICOS PARA AVALIAÇÃO PERICIAL</h2>',
     blocoConteudo(paragrafos(t.normasReferencias)),
-    `<h2>${secao()}. EQUIPAMENTOS E PROCEDIMENTOS ANALISADOS</h2>`,
+    '<h2>5. METODOLOGIA DE AVALIAÇÃO</h2>',
     blocoConteudo(paragrafos(t.equipamentosAnalisados)),
-    `<h2>${secao()}. INFORMAÇÕES LEVANTADAS NA VISTORIA</h2>`,
-    blocoConteudo(paragrafos(t.informacoesLevantadas)),
-    `<h2>${secao()}. ANÁLISE TÉCNICA</h2>`,
+    '<h2>6. DESCRIÇÃO DO POSTO DE TRABALHO, MÁQUINAS, FERRAMENTAS E PRODUTOS</h2>',
+    blocoConteudo(
+      '<h3>6.1. Características do Posto de Trabalho</h3>' +
+        paragrafos(t.descricaoPostoTrabalho || t.descricaoAmbiente) +
+        fotosAtividades +
+        '<h3>6.2. Máquinas, Ferramentas e Equipamentos Utilizados</h3>' +
+        paragrafos(t.maquinasFerramentas) +
+        fotosEquipamentos +
+        '<h3>6.3. Constatações da Vistoria Pericial</h3>' +
+        paragrafos(t.informacoesLevantadas) +
+        '<h3>6.4. Produtos Utilizados Habitualmente nas Atividades</h3>' +
+        paragrafos(t.produtosUtilizados) +
+        fotosProdutos,
+    ),
+    '<h2>7. HISTÓRICO LABORAL, PERÍODOS E ATIVIDADES HABITUAIS EXERCIDAS</h2>',
+    blocoConteudo(
+      tabelaPeriodos +
+        '<h3>7.1. Atividades Efetivamente Exercidas</h3>' +
+        paragrafos(t.atividadesFuncoes) +
+        (temInsalubridade
+          ? '<h3>7.2. NR-15 — Avaliação da Exposição Ocupacional</h3>' + tabelaAgentes(agentesNr15)
+          : '') +
+        (temPericulosidade
+          ? '<h3>7.3. NR-16 — Avaliação das Atividades e Operações Perigosas</h3>' + tabelaAgentes(agentesNr16)
+          : '') +
+        (t.divergenciasFaticas?.trim()
+          ? '<h3>7.4. Divergências Fáticas</h3>' + paragrafos(t.divergenciasFaticas)
+          : '') +
+        fotosDocumentos,
+    ),
+    '<h2>8. DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)</h2>',
+    blocoConteudo(blocoProtecoes + fotosEpis),
+    '<h2>9. DAS PROTEÇÕES COLETIVAS</h2>',
+    blocoConteudo(paragrafos(t.protecoesColetivas)),
+    '<h2>10. ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS</h2>',
     blocoConteudo(paragrafos(t.analiseTecnica)),
   ]
 
-  if (blocoFotos) {
-    partes.push(`<h2>${secao()}. RELATÓRIO FOTOGRÁFICO</h2>`, blocoFotos)
-  }
-
-  partes.push(`<h2>${secao()}. CONCLUSÃO</h2>`, blocoConteudo(paragrafos(t.conclusao)))
-
-  if (t.observacoesAdicionais?.trim()) {
-    partes.push(
-      `<h2>${secao()}. OBSERVAÇÕES ADICIONAIS</h2>`,
-      blocoConteudo(paragrafos(t.observacoesAdicionais)),
-    )
-  }
+  if (temInsalubridade) partes.push('<h2>11. NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO</h2>', blocoConteudo(paragrafos(conclusaoNr15)))
+  if (temPericulosidade) partes.push('<h2>12. NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO</h2>', blocoConteudo(paragrafos(conclusaoNr16)))
+  if (t.respostasQuesitos?.trim()) partes.push('<h2>13. RESPOSTAS AOS QUESITOS TÉCNICOS</h2>', blocoConteudo(paragrafos(t.respostasQuesitos)))
 
   partes.push(
+    '<h2>14. ENCERRAMENTO</h2>',
+    blocoConteudo(paragrafos(encerramento)),
     '<p class="sem-recuo" style="margin-top:24px">Sendo o que se apresenta para o momento, o signatário coloca-se à disposição deste MM. Juízo para os esclarecimentos que se fizerem necessários.</p>',
     assinatura(perito, pericia.comarca),
   )

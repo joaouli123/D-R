@@ -71,7 +71,7 @@ const pericia = {
   dataVistoria: '2026-07-15',
   horaVistoria: '09:30',
   localVistoria: 'Rodovia Anhanguera, km 32 — Cajamar/SP',
-  modalidade: 'insalubridade',
+  modalidade: 'ambas',
   status: 'em_andamento',
   responsavelId: 'usr-1',
   criadoEm: new Date(),
@@ -86,6 +86,9 @@ const pericia = {
       'A Reclamada atua no ramo de usinagem e tratamento de superfície de peças metálicas, ocupando galpão industrial de aproximadamente 4.200 m², com pé-direito de 9 metros.',
     descricaoAmbiente:
       'Galpão industrial de alvenaria com estrutura metálica, piso em concreto polido, cobertura em telhas metálicas, ventilação natural por sheds complementada por exaustão mecânica localizada.',
+    descricaoPostoTrabalho: 'Posto fixo junto aos tornos CNC, com bancada de apoio e circulação delimitada.',
+    maquinasFerramentas: 'Tornos CNC, retífica plana, paquímetro e ponte rolante.',
+    produtosUtilizados: 'Fluido de corte solúvel e óleo lubrificante mineral.',
     atividadesFuncoes: 'Operação de tornos CNC e retíficas, com manuseio de fluidos de corte.',
     periodos: [
       {
@@ -233,10 +236,16 @@ const pericia = {
     equipamentosAnalisados: 'Audiodosímetro digital, termômetro de globo, fichas de EPI.',
     informacoesLevantadas:
       'Foram apresentadas fichas de entrega de EPI referentes ao período de 2019 a 2024, com lacunas em 2018.',
+    divergenciasFaticas: 'Não houve divergência relevante entre as versões apresentadas durante a diligência.',
+    protecoesColetivas: 'Exaustão localizada junto aos pontos de geração de névoa e enclausuramento parcial.',
     analiseTecnica:
       'A exposição habitual a névoas de óleo mineral, sem neutralização comprovada, atrai o enquadramento qualitativo do Anexo 13 da NR-15.\n\nRegistra-se que o simples fornecimento de EPI não elide o adicional, nos termos das Súmulas 80 e 289 do C. TST.',
     conclusao:
       'Diante de todo o exposto, conclui este Perito pela CARACTERIZAÇÃO da insalubridade em GRAU MÉDIO (20%), com fundamento no Anexo 13 da NR-15, durante todo o período laborado.',
+    conclusaoInsalubridade: 'Caracteriza-se a insalubridade em grau médio, nos termos da NR-15.',
+    conclusaoPericulosidade: 'Não se caracteriza a periculosidade, nos termos da NR-16.',
+    respostasQuesitos: 'Os quesitos técnicos foram respondidos conforme os elementos colhidos na diligência.',
+    encerramento: 'O presente parecer é encerrado com as conclusões técnicas acima consignadas. Aspas "duplas", <tags> e & comercial.',
     observacoesAdicionais: 'Aspas "duplas", <tags> e & comercial para testar o escape.',
   },
   reclamadas: [{ id: 'rec-1', periciaId: 'per-1', empresaId: 'emp-1', principal: true }],
@@ -449,7 +458,7 @@ async function main() {
     'a assinatura da impugnação não deve ficar órfã em uma segunda página',
   )
   assert.ok(
-    (saidasVisuais.find((saida) => saida.nome === 'parecer')?.paginasPdf ?? Infinity) <= 7,
+    (saidasVisuais.find((saida) => saida.nome === 'parecer')?.paginasPdf ?? Infinity) <= 8,
     'o parecer de teste não deve criar uma página exclusiva para a assinatura',
   )
   assert.match(
@@ -480,7 +489,7 @@ async function main() {
   assert.doesNotMatch(htmlParecer, /undefined|null/)
 
   const secaoAgentes = htmlParecer.match(
-    /<h2>\d+\. Agentes e Riscos Avaliados<\/h2>([\s\S]*?)<h2>\d+\. Normas/i,
+    /<h2>7\. HISTÓRICO LABORAL[\s\S]*?<h3>7\.2\. NR-15[^<]*<\/h3>([\s\S]*?)<h2>8\. DOS EQUIPAMENTOS/i,
   )?.[1]
   assert.ok(secaoAgentes, 'seção de agentes não encontrada')
   assert.match(secaoAgentes, /class="agente-bloco"/)
@@ -492,6 +501,13 @@ async function main() {
   assert.doesNotMatch(secaoAgentes, /class="tabela-agentes"/)
   assert.match(secaoAgentes, /<th>Propriedade<\/th><th>Informação<\/th>/)
   assert.doesNotMatch(secaoAgentes, /<th>CAS<\/th><td>não aplicável<\/td>/)
+  assert.doesNotMatch(secaoAgentes, /CA da peça facial|CA do cartucho\/filtro|90 - 17 = 73 dB\(A\)/)
+
+  const secaoEpis = htmlParecer.match(
+    /<h2>8\. DOS EQUIPAMENTOS[^<]*<\/h2>([\s\S]*?)<h2>9\. DAS PROTEÇÕES COLETIVAS<\/h2>/i,
+  )?.[1]
+  assert.ok(secaoEpis, 'seção de EPI não encontrada')
+  assert.match(secaoEpis, /CA da peça facial|CA do cartucho\/filtro|90 - 17 = 73 dB\(A\)/)
 
   assert.match(htmlParecer, /font-family: Arial, sans-serif/)
   assert.match(htmlParecer, /h1 \{[^}]*font-size: 18pt/s)
@@ -528,6 +544,29 @@ async function main() {
       ordemAbertura.every((indice, i) => i === 0 || indice > ordemAbertura[i - 1]),
     `abertura do parecer fora da estrutura aprovada: ${ordemAbertura.join(', ')}`,
   )
+
+  const estruturaEnxuta = [
+    '1. OBJETO DA PERÍCIA E DADOS CONTRATUAIS',
+    '2. DA DILIGÊNCIA TÉCNICA PERICIAL',
+    '3. DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA',
+    '4. CRITÉRIOS TÉCNICOS PARA AVALIAÇÃO PERICIAL',
+    '5. METODOLOGIA DE AVALIAÇÃO',
+    '6. DESCRIÇÃO DO POSTO DE TRABALHO, MÁQUINAS, FERRAMENTAS E PRODUTOS',
+    '7. HISTÓRICO LABORAL, PERÍODOS E ATIVIDADES HABITUAIS EXERCIDAS',
+    '8. DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)',
+    '9. DAS PROTEÇÕES COLETIVAS',
+    '10. ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS',
+    '11. NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO',
+    '12. NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO',
+    '13. RESPOSTAS AOS QUESITOS TÉCNICOS',
+    '14. ENCERRAMENTO',
+  ].map((trecho) => corpoParecer.indexOf(trecho))
+  assert.ok(
+    estruturaEnxuta.every((indice) => indice >= 0) &&
+      estruturaEnxuta.every((indice, i) => i === 0 || indice > estruturaEnxuta[i - 1]),
+    `estrutura enxuta fora da ordem aprovada: ${estruturaEnxuta.join(', ')}`,
+  )
+  assert.doesNotMatch(corpoParecer, /RELATÓRIO FOTOGRÁFICO/)
 
   // O escape precisa ter neutralizado a <tag> plantada em observacoesAdicionais.
   const escapou = htmlParecer.includes('&lt;tags&gt;') && !htmlParecer.includes('<tags>')
