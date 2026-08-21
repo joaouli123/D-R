@@ -814,12 +814,15 @@ export default function PericiaEditor() {
                 const regraAnexo = obterRegraAnexo(a.anexoNr15)
                 const agenteFixo = Boolean(regraAnexo?.agenteFixo)
                 const grauFixo = regraAnexo?.grausPermitidos.length === 1
+                const exibeCas = regraAnexo?.exibeCas ?? true
                 return (
                 <div key={a.id} className="rounded-lg border border-ink-200 border-l-4 border-l-navy-700 p-3">
                   <ol aria-label="Fluxo técnico do agente" className="mb-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                     <li className="text-navy-700">Agente</li><li aria-hidden="true">→</li><li>Medição</li><li aria-hidden="true">→</li><li>Proteção</li>
                   </ol>
-                  <div className="grid gap-3 md:grid-cols-[1.4fr_120px_130px_130px_auto]">
+                  <div className={`grid gap-3 ${exibeCas
+                    ? 'md:grid-cols-[minmax(220px,1.4fr)_minmax(120px,0.65fr)_minmax(230px,1fr)_minmax(130px,0.65fr)_auto]'
+                    : 'md:grid-cols-[minmax(240px,1.5fr)_minmax(240px,1fr)_minmax(150px,0.7fr)_auto]'}`}>
                     <Input
                       label="Agente"
                       value={regraAnexo?.agenteFixo ?? a.nome}
@@ -832,7 +835,7 @@ export default function PericiaEditor() {
                         })
                       }
                     />
-                    {(regraAnexo?.exibeCas ?? true) && <Input
+                    {exibeCas && <Input
                       label="CAS"
                       value={a.cas ?? ''}
                       disabled={referenciaNormativaSelecionada}

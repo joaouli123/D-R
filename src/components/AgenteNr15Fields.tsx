@@ -4,6 +4,7 @@ import { anexoNr15PorId, ATIVIDADES_ANEXO_13, ATIVIDADES_ANEXO_14, SUBSTANCIAS_A
 import type { ReferenciaNormativa, UnidadeMedicao } from '@/content/nr15/tipos'
 import { normalizarNumeroMedido, unidadesDisponiveis } from '@/lib/medicoes'
 import { aplicarReferencia } from '@/lib/nr15'
+import { calcularProtecaoAuditiva } from '@/lib/protecaoAuditiva'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
 import type { AgenteAvaliado } from '@/types'
 import { Input, Select } from './ui'
@@ -125,6 +126,15 @@ function CamposGenericos({
   const regra = obterRegraAnexo(agente.anexoNr15)
   const [valorDigitado, setValorDigitado] = useState(agente.valorMedido ?? '')
   const [erroValor, setErroValor] = useState('')
+  const unidadeMedicao = agente.unidadeMedicao ?? regra?.unidadePadrao
+  const epiAuditivo = agente.epis?.[0]
+  const medicaoRuido = agente.valorMedido?.trim() ? Number(agente.valorMedido) : undefined
+  const resultadoProtecao = regra?.calculo === 'ruido_nrrsf'
+    && medicaoRuido != null
+    && Number.isFinite(medicaoRuido)
+    && epiAuditivo
+    ? calcularProtecaoAuditiva(medicaoRuido, epiAuditivo.nivelProtecaoDb, unidadeMedicao)
+    : undefined
 
   useEffect(() => setValorDigitado(agente.valorMedido ?? ''), [agente.valorMedido])
 
@@ -165,7 +175,7 @@ function CamposGenericos({
         {regra?.exibeMedicao && (
           <>
             <Input
-              label="Medição registrada"
+              label={`Medição registrada${unidadeMedicao ? ` (${unidadeMedicao})` : ''}`}
               aria-label="Medição registrada"
               inputMode="decimal"
               value={valorDigitado}
@@ -174,8 +184,19 @@ function CamposGenericos({
               onChange={(evento) => { setValorDigitado(evento.target.value); setErroValor('') }}
               onBlur={confirmarValor}
             />
-            {regra.unidadePadrao && (
-              <Input label="Unidade" aria-label="Unidade da medição" value={regra.unidadePadrao} readOnly hint="Definida pelo anexo selecionado." />
+            {regra.calculo === 'ruido_nrrsf' ? (
+              <Input
+                label="Resultado após proteção"
+                aria-label="Resultado após proteção"
+                value={resultadoProtecao ? `${resultadoProtecao.resultadoDbA} ${resultadoProtecao.unidade}` : ''}
+                placeholder={!agente.valorMedido ? 'Informe a medição' : 'Associe um protetor auditivo'}
+                readOnly
+                hint={resultadoProtecao
+                  ? `${resultadoProtecao.medicaoDbA} − ${resultadoProtecao.atenuacaoDb} = ${resultadoProtecao.resultadoDbA} ${resultadoProtecao.unidade} · ${resultadoProtecao.eficaz ? 'Proteção eficaz' : 'Proteção ineficaz'}`
+                  : 'O resultado será calculado automaticamente com o NRRsf do EPI.'}
+              />
+            ) : regra.unidadePadrao && (
+              <Input label="Unidade" aria-label="Unidade da medição" value={unidadeMedicao} readOnly hint="Definida pelo anexo selecionado." />
             )}
           </>
         )}

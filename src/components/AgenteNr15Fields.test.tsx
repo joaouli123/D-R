@@ -28,12 +28,31 @@ describe('campos específicos do Anexo 1', () => {
 
     const medicao = screen.getByRole('textbox', { name: 'Medição registrada' })
     expect(medicao.getAttribute('inputmode')).toBe('decimal')
-    expect(screen.getByDisplayValue('dB(A)').getAttribute('readonly')).not.toBeNull()
+    expect(screen.getByText('Medição registrada (dB(A))')).toBeDefined()
+    expect(screen.queryByRole('textbox', { name: 'Unidade da medição' })).toBeNull()
     expect(screen.getByDisplayValue('85 dB(A) para jornada de 8h/dia (q=5)').getAttribute('readonly')).not.toBeNull()
 
     await user.type(medicao, '90,5')
     await user.tab()
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ valorMedido: '90.5', unidadeMedicao: 'dB(A)' }))
+  })
+
+  it('mostra no lugar da unidade o resultado calculado após a proteção', () => {
+    render(<AgenteNr15Fields agente={{
+      ...RUIDO,
+      valorMedido: '90',
+      epis: [{
+        categoria: 'Protetor auditivo',
+        modelo: 'CA 11882',
+        caUnico: '11882',
+        nivelProtecaoDb: 17,
+      }],
+    }} onChange={() => undefined} />)
+
+    const resultado = screen.getByRole('textbox', { name: 'Resultado após proteção' }) as HTMLInputElement
+    expect(resultado.value).toBe('73 dB(A)')
+    expect(resultado.readOnly).toBe(true)
+    expect(screen.getByText('90 − 17 = 73 dB(A) · Proteção eficaz')).toBeDefined()
   })
 
   it('não mostra medição numérica para anexo qualitativo', () => {
