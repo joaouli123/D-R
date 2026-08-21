@@ -2,6 +2,7 @@ import { labelAnexoNr15 } from '@/content/anexosNr15'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
 import type { AgenteAvaliado, EpiSelecionado } from '@/types'
 
+import { usaAtenuacaoRuido } from './nr15'
 import { calcularProtecaoAuditiva } from './protecaoAuditiva'
 
 export interface LinhaAgente {
@@ -64,10 +65,10 @@ function linhasProtecao(
     ...formatarCasEpi(epi),
   ].filter((linha): linha is LinhaAgente => Boolean(linha))
 
-  if (agente.anexoNr15 === 'ANEXO_01') {
+  if (usaAtenuacaoRuido(agente)) {
     const medicao = agente.valorMedido == null ? Number.NaN : Number(agente.valorMedido)
     const resultado = Number.isFinite(medicao)
-      ? calcularProtecaoAuditiva(medicao, epi.nivelProtecaoDb)
+      ? calcularProtecaoAuditiva(medicao, epi.nivelProtecaoDb, agente.unidadeMedicao)
       : null
     linhas.push({
       rotulo: 'NRRsf',
@@ -76,8 +77,8 @@ function linhasProtecao(
     })
     if (resultado) {
       linhas.push(
-        { rotulo: 'Cálculo', valor: `${numeroDocumento(resultado.medicaoDbA)} - ${numeroDocumento(resultado.atenuacaoDb)} = ${numeroDocumento(resultado.resultadoDbA)} dB(A)` },
-        { rotulo: 'Conclusão', valor: resultado.eficaz ? 'Proteção eficaz' : 'Proteção ineficaz', destaque: resultado.eficaz ? 'positivo' : 'negativo' },
+        { rotulo: 'Cálculo', valor: `${numeroDocumento(resultado.medicaoDbA)} - ${numeroDocumento(resultado.atenuacaoDb)} = ${numeroDocumento(resultado.resultadoDbA)} ${resultado.unidade}` },
+        { rotulo: 'Conclusão', valor: `${resultado.eficaz ? 'Proteção eficaz' : 'Proteção ineficaz'} (limite de ${numeroDocumento(resultado.limiteDb)} ${resultado.unidade})`, destaque: resultado.eficaz ? 'positivo' : 'negativo' },
       )
     } else {
       linhas.push({ rotulo: 'Cálculo', valor: 'Medição registrada não informada', destaque: 'aviso' })

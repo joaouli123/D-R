@@ -293,6 +293,29 @@ function anexoLegivel(anexo?: string): string {
   return anexo ? (rotulos[anexo] ?? anexo) : ''
 }
 
+/**
+ * Anexos julgados pela conta "medição − NRRsf": o 1 (contínuo ou
+ * intermitente) e o 2 (impacto). Espelha `usaAtenuacaoRuido` do front —
+ * os dois precisam mudar juntos, ou a tela e o laudo divergem.
+ */
+const ANEXOS_RUIDO = new Set(['ANEXO_01', 'ANEXO_02'])
+
+/**
+ * O limite vem da unidade: 85 dB(A) no Anexo 1; no Anexo 2, 130 dB(C)
+ * na resposta Impacto ou 120 dB(Linear) na resposta Fast.
+ */
+const LIMITE_RUIDO_POR_UNIDADE = {
+  'dB(A)': 85,
+  'dB(C)': 130,
+  'dB(Linear)': 120,
+} as const
+
+type UnidadeRuido = keyof typeof LIMITE_RUIDO_POR_UNIDADE
+
+function unidadeRuido(unidade?: string): UnidadeRuido {
+  return unidade && unidade in LIMITE_RUIDO_POR_UNIDADE ? (unidade as UnidadeRuido) : 'dB(A)'
+}
+
 function protecaoDocumento(
   agente: AgenteDocumento,
   epi: EpiDocumento,
@@ -312,7 +335,9 @@ function protecaoDocumento(
     ].filter((linha): linha is LinhaApresentacaoAgente => Boolean(linha)),
   ].filter((linha): linha is LinhaApresentacaoAgente => Boolean(linha))
 
-  if (agente.anexoNr15 === 'ANEXO_01') {
+  if (ANEXOS_RUIDO.has(agente.anexoNr15 ?? '')) {
+    const unidade = unidadeRuido(agente.unidadeMedicao)
+    const limite = LIMITE_RUIDO_POR_UNIDADE[unidade]
     const medicao = agente.valorMedido == null ? Number.NaN : Number(agente.valorMedido)
     const atenuacao = epi.nivelProtecaoDb ?? 0
     const resultado = Number.isFinite(medicao) ? Number((medicao - atenuacao).toFixed(2)) : null
@@ -324,10 +349,14 @@ function protecaoDocumento(
     if (resultado == null) {
       linhas.push({ rotulo: 'Cálculo', valor: 'Medição registrada não informada', destaque: 'aviso' })
     } else {
-      const eficaz = resultado <= 85
+      const eficaz = resultado <= limite
       linhas.push(
-        { rotulo: 'Cálculo', valor: `${numeroDocumento(medicao)} - ${numeroDocumento(atenuacao)} = ${numeroDocumento(resultado)} dB(A)` },
-        { rotulo: 'Conclusão', valor: eficaz ? 'Proteção eficaz' : 'Proteção ineficaz', destaque: eficaz ? 'positivo' : 'negativo' },
+        { rotulo: 'Cálculo', valor: `${numeroDocumento(medicao)} - ${numeroDocumento(atenuacao)} = ${numeroDocumento(resultado)} ${unidade}` },
+        {
+          rotulo: 'Conclusão',
+          valor: `${eficaz ? 'Proteção eficaz' : 'Proteção ineficaz'} (limite de ${numeroDocumento(limite)} ${unidade})`,
+          destaque: eficaz ? 'positivo' : 'negativo',
+        },
       )
     }
   } else {
@@ -338,7 +367,7 @@ function protecaoDocumento(
 }
 
 export function montarApresentacaoAgente(agente: AgenteDocumento): ApresentacaoAgenteDocumento {
-  const ruido = agente.anexoNr15 === 'ANEXO_01'
+  const ruido = ANEXOS_RUIDO.has(agente.anexoNr15 ?? '')
   const qualitativo = agente.criterio === 'qualitativo'
   const linhas: LinhaApresentacaoAgente[] = [
     ...(agente.anexoNr15 ? [{ rotulo: 'Anexo NR-15', valor: anexoLegivel(agente.anexoNr15) }] : []),

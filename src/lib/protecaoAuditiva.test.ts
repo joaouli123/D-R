@@ -10,6 +10,8 @@ describe('calcularProtecaoAuditiva', () => {
       resultadoDbA: 73,
       eficaz: true,
       nivelInformado: true,
+      unidade: 'dB(A)',
+      limiteDb: 85,
     })
   })
 
@@ -20,6 +22,8 @@ describe('calcularProtecaoAuditiva', () => {
       resultadoDbA: 86,
       eficaz: false,
       nivelInformado: true,
+      unidade: 'dB(A)',
+      limiteDb: 85,
     })
   })
 
@@ -30,6 +34,35 @@ describe('calcularProtecaoAuditiva', () => {
       resultadoDbA: 99,
       eficaz: false,
       nivelInformado: false,
+      unidade: 'dB(A)',
+      limiteDb: 85,
+    })
+  })
+
+  it('usa o limite do ruído de impacto quando a medição é em dB(C)', () => {
+    // 125 dB(C) seria "ineficaz" pelo limite do contínuo (85), mas o
+    // Anexo 2 tolera até 130 dB(C) na resposta Impacto.
+    expect(calcularProtecaoAuditiva(140, 17, 'dB(C)')).toMatchObject({
+      resultadoDbA: 123,
+      eficaz: true,
+      unidade: 'dB(C)',
+      limiteDb: 130,
+    })
+  })
+
+  it('usa 120 dB na resposta Fast (dB(Linear))', () => {
+    expect(calcularProtecaoAuditiva(140, 17, 'dB(Linear)')).toMatchObject({
+      resultadoDbA: 123,
+      eficaz: false,
+      unidade: 'dB(Linear)',
+      limiteDb: 120,
+    })
+  })
+
+  it('cai no limite do Anexo 1 quando a unidade não é de ruído', () => {
+    expect(calcularProtecaoAuditiva(90, 0, 'mg/m³')).toMatchObject({
+      unidade: 'dB(A)',
+      limiteDb: 85,
     })
   })
 })

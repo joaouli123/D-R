@@ -142,9 +142,35 @@ describe('EpiSelector', () => {
 
     expect(api.epis.listar).toHaveBeenCalledWith({ anexo: 'Anexo 1' })
     expect(screen.getByText('90 - 17 = 73 dB(A)')).toBeDefined()
-    expect(screen.getByText('Proteção eficaz')).toBeDefined()
+    expect(screen.getByText(/Proteção eficaz · limite 85 dB\(A\)/)).toBeDefined()
+    expect(screen.getByText('Atenuação (NRRsf): 17 dB')).toBeDefined()
     expect(screen.getByText('90 - 0 = 90 dB(A)')).toBeDefined()
+    expect(screen.getByText('Atenuação (NRRsf): não informada')).toBeDefined()
     expect(screen.getByText(/NRRsf não informado; considerado 0 dB/)).toBeDefined()
+  })
+
+  it('calcula o ruído de impacto pelo limite do Anexo 2', async () => {
+    vi.mocked(api.epis.listar).mockResolvedValue([])
+    const agente: AgenteAvaliado = {
+      id: 'impacto-1',
+      nome: 'Ruído de impacto',
+      tipo: 'fisico',
+      criterio: 'quantitativo',
+      anexoNr15: 'ANEXO_02',
+      valorMedido: '135',
+      unidadeMedicao: 'dB(C)',
+      epis: [
+        { categoria: 'Proteção auditiva', modelo: 'CA 11882', marca: 'Não informada', caUnico: '11882', nivelProtecaoDb: 17, metodoAtenuacao: 'NRRsf' },
+      ],
+    }
+
+    render(<EpiSelector agente={agente} onChange={() => undefined} />)
+
+    expect(api.epis.listar).toHaveBeenCalledWith({ anexo: 'Anexo 2' })
+    expect(screen.getByText('Atenuação (NRRsf): 17 dB')).toBeDefined()
+    expect(screen.getByText('135 - 17 = 118 dB(C)')).toBeDefined()
+    // 118 passaria longe do limite do Anexo 1 (85); aqui o limite é 130.
+    expect(screen.getByText(/Proteção eficaz · limite 130 dB\(C\)/)).toBeDefined()
   })
 
   it('permite informar NRRsf ao cadastrar proteção auditiva manual', async () => {

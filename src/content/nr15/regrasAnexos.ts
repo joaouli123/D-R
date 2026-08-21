@@ -32,7 +32,18 @@ const REGRAS_ESPECIFICAS: Record<string, Partial<RegraAnexoNr15>> = {
     calculo: 'ruido_nrrsf',
     categoriaProtecao: 'Proteção auditiva',
   },
-  ANEXO_02: { agenteFixo: 'Ruído de impacto', unidades: ['dB(C)', 'dB(Linear)'], unidadePadrao: 'dB(C)' },
+  // Mesma lógica do Anexo 1 (medição - NRRsf), só que o limite vem da
+  // unidade: 130 dB(C) na resposta Impacto, 120 dB(Linear) na Fast.
+  ANEXO_02: {
+    agenteFixo: 'Ruído de impacto',
+    grausPermitidos: ['medio'],
+    unidades: ['dB(C)', 'dB(Linear)'],
+    unidadePadrao: 'dB(C)',
+    exibeCas: false,
+    exibeMedicao: true,
+    calculo: 'ruido_nrrsf',
+    categoriaProtecao: 'Proteção auditiva',
+  },
   ANEXO_03: { agenteFixo: 'Calor', unidades: ['IBUTG °C'], unidadePadrao: 'IBUTG °C' },
   ANEXO_05: { agenteFixo: 'Radiações ionizantes', unidades: ['mSv/ano'], unidadePadrao: 'mSv/ano' },
   ANEXO_07: { agenteFixo: 'Radiações não ionizantes', exibeMedicao: false },

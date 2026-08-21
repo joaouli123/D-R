@@ -43,6 +43,15 @@ export function categoriaProtecaoDoAgente(
   return REFERENCIAS_NR15.find((referencia) => referencia.id === agente.referenciaNormativaId)?.categoriaProtecao
 }
 
+/**
+ * Anexos em que a eficácia sai da conta "medição − NRRsf": o 1 (ruído
+ * contínuo ou intermitente) e o 2 (ruído de impacto). Quem decide é a
+ * regra do anexo, não uma lista de ids espalhada pela interface.
+ */
+export function usaAtenuacaoRuido(agente: Pick<AgenteAvaliado, 'anexoNr15'>): boolean {
+  return obterRegraAnexo(agente.anexoNr15)?.calculo === 'ruido_nrrsf'
+}
+
 export function aplicarAnexo(agente: AgenteAvaliado, anexoId: string): AgenteAvaliado {
   const anexo = anexoNr15PorId(anexoId)
   const regra = obterRegraAnexo(anexoId)

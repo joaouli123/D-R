@@ -30,9 +30,25 @@ describe('montarApresentacaoAgente', () => {
     expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'Descrição', valor: 'Protetor CA 11882' })
     expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'Validade do CA', valor: '31/12/2028' })
     expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'Cálculo', valor: '90 - 17 = 73 dB(A)' })
-    expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'Conclusão', valor: 'Proteção eficaz', destaque: 'positivo' })
+    expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'Conclusão', valor: 'Proteção eficaz (limite de 85 dB(A))', destaque: 'positivo' })
     expect(apresentacao.protecoes[1]?.linhas).toContainEqual({ rotulo: 'NRRsf', valor: 'Não informado — considerado 0 dB', destaque: 'aviso' })
     expect(apresentacao.protecoes[1]?.linhas).toContainEqual({ rotulo: 'Cálculo', valor: '90 - 0 = 90 dB(A)' })
+  })
+
+  it('aplica a mesma lógica ao ruído de impacto, com o limite do Anexo 2', () => {
+    const apresentacao = montarApresentacaoAgente({
+      ...ruido,
+      anexoNr15: 'ANEXO_02',
+      nome: 'Ruído de impacto',
+      limiteTolerancia: '130 dB(C) (resposta Impacto) ou 120 dB(Linear) (resposta Fast)',
+      valorMedido: '135',
+      unidadeMedicao: 'dB(C)',
+    })
+
+    expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'NRRsf', valor: '17 dB' })
+    expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'Cálculo', valor: '135 - 17 = 118 dB(C)' })
+    expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'Conclusão', valor: 'Proteção eficaz (limite de 130 dB(C))', destaque: 'positivo' })
+    expect(apresentacao.protecoes[0]?.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'Eficácia comprovada' }))
   })
 
   it('mantém CAS e eficácia manual para agente químico legado', () => {

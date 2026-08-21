@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { AlertTriangle, BadgeCheck, History, Plus, Search, ShieldCheck, Trash2, X } from 'lucide-react'
 
 import { Button, Input } from '@/components/ui'
-import { categoriaProtecaoDoAgente } from '@/lib/nr15'
+import { categoriaProtecaoDoAgente, usaAtenuacaoRuido } from '@/lib/nr15'
 import { calcularProtecaoAuditiva } from '@/lib/protecaoAuditiva'
 import { formatDate } from '@/lib/utils'
 import * as api from '@/services/api'
@@ -130,9 +130,12 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
   const selecionados = agente.epis ?? []
   const limiteAtingido = selecionados.length >= 10
   const categoriaProtecao = categoriaProtecaoDoAgente(agente)
-  const ehRuidoContinuo = agente.anexoNr15 === 'ANEXO_01'
+  const ehRuido = usaAtenuacaoRuido(agente)
   const ehProdutoQuimico = agente.tipo === 'quimico'
   const medicaoRuido = agente.valorMedido == null ? null : Number(agente.valorMedido)
+  // dB(A) no Anexo 1; dB(C) ou dB(Linear) no Anexo 2 — cada um com o
+  // seu limite de tolerância.
+  const unidadeRuido = agente.unidadeMedicao
   const dataVistoria = dataReferencia?.slice(0, 10) || ''
   const campoCa: CampoCa = ehProdutoQuimico ? campoCaQuimico : 'caUnico'
   const baseVazia = statusBase != null && statusBase.totais.homologacoes === 0
@@ -300,9 +303,9 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
       ...(!ehProdutoQuimico && manual.caUnico.trim() ? { caUnico: manual.caUnico.trim() } : {}),
       ...(ehProdutoQuimico && manual.caPecaFacial.trim() ? { caPecaFacial: manual.caPecaFacial.trim() } : {}),
       ...(ehProdutoQuimico && manual.caFiltroCartucho.trim() ? { caFiltroCartucho: manual.caFiltroCartucho.trim() } : {}),
-      ...(ehRuidoContinuo && nivelProtecaoDb != null
+      ...(ehRuido && nivelProtecaoDb != null
         ? { nivelProtecaoDb, metodoAtenuacao: 'NRRsf' as const }
-        : ehRuidoContinuo ? { nivelProtecaoDb: null } : {}),
+        : ehRuido ? { nivelProtecaoDb: null } : {}),
     })
     setManual(MANUAL_VAZIO)
     setErroManual('')
@@ -323,7 +326,7 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
           <div className="min-w-0">
             <h4 id={tituloId} className="text-sm font-semibold text-ink-900">Proteção associada</h4>
             <p className="mt-0.5 text-xs leading-5 text-ink-500">
-              {ehRuidoContinuo
+              {ehRuido
                 ? 'Digite o CA da etiqueta. O sistema busca na base oficial, desconta o NRRsf da medição e avalia cada CA separadamente.'
                 : 'Digite o CA da etiqueta e o sistema preenche o equipamento pela base oficial do Ministério do Trabalho.'}
             </p>
@@ -506,12 +509,12 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
                   {erroNrrsf && <p role="alert" className="mt-2 text-[11px] text-red-700">{erroNrrsf}</p>}
                   {avisoNrrsf && <p role="status" className="mt-2 text-[11px] text-emerald-800">{avisoNrrsf}</p>}
 
-                  {ehRuidoContinuo && medicaoRuido != null && Number.isFinite(medicaoRuido) && (() => {
-                    const previa = calcularProtecaoAuditiva(medicaoRuido, nrrsfAtual)
+                  {ehRuido && medicaoRuido != null && Number.isFinite(medicaoRuido) && (() => {
+                    const previa = calcularProtecaoAuditiva(medicaoRuido, nrrsfAtual, unidadeRuido)
                     return (
                       <p className={`mt-2 rounded-md px-2 py-1.5 text-[11px] font-semibold ${previa.eficaz ? 'bg-emerald-50 text-emerald-900' : 'bg-red-50 text-red-900'}`}>
-                        Com este CA: {previa.medicaoDbA} − {previa.atenuacaoDb} = {previa.resultadoDbA} dB(A) ·{' '}
-                        {previa.eficaz ? 'proteção eficaz' : 'proteção ineficaz'}
+                        Com este CA: {previa.medicaoDbA} − {previa.atenuacaoDb} = {previa.resultadoDbA} {previa.unidade} ·{' '}
+                        {previa.eficaz ? 'proteção eficaz' : 'proteção ineficaz'} (limite {previa.limiteDb} {previa.unidade})
                       </p>
                     )
                   })()}
@@ -565,12 +568,21 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
                 </p>
                 {epi.validadeCa && <p className="text-xs text-ink-600">Validade do CA: {epi.validadeCa}</p>}
                 {descricaoCas(epi).map((ca) => <p key={ca} className="text-xs text-ink-500">{ca}</p>)}
-                {ehRuidoContinuo && medicaoRuido != null && Number.isFinite(medicaoRuido) && (() => {
-                  const resultado = calcularProtecaoAuditiva(medicaoRuido, epi.nivelProtecaoDb)
+                {/* A atenuação em linha própria: dentro da conta ela some, e é
+                    o número que o perito confere contra a etiqueta do CA. */}
+                {ehRuido && (
+                  <p className="text-xs font-semibold text-navy-700">
+                    {epi.nivelProtecaoDb != null
+                      ? `Atenuação (NRRsf): ${epi.nivelProtecaoDb} dB`
+                      : 'Atenuação (NRRsf): não informada'}
+                  </p>
+                )}
+                {ehRuido && medicaoRuido != null && Number.isFinite(medicaoRuido) && (() => {
+                  const resultado = calcularProtecaoAuditiva(medicaoRuido, epi.nivelProtecaoDb, unidadeRuido)
                   return (
                     <div className={`mt-2 rounded-md border px-2.5 py-2 ${resultado.eficaz ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-red-200 bg-red-50 text-red-900'}`}>
-                      <p className="text-xs font-semibold">{resultado.medicaoDbA} - {resultado.atenuacaoDb} = {resultado.resultadoDbA} dB(A)</p>
-                      <p className="text-xs font-bold">{resultado.eficaz ? 'Proteção eficaz' : 'Proteção ineficaz'}</p>
+                      <p className="text-xs font-semibold">{resultado.medicaoDbA} - {resultado.atenuacaoDb} = {resultado.resultadoDbA} {resultado.unidade}</p>
+                      <p className="text-xs font-bold">{resultado.eficaz ? 'Proteção eficaz' : 'Proteção ineficaz'} · limite {resultado.limiteDb} {resultado.unidade}</p>
                       {!resultado.nivelInformado && <p className="mt-1 text-[11px]">NRRsf não informado; considerado 0 dB.</p>}
                     </div>
                   )
@@ -663,7 +675,7 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
           {!ehProdutoQuimico && <Input aria-label="CA único" placeholder="CA único" value={manual.caUnico} onChange={(evento) => setManual({ ...manual, caUnico: evento.target.value })} />}
           {ehProdutoQuimico && <Input aria-label="CA da peça facial" placeholder="CA da peça facial" value={manual.caPecaFacial} onChange={(evento) => setManual({ ...manual, caPecaFacial: evento.target.value })} />}
           {ehProdutoQuimico && <Input aria-label="CA do cartucho ou filtro" placeholder="CA do cartucho/filtro" value={manual.caFiltroCartucho} onChange={(evento) => setManual({ ...manual, caFiltroCartucho: evento.target.value })} />}
-          {ehRuidoContinuo && <Input type="number" min="0" max="100" step="0.1" aria-label="NRRsf em dB" placeholder="NRRsf (dB)" value={manual.nivelProtecaoDb} onChange={(evento) => setManual({ ...manual, nivelProtecaoDb: evento.target.value })} />}
+          {ehRuido && <Input type="number" min="0" max="100" step="0.1" aria-label="NRRsf em dB" placeholder="NRRsf (dB)" value={manual.nivelProtecaoDb} onChange={(evento) => setManual({ ...manual, nivelProtecaoDb: evento.target.value })} />}
         </div>
         {erroManual && <p role="alert" className="mt-2 text-xs text-red-700">{erroManual}</p>}
         <Button type="button" size="sm" className={`mt-3 ${FOCO_VISIVEL}`} disabled={limiteAtingido} onClick={adicionarManual}>

@@ -49,7 +49,7 @@ import type {
 } from '@/types'
 import { ANEXOS_NR15 } from '@/content/anexosNr15'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
-import { aplicarAnexo } from '@/lib/nr15'
+import { aplicarAnexo, usaAtenuacaoRuido } from '@/lib/nr15'
 import { dadosPapel, PAPEIS } from '@/lib/participantes'
 import { maskProcesso, uid } from '@/lib/utils'
 
@@ -921,7 +921,9 @@ export default function PericiaEditor() {
                     dataReferencia={p.dataVistoria}
                     onChange={(agenteAtualizado) => setT({ agentes: p.tecnico.agentes.map((x) => x.id === a.id ? agenteAtualizado : x) })}
                   />
-                  {a.anexoNr15 !== 'ANEXO_01' && <Checkbox
+                  {/* No ruído a conclusão sai do cálculo, não de um
+                      checkbox — vale para o Anexo 1 e para o 2. */}
+                  {!usaAtenuacaoRuido(a) && <Checkbox
                     className="mt-3 rounded-md px-1 py-1 focus-within:ring-2 focus-within:ring-brand-600"
                     label="EPI comprovadamente eficaz para este agente"
                     description="Adicionar equipamento não altera automaticamente esta conclusão técnica."
