@@ -55,7 +55,7 @@ async function main() {
     dataVistoria: '2026-08-18',
     horaVistoria: '09:00',
     localVistoria: 'Local de teste',
-    modalidade: 'insalubridade',
+    modalidade: 'ambas',
     status: 'em_andamento',
     responsavelId: 'usr-layout',
     criadoEm: new Date(),
@@ -65,13 +65,22 @@ async function main() {
       objetivoPericia: 'Objetivo da perícia.',
       descricaoEmpresa: 'Descrição da empresa.',
       descricaoAmbiente: 'Descrição do ambiente.',
+      descricaoPostoTrabalho: 'Descrição do posto de trabalho.',
+      maquinasFerramentas: 'Máquinas e ferramentas utilizadas.',
+      produtosUtilizados: 'Produtos utilizados nas atividades.',
       atividadesFuncoes: 'Atividades exercidas.',
       agentes: [],
       normasReferencias: 'NR-15.',
       equipamentosAnalisados: 'Equipamentos analisados.',
       informacoesLevantadas: 'Informações da vistoria.',
+      divergenciasFaticas: 'Divergências fáticas registradas.',
+      protecoesColetivas: 'Proteções coletivas avaliadas.',
       analiseTecnica: 'Análise técnica.',
       conclusao: 'Conclusão técnica.',
+      conclusaoInsalubridade: 'Conclusão de insalubridade.',
+      conclusaoPericulosidade: 'Conclusão de periculosidade.',
+      respostasQuesitos: 'Respostas aos quesitos técnicos.',
+      encerramento: 'Encerramento do parecer.',
     },
     reclamadas: [{ id: 'rec-layout', periciaId: 'per-layout', empresaId: 'emp-layout', principal: true }],
     participantes: [],
@@ -200,6 +209,37 @@ async function main() {
       ordemAbertura.every((indice, i) => i === 0 || indice > ordemAbertura[i - 1]),
     `abertura do DOCX fora da estrutura aprovada: ${ordemAbertura.join(', ')}`,
   )
+  const estruturaEnxuta = [
+    '1. OBJETO DA PERÍCIA E DADOS CONTRATUAIS',
+    '2. DA DILIGÊNCIA TÉCNICA PERICIAL',
+    '3. DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA',
+    '4. CRITÉRIOS TÉCNICOS PARA AVALIAÇÃO PERICIAL',
+    '5. METODOLOGIA DE AVALIAÇÃO',
+    '6. DESCRIÇÃO DO POSTO DE TRABALHO, MÁQUINAS, FERRAMENTAS E PRODUTOS',
+    '7. HISTÓRICO LABORAL, PERÍODOS E ATIVIDADES HABITUAIS EXERCIDAS',
+    '8. DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)',
+    '9. DAS PROTEÇÕES COLETIVAS',
+    '10. ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS',
+    '11. NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO',
+    '12. NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO',
+    '13. RESPOSTAS AOS QUESITOS TÉCNICOS',
+    '14. ENCERRAMENTO',
+  ].map((trecho) => xml.indexOf(trecho))
+  assert.ok(
+    estruturaEnxuta.every((indice) => indice >= 0) &&
+      estruturaEnxuta.every((indice, i) => i === 0 || indice > estruturaEnxuta[i - 1]),
+    `estrutura enxuta do DOCX fora da ordem aprovada: ${estruturaEnxuta.join(', ')}`,
+  )
+  assert.doesNotMatch(xml, /RELATÓRIO FOTOGRÁFICO/)
+
+  const fotoAmbiente = xml.indexOf('Figura 1 — Vista geral do ambiente de trabalho')
+  const secao3 = xml.indexOf('3. DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA')
+  const secao4 = xml.indexOf('4. CRITÉRIOS TÉCNICOS PARA AVALIAÇÃO PERICIAL')
+  assert.ok(secao3 < fotoAmbiente && fotoAmbiente < secao4, 'foto do ambiente deve permanecer na seção 3')
+  const fotoEpi = xml.indexOf('Figura 5 — Registro documental relacionado aos equipamentos de proteção individual')
+  const secao8 = xml.indexOf('8. DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)')
+  const secao9 = xml.indexOf('9. DAS PROTEÇÕES COLETIVAS')
+  assert.ok(secao8 < fotoEpi && fotoEpi < secao9, 'foto de EPI deve permanecer na seção 8')
 
   assert.equal((xml.match(/<wp:inline\b/g) ?? []).length, 6, 'todas as fotos devem ser incluídas inline')
   assert.doesNotMatch(xml, /<wp:anchor\b/, 'imagens flutuantes não são permitidas')

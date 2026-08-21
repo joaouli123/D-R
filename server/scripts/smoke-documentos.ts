@@ -524,6 +524,11 @@ async function main() {
     /figure img \{[^}]*object-fit:\s*contain/s,
     'as fotografias do PDF devem preservar a proporção sem corte',
   )
+  assert.match(
+    htmlParecer,
+    /figure img \{[^}]*max-height:\s*11cm/s,
+    'as fotografias do PDF devem ter altura limitada para não criar páginas quase vazias',
+  )
 
   const corpoParecer = htmlParecer.match(/<body>([\s\S]*?)<\/body>/)?.[1] ?? ''
   assert.doesNotMatch(

@@ -27,7 +27,6 @@ import {
   MODALIDADE_LABEL,
   ORIGEM_PONTO,
   PAPEL,
-  SECAO_FOTO,
   type TecnicoJson,
   VAZIO,
   data,
@@ -86,9 +85,10 @@ const p = (t: string) =>
   })
 
 /** Parágrafo sem recuo — endereçamento, rótulos, encerramento. */
-const pSemRecuo = (t: string, negrito = false) =>
+const pSemRecuo = (t: string, negrito = false, manterComProximo = false) =>
   new Paragraph({
     alignment: AlignmentType.JUSTIFIED,
+    keepNext: manterComProximo,
     spacing: { after: 120, line: 340 },
     children: [texto(t, { negrito })],
   })
@@ -148,6 +148,21 @@ const blocos = (t?: string | null): Paragraph[] => {
     ]
   }
   return partes.map(p)
+}
+
+const blocosComProximo = (t?: string | null): Paragraph[] => {
+  const partes = emParagrafos(t)
+  const conteudo = partes.length ? partes : [VAZIO]
+  return conteudo.map(
+    (parte) =>
+      new Paragraph({
+        alignment: AlignmentType.JUSTIFIED,
+        indent: { firstLine: RECUO_PRIMEIRA_LINHA },
+        keepNext: true,
+        spacing: { after: 120, line: 340 },
+        children: [texto(parte, { italico: !partes.length })],
+      }),
+  )
 }
 
 const borda = { style: BorderStyle.SINGLE, size: 4, color: MARCA.documentoBorda }
@@ -278,17 +293,20 @@ function assinatura(perito: Usuario | null, comarca?: string | null): Paragraph[
   return [
     new Paragraph({
       alignment: AlignmentType.CENTER,
+      keepNext: true,
       spacing: { before: 600, after: 720 },
       children: [texto(`${comarca || 'São Paulo/SP'}, ${extenso(hoje())}.`)],
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
+      keepNext: true,
       border: { top: { style: BorderStyle.SINGLE, size: 6, color: MARCA.tinta800 } },
       spacing: { after: 0 },
       children: [texto(perito?.nome ?? '—', { negrito: true })],
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
+      keepNext: true,
       spacing: { after: 0 },
       children: [texto(perito?.titulo ?? '', { tamanho: 20 })],
     }),
@@ -352,7 +370,7 @@ function montarDocumento(filhos: (Paragraph | Table)[]): Document {
           page: {
             // A4 com as margens do modelo em Word do contratante.
             size: { width: 11906, height: 16838 },
-            margin: { top: 1417, right: 1134, bottom: 1134, left: 1701 },
+            margin: { top: 1417, right: 1134, bottom: 1701, left: 1701 },
           },
         },
         footers: { default: rodape() },
@@ -378,8 +396,27 @@ async function docParecer(
     .map((r) => porId.get(r.empresaId))
     .filter((e): e is Empresa => Boolean(e))
 
-  let n = 0
-  const secao = () => ++n
+  const fotosOrdenadas = [...pericia.fotos].sort((a, b) => a.ordem - b.ordem)
+  const numeroDaFoto = new Map(fotosOrdenadas.map((foto, indice) => [foto.id, indice + 1]))
+  const fotosDasSecoes = async (secoes: string[]) => {
+    const elementos: (Paragraph | Table)[] = []
+    for (const foto of fotosOrdenadas.filter((item) => secoes.includes(item.secao))) {
+      elementos.push(...(await figuraDocx(foto.arquivo, foto.legenda, numeroDaFoto.get(foto.id) ?? 0)))
+    }
+    return elementos
+  }
+
+  const agentes = t.agentes ?? []
+  const agentesNr15 = agentes.filter((agente) => agente.tipo !== 'periculosidade')
+  const agentesNr16 = agentes.filter((agente) => agente.tipo === 'periculosidade')
+  const temInsalubridade = pericia.modalidade !== 'periculosidade'
+  const temPericulosidade = pericia.modalidade !== 'insalubridade'
+  const conclusaoNr15 =
+    t.conclusaoInsalubridade?.trim() ||
+    (pericia.modalidade === 'insalubridade' || !t.conclusaoPericulosidade?.trim() ? t.conclusao : '')
+  const conclusaoNr16 =
+    t.conclusaoPericulosidade?.trim() || (pericia.modalidade === 'periculosidade' ? t.conclusao : '')
+  const encerramento = t.encerramento?.trim() || t.observacoesAdicionais
 
   const filhos: (Paragraph | Table)[] = [
     ...enderecamentoDoParecer(pericia.vara, pericia.comarca, t.enderecamento),
@@ -399,14 +436,14 @@ async function docParecer(
     h1(titulo, true),
     h3('APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA'),
     ...blocos(t.apresentacao),
-    h2(`${secao()}. OBJETO DA PERÍCIA E DADOS CONTRATUAIS`),
+    h2('1. OBJETO DA PERÍCIA E DADOS CONTRATUAIS'),
     ...blocos(t.objetivoPericia),
     tabela([
       fichaLinha('Função / Cargo', pericia.funcaoReclamante || '—'),
       fichaLinha('Data de admissão', data(pericia.admissao)),
       fichaLinha('Data de desligamento', pericia.demissao ? data(pericia.demissao) : 'Contrato vigente'),
     ]),
-    h2(`${secao()}. DA DILIGÊNCIA TÉCNICA PERICIAL`),
+    h2('2. DA DILIGÊNCIA TÉCNICA PERICIAL'),
     p(
       `A vistoria técnica foi realizada em ${extenso(pericia.dataVistoria)}${
         pericia.horaVistoria ? `, às ${pericia.horaVistoria}` : ''
@@ -440,14 +477,32 @@ async function docParecer(
   }
 
   filhos.push(
-    h2(`${secao()}. DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA`),
+    h2('3. DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA'),
     ...blocos(t.descricaoEmpresa),
     h3('3.1. Instalações Físicas'),
     ...blocos(t.descricaoAmbiente),
-    h2(`${secao()}. DESCRIÇÃO DO POSTO DE TRABALHO, MÁQUINAS, FERRAMENTAS E PRODUTOS`),
-    h3('4.1. Atividades e Funções Exercidas'),
-    ...blocos(t.atividadesFuncoes),
   )
+  filhos.push(...(await fotosDasSecoes(['ambiente'])))
+  filhos.push(
+    h2('4. CRITÉRIOS TÉCNICOS PARA AVALIAÇÃO PERICIAL'),
+    ...blocos(t.normasReferencias),
+    h2('5. METODOLOGIA DE AVALIAÇÃO'),
+    ...blocos(t.equipamentosAnalisados),
+    h2('6. DESCRIÇÃO DO POSTO DE TRABALHO, MÁQUINAS, FERRAMENTAS E PRODUTOS'),
+    h3('6.1. Características do Posto de Trabalho'),
+    ...blocos(t.descricaoPostoTrabalho || t.descricaoAmbiente),
+  )
+  filhos.push(...(await fotosDasSecoes(['atividades'])))
+  filhos.push(h3('6.2. Máquinas, Ferramentas e Equipamentos Utilizados'), ...blocos(t.maquinasFerramentas))
+  filhos.push(...(await fotosDasSecoes(['equipamentos'])))
+  filhos.push(
+    h3('6.3. Constatações da Vistoria Pericial'),
+    ...blocos(t.informacoesLevantadas),
+    h3('6.4. Produtos Utilizados Habitualmente nas Atividades'),
+    ...blocos(t.produtosUtilizados),
+  )
+  filhos.push(...(await fotosDasSecoes(['produtos'])))
+  filhos.push(h2('7. HISTÓRICO LABORAL, PERÍODOS E ATIVIDADES HABITUAIS EXERCIDAS'))
 
   if (t.periodos?.length) {
     filhos.push(
@@ -476,10 +531,14 @@ async function docParecer(
     )
   }
 
-  filhos.push(h2(`${secao()}. AGENTES E RISCOS AVALIADOS`))
+  filhos.push(h3('7.1. Atividades Efetivamente Exercidas'), ...blocos(t.atividadesFuncoes))
 
-  if (t.agentes?.length) {
-    for (const agente of t.agentes) {
+  const adicionarAgentes = (lista: typeof agentes) => {
+    if (!lista.length) {
+      filhos.push(new Paragraph({ children: [texto('[Nenhum agente cadastrado]', { italico: true })] }))
+      return
+    }
+    for (const agente of lista) {
       const apresentacao = montarApresentacaoAgente(agente)
       filhos.push(
         h3(apresentacao.titulo),
@@ -495,55 +554,53 @@ async function docParecer(
           ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor)),
         ]),
       )
-      for (const protecao of apresentacao.protecoes) {
-        filhos.push(
-          new Paragraph({ spacing: { before: 140, after: 60 }, children: [texto(protecao.titulo, { negrito: true, tamanho: 20 })] }),
-          tabela(protecao.linhas.map((item) => fichaLinha(item.rotulo, item.valor))),
-        )
-      }
     }
-  } else {
-    filhos.push(new Paragraph({ children: [texto('[Nenhum agente cadastrado]', { italico: true })] }))
   }
+
+  if (temInsalubridade) {
+    filhos.push(h3('7.2. NR-15 — Avaliação da Exposição Ocupacional'))
+    adicionarAgentes(agentesNr15)
+  }
+  if (temPericulosidade) {
+    filhos.push(h3('7.3. NR-16 — Avaliação das Atividades e Operações Perigosas'))
+    adicionarAgentes(agentesNr16)
+  }
+  if (t.divergenciasFaticas?.trim()) filhos.push(h3('7.4. Divergências Fáticas'), ...blocos(t.divergenciasFaticas))
+  filhos.push(...(await fotosDasSecoes(['documentos'])))
+
+  filhos.push(h2('8. DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)'))
+  let temProtecao = false
+  for (const agente of agentes) {
+    const apresentacao = montarApresentacaoAgente(agente)
+    if (!apresentacao.protecoes.length) continue
+    temProtecao = true
+    filhos.push(h3(apresentacao.titulo))
+    for (const protecao of apresentacao.protecoes) {
+      filhos.push(
+        new Paragraph({ spacing: { before: 140, after: 60 }, children: [texto(protecao.titulo, { negrito: true, tamanho: 20 })] }),
+        tabela(protecao.linhas.map((item) => fichaLinha(item.rotulo, item.valor))),
+      )
+    }
+  }
+  if (!temProtecao) filhos.push(new Paragraph({ children: [texto('[Nenhum EPI associado aos agentes]', { italico: true })] }))
+  filhos.push(...(await fotosDasSecoes(['epi'])))
 
   filhos.push(
-    h2(`${secao()}. NORMAS E REFERÊNCIAS TÉCNICAS UTILIZADAS`),
-    ...blocos(t.normasReferencias),
-    h2(`${secao()}. EQUIPAMENTOS E PROCEDIMENTOS ANALISADOS`),
-    ...blocos(t.equipamentosAnalisados),
-    h2(`${secao()}. INFORMAÇÕES LEVANTADAS NA VISTORIA`),
-    ...blocos(t.informacoesLevantadas),
-    h2(`${secao()}. ANÁLISE TÉCNICA`),
+    h2('9. DAS PROTEÇÕES COLETIVAS'),
+    ...blocos(t.protecoesColetivas),
+    h2('10. ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS'),
     ...blocos(t.analiseTecnica),
   )
-
-  if (pericia.fotos.length) {
-    filhos.push(h2(`${secao()}. RELATÓRIO FOTOGRÁFICO`))
-    const porSecao = new Map<string, typeof pericia.fotos>()
-    for (const foto of [...pericia.fotos].sort((a, b) => a.ordem - b.ordem)) {
-      const lista = porSecao.get(foto.secao) ?? []
-      lista.push(foto)
-      porSecao.set(foto.secao, lista)
-    }
-
-    let numeroFigura = 0
-    for (const [secaoFoto, fotos] of porSecao) {
-      filhos.push(h3(SECAO_FOTO[secaoFoto] ?? secaoFoto))
-      for (const foto of fotos) {
-        filhos.push(...(await figuraDocx(foto.arquivo, foto.legenda, ++numeroFigura)))
-      }
-    }
-  }
-
-  filhos.push(h2(`${secao()}. CONCLUSÃO`), ...blocos(t.conclusao))
-
-  if (t.observacoesAdicionais?.trim()) {
-    filhos.push(h2(`${secao()}. OBSERVAÇÕES ADICIONAIS`), ...blocos(t.observacoesAdicionais))
-  }
+  if (temInsalubridade) filhos.push(h2('11. NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO'), ...blocos(conclusaoNr15))
+  if (temPericulosidade) filhos.push(h2('12. NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO'), ...blocos(conclusaoNr16))
+  if (t.respostasQuesitos?.trim()) filhos.push(h2('13. RESPOSTAS AOS QUESITOS TÉCNICOS'), ...blocos(t.respostasQuesitos))
+  filhos.push(h2('14. ENCERRAMENTO'), ...blocosComProximo(encerramento))
 
   filhos.push(
     pSemRecuo(
       'Sendo o que se apresenta para o momento, o signatário coloca-se à disposição deste MM. Juízo para os esclarecimentos que se fizerem necessários.',
+      false,
+      true,
     ),
     ...assinatura(perito, pericia.comarca),
   )

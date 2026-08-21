@@ -152,7 +152,7 @@ const CSS = `
     width: auto;
     max-width: 100%;
     height: auto;
-    max-height: 19cm;
+    max-height: 11cm;
     object-fit: contain;
     border: 1px solid ${css(MARCA.tinta300)};
     display: block;
