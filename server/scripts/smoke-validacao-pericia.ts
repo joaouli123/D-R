@@ -7,7 +7,13 @@
 process.env.DATABASE_URL ??= 'postgresql://smoke:smoke@127.0.0.1:5432/smoke'
 process.env.JWT_SECRET ??= 'smoke-test-secret-with-at-least-32-characters'
 
-const { agenteSchema } = await import('../src/routes/pericias.js')
+const moduloPericias = await import('../src/routes/pericias.js')
+const { agenteSchema } = moduloPericias
+const tecnicoSchema = (
+  moduloPericias as typeof moduloPericias & {
+    tecnicoSchema?: { safeParse: (valor: unknown) => { success: boolean; data?: Record<string, unknown> } }
+  }
+).tecnicoSchema
 
 const agenteLegado = {
   id: 'agn-legado',
@@ -95,6 +101,32 @@ const agenteComEpiManual = {
   }],
 }
 
+const tecnicoNaNovaEstrutura = {
+  apresentacao: '',
+  enderecamento: '',
+  objetivoPericia: '',
+  descricaoEmpresa: '',
+  descricaoAmbiente: '',
+  descricaoPostoTrabalho: 'Posto de soldagem',
+  maquinasFerramentas: 'Máquina de solda e esmerilhadeira',
+  produtosUtilizados: 'Argônio e oxigênio',
+  atividadesFuncoes: '',
+  periodos: [],
+  agentes: [],
+  normasReferencias: '',
+  equipamentosAnalisados: '',
+  informacoesLevantadas: '',
+  divergenciasFaticas: 'Versões divergentes registradas na diligência',
+  protecoesColetivas: 'Exaustão localizada',
+  analiseTecnica: '',
+  conclusao: '',
+  conclusaoInsalubridade: 'Não caracterizada',
+  conclusaoPericulosidade: 'Não caracterizada',
+  respostasQuesitos: 'Quesitos respondidos no corpo do parecer',
+  encerramento: 'Parecer composto por folhas rubricadas.',
+  observacoesAdicionais: '',
+}
+
 const legado = agenteSchema.safeParse(agenteLegado)
 const completo = agenteSchema.safeParse(agenteCompleto)
 const enumInvalido = agenteSchema.safeParse(agenteComEnumInvalido)
@@ -105,6 +137,7 @@ const epiSemCamposObrigatorios = agenteSchema.safeParse(agenteComEpiSemCamposObr
 const epiComCamposObrigatoriosVazios = agenteSchema.safeParse(agenteComEpiComCamposObrigatoriosVazios)
 const epiMinimo = agenteSchema.safeParse(agenteComEpiMinimo)
 const epiManual = agenteSchema.safeParse(agenteComEpiManual)
+const novaEstrutura = tecnicoSchema?.safeParse(tecnicoNaNovaEstrutura)
 
 const resultados = [
   {
@@ -156,6 +189,15 @@ const resultados = [
   {
     nome: 'cadastro manual preserva a validade do CA sem exigir marca',
     ok: epiManual.success && epiManual.data.epis[0]?.validadeCa === '31/12/2028',
+  },
+  {
+    nome: 'estrutura enxuta do parecer é preservada pelo contrato da perícia',
+    ok:
+      novaEstrutura?.success === true &&
+      novaEstrutura.data?.descricaoPostoTrabalho === 'Posto de soldagem' &&
+      novaEstrutura.data?.protecoesColetivas === 'Exaustão localizada' &&
+      novaEstrutura.data?.conclusaoPericulosidade === 'Não caracterizada' &&
+      novaEstrutura.data?.encerramento === 'Parecer composto por folhas rubricadas.',
   },
 ]
 

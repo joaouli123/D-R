@@ -67,20 +67,29 @@ export const agenteSchema = z.object({
   observacao: texto.optional(),
 })
 
-const tecnicoSchema = z.object({
+export const tecnicoSchema = z.object({
   apresentacao: texto,
   enderecamento: texto,
   objetivoPericia: texto,
   descricaoEmpresa: texto,
   descricaoAmbiente: texto,
+  descricaoPostoTrabalho: texto,
+  maquinasFerramentas: texto,
+  produtosUtilizados: texto,
   atividadesFuncoes: texto,
   periodos: z.array(periodoSchema).default([]),
   agentes: z.array(agenteSchema).default([]),
   normasReferencias: texto,
   equipamentosAnalisados: texto,
   informacoesLevantadas: texto,
+  divergenciasFaticas: texto,
+  protecoesColetivas: texto,
   analiseTecnica: texto,
   conclusao: texto,
+  conclusaoInsalubridade: texto,
+  conclusaoPericulosidade: texto,
+  respostasQuesitos: texto,
+  encerramento: texto,
   observacoesAdicionais: texto,
 })
 

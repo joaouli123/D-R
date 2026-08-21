@@ -162,14 +162,23 @@ export interface PreenchimentoTecnico {
   objetivoPericia: string
   descricaoEmpresa: string
   descricaoAmbiente: string
+  descricaoPostoTrabalho?: string
+  maquinasFerramentas?: string
+  produtosUtilizados?: string
   atividadesFuncoes: string
   periodos: PeriodoFuncao[]
   agentes: AgenteAvaliado[]
   normasReferencias: string
   equipamentosAnalisados: string
   informacoesLevantadas: string
+  divergenciasFaticas?: string
+  protecoesColetivas?: string
   analiseTecnica: string
   conclusao: string
+  conclusaoInsalubridade?: string
+  conclusaoPericulosidade?: string
+  respostasQuesitos?: string
+  encerramento?: string
   observacoesAdicionais: string
 }
 
