@@ -417,8 +417,8 @@ async function main() {
     )
     assert.match(
       saida.html,
-      /--documento-secao:\s*#2980B9/,
-      `${saida.nome}: seções devem usar o azul do padrão de referência`,
+      /--documento-secao:\s*#2C3E50/,
+      `${saida.nome}: seções devem usar o azul-ardósia sóbrio do padrão vigente`,
     )
     assert.match(
       saida.html,
@@ -442,13 +442,13 @@ async function main() {
     )
     assert.match(
       saida.xml,
-      /<w:color w:val="2980B9"/,
-      `${saida.nome}: títulos de seção do DOCX devem usar o azul de referência`,
+      /<w:color w:val="2C3E50"/,
+      `${saida.nome}: títulos de seção do DOCX devem usar o azul-ardósia vigente`,
     )
     assert.match(
       saida.xml,
-      /<w:shd[^>]*w:fill="EEF4F8"/,
-      `${saida.nome}: tabelas do DOCX devem usar o fundo azul-cinza padronizado`,
+      /<w:shd[^>]*w:fill="EFF1F4"/,
+      `${saida.nome}: tabelas do DOCX devem usar o fundo cinza-claro padronizado`,
     )
   }
 
