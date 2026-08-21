@@ -7,7 +7,6 @@ import {
   type ConteudoManifestacao,
   type ConteudoQuesitos,
   MARCA,
-  MODALIDADE_LABEL,
   ORIGEM_PONTO,
   PAPEL,
   type TecnicoJson,
@@ -252,7 +251,6 @@ export async function htmlDoParecer(
   const identificacao = `
   <table class="ficha-processual"><tbody>
     ${linha('Processo nº', esc(pericia.numeroProcesso))}
-    ${linha('Tramitação', esc(MODALIDADE_LABEL[pericia.modalidade] ?? pericia.modalidade))}
     ${linha('Reclamante', `${esc(pericia.reclamante)}${pericia.funcaoReclamante ? ` — ${esc(pericia.funcaoReclamante)}` : ''}`)}
     ${linha('Reclamada', principal ? `${esc(principal.razaoSocial)} — CNPJ ${esc(mascaraCnpj(principal.cnpj))}` : '—')}
     ${solidarias.map((e) => linha('Reclamada', `${esc(e.razaoSocial)} — CNPJ ${esc(mascaraCnpj(e.cnpj))}`)).join('')}

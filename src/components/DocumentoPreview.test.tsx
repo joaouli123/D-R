@@ -211,5 +211,6 @@ describe('DocumentoPreview', () => {
       posicaoAnterior = posicao
     }
     expect(html).not.toContain('Relatório Fotográfico')
+    expect(html).not.toContain('Tramitação')
   })
 })

@@ -403,6 +403,13 @@ async function main() {
   }
 
   const htmlParecer = await fs.readFile(path.join(SAIDA, 'parecer.html'), 'utf8')
+  const parecerGerado = saidasVisuais.find((saida) => saida.nome === 'parecer')
+  assert.doesNotMatch(htmlParecer, />Tramitação</, 'o PDF não deve repetir a modalidade no campo Tramitação')
+  assert.doesNotMatch(
+    parecerGerado?.xml ?? '',
+    />Tramitação</,
+    'o DOCX não deve repetir a modalidade no campo Tramitação',
+  )
 
   for (const saida of saidasVisuais) {
     assert.doesNotMatch(

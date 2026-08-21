@@ -140,10 +140,6 @@ export function DocumentoPreview({
             </td>
           </tr>
           <tr>
-            <th>Tramitação</th>
-            <td>{pericia.modalidade === 'ambas' ? 'Insalubridade e Periculosidade' : pericia.modalidade}</td>
-          </tr>
-          <tr>
             <th>Reclamante</th>
             <td>
               {pericia.reclamante}

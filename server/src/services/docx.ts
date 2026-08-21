@@ -24,7 +24,6 @@ import {
   type ConteudoManifestacao,
   type ConteudoQuesitos,
   MARCA,
-  MODALIDADE_LABEL,
   ORIGEM_PONTO,
   PAPEL,
   type TecnicoJson,
@@ -422,7 +421,6 @@ async function docParecer(
     ...enderecamentoDoParecer(pericia.vara, pericia.comarca, t.enderecamento),
     tabela([
       fichaLinha('Processo nº', pericia.numeroProcesso),
-      fichaLinha('Tramitação', MODALIDADE_LABEL[pericia.modalidade] ?? pericia.modalidade),
       fichaLinha(
         'Reclamante',
         `${pericia.reclamante}${pericia.funcaoReclamante ? ` — ${pericia.funcaoReclamante}` : ''}`,
