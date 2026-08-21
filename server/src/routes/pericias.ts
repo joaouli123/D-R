@@ -193,9 +193,17 @@ periciasRouter.post(
     const d = corpo.parse(req.body)
     const sessao = sessaoDe(req)
 
+    // Uma empresa não pode figurar duas vezes como reclamada do mesmo
+    // processo: a ficha do laudo imprime uma linha por vínculo, e ela
+    // sairia repetida no documento entregue ao juízo. A tela já evita o
+    // engano (src/lib/reclamadas.ts, função `semRepetidas`) — aqui é a
+    // última porta antes do banco. Os dois precisam mudar juntos.
+    const reclamadasValidas = d.reclamadas.filter(
+      (r, i, todas) => r.empresaId !== '' && todas.findIndex((x) => x.empresaId === r.empresaId) === i,
+    )
+
     // Uma única reclamada pode ser a principal; se o cliente não
     // marcou nenhuma, a primeira assume.
-    const reclamadasValidas = d.reclamadas.filter((r) => r.empresaId)
     const indicePrincipal = Math.max(
       0,
       reclamadasValidas.findIndex((r) => r.principal),

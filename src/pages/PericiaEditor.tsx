@@ -51,6 +51,7 @@ import { ANEXOS_NR15 } from '@/content/anexosNr15'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
 import { aplicarAnexo, usaAtenuacaoRuido } from '@/lib/nr15'
 import { dadosPapel, PAPEIS } from '@/lib/participantes'
+import { empresasLivres, opcoesDaLinha } from '@/lib/reclamadas'
 import { maskProcesso, uid } from '@/lib/utils'
 
 const ROTULOS_GRAU: Record<NonNullable<AgenteAvaliado['grau']>, string> = {
@@ -178,6 +179,8 @@ export default function PericiaEditor() {
     () => empresas.find((e) => e.id === p.reclamadas.find((r) => r.principal)?.empresaId),
     [empresas, p.reclamadas],
   )
+
+  const livres = useMemo(() => empresasLivres(empresas, p.reclamadas), [empresas, p.reclamadas])
 
   const docsDaPericia = documentos.filter((d) => d.periciaId === p.id)
 
@@ -454,13 +457,17 @@ export default function PericiaEditor() {
                   size="sm"
                   variant="outline"
                   icon={<Plus size={14} />}
+                  disabled={livres.length === 0}
                   onClick={() =>
                     set({
                       reclamadas: [
                         ...p.reclamadas,
                         {
                           id: uid('rec'),
-                          empresaId: empresas[0]?.id ?? '',
+                          // Em branco de propósito. Dizer que uma empresa é
+                          // reclamada neste processo é decisão do perito, não
+                          // consequência de ter clicado em "Adicionar".
+                          empresaId: '',
                           principal: p.reclamadas.length === 0,
                         },
                       ],
@@ -492,7 +499,7 @@ export default function PericiaEditor() {
                     }
                   >
                     <option value="">— selecione —</option>
-                    {empresas.map((e) => (
+                    {opcoesDaLinha(empresas, p.reclamadas, r).map((e) => (
                       <option key={e.id} value={e.id}>
                         {e.razaoSocial}
                       </option>
