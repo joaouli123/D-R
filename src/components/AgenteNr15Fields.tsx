@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react'
 
 import { anexoNr15PorId, ATIVIDADES_ANEXO_13, ATIVIDADES_ANEXO_14, SUBSTANCIAS_ANEXO_11 } from '@/content/anexosNr15'
 import type { ReferenciaNormativa, UnidadeMedicao } from '@/content/nr15/tipos'
-import { normalizarNumeroMedido, unidadesDisponiveis } from '@/lib/medicoes'
+import { medicaoAdotada, normalizarNumeroMedido, unidadesDisponiveis } from '@/lib/medicoes'
 import { aplicarReferencia } from '@/lib/nr15'
-import { calcularProtecaoAuditiva } from '@/lib/protecaoAuditiva'
+import { protecaoDoConjunto } from '@/lib/protecaoAuditiva'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
-import type { AgenteAvaliado } from '@/types'
+import type { AgenteAvaliado, OrigemMedicao } from '@/types'
 import { Input, Select } from './ui'
 import { BuscaNormativa } from './BuscaNormativa'
 
@@ -16,19 +16,156 @@ const CONFIGURACOES = {
   ANEXO_14: { itens: ATIVIDADES_ANEXO_14, titulo: 'Atividade do Anexo 14', placeholder: 'Busque por atividade biológica' },
 } as const
 
+const OPCOES_ORIGEM: { valor: OrigemMedicao; rotulo: string }[] = [
+  { valor: 'perito', rotulo: 'Avaliação do perito em diligência' },
+  { valor: 'empresa', rotulo: 'Avaliação da empresa (PGR / laudo ambiental)' },
+  { valor: 'nao_informado', rotulo: 'Não informado pelo perito' },
+]
+
 interface AgenteNr15FieldsProps {
   agente: AgenteAvaliado
   onChange: (agente: AgenteAvaliado) => void
+}
+
+/**
+ * Campo numérico com confirmação no blur.
+ *
+ * Guarda o que foi digitado em estado local para o perito poder digitar
+ * "88," sem que a vírgula solta vire erro a cada tecla; só ao sair do
+ * campo o valor é normalizado e sobe.
+ */
+function CampoNumerico({
+  label,
+  valor,
+  hint,
+  placeholder,
+  onConfirmar,
+}: {
+  label: string
+  valor?: string
+  hint?: string
+  placeholder?: string
+  onConfirmar: (normalizado: string | null) => void
+}) {
+  const [texto, setTexto] = useState(valor ?? '')
+  const [erro, setErro] = useState('')
+
+  useEffect(() => setTexto(valor ?? ''), [valor])
+
+  function confirmar() {
+    if (!texto.trim()) {
+      setErro('')
+      onConfirmar(null)
+      return
+    }
+    const normalizado = normalizarNumeroMedido(texto)
+    if (!normalizado) {
+      setErro('Informe um valor numérico, usando ponto ou vírgula para decimais.')
+      return
+    }
+    setErro('')
+    setTexto(normalizado)
+    onConfirmar(normalizado)
+  }
+
+  return (
+    <Input
+      label={label}
+      aria-label={label}
+      inputMode="decimal"
+      value={texto}
+      error={erro}
+      hint={hint}
+      placeholder={placeholder}
+      onChange={(evento) => { setTexto(evento.target.value); setErro('') }}
+      onBlur={confirmar}
+    />
+  )
+}
+
+/**
+ * As três origens que o perito precisa distinguir: a medição que ele
+ * fez, a que a empresa apresentou nos seus documentos, e o caso em que
+ * ele não mediu. Quando as duas existem e divergem — 83 dB no PGR
+ * contra 88,41 dB na diligência —, o laudo tem de dizer qual prevaleceu.
+ */
+function OrigemDaMedicao({
+  agente,
+  onChange,
+  unidade,
+}: AgenteNr15FieldsProps & { unidade?: string }) {
+  const origem: OrigemMedicao = agente.origemMedicao ?? 'perito'
+  const adotada = medicaoAdotada(agente)
+  const sufixo = unidade ? ` (${unidade})` : ''
+
+  function definirNumero(campo: 'valorMedido' | 'medicaoEmpresa', normalizado: string | null) {
+    if (normalizado == null) {
+      const { [campo]: _removido, ...semValor } = agente
+      onChange(semValor)
+      return
+    }
+    // `medido` era o campo de texto livre antigo. Uma vez que existe
+    // número, ele só confundiria o documento.
+    const { medido: _legado, ...semLegado } = agente
+    onChange({ ...semLegado, [campo]: normalizado })
+  }
+
+  return (
+    <div className="mt-3 border-t border-ink-200 pt-3">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-navy-700">Origem da medição</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Select
+          label="Medição adotada no laudo"
+          aria-label="Origem da medição adotada no laudo"
+          className="sm:col-span-2"
+          value={origem}
+          hint={origem === 'nao_informado'
+            ? 'O laudo registra que o perito não mediu e adota a avaliação da empresa.'
+            : 'Define qual número entra no cálculo e na conclusão.'}
+          onChange={(evento) => onChange({ ...agente, origemMedicao: evento.target.value as OrigemMedicao })}
+        >
+          {OPCOES_ORIGEM.map((opcao) => (
+            <option key={opcao.valor} value={opcao.valor}>{opcao.rotulo}</option>
+          ))}
+        </Select>
+
+        <CampoNumerico
+          label={`Medição do perito${sufixo}`}
+          valor={agente.valorMedido}
+          hint={origem === 'perito' ? 'Adotada no laudo.' : 'Registrada para comparação.'}
+          onConfirmar={(normalizado) => definirNumero('valorMedido', normalizado)}
+        />
+        <CampoNumerico
+          label={`Medição da empresa${sufixo}`}
+          valor={agente.medicaoEmpresa}
+          hint={origem === 'perito' ? 'Registrada para comparação.' : 'Adotada no laudo.'}
+          onConfirmar={(normalizado) => definirNumero('medicaoEmpresa', normalizado)}
+        />
+        <Input
+          label="Documento da empresa"
+          aria-label="Documento de origem da medição da empresa"
+          className="sm:col-span-2"
+          value={agente.fonteMedicaoEmpresa ?? ''}
+          placeholder="Ex.: PGR 2024, LTCAT de 12/03/2023, laudo ambiental"
+          hint="Sai no laudo junto da medição da empresa."
+          onChange={(evento) => onChange({ ...agente, fonteMedicaoEmpresa: evento.target.value })}
+        />
+      </div>
+
+      {adotada.divergente && (
+        <p role="status" className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs leading-5 text-amber-900">
+          As duas avaliações divergem. O laudo adota a {adotada.origem === 'perito' ? 'do perito' : 'da empresa'} e
+          apresenta a outra ao lado — justifique a escolha na análise técnica.
+        </p>
+      )}
+    </div>
+  )
 }
 
 export function AgenteNr15Fields({ agente, onChange }: AgenteNr15FieldsProps) {
   const configuracao = CONFIGURACOES[agente.anexoNr15 as keyof typeof CONFIGURACOES]
   const referencia = configuracao?.itens.find((item) => item.id === agente.referenciaNormativaId)
   const referenciaLegadaAusente = Boolean(agente.referenciaNormativaId && !referencia)
-  const [valorDigitado, setValorDigitado] = useState(agente.valorMedido ?? '')
-  const [erroValor, setErroValor] = useState('')
-
-  useEffect(() => setValorDigitado(agente.valorMedido ?? ''), [agente.valorMedido])
 
   if (!configuracao) return <CamposGenericos agente={agente} onChange={onChange} referenciaLegadaAusente={referenciaLegadaAusente} />
 
@@ -39,24 +176,6 @@ export function AgenteNr15Fields({ agente, onChange }: AgenteNr15FieldsProps) {
 
   function selecionarReferenciaNr15(item: ReferenciaNormativa) {
     onChange(aplicarReferencia(agente, item))
-  }
-
-  function confirmarValor() {
-    if (!valorDigitado.trim()) {
-      const { valorMedido, ...semValor } = agente
-      setErroValor('')
-      onChange(semValor)
-      return
-    }
-    const normalizado = normalizarNumeroMedido(valorDigitado)
-    if (!normalizado) {
-      setErroValor('Informe um valor numérico, usando ponto ou vírgula para decimais.')
-      return
-    }
-    const { medido, ...semLegado } = agente
-    setErroValor('')
-    setValorDigitado(normalizado)
-    onChange({ ...semLegado, valorMedido: normalizado })
   }
 
   const unidades = referencia ? unidadesDisponiveis(referencia) : []
@@ -76,16 +195,7 @@ export function AgenteNr15Fields({ agente, onChange }: AgenteNr15FieldsProps) {
       {referencia && unidades.length > 0 && (
         <div className="mt-3 border-t border-brand-100 pt-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-navy-700">Medição quantitativa</p>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Input
-              label="Valor medido"
-              aria-label="Valor medido"
-              inputMode="decimal"
-              value={valorDigitado}
-              error={erroValor}
-              onChange={(evento) => { setValorDigitado(evento.target.value); setErroValor('') }}
-              onBlur={confirmarValor}
-            />
+          <div className="grid gap-3 sm:grid-cols-2">
             <Select
               label="Unidade"
               aria-label="Unidade da medição"
@@ -106,6 +216,7 @@ export function AgenteNr15Fields({ agente, onChange }: AgenteNr15FieldsProps) {
             </Select>
             <Input label="Limite de tolerância" aria-label="Limite de tolerância" value={limite && unidade ? `${limite} ${unidade}` : ''} readOnly hint="Derivado da referência e unidade selecionadas." />
           </div>
+          <OrigemDaMedicao agente={agente} onChange={onChange} unidade={unidade || undefined} />
           {agente.medido && !agente.valorMedido && (
             <p role="alert" className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
               Medição legada preservada: “{agente.medido}”. Informe um valor numérico para substituí-la explicitamente.
@@ -124,45 +235,19 @@ function CamposGenericos({
 }: AgenteNr15FieldsProps & { referenciaLegadaAusente: boolean }) {
   const anexo = anexoNr15PorId(agente.anexoNr15)
   const regra = obterRegraAnexo(agente.anexoNr15)
-  const [valorDigitado, setValorDigitado] = useState(agente.valorMedido ?? '')
-  const [erroValor, setErroValor] = useState('')
   const unidadeMedicao = agente.unidadeMedicao ?? regra?.unidadePadrao
-  const epiAuditivo = agente.epis?.[0]
-  const medicaoRuido = agente.valorMedido?.trim() ? Number(agente.valorMedido) : undefined
-  const resultadoProtecao = regra?.calculo === 'ruido_nrrsf'
+  const adotada = medicaoAdotada(agente)
+  const medicaoRuido = adotada.valor ? Number(adotada.valor) : undefined
+  const conjunto = regra?.calculo === 'ruido_nrrsf'
     && medicaoRuido != null
     && Number.isFinite(medicaoRuido)
-    && epiAuditivo
-    ? calcularProtecaoAuditiva(medicaoRuido, epiAuditivo.nivelProtecaoDb, unidadeMedicao)
+    ? protecaoDoConjunto(medicaoRuido, agente.epis ?? [], unidadeMedicao)
     : undefined
-
-  useEffect(() => setValorDigitado(agente.valorMedido ?? ''), [agente.valorMedido])
-
-  function confirmarValor() {
-    if (!valorDigitado.trim()) {
-      const { valorMedido, ...semValor } = agente
-      setErroValor('')
-      onChange(semValor)
-      return
-    }
-    const normalizado = normalizarNumeroMedido(valorDigitado)
-    if (!normalizado) {
-      setErroValor('Informe um valor numérico, usando ponto ou vírgula para decimais.')
-      return
-    }
-    const { medido, ...semLegado } = agente
-    setErroValor('')
-    setValorDigitado(normalizado)
-    onChange({
-      ...semLegado,
-      valorMedido: normalizado,
-      ...(regra?.unidadePadrao ? { unidadeMedicao: regra.unidadePadrao } : {}),
-    })
-  }
+  const resultadoProtecao = conjunto?.melhor
 
   return (
     <div className="mt-3 rounded-lg border border-ink-200 bg-ink-50/60 p-3">
-      <div className="grid gap-3 md:grid-cols-[minmax(220px,1.2fr)_minmax(180px,1fr)_minmax(112px,0.55fr)]">
+      <div className="grid gap-3 md:grid-cols-[minmax(220px,1.2fr)_minmax(180px,1fr)]">
         <Input
           label="Limite de tolerância"
           aria-label="Limite de tolerância"
@@ -173,32 +258,20 @@ function CamposGenericos({
           onChange={(evento) => onChange({ ...agente, limiteTolerancia: evento.target.value })}
         />
         {regra?.exibeMedicao && (
-          <>
+          regra.calculo === 'ruido_nrrsf' ? (
             <Input
-              label={`Medição registrada${unidadeMedicao ? ` (${unidadeMedicao})` : ''}`}
-              aria-label="Medição registrada"
-              inputMode="decimal"
-              value={valorDigitado}
-              error={erroValor}
-              hint="Informe apenas o valor numérico."
-              onChange={(evento) => { setValorDigitado(evento.target.value); setErroValor('') }}
-              onBlur={confirmarValor}
+              label="Resultado após proteção"
+              aria-label="Resultado após proteção"
+              value={resultadoProtecao ? `${resultadoProtecao.resultadoDbA} ${resultadoProtecao.unidade}` : ''}
+              placeholder={!adotada.valor ? 'Informe a medição' : 'Associe um protetor auditivo'}
+              readOnly
+              hint={resultadoProtecao && conjunto
+                ? `${resultadoProtecao.medicaoDbA} − ${resultadoProtecao.atenuacaoDb} = ${resultadoProtecao.resultadoDbA} ${resultadoProtecao.unidade} · ${resultadoProtecao.eficaz ? 'Proteção eficaz' : 'Proteção ineficaz'}${conjunto.quantidade > 1 ? ` · melhor entre ${conjunto.quantidade} protetores` : ''}`
+                : 'O resultado será calculado automaticamente com o NRRsf do EPI.'}
             />
-            {regra.calculo === 'ruido_nrrsf' ? (
-              <Input
-                label="Resultado após proteção"
-                aria-label="Resultado após proteção"
-                value={resultadoProtecao ? `${resultadoProtecao.resultadoDbA} ${resultadoProtecao.unidade}` : ''}
-                placeholder={!agente.valorMedido ? 'Informe a medição' : 'Associe um protetor auditivo'}
-                readOnly
-                hint={resultadoProtecao
-                  ? `${resultadoProtecao.medicaoDbA} − ${resultadoProtecao.atenuacaoDb} = ${resultadoProtecao.resultadoDbA} ${resultadoProtecao.unidade} · ${resultadoProtecao.eficaz ? 'Proteção eficaz' : 'Proteção ineficaz'}`
-                  : 'O resultado será calculado automaticamente com o NRRsf do EPI.'}
-              />
-            ) : regra.unidadePadrao && (
-              <Input label="Unidade" aria-label="Unidade da medição" value={unidadeMedicao} readOnly hint="Definida pelo anexo selecionado." />
-            )}
-          </>
+          ) : regra.unidadePadrao && (
+            <Input label="Unidade" aria-label="Unidade da medição" value={unidadeMedicao} readOnly hint="Definida pelo anexo selecionado." />
+          )
         )}
         {!regra && (
           <Input
@@ -210,6 +283,7 @@ function CamposGenericos({
           />
         )}
       </div>
+      {regra?.exibeMedicao && <OrigemDaMedicao agente={agente} onChange={onChange} unidade={unidadeMedicao} />}
       {agente.medido && regra?.exibeMedicao && !agente.valorMedido && (
         <p role="alert" className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
           Medição legada preservada: “{agente.medido}”. Informe um valor numérico para substituí-la explicitamente.

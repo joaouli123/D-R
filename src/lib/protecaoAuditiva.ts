@@ -36,6 +36,40 @@ export interface ResultadoProtecaoAuditiva {
   limiteDb: number
 }
 
+export interface ProtecaoDoConjunto {
+  /** O protetor que mais atenua — é ele que decide se a exposição é neutralizada. */
+  melhor: ResultadoProtecaoAuditiva
+  indiceMelhor: number
+  quantidade: number
+  /** Nenhum dos protetores baixa a exposição ao limite. */
+  nenhumEficaz: boolean
+}
+
+/**
+ * Conclusão do conjunto de protetores auditivos.
+ *
+ * O trabalhador que recebeu quatro CAs diferentes ao longo do contrato
+ * não usa os quatro ao mesmo tempo: cada um é avaliado por si (e o
+ * laudo lista todos), mas a exposição só está neutralizada se ao menos
+ * um deles der conta. Daí a conclusão sair do melhor NRRsf, e não do
+ * primeiro da lista.
+ */
+export function protecaoDoConjunto(
+  medicaoDbA: number,
+  epis: readonly { nivelProtecaoDb?: number | null }[],
+  unidadeMedicao?: string | null,
+): ProtecaoDoConjunto | undefined {
+  if (!epis.length) return undefined
+
+  let indiceMelhor = 0
+  epis.forEach((epi, indice) => {
+    if ((epi.nivelProtecaoDb ?? 0) > (epis[indiceMelhor].nivelProtecaoDb ?? 0)) indiceMelhor = indice
+  })
+
+  const melhor = calcularProtecaoAuditiva(medicaoDbA, epis[indiceMelhor].nivelProtecaoDb, unidadeMedicao)
+  return { melhor, indiceMelhor, quantidade: epis.length, nenhumEficaz: !melhor.eficaz }
+}
+
 export function calcularProtecaoAuditiva(
   medicaoDbA: number,
   nivelProtecaoDb?: number | null,

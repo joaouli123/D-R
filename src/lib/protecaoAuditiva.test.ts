@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { calcularProtecaoAuditiva } from './protecaoAuditiva'
+import { calcularProtecaoAuditiva, protecaoDoConjunto } from './protecaoAuditiva'
 
 describe('calcularProtecaoAuditiva', () => {
   it('classifica como eficaz quando a medição menos o NRRsf fica abaixo do limite', () => {
@@ -64,5 +64,38 @@ describe('calcularProtecaoAuditiva', () => {
       unidade: 'dB(A)',
       limiteDb: 85,
     })
+  })
+})
+
+describe('protecaoDoConjunto', () => {
+  it('conclui pelo protetor mais atenuante, não pelo primeiro da lista', () => {
+    // O trabalhador usa vários CAs; o laudo precisa responder se algum
+    // deles neutraliza a exposição.
+    const conjunto = protecaoDoConjunto(88.41, [
+      { nivelProtecaoDb: 9 },
+      { nivelProtecaoDb: 17 },
+      { nivelProtecaoDb: 12 },
+    ])
+
+    expect(conjunto).toMatchObject({ indiceMelhor: 1, quantidade: 3, nenhumEficaz: false })
+    expect(conjunto?.melhor.resultadoDbA).toBe(71.41)
+  })
+
+  it('trata NRRsf ausente como zero sem perder para ele', () => {
+    const conjunto = protecaoDoConjunto(90, [{ nivelProtecaoDb: null }, { nivelProtecaoDb: 17 }])
+
+    expect(conjunto?.indiceMelhor).toBe(1)
+    expect(conjunto?.melhor.atenuacaoDb).toBe(17)
+  })
+
+  it('avisa quando nenhum dos protetores basta', () => {
+    const conjunto = protecaoDoConjunto(110, [{ nivelProtecaoDb: 9 }, { nivelProtecaoDb: 17 }])
+
+    expect(conjunto?.nenhumEficaz).toBe(true)
+    expect(conjunto?.melhor.eficaz).toBe(false)
+  })
+
+  it('não conclui nada sem protetor associado', () => {
+    expect(protecaoDoConjunto(90, [])).toBeUndefined()
   })
 })

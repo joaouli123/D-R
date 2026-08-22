@@ -224,6 +224,9 @@ export interface AgenteDocumento {
   limiteTolerancia?: string
   medido?: string
   valorMedido?: string
+  medicaoEmpresa?: string
+  fonteMedicaoEmpresa?: string
+  origemMedicao?: OrigemMedicaoDocumento
   unidadeMedicao?: 'ppm' | 'mg/m³' | '% O₂ em volume' | 'dB(A)' | 'dB(C)' | 'dB(Linear)' | 'IBUTG °C' | 'mSv/ano' | 'm/s²' | 'm/s¹·⁷⁵' | 'fibras/cm³'
   epis?: EpiDocumento[]
   epiEficaz?: boolean
@@ -231,12 +234,49 @@ export interface AgenteDocumento {
   grau?: string
 }
 
+export type OrigemMedicaoDocumento = 'perito' | 'empresa' | 'nao_informado'
+
+export const ROTULO_ORIGEM_MEDICAO: Record<OrigemMedicaoDocumento, string> = {
+  perito: 'Avaliação do perito em diligência',
+  empresa: 'Avaliação da empresa (PGR / laudo ambiental)',
+  nao_informado: 'Não informado pelo perito — adotada a avaliação da empresa',
+}
+
+export interface MedicaoAdotadaDocumento {
+  valor: string
+  origem: OrigemMedicaoDocumento
+  rotuloOrigem: string
+  fonte?: string
+  divergente: boolean
+}
+
+/**
+ * Qual medição o documento adota.
+ *
+ * Espelha `medicaoAdotada` de `src/lib/medicoes.ts`. Os dois precisam
+ * mudar juntos: a tela mostra uma conclusão ao perito, este arquivo
+ * imprime a que vai ao juízo.
+ */
+export function medicaoAdotadaDocumento(agente: AgenteDocumento): MedicaoAdotadaDocumento {
+  const origem: OrigemMedicaoDocumento = agente.origemMedicao ?? 'perito'
+  const doPerito = agente.valorMedido?.trim() ?? ''
+  const daEmpresa = agente.medicaoEmpresa?.trim() ?? ''
+  const fonte = agente.fonteMedicaoEmpresa?.trim() || undefined
+  const divergente = Boolean(doPerito && daEmpresa && Number(doPerito) !== Number(daEmpresa))
+  const rotuloOrigem = ROTULO_ORIGEM_MEDICAO[origem]
+
+  if (origem === 'perito') return { valor: doPerito, origem, rotuloOrigem, divergente }
+  return { valor: daEmpresa, origem, rotuloOrigem, fonte, divergente }
+}
+
+function comUnidadeMedicao(valor: string, unidade?: string): string {
+  const formatado = valor.replace('.', ',')
+  return unidade ? `${formatado} ${unidade}` : formatado
+}
+
 export function formatarMedicao(agente: AgenteDocumento): string {
-  const valor = agente.valorMedido?.trim()
-  if (valor) {
-    const formatado = valor.replace('.', ',')
-    return agente.unidadeMedicao ? `${formatado} ${agente.unidadeMedicao}` : formatado
-  }
+  const valor = medicaoAdotadaDocumento(agente).valor
+  if (valor) return comUnidadeMedicao(valor, agente.unidadeMedicao)
   return agente.medido?.trim() || '—'
 }
 
@@ -338,7 +378,8 @@ function protecaoDocumento(
   if (ANEXOS_RUIDO.has(agente.anexoNr15 ?? '')) {
     const unidade = unidadeRuido(agente.unidadeMedicao)
     const limite = LIMITE_RUIDO_POR_UNIDADE[unidade]
-    const medicao = agente.valorMedido == null ? Number.NaN : Number(agente.valorMedido)
+    const adotada = medicaoAdotadaDocumento(agente).valor
+    const medicao = adotada ? Number(adotada) : Number.NaN
     const atenuacao = epi.nivelProtecaoDb ?? 0
     const resultado = Number.isFinite(medicao) ? Number((medicao - atenuacao).toFixed(2)) : null
     linhas.push({
@@ -377,12 +418,89 @@ export function montarApresentacaoAgente(agente: AgenteDocumento): ApresentacaoA
     ...(!ruido && agente.cas?.trim() ? [{ rotulo: 'CAS', valor: agente.cas.trim() }] : []),
     ...(agente.atividadeEnquadrada?.trim() ? [{ rotulo: 'Atividade ou referência normativa', valor: agente.atividadeEnquadrada.trim() }] : []),
     ...(agente.limiteTolerancia?.trim() ? [{ rotulo: 'Limite de tolerância', valor: limiteComUnidade(agente.limiteTolerancia, agente.unidadeLimite) }] : []),
-    ...(!qualitativo && (agente.valorMedido || agente.medido) ? [{ rotulo: 'Medição registrada', valor: formatarMedicao(agente) }] : []),
+    ...(!qualitativo && (agente.valorMedido || agente.medicaoEmpresa || agente.medido)
+      ? [{ rotulo: 'Medição registrada', valor: formatarMedicao(agente) }, ...linhasOrigemMedicao(agente)]
+      : []),
   ]
+
+  const epis = agente.epis ?? []
+  const protecoes = epis.map((epi, indice) => protecaoDocumento(agente, epi, indice))
+
+  // Vários protetores: o laudo avalia cada um e ainda precisa responder
+  // se o melhor deles neutraliza a exposição.
+  if (ruido && epis.length > 1) {
+    const conjunto = conclusaoDoConjunto(agente, epis)
+    if (conjunto) protecoes.push(conjunto)
+  }
+
+  return { titulo: agente.nome || 'Agente não informado', linhas, protecoes }
+}
+
+/**
+ * De onde veio o número. Só entra no documento quando há divergência ou
+ * escolha explícita — do contrário o laudo ganharia linhas para dizer
+ * que o perito mediu, que é o esperado.
+ */
+function linhasOrigemMedicao(agente: AgenteDocumento): LinhaApresentacaoAgente[] {
+  const adotada = medicaoAdotadaDocumento(agente)
+  const doPerito = agente.valorMedido?.trim() ?? ''
+  const daEmpresa = agente.medicaoEmpresa?.trim() ?? ''
+  if (!daEmpresa && adotada.origem === 'perito') return []
+
+  return [
+    { rotulo: 'Origem da medição', valor: adotada.rotuloOrigem, ...(adotada.divergente ? { destaque: 'aviso' as const } : {}) },
+    ...(adotada.fonte ? [{ rotulo: 'Documento da empresa', valor: adotada.fonte }] : []),
+    ...(daEmpresa && adotada.origem === 'perito'
+      ? [{ rotulo: 'Medição da empresa (não adotada)', valor: comUnidadeMedicao(daEmpresa, agente.unidadeMedicao) }]
+      : []),
+    ...(doPerito && adotada.origem !== 'perito'
+      ? [{ rotulo: 'Medição do perito (não adotada)', valor: comUnidadeMedicao(doPerito, agente.unidadeMedicao) }]
+      : []),
+  ]
+}
+
+function conclusaoDoConjunto(
+  agente: AgenteDocumento,
+  epis: EpiDocumento[],
+): ApresentacaoAgenteDocumento['protecoes'][number] | undefined {
+  const adotada = medicaoAdotadaDocumento(agente).valor
+  const medicao = adotada ? Number(adotada) : Number.NaN
+  if (!Number.isFinite(medicao)) return undefined
+
+  const unidade = unidadeRuido(agente.unidadeMedicao)
+  const limite = LIMITE_RUIDO_POR_UNIDADE[unidade]
+
+  // Quem responde se a exposição foi neutralizada é o protetor que
+  // atenua mais — não o primeiro que o perito associou.
+  let indiceMelhor = 0
+  let atenuacao = epis[0]?.nivelProtecaoDb ?? 0
+  epis.forEach((epi, indice) => {
+    const daVez = epi.nivelProtecaoDb ?? 0
+    if (daVez > atenuacao) {
+      atenuacao = daVez
+      indiceMelhor = indice
+    }
+  })
+
+  const maisAtenuante = epis[indiceMelhor]
+  if (!maisAtenuante) return undefined
+
+  const resultado = Number((medicao - atenuacao).toFixed(2))
+  const eficaz = resultado <= limite
+
   return {
-    titulo: agente.nome || 'Agente não informado',
-    linhas,
-    protecoes: (agente.epis ?? []).map((epi, indice) => protecaoDocumento(agente, epi, indice)),
+    titulo: `Conclusão do conjunto (${epis.length} protetores)`,
+    linhas: [
+      { rotulo: 'Protetor mais atenuante', valor: `Proteção ${indiceMelhor + 1} — ${maisAtenuante.modelo}` },
+      { rotulo: 'Cálculo', valor: `${numeroDocumento(medicao)} - ${numeroDocumento(atenuacao)} = ${numeroDocumento(resultado)} ${unidade}` },
+      {
+        rotulo: 'Conclusão',
+        valor: eficaz
+          ? `Exposição neutralizada pelo protetor mais atenuante (limite de ${numeroDocumento(limite)} ${unidade})`
+          : `Nenhum dos protetores associados neutraliza a exposição (limite de ${numeroDocumento(limite)} ${unidade})`,
+        destaque: eficaz ? 'positivo' : 'negativo',
+      },
+    ],
   }
 }
 

@@ -403,7 +403,12 @@ describe('aplicarReferencia', () => {
 })
 
 describe('BuscaNormativa', () => {
-  it('limita a lista inicial a trinta referencias normativas', () => {
+  // A lista aberta por padrão tapava o bloco "Proteção associada" logo
+  // abaixo, e o perito concluía que os Anexos 11, 13 e 14 não tinham
+  // consulta de CA. O comportamento aberto/fechado está coberto em
+  // BuscaNormativa.test.tsx; aqui só se garante que a primeira pintura
+  // não cobre nada.
+  it('não abre a lista antes do perito pedir', () => {
     const html = renderToStaticMarkup(createElement(BuscaNormativa, {
       itens: SUBSTANCIAS_ANEXO_11,
       value: '',
@@ -411,8 +416,8 @@ describe('BuscaNormativa', () => {
       placeholder: 'Buscar substância',
     }))
 
-    expect((html.match(/role="option"/g) ?? [])).toHaveLength(30)
-    expect(html).toContain('Acetaldeído — CAS 75-07-0')
+    expect(html).not.toContain('role="option"')
+    expect(html).toContain('aria-expanded="false"')
   })
 })
 

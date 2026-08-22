@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { AlertTriangle, BadgeCheck, History, Plus, Search, ShieldCheck, Trash2, X } from 'lucide-react'
 
 import { Button, Input } from '@/components/ui'
+import { medicaoAdotada } from '@/lib/medicoes'
 import { categoriaProtecaoDoAgente, usaAtenuacaoRuido } from '@/lib/nr15'
 import { calcularProtecaoAuditiva } from '@/lib/protecaoAuditiva'
 import { formatDate } from '@/lib/utils'
@@ -132,7 +133,10 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
   const categoriaProtecao = categoriaProtecaoDoAgente(agente)
   const ehRuido = usaAtenuacaoRuido(agente)
   const ehProdutoQuimico = agente.tipo === 'quimico'
-  const medicaoRuido = agente.valorMedido == null ? null : Number(agente.valorMedido)
+  // A medição que o laudo adota — a do perito, a da empresa, ou a da
+  // empresa quando o perito não mediu.
+  const valorAdotado = medicaoAdotada(agente).valor
+  const medicaoRuido = valorAdotado ? Number(valorAdotado) : null
   // dB(A) no Anexo 1; dB(C) ou dB(Linear) no Anexo 2 — cada um com o
   // seu limite de tolerância.
   const unidadeRuido = agente.unidadeMedicao

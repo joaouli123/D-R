@@ -13,6 +13,7 @@ import {
   Paperclip,
   Plus,
   Printer,
+  RotateCcw,
   Save,
   Trash2,
   Users,
@@ -49,6 +50,12 @@ import type {
 } from '@/types'
 import { ANEXOS_NR15 } from '@/content/anexosNr15'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
+import {
+  CAMPOS_COM_TEXTO_PADRAO,
+  patchDeTextosPadrao,
+  textosPadraoDaPericia,
+  type CampoComTextoPadrao,
+} from '@/content/textosPadrao'
 import { aplicarAnexo, usaAtenuacaoRuido } from '@/lib/nr15'
 import { dadosPapel, PAPEIS } from '@/lib/participantes'
 import { comEmpresaVinculada, empresasLivres, opcoesDaLinha } from '@/lib/reclamadas'
@@ -70,7 +77,10 @@ const ROTULOS_GRAU: Record<NonNullable<AgenteAvaliado['grau']>, string> = {
 const PASSOS = [
   { label: 'Processo', description: 'Módulo C' },
   { label: 'Preenchimento', description: 'Módulo D' },
-  { label: 'Agentes', description: 'Módulo D' },
+  // "e EPIs" no rótulo porque é ali que o perito associa o equipamento —
+  // o nome antigo escondia metade da etapa. Curto porque a trilha do
+  // topo trunca o que não cabe.
+  { label: 'Agentes e EPIs', description: 'Módulo D' },
   { label: 'Fotografias', description: 'Módulo E' },
   { label: 'Conclusão', description: 'Módulo D' },
   { label: 'Documento', description: 'Módulos G–I' },
@@ -119,8 +129,11 @@ function novaPericia(responsavelId: string): Pericia {
       atividadesFuncoes: '',
       periodos: [],
       agentes: [],
-      normasReferencias:
-        'Portaria MTb nº 3.214/78 — NR-15 (Atividades e Operações Insalubres) e NR-16 (Atividades e Operações Perigosas); NHO-01 e NHO-06 da FUNDACENTRO; NR-06 (EPI); NR-09 (Avaliação e Controle das Exposições Ocupacionais).',
+      // Apresentação, objeto, normas, metodologia e encerramento nascem
+      // vazios e são preenchidos pelo efeito de textos padrão, que
+      // conhece a modalidade, o perito e as partes. Ver
+      // `src/content/textosPadrao.ts`.
+      normasReferencias: '',
       equipamentosAnalisados: '',
       informacoesLevantadas: '',
       divergenciasFaticas: '',
@@ -199,6 +212,33 @@ export default function PericiaEditor() {
   )
 
   const livres = useMemo(() => empresasLivres(empresas, p.reclamadas), [empresas, p.reclamadas])
+
+  /**
+   * Textos padrão: o perito não redige de novo, a cada processo, aquilo
+   * que é igual em todo laudo. Enquanto ele não editar o campo, o texto
+   * acompanha os dados da perícia — trocar a modalidade para
+   * "periculosidade" reescreve o objeto e as normas na hora. Ao primeiro
+   * caractere digitado, o campo vira dele e o mecanismo larga o osso.
+   */
+  const padroesAplicados = useRef<Partial<Record<CampoComTextoPadrao, string>>>({})
+  useEffect(() => {
+    const padroes = textosPadraoDaPericia(p, usuario, empresaPrincipal)
+    const patch = patchDeTextosPadrao(p.tecnico, padroes, padroesAplicados.current)
+    padroesAplicados.current = padroes
+    if (Object.keys(patch).length) setT(patch)
+  }, [p, usuario, empresaPrincipal])
+
+  /** O campo, quando ele é um dos que têm texto padrão; senão, null. */
+  const campoPadraoDe = (campo: string): CampoComTextoPadrao | null =>
+    (CAMPOS_COM_TEXTO_PADRAO as readonly string[]).includes(campo) ? (campo as CampoComTextoPadrao) : null
+
+  /** Devolve o campo ao texto padrão e volta a mantê-lo sincronizado. */
+  function restaurarTextoPadrao(campo: CampoComTextoPadrao) {
+    const padrao = textosPadraoDaPericia(p, usuario, empresaPrincipal)[campo]
+    padroesAplicados.current = { ...padroesAplicados.current, [campo]: padrao }
+    setT({ [campo]: padrao } as never)
+    toast('Texto padrão restaurado neste campo.')
+  }
 
   const docsDaPericia = documentos.filter((d) => d.periciaId === p.id)
 
@@ -667,20 +707,35 @@ export default function PericiaEditor() {
               { campo: 'produtosUtilizados', secao: 'atividades', label: 'Produtos utilizados', rows: 5 },
               { campo: 'atividadesFuncoes', secao: 'atividades', label: 'Atividades e funções exercidas', rows: 6 },
             ] as const
-          ).map((f) => (
+          ).map((f) => {
+            const campoPadrao = campoPadraoDe(f.campo)
+            return (
             <Card key={f.campo}>
               <CardHeader
                 title={f.label}
+                subtitle={campoPadrao ? 'Já preenchido com o texto padrão — edite apenas se este processo pedir.' : undefined}
                 icon={<FileText size={18} />}
                 action={
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    icon={<BookOpen size={14} />}
-                    onClick={() => setBibliotecaPara({ campo: f.campo, secao: f.secao })}
-                  >
-                    Biblioteca
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {campoPadrao && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={<RotateCcw size={14} />}
+                        onClick={() => restaurarTextoPadrao(campoPadrao)}
+                      >
+                        Texto padrão
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      icon={<BookOpen size={14} />}
+                      onClick={() => setBibliotecaPara({ campo: f.campo, secao: f.secao })}
+                    >
+                      Biblioteca
+                    </Button>
+                  </div>
                 }
               />
               <div className="p-5">
@@ -692,7 +747,8 @@ export default function PericiaEditor() {
                 />
               </div>
             </Card>
-          ))}
+            )
+          })}
 
           {/* Períodos por função */}
           <Card>
@@ -806,8 +862,8 @@ export default function PericiaEditor() {
         <div className="space-y-4">
           <Card>
             <CardHeader
-              title="Agentes e riscos avaliados"
-              subtitle="Cadastre os agentes identificados e o respectivo enquadramento normativo."
+              title="Agentes ambientais e EPIs"
+              subtitle="Cadastre os agentes identificados, o enquadramento normativo e a proteção individual associada a cada um."
               icon={<FileText size={18} />}
               action={
                 <Button
@@ -963,13 +1019,27 @@ export default function PericiaEditor() {
                   />
                   {/* No ruído a conclusão sai do cálculo, não de um
                       checkbox — vale para o Anexo 1 e para o 2. */}
-                  {!usaAtenuacaoRuido(a) && <Checkbox
-                    className="mt-3 rounded-md px-1 py-1 focus-within:ring-2 focus-within:ring-brand-600"
-                    label="EPI comprovadamente eficaz para este agente"
-                    description="Adicionar equipamento não altera automaticamente esta conclusão técnica."
-                    checked={a.epiEficaz ?? false}
-                    onChange={(e) => setT({ agentes: p.tecnico.agentes.map((x) => x.id === a.id ? { ...x, epiEficaz: e.target.checked } : x) })}
-                  />}
+                  {!usaAtenuacaoRuido(a) && (
+                    <div className="mt-3">
+                      <Checkbox
+                        className="rounded-md px-1 py-1 focus-within:ring-2 focus-within:ring-brand-600"
+                        label="EPI comprovadamente eficaz para este agente"
+                        description="Adicionar equipamento não altera automaticamente esta conclusão técnica."
+                        checked={a.epiEficaz ?? false}
+                        onChange={(e) => setT({ agentes: p.tecnico.agentes.map((x) => x.id === a.id ? { ...x, epiEficaz: e.target.checked } : x) })}
+                      />
+                      {/* O enquadramento destes anexos é por atividade, e há
+                          quem sustente que aí o EPI não conta. A lei permite
+                          contar; quem decide é o perito, então a base fica à
+                          vista de quem marca. */}
+                      <p className="mt-1.5 rounded-md border border-ink-200 bg-ink-50/70 px-2.5 py-2 text-[11px] leading-4 text-ink-600">
+                        NR-15, item 15.4.1: a insalubridade é eliminada ou neutralizada “a) com a
+                        adoção de medidas de ordem geral que conservem o ambiente de trabalho dentro
+                        dos limites de tolerância; b) com a utilização de equipamento de proteção
+                        individual”. No mesmo sentido, o art. 191, I e II, da CLT.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )})}
               {p.tecnico.agentes.length === 0 && (
@@ -1089,20 +1159,35 @@ export default function PericiaEditor() {
               { campo: 'conclusao', secao: 'conclusao', label: 'Conclusão geral (compatibilidade com documentos anteriores)', rows: 6 },
               { campo: 'observacoesAdicionais', secao: 'generico', label: 'Observações adicionais (compatibilidade)', rows: 3 },
             ] as const
-          ).map((f) => (
+          ).map((f) => {
+            const campoPadrao = campoPadraoDe(f.campo)
+            return (
             <Card key={f.campo}>
               <CardHeader
                 title={f.label}
+                subtitle={campoPadrao ? 'Já preenchido com o texto padrão — edite apenas se este processo pedir.' : undefined}
                 icon={<FileText size={18} />}
                 action={
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    icon={<BookOpen size={14} />}
-                    onClick={() => setBibliotecaPara({ campo: f.campo, secao: f.secao })}
-                  >
-                    Biblioteca
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {campoPadrao && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={<RotateCcw size={14} />}
+                        onClick={() => restaurarTextoPadrao(campoPadrao)}
+                      >
+                        Texto padrão
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      icon={<BookOpen size={14} />}
+                      onClick={() => setBibliotecaPara({ campo: f.campo, secao: f.secao })}
+                    >
+                      Biblioteca
+                    </Button>
+                  </div>
                 }
               />
               <div className="p-5">
@@ -1113,7 +1198,8 @@ export default function PericiaEditor() {
                 />
               </div>
             </Card>
-          ))}
+            )
+          })}
         </div>
       )}
 

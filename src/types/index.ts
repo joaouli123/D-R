@@ -127,6 +127,19 @@ export interface EpiSelecionado {
   observacao?: string
 }
 
+/**
+ * De onde veio o número que o laudo adota.
+ *
+ * O caso concreto: a empresa mediu 83 dB(A) no PGR e o perito mediu
+ * 88,41 dB(A) na diligência. As duas medições existem, divergem, e o
+ * documento precisa dizer qual prevaleceu e por quê — não escolher em
+ * silêncio.
+ *
+ * `nao_informado` é o perito que não mediu: resta a avaliação da
+ * empresa, e o laudo registra isso em vez de fingir uma medição.
+ */
+export type OrigemMedicao = 'perito' | 'empresa' | 'nao_informado'
+
 export interface AgenteAvaliado {
   id: UUID
   nome: string
@@ -138,7 +151,14 @@ export interface AgenteAvaliado {
   unidadeLimite?: string
   limiteTolerancia?: string
   medido?: string
+  /** Medição do perito na diligência. */
   valorMedido?: string
+  /** Medição da empresa (PGR, LTCAT, laudo ambiental). */
+  medicaoEmpresa?: string
+  /** Documento de onde saiu a medição da empresa. Ex.: "PGR 2024". */
+  fonteMedicaoEmpresa?: string
+  /** Qual das duas o laudo adota. Ausente = perito, como sempre foi. */
+  origemMedicao?: OrigemMedicao
   unidadeMedicao?: UnidadeMedicao
   epis?: EpiSelecionado[]
   criterio: 'qualitativo' | 'quantitativo' | 'nao_aplicavel'

@@ -56,6 +56,11 @@ export const agenteSchema = z.object({
   limiteTolerancia: texto.optional(),
   medido: texto.optional(),
   valorMedido: z.string().regex(/^-?\d+(\.\d+)?$/).optional(),
+  // A medição da empresa (PGR, LTCAT) convive com a do perito: o laudo
+  // guarda as duas e diz qual adotou.
+  medicaoEmpresa: z.string().regex(/^-?\d+(\.\d+)?$/).optional(),
+  fonteMedicaoEmpresa: texto.optional(),
+  origemMedicao: z.enum(['perito', 'empresa', 'nao_informado']).optional(),
   unidadeMedicao: z.enum([
     'ppm', 'mg/m³', '% O₂ em volume', 'dB(A)', 'dB(C)', 'dB(Linear)',
     'IBUTG °C', 'mSv/ano', 'm/s²', 'm/s¹·⁷⁵', 'fibras/cm³',

@@ -20,14 +20,32 @@ export function BuscaNormativa<T extends ReferenciaNormativa>({
 }: BuscaNormativaProps<T>) {
   const listboxId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
+  const raizRef = useRef<HTMLDivElement>(null)
   const [consulta, setConsulta] = useState('')
-  const [aberto, setAberto] = useState(true)
+  /**
+   * Começa fechada. Aberta por padrão, a lista do anexo tapava o bloco
+   * "Proteção associada" logo abaixo — e o perito concluía que os
+   * Anexos 11, 13 e 14 não tinham consulta de CA. Tinham; estavam
+   * embaixo da lista.
+   */
+  const [aberto, setAberto] = useState(false)
   const [indiceAtivo, setIndiceAtivo] = useState(0)
 
   useEffect(() => {
     setConsulta('')
     setIndiceAtivo(0)
   }, [itens, value])
+
+  // Clicar fora fecha. Sem isto a lista só saía da frente com Escape,
+  // que ninguém adivinha.
+  useEffect(() => {
+    if (!aberto) return
+    function aoClicarFora(evento: PointerEvent) {
+      if (!raizRef.current?.contains(evento.target as Node)) setAberto(false)
+    }
+    document.addEventListener('pointerdown', aoClicarFora)
+    return () => document.removeEventListener('pointerdown', aoClicarFora)
+  }, [aberto])
 
   const resultados = useMemo(
     () => buscarReferencias(itens, consulta).slice(0, LIMITE_RESULTADOS),
@@ -56,7 +74,7 @@ export function BuscaNormativa<T extends ReferenciaNormativa>({
   }
 
   return (
-    <div className="relative">
+    <div ref={raizRef} className="relative">
       <input
         ref={inputRef}
         type="search"
