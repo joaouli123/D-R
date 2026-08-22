@@ -30,6 +30,22 @@ export function opcoesDaLinha(
 }
 
 /**
+ * Acrescenta o vínculo se a empresa ainda não estiver no processo.
+ *
+ * É o atalho "usar em perícia" da tela de Clientes: ali a empresa foi
+ * escolhida a dedo, então chega já selecionada — o que a tela da perícia
+ * não faz sozinha é *decidir* por quem ninguém escolheu.
+ */
+export function comEmpresaVinculada(
+  reclamadas: Reclamada[],
+  empresaId: string,
+  novoId: string,
+): Reclamada[] {
+  if (reclamadas.some((r) => r.empresaId === empresaId)) return reclamadas
+  return [...reclamadas, { id: novoId, empresaId, principal: reclamadas.length === 0 }]
+}
+
+/**
  * Descarta linhas em branco e vínculos repetidos. A ficha do laudo
  * imprime uma linha "Reclamada" por vínculo: repetido, a empresa sai
  * duas vezes no documento entregue ao juízo.

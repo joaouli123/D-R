@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Building2, MapPin, Pencil, Plus, Search, Trash2, User } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Briefcase, Building2, MapPin, Pencil, Plus, Search, Trash2, User } from 'lucide-react'
 import { Badge, Button, Card, EmptyState, Input, Modal, Select } from '@/components/ui'
 import { useToast } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
@@ -34,10 +35,14 @@ const vazia = (): Empresa => ({
 export default function Clientes() {
   const { empresas, salvarEmpresa, removerEmpresa, pericias } = useApp()
   const toast = useToast()
+  const navigate = useNavigate()
   const [busca, setBusca] = useState('')
   const [editando, setEditando] = useState<Empresa | null>(null)
   const [confirmar, setConfirmar] = useState<Empresa | null>(null)
   const [salvando, setSalvando] = useState(false)
+  /** Empresa escolhida no atalho "usar em perícia", e o processo de destino. */
+  const [vinculando, setVinculando] = useState<Empresa | null>(null)
+  const [destino, setDestino] = useState('')
 
   const filtradas = useMemo(() => {
     const q = busca.toLowerCase().trim()
@@ -84,6 +89,17 @@ export default function Clientes() {
   }
 
   const set = (patch: Partial<Empresa>) => setEditando((e) => (e ? { ...e, ...patch } : e))
+
+  /**
+   * Leva a empresa para a perícia escolhida. Ela chega já selecionada como
+   * reclamada porque a escolha foi explícita aqui — o editor de perícia é
+   * que nunca escolhe empresa por conta própria.
+   */
+  function abrirPericia() {
+    if (!vinculando) return
+    const rota = destino ? `/pericias/${destino}` : '/pericias/nova'
+    navigate(`${rota}?empresa=${vinculando.id}`)
+  }
 
   return (
     <>
@@ -172,7 +188,18 @@ export default function Clientes() {
                 <Badge tone={usosDe(e.id) ? 'green' : 'gray'}>
                   {usosDe(e.id)} {usosDe(e.id) === 1 ? 'processo' : 'processos'}
                 </Badge>
-                <div className="flex gap-1">
+                <div className="flex flex-wrap justify-end gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={<Briefcase size={14} />}
+                    onClick={() => {
+                      setVinculando(e)
+                      setDestino('')
+                    }}
+                  >
+                    Usar em perícia
+                  </Button>
                   <Button variant="ghost" size="sm" icon={<Pencil size={14} />} onClick={() => setEditando(e)}>
                     Editar
                   </Button>
@@ -317,6 +344,41 @@ export default function Clientes() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Atalho: da empresa para o processo em que ela é reclamada. */}
+      <Modal
+        open={!!vinculando}
+        onClose={() => setVinculando(null)}
+        title="Usar em perícia"
+        subtitle="A empresa entra como reclamada no processo escolhido."
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setVinculando(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={abrirPericia}>Abrir perícia</Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink-600">
+          <strong>{vinculando?.razaoSocial}</strong> será vinculada como reclamada. Escolha o
+          processo — ou deixe em nova perícia para começar do zero.
+        </p>
+        <div className="mt-4">
+          <Select label="Processo" value={destino} onChange={(e) => setDestino(e.target.value)}>
+            <option value="">Nova perícia</option>
+            {pericias.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.numeroProcesso || 'Sem número'} — {p.reclamante || 'sem reclamante'}
+                {vinculando && p.reclamadas.some((r) => r.empresaId === vinculando.id)
+                  ? ' (já vinculada)'
+                  : ''}
+              </option>
+            ))}
+          </Select>
+        </div>
       </Modal>
 
       <Modal

@@ -51,7 +51,7 @@ import { ANEXOS_NR15 } from '@/content/anexosNr15'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
 import { aplicarAnexo, usaAtenuacaoRuido } from '@/lib/nr15'
 import { dadosPapel, PAPEIS } from '@/lib/participantes'
-import { empresasLivres, opcoesDaLinha } from '@/lib/reclamadas'
+import { comEmpresaVinculada, empresasLivres, opcoesDaLinha } from '@/lib/reclamadas'
 import { maskProcesso, uid } from '@/lib/utils'
 
 const ROTULOS_GRAU: Record<NonNullable<AgenteAvaliado['grau']>, string> = {
@@ -170,6 +170,24 @@ export default function PericiaEditor() {
   useEffect(() => {
     if (original) setP(original)
   }, [original])
+
+  /**
+   * Empresa vinda do atalho "usar em perícia" (Módulo B). Só entra depois
+   * que a perícia existente carregou — antes disso o efeito acima ainda
+   * vai sobrescrever o estado com o que veio do servidor.
+   */
+  const empresaDoAtalho = params.get('empresa')
+  const atalhoAplicado = useRef(false)
+  useEffect(() => {
+    if (!empresaDoAtalho || atalhoAplicado.current) return
+    if (id && !original) return
+    if (!empresas.some((e) => e.id === empresaDoAtalho)) return
+    atalhoAplicado.current = true
+    setP((v) => ({
+      ...v,
+      reclamadas: comEmpresaVinculada(v.reclamadas, empresaDoAtalho, uid('rec')),
+    }))
+  }, [empresaDoAtalho, empresas, id, original])
 
   const set = (patch: Partial<Pericia>) => setP((v) => ({ ...v, ...patch }))
   const setT = (patch: Partial<Pericia['tecnico']>) =>

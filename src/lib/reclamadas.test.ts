@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { empresasLivres, opcoesDaLinha, semRepetidas } from './reclamadas'
+import { comEmpresaVinculada, empresasLivres, opcoesDaLinha, semRepetidas } from './reclamadas'
 import type { Empresa, Reclamada } from '@/types'
 
 const empresa = (id: string, razaoSocial: string): Empresa =>
@@ -38,6 +38,28 @@ describe('opcoesDaLinha', () => {
     const linha = vinculo('r1', 'emp-1')
     const reclamadas = [linha, vinculo('r2', 'emp-3')]
     expect(opcoesDaLinha(TODAS, reclamadas, linha)).toEqual([AURORA, BOREAL])
+  })
+})
+
+describe('comEmpresaVinculada', () => {
+  it('a primeira empresa do processo entra como principal', () => {
+    expect(comEmpresaVinculada([], 'emp-1', 'r1')).toEqual([
+      { id: 'r1', empresaId: 'emp-1', principal: true },
+    ])
+  })
+
+  it('as seguintes entram como solidárias', () => {
+    const antes = [{ id: 'r1', empresaId: 'emp-1', principal: true }]
+    expect(comEmpresaVinculada(antes, 'emp-2', 'r2')[1]).toEqual({
+      id: 'r2',
+      empresaId: 'emp-2',
+      principal: false,
+    })
+  })
+
+  it('não duplica quando a empresa já está no processo', () => {
+    const antes = [vinculo('r1', 'emp-2')]
+    expect(comEmpresaVinculada(antes, 'emp-2', 'r9')).toBe(antes)
   })
 })
 
