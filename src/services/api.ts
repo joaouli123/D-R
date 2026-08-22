@@ -506,6 +506,86 @@ export const pericias = {
     ehRest ? http<void>(`/pericias/${id}`, { method: 'DELETE' }) : delay(undefined),
 }
 
+// ---------------- Preenchimento por fontes públicas ----------------
+
+export interface DadosCnpj {
+  cnpj: string
+  cnpjFormatado: string
+  razaoSocial: string
+  nomeFantasia: string | null
+  situacao: string | null
+  situacaoDesde: string | null
+  cnae: string | null
+  cnaeDescricao: string | null
+  naturezaJuridica: string | null
+  porte: string | null
+  abertura: string | null
+  endereco: string
+  numero: string | null
+  complemento: string | null
+  bairro: string | null
+  cidade: string
+  uf: string
+  cep: string | null
+  telefone: string | null
+  email: string | null
+  consultadoEm: string
+  fonte: string
+}
+
+export interface InstanciaProcesso {
+  grau: string | null
+  grauRotulo: string
+  orgao: string | null
+  classe: string | null
+  dataAjuizamento: string | null
+  ultimaAtualizacao: string | null
+  assuntos: string[]
+}
+
+export interface DadosProcesso {
+  numeroProcesso: string
+  numeroFormatado: string
+  tribunal: string | null
+  grau: string | null
+  grauRotulo: string
+  vara: string | null
+  comarca: string | null
+  classe: string | null
+  assuntos: string[]
+  dataAjuizamento: string | null
+  instancias: InstanciaProcesso[]
+  consultadoEm: string
+  fonte: string
+  aviso: string
+}
+
+const CONSULTA_SEM_BACKEND =
+  'O preenchimento automático exige o backend ativo. Digite os dados normalmente.'
+
+/**
+ * Consultas às bases públicas — cadastro da Receita pelo CNPJ e
+ * tramitação do CNJ pelo número do processo. Quem sai à rede é o
+ * servidor; a tela só recebe o resultado já traduzido.
+ */
+export const consultas = {
+  async cnpj(numero: string): Promise<DadosCnpj> {
+    if (!ehRest) {
+      await delay(null, 200)
+      throw new ErroApi(503, CONSULTA_SEM_BACKEND)
+    }
+    return http<DadosCnpj>(`/consultas/cnpj/${encodeURIComponent(numero.replace(/\D/g, ''))}`)
+  },
+
+  async processo(numero: string): Promise<DadosProcesso> {
+    if (!ehRest) {
+      await delay(null, 200)
+      throw new ErroApi(503, CONSULTA_SEM_BACKEND)
+    }
+    return http<DadosProcesso>(`/consultas/processo/${encodeURIComponent(numero.replace(/\D/g, ''))}`)
+  },
+}
+
 // ---------------- Módulo E — Fotografias ----------------
 export const fotos = {
   /**

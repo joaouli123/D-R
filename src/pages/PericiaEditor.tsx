@@ -33,11 +33,14 @@ import {
 } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { BibliotecaDrawer } from '@/components/BibliotecaDrawer'
+import { BuscaProcesso } from '@/components/BuscaProcesso'
+import type { OrigemConsulta } from '@/components/BuscaCnpj'
 import { DocumentoPreview } from '@/components/DocumentoPreview'
 import { AgenteNr15Fields } from '@/components/AgenteNr15Fields'
 import { EpiSelector } from '@/components/EpiSelector'
 import { useApp } from '@/store/AppStore'
 import * as api from '@/services/api'
+import type { DadosProcesso } from '@/services/api'
 import type {
   AgenteAvaliado,
   Foto,
@@ -56,10 +59,11 @@ import {
   textosPadraoDaPericia,
   type CampoComTextoPadrao,
 } from '@/content/textosPadrao'
+import { patchDoProcesso } from '@/lib/consultas'
 import { aplicarAnexo, usaAtenuacaoRuido } from '@/lib/nr15'
 import { dadosPapel, PAPEIS } from '@/lib/participantes'
 import { comEmpresaVinculada, empresasLivres, opcoesDaLinha } from '@/lib/reclamadas'
-import { maskProcesso, uid } from '@/lib/utils'
+import { uid } from '@/lib/utils'
 
 const ROTULOS_GRAU: Record<NonNullable<AgenteAvaliado['grau']>, string> = {
   minimo: 'Mínimo 10%',
@@ -203,6 +207,25 @@ export default function PericiaEditor() {
   }, [empresaDoAtalho, empresas, id, original])
 
   const set = (patch: Partial<Pericia>) => setP((v) => ({ ...v, ...patch }))
+
+  /**
+   * O que a base pública do CNJ devolveu sobre o processo. O patch é
+   * calculado dentro do updater porque a busca automática só preenche
+   * campo vazio — e o "vazio" que vale é o do estado no momento em que
+   * a resposta chegou, não o de quando a consulta saiu.
+   */
+  function aplicarDadosDoProcesso(dados: DadosProcesso, origem: OrigemConsulta) {
+    setP((atual) => ({
+      ...atual,
+      ...patchDoProcesso(atual, dados, { sobrescrever: origem === 'manual' }),
+    }))
+    toast(
+      origem === 'manual'
+        ? 'Vara e comarca atualizadas com os dados do CNJ.'
+        : 'Vara e comarca preenchidas pela base pública do CNJ.',
+    )
+  }
+
   const setT = (patch: Partial<Pericia['tecnico']>) =>
     setP((v) => ({ ...v, tecnico: { ...v.tecnico, ...patch } }))
 
@@ -435,12 +458,12 @@ export default function PericiaEditor() {
           <Card>
             <CardHeader title="Dados do processo" icon={<FileText size={18} />} />
             <div className="grid gap-4 p-5 sm:grid-cols-2">
-              <Input
-                label="Número do processo"
-                required
-                value={p.numeroProcesso}
-                onChange={(e) => set({ numeroProcesso: maskProcesso(e.target.value) })}
-                placeholder="0000000-00.0000.0.00.0000"
+              <BuscaProcesso
+                className="sm:col-span-2"
+                valor={p.numeroProcesso}
+                onChange={(numeroProcesso) => set({ numeroProcesso })}
+                onDados={aplicarDadosDoProcesso}
+                autoBuscar={!p.vara.trim()}
               />
               <Input
                 label="Vara do Trabalho"

@@ -4,9 +4,12 @@ import { Briefcase, Building2, MapPin, Pencil, Plus, Search, Trash2, User } from
 import { Badge, Button, Card, EmptyState, Input, Modal, Select } from '@/components/ui'
 import { useToast } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
+import { BuscaCnpj, type OrigemConsulta } from '@/components/BuscaCnpj'
 import { useApp } from '@/store/AppStore'
+import type { DadosCnpj } from '@/services/api'
 import type { Empresa } from '@/types'
-import { maskCNPJ, uid, UFS } from '@/lib/utils'
+import { patchDaReceita } from '@/lib/consultas'
+import { uid, UFS } from '@/lib/utils'
 
 // ============================================================
 // MÓDULO B — Cadastro de Empresas (reutilizável entre processos)
@@ -89,6 +92,24 @@ export default function Clientes() {
   }
 
   const set = (patch: Partial<Empresa>) => setEditando((e) => (e ? { ...e, ...patch } : e))
+
+  /**
+   * Cadastro da Receita chegando no formulário. O patch é calculado
+   * dentro do setEditando porque a consulta é assíncrona: entre pedir
+   * e receber, o perito pode ter digitado em outro campo.
+   */
+  function aplicarDadosDaReceita(dados: DadosCnpj, origem: OrigemConsulta) {
+    setEditando((atual) =>
+      atual
+        ? { ...atual, ...patchDaReceita(atual, dados, { sobrescrever: origem === 'manual' }) }
+        : atual,
+    )
+    toast(
+      origem === 'manual'
+        ? 'Cadastro atualizado com os dados da Receita Federal.'
+        : 'Dados da empresa preenchidos pela Receita Federal.',
+    )
+  }
 
   /**
    * Leva a empresa para a perícia escolhida. Ela chega já selecionada como
@@ -238,6 +259,14 @@ export default function Clientes() {
       >
         {editando && (
           <div className="space-y-4">
+            {/* O CNPJ vem primeiro porque é ele que preenche o resto. */}
+            <BuscaCnpj
+              valor={editando.cnpj}
+              onChange={(cnpj) => set({ cnpj })}
+              onDados={aplicarDadosDaReceita}
+              autoBuscar={!editando.razaoSocial.trim()}
+            />
+
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
                 label="Razão social"
@@ -252,14 +281,7 @@ export default function Clientes() {
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Input
-                label="CNPJ"
-                required
-                value={editando.cnpj}
-                onChange={(e) => set({ cnpj: maskCNPJ(e.target.value) })}
-                placeholder="00.000.000/0000-00"
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
               <Input
                 label="CNAE"
                 value={editando.cnae}
@@ -270,7 +292,9 @@ export default function Clientes() {
                 label="Grau de risco"
                 value={editando.grauRisco}
                 onChange={(e) => set({ grauRisco: e.target.value as Empresa['grauRisco'] })}
-                hint="Conforme NR-04"
+                // A Receita não publica grau de risco: ele sai da NR-04
+                // conforme a atividade avaliada, e essa leitura é do perito.
+                hint="Conforme NR-04 — confira pela atividade avaliada."
               >
                 <option value="1">Grau 1</option>
                 <option value="2">Grau 2</option>

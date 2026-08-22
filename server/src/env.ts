@@ -30,6 +30,17 @@ const schema = z.object({
   /// Puppeteer: no container usamos o Chromium do sistema.
   PUPPETEER_EXECUTABLE_PATH: z.string().optional(),
 
+  /// Chave da API Pública do DataJud (CNJ), usada para puxar os dados
+  /// básicos do processo. O próprio CNJ publica esta chave no wiki da
+  /// API — não é segredo. Fica com valor padrão no código para a
+  /// instalação não depender de configuração manual; no dia em que o
+  /// CNJ trocar a chave, basta definir a variável de ambiente, sem
+  /// precisar de novo deploy do código.
+  DATAJUD_API_KEY: z
+    .string()
+    .min(1)
+    .default('cDZHYzlZa0JadVREZDJCendQbXY6SkJlTzNjLV9TRENyQk1RdnFKZGRQdw=='),
+
   /// Credenciais transacionais da Brevo (antiga Sendinblue).
   BREVO_API_KEY: z.string().optional(),
   BREVO_SMTP_HOST: z.string().default('smtp-relay.brevo.com'),
