@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { AlertTriangle, BadgeCheck, History, Plus, Search, ShieldCheck, Trash2, X } from 'lucide-react'
+import { AlertTriangle, BadgeCheck, ExternalLink, History, Plus, RotateCcw, Search, ShieldCheck, Trash2, X } from 'lucide-react'
 
 import { Button, Input } from '@/components/ui'
 import { medicaoAdotada } from '@/lib/medicoes'
@@ -101,6 +101,34 @@ function tomValidade(validade: api.ValidadeNaData, dataReferencia: string) {
   return { cartao: 'border-red-200 bg-red-50', pilula: 'bg-red-100 text-red-900', rotulo: `Sem validade em ${formatDate(dataReferencia)}` }
 }
 
+const PORTAL_CAEPI = 'https://caepi.trabalho.gov.br/internet/ConsultaCAInternet.aspx'
+
+/**
+ * O que dizer quando o protetor auditivo ficou sem NRRsf.
+ *
+ * O sistema busca a ficha do MTE sozinho, mas o portal nem sempre
+ * responde. O perito precisa saber qual é o caso: esperar a próxima
+ * tentativa ou pegar o número no certificado. Sem esse recado, sobra o
+ * que aconteceu no CA 11512 — baixar a ficha no site do Ministério.
+ */
+function recadoSemNrrsf(estado: api.EstadoBuscaNrrsf | null): string {
+  if (estado === 'sem_valor_na_ficha') {
+    return 'A ficha deste CA no site do MTE não traz o NRRsf. Pegue na embalagem ou no certificado do fabricante e preencha uma vez — vale para todas as perícias.'
+  }
+  if (estado === 'portal_bloqueado') {
+    return 'O site do MTE está recusando consultas automáticas neste momento. O sistema tenta de novo sozinho em alguns minutos — ou você busca outra vez agora, ou preenche o valor à mão.'
+  }
+  if (estado === 'falhou') {
+    return 'Não deu para ler a ficha do MTE agora. O sistema tenta de novo sozinho — ou você busca outra vez agora, ou preenche o valor à mão.'
+  }
+  return 'Não consta na base do MTE. Pegue na ficha do CA ou na embalagem e preencha uma vez — vale para todas as perícias.'
+}
+
+/** Falha de rede ou bloqueio passam; ficha sem o campo, não. */
+function valeTentarDeNovo(estado: api.EstadoBuscaNrrsf | null): boolean {
+  return estado === 'portal_bloqueado' || estado === 'falhou'
+}
+
 export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorProps) {
   const tituloId = useId()
   const caId = useId()
@@ -120,6 +148,9 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
   const [campoCaQuimico, setCampoCaQuimico] = useState<'caPecaFacial' | 'caFiltroCartucho'>('caPecaFacial')
   const [nrrsf, setNrrsf] = useState('')
   const [salvandoNrrsf, setSalvandoNrrsf] = useState(false)
+  // Nova ida ao portal pedida pelo perito. Separado do botão "Consultar
+  // CA" para os dois não piscarem juntos.
+  const [buscandoNrrsf, setBuscandoNrrsf] = useState(false)
   const [erroNrrsf, setErroNrrsf] = useState('')
   const [avisoNrrsf, setAvisoNrrsf] = useState('')
   // Sem isso, uma base ainda não carregada devolveria "esse CA não
@@ -206,7 +237,11 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
     setAvisoNrrsf('')
   }
 
-  async function consultarCa() {
+  /**
+   * `forcar` é o perito pedindo o NRRsf de novo depois de o portal do
+   * MTE ter recusado: a busca ignora a pausa automática.
+   */
+  async function consultarCa(forcar = false) {
     const numero = numeroCa.replace(/\D/g, '').replace(/^0+/, '')
     setErroNrrsf('')
     setAvisoNrrsf('')
@@ -216,10 +251,11 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
       return
     }
 
-    setConsultandoCa(true)
+    if (forcar) setBuscandoNrrsf(true)
+    else setConsultandoCa(true)
     setErroCa('')
     try {
-      const encontrada = await api.caepi.consultar(numero, dataVistoria || undefined)
+      const encontrada = await api.caepi.consultar(numero, dataVistoria || undefined, { forcarNrrsf: forcar })
       if (!encontrada) {
         setFicha(null)
         setErroCa(baseVazia
@@ -228,7 +264,11 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
         return
       }
       setFicha(encontrada)
-      setNrrsf(encontrada.atenuacao?.nrrsfDb == null ? '' : String(encontrada.atenuacao.nrrsfDb).replace('.', ','))
+      const valorVindo = encontrada.atenuacao?.nrrsfDb
+      // Numa busca forçada, o que o perito já digitou não é apagado.
+      if (!forcar || valorVindo != null) {
+        setNrrsf(valorVindo == null ? '' : String(valorVindo).replace('.', ','))
+      }
     } catch (e) {
       setFicha(null)
       setErroCa(e instanceof api.ErroApi
@@ -236,6 +276,7 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
         : 'Não foi possível consultar o CA agora. Tente de novo ou informe o EPI manualmente.')
     } finally {
       setConsultandoCa(false)
+      setBuscandoNrrsf(false)
     }
   }
 
@@ -255,6 +296,9 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
       const salvo = await api.caepi.salvarNrrsf(ficha.numeroCa, { nrrsfDb: valor })
       setFicha({
         ...ficha,
+        // Com o valor do perito gravado, não há mais o que buscar; se
+        // ele apagou, volta ao recado genérico de "preencha uma vez".
+        buscaNrrsf: salvo.nrrsfDb == null ? null : 'ja_tinha',
         atenuacao: {
           nrrsfDb: salvo.nrrsfDb,
           fonte: salvo.fonte,
@@ -481,9 +525,38 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
                   </label>
                   <p className="mt-0.5 text-[11px] leading-4 text-ink-500">
                     {nrrsfAtual == null
-                      ? 'Não consta na base do MTE. Pegue na ficha do CA ou na embalagem e preencha uma vez — vale para todas as perícias.'
-                      : `${emDb(nrrsfAtual)} · ${ficha.atenuacao?.fonte === 'PERITO' ? 'preenchido por você' : 'lido da ficha do MTE'}.`}
+                      ? recadoSemNrrsf(ficha.buscaNrrsf)
+                      : `${emDb(nrrsfAtual)} · ${ficha.atenuacao?.fonte === 'PERITO' ? 'preenchido por você' : 'lido da ficha do CA no site do MTE'}.`}
                   </p>
+
+                  {/* Só quando falta o valor: buscar de novo e, ao lado,
+                      o caminho manual — a ficha do CA no portal. */}
+                  {nrrsfAtual == null && (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      {valeTentarDeNovo(ficha.buscaNrrsf) && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className={FOCO_VISIVEL}
+                          loading={buscandoNrrsf}
+                          icon={<RotateCcw size={14} />}
+                          onClick={() => void consultarCa(true)}
+                        >
+                          Buscar no MTE
+                        </Button>
+                      )}
+                      <a
+                        href={PORTAL_CAEPI}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={`inline-flex items-center gap-1 rounded text-[11px] font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-800 ${FOCO_VISIVEL}`}
+                      >
+                        Abrir a ficha do CA no site do MTE
+                        <ExternalLink size={11} aria-hidden="true" />
+                      </a>
+                    </div>
+                  )}
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <input
                       id={nrrsfId}

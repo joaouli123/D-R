@@ -464,6 +464,7 @@ describe('consulta ao CAEPI', () => {
       numeroCa: '11882',
       dataReferencia: '2022-05-01',
       exigeNrrsf: true,
+      buscaNrrsf: 'ja_tinha',
       temHistorico: false,
       vigente: HOMOLOGACAO,
       homologacoes: [HOMOLOGACAO],
@@ -494,7 +495,7 @@ describe('consulta ao CAEPI', () => {
     vi.mocked(api.caepi.consultar).mockResolvedValue(ficha())
     await consultar()
 
-    expect(api.caepi.consultar).toHaveBeenCalledWith('11882', '2022-05-01')
+    expect(api.caepi.consultar).toHaveBeenCalledWith('11882', '2022-05-01', { forcarNrrsf: false })
     expect(await screen.findByText('Válido em 01/05/2022')).toBeDefined()
     expect(screen.getByText(/o CA vencia em 23\/03\/2024/)).toBeDefined()
     expect(screen.getByText(/CA 11882 · PROTETOR AUDITIVO/)).toBeDefined()
@@ -548,6 +549,43 @@ describe('consulta ao CAEPI', () => {
     expect(await screen.findByText(/NRRsf de 17 dB salvo/)).toBeDefined()
     // 90 − 17 = 73 dB(A): abaixo dos 85 dB(A), proteção eficaz.
     expect(screen.getByText(/90 − 17 = 73 dB\(A\).*proteção eficaz/)).toBeDefined()
+  })
+
+  it('usa o NRRsf que o sistema foi buscar sozinho na ficha do MTE', async () => {
+    vi.mocked(api.caepi.consultar).mockResolvedValue(ficha({
+      buscaNrrsf: 'encontrado',
+      atenuacao: { nrrsfDb: 21, fonte: 'CAEPI', bandas: null, observacao: null, fichaConsultadaEm: '2026-08-22T10:00:00.000Z' },
+    }))
+    await consultar()
+
+    expect(await screen.findByText(/21 dB · lido da ficha do CA no site do MTE/)).toBeDefined()
+    // Com o valor em mãos, nada de mandar o perito ao site do MTE.
+    expect(screen.queryByRole('button', { name: 'Buscar no MTE' })).toBeNull()
+  })
+
+  it('com o portal do MTE recusando, explica e deixa buscar de novo', async () => {
+    vi.mocked(api.caepi.consultar).mockResolvedValue(ficha({ buscaNrrsf: 'portal_bloqueado', atenuacao: null }))
+    const { user } = await consultar()
+
+    expect(await screen.findByText(/recusando consultas automáticas/)).toBeDefined()
+
+    vi.mocked(api.caepi.consultar).mockResolvedValue(ficha({
+      buscaNrrsf: 'encontrado',
+      atenuacao: { nrrsfDb: 21, fonte: 'CAEPI', bandas: null, observacao: null, fichaConsultadaEm: null },
+    }))
+    await user.click(screen.getByRole('button', { name: 'Buscar no MTE' }))
+
+    expect(api.caepi.consultar).toHaveBeenLastCalledWith('11882', '2022-05-01', { forcarNrrsf: true })
+    expect(await screen.findByText(/21 dB · lido da ficha do CA no site do MTE/)).toBeDefined()
+  })
+
+  it('quando a ficha do MTE não traz o NRRsf, manda direto para o certificado', async () => {
+    vi.mocked(api.caepi.consultar).mockResolvedValue(ficha({ buscaNrrsf: 'sem_valor_na_ficha', atenuacao: null }))
+    await consultar()
+
+    expect(await screen.findByText(/não traz o NRRsf/)).toBeDefined()
+    // Insistir no portal não adiantaria: a ficha existe e não tem o campo.
+    expect(screen.queryByRole('button', { name: 'Buscar no MTE' })).toBeNull()
   })
 
   it('recusa NRRsf fora da faixa sem chamar o servidor', async () => {
@@ -625,7 +663,7 @@ describe('consulta ao CAEPI', () => {
     vi.mocked(api.caepi.consultar).mockResolvedValue(ficha())
     await consultar({ dataReferencia: undefined })
 
-    expect(api.caepi.consultar).toHaveBeenCalledWith('11882', undefined)
+    expect(api.caepi.consultar).toHaveBeenCalledWith('11882', undefined, { forcarNrrsf: false })
     expect(screen.getByText('Validade conferida em hoje')).toBeDefined()
     expect(screen.getByText(/Preencha a data da vistoria/)).toBeDefined()
   })

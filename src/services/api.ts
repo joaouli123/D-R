@@ -233,10 +233,25 @@ export interface AtenuacaoCa {
   fichaConsultadaEm: string | null
 }
 
+/**
+ * O que a API fez para achar o NRRsf nesta consulta. O valor só existe
+ * na ficha individual do MTE, e o portal fica atrás do Cloudflare — daí
+ * a diferença entre "a ficha não publica o número" e "o portal recusou".
+ */
+export type EstadoBuscaNrrsf =
+  | 'ja_tinha'
+  | 'encontrado'
+  | 'sem_valor_na_ficha'
+  | 'ca_inexistente'
+  | 'portal_bloqueado'
+  | 'falhou'
+
 export interface FichaCa {
   numeroCa: string
   dataReferencia: string
   exigeNrrsf: boolean
+  /** Null quando não é protetor auditivo: aí não há NRRsf a procurar. */
+  buscaNrrsf: EstadoBuscaNrrsf | null
   /** O CA foi renovado com validades diferentes — muda a resposta do laudo. */
   temHistorico: boolean
   vigente: HomologacaoCa | null
@@ -290,6 +305,7 @@ interface FiltrosCa {
   /** Data da perícia (aaaa-mm-dd). Sem ela, a referência é hoje. */
   em?: string
   limite?: number
+  buscarNrrsf?: 'forcar'
 }
 
 const CAEPI_SEM_BACKEND = 'A consulta ao CAEPI exige o backend ativo. Informe o EPI manualmente.'
@@ -309,14 +325,23 @@ export const caepi = {
    * Ficha de um CA na data da perícia. Devolve null quando o número não
    * consta na base: isso é resposta, não falha — o perito segue pelo
    * cadastro manual.
+   *
+   * Sendo protetor auditivo sem NRRsf gravado, a API busca a ficha do
+   * MTE na hora. `forcarNrrsf` é o perito pedindo de novo depois de o
+   * portal ter recusado — ignora a pausa automática.
    */
-  async consultar(numeroCa: string, em?: string): Promise<FichaCa | null> {
+  async consultar(
+    numeroCa: string,
+    em?: string,
+    opcoes: { forcarNrrsf?: boolean } = {},
+  ): Promise<FichaCa | null> {
     if (!ehRest) {
       await delay(null, 200)
       throw new ErroApi(503, CAEPI_SEM_BACKEND)
     }
+    const filtros: FiltrosCa = { ...(em ? { em } : {}), ...(opcoes.forcarNrrsf ? { buscarNrrsf: 'forcar' as const } : {}) }
     try {
-      return await http<FichaCa>(`/caepi/cas/${encodeURIComponent(numeroCa)}${parametrosCa({ em })}`)
+      return await http<FichaCa>(`/caepi/cas/${encodeURIComponent(numeroCa)}${parametrosCa(filtros)}`)
     } catch (e) {
       if (e instanceof ErroApi && e.status === 404) return null
       throw e

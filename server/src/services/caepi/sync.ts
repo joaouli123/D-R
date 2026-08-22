@@ -22,6 +22,7 @@ import { prisma } from '../../prisma.js'
 import { lerCaepi } from './csv.js'
 import { chaveRegistro, mapearLinha, mesclarRegistros, type RegistroCa } from './mapear.js'
 import { normalizarNrrsf } from './normalizar.js'
+import { gravarAtenuacaoDaFicha } from './nrrsf.js'
 import { baixarBaseCaepi, buscarFicha } from './portal.js'
 
 /** Colunas gravadas a partir do CSV, na ordem dos parâmetros. */
@@ -241,21 +242,10 @@ export async function sincronizarFichas(opcoes: OpcoesFichas = {}): Promise<Resu
       const nrrsf = normalizarNrrsf(ficha?.nrrsfBruto)
       const bandas = ficha?.bandas && Object.keys(ficha.bandas).length ? JSON.stringify(ficha.bandas) : null
 
-      // Marca a visita mesmo sem NRRsf, senão a próxima rodada
-      // tentaria os mesmos CAs sem valor para sempre.
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "cas_atenuacao" ("numeroCa", "nrrsfDb", "fonte", "bandas", "fichaConsultadaEm", "atualizadoEm")
-         VALUES ($1, $2, 'CAEPI', $3::jsonb, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-         ON CONFLICT ("numeroCa") DO UPDATE SET
-           "nrrsfDb"           = COALESCE(EXCLUDED."nrrsfDb", "cas_atenuacao"."nrrsfDb"),
-           "bandas"            = COALESCE(EXCLUDED."bandas", "cas_atenuacao"."bandas"),
-           "fichaConsultadaEm" = CURRENT_TIMESTAMP,
-           "atualizadoEm"      = CURRENT_TIMESTAMP
-         WHERE "cas_atenuacao"."fonte" <> 'PERITO'`,
-        numeroCa,
-        nrrsf,
-        bandas,
-      )
+      // Mesma gravação da busca sob demanda: marca a visita mesmo sem
+      // NRRsf, senão a próxima rodada tentaria os mesmos CAs para
+      // sempre, e nunca encosta no valor de fonte PERITO.
+      await gravarAtenuacaoDaFicha(numeroCa, nrrsf, bandas)
 
       if (nrrsf != null) comNrrsf += 1
       opcoes.aoProgredir?.(numeroCa, nrrsf)

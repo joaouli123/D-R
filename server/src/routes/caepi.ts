@@ -5,6 +5,7 @@ import { ErroHttp, parametro, rota } from '../erros.js'
 import { descomprimirCsvCaepi, pareceComprimido } from '../services/caepi/arquivo.js'
 import { avaliar, escolherHomologacao, hojeIso } from '../services/caepi/consulta.js'
 import { normalizarNumeroCa, normalizarNrrsf } from '../services/caepi/normalizar.js'
+import { buscadorNrrsf, type Buscador, type EstadoBuscaNrrsf } from '../services/caepi/nrrsf.js'
 import { repositorioPrisma, type RepositorioCaepi } from '../services/caepi/repositorio.js'
 import { sincronizar } from '../services/caepi/sync.js'
 
@@ -36,7 +37,12 @@ const consultaSchema = z.object({
   limite: z.coerce.number().int().min(1).max(200).optional(),
 })
 
-const referenciaSchema = z.object({ em: dataIso.optional() })
+const fichaSchema = z.object({
+  em: dataIso.optional(),
+  // O perito clicando "buscar de novo" depois de o portal ter caído.
+  // Ignora o disjuntor, que existe para o caso automático.
+  buscarNrrsf: z.enum(['forcar']).optional(),
+})
 
 const importacaoSchema = z.object({
   // O nome do arquivo é o que diz se veio comprimido — a mesma regra
@@ -59,7 +65,10 @@ function exigirNumeroCa(bruto: string): string {
   return numero
 }
 
-export function criarCaepiRouter(repositorio: RepositorioCaepi = repositorioPrisma) {
+export function criarCaepiRouter(
+  repositorio: RepositorioCaepi = repositorioPrisma,
+  buscador: Buscador = buscadorNrrsf,
+) {
   const caepiRouter = Router()
   caepiRouter.use(exigirSessao)
 
@@ -140,11 +149,16 @@ export function criarCaepiRouter(repositorio: RepositorioCaepi = repositorioPris
   )
 
   // Ficha completa de um CA: todas as homologações + atenuação.
+  //
+  // Quando é protetor auditivo e o NRRsf ainda não está no espelho, a
+  // ficha individual do MTE é buscada aqui mesmo — é a única fonte do
+  // valor, e deixar isso para um lote manual significava, na prática,
+  // o perito ir buscar o certificado no site do Ministério à mão.
   caepiRouter.get(
     '/cas/:numero',
     rota(async (req, res) => {
       const numeroCa = exigirNumeroCa(parametro(req, 'numero'))
-      const { em } = referenciaSchema.parse(req.query)
+      const { em, buscarNrrsf } = fichaSchema.parse(req.query)
       const dataReferencia = em ?? hojeIso()
 
       const homologacoes = await repositorio.homologacoesDe(numeroCa)
@@ -155,13 +169,28 @@ export function criarCaepiRouter(repositorio: RepositorioCaepi = repositorioPris
         )
       }
 
-      const atenuacao = await repositorio.atenuacaoDe(numeroCa)
+      let atenuacao = await repositorio.atenuacaoDe(numeroCa)
       const exigeNrrsf = homologacoes.some((registro) => registro.exigeNrrsf)
+
+      // Só protetor auditivo tem NRRsf, e valor do perito nunca é
+      // trocado pelo da ficha — por isso a busca só entra quando falta.
+      let buscaNrrsf: EstadoBuscaNrrsf | null = null
+      if (exigeNrrsf) {
+        if (atenuacao?.nrrsfDb != null && buscarNrrsf !== 'forcar') {
+          buscaNrrsf = 'ja_tinha'
+        } else {
+          buscaNrrsf = (await buscador.garantir(numeroCa, buscarNrrsf === 'forcar')).estado
+          if (buscaNrrsf === 'encontrado') atenuacao = await repositorio.atenuacaoDe(numeroCa)
+        }
+      }
 
       res.json({
         numeroCa,
         dataReferencia,
         exigeNrrsf,
+        // O que aconteceu com a busca automática. O front usa para
+        // dizer se vale esperar ou se é caso de digitar o valor.
+        buscaNrrsf,
         // Mais de uma homologação = o CA foi renovado com validades
         // diferentes. O front avisa, porque muda a resposta do laudo.
         temHistorico: homologacoes.length > 1,

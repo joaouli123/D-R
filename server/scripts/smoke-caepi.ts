@@ -37,7 +37,8 @@ const { chaveRegistro, mapearLinha, mesclarRegistros } = await import('../src/se
 const { COLUNAS_CSV, TAMANHO_LOTE, montarUpsert } = await import('../src/services/caepi/sync.js')
 const { escolherHomologacao, montarTsQuery, EXPRESSAO_BUSCA } = await import('../src/services/caepi/consulta.js')
 const { montarBusca } = await import('../src/services/caepi/repositorio.js')
-const { ehDesafioCloudflare, extrairFicha } = await import('../src/services/caepi/portal.js')
+const { ehDesafioCloudflare, ErroDesafioCloudflare, extrairFicha } = await import('../src/services/caepi/portal.js')
+const { criarBuscadorNrrsf } = await import('../src/services/caepi/nrrsf.js')
 const { criarCaepiRouter } = await import('../src/routes/caepi.js')
 const { tratarErros } = await import('../src/erros.js')
 
@@ -45,6 +46,9 @@ type LinhaCaepi = import('../src/services/caepi/csv.js').LinhaCaepi
 type RegistroCa = import('../src/services/caepi/mapear.js').RegistroCa
 type Homologacao = import('../src/services/caepi/consulta.js').Homologacao
 type RepositorioCaepi = import('../src/services/caepi/repositorio.js').RepositorioCaepi
+type Atenuacao = import('../src/services/caepi/repositorio.js').Atenuacao
+type Buscador = import('../src/services/caepi/nrrsf.js').Buscador
+type FichaCa = import('../src/services/caepi/portal.js').FichaCa
 
 const conferidos: string[] = []
 const marcar = (texto: string) => conferidos.push(texto)
@@ -392,19 +396,160 @@ assert.equal(ehDesafioCloudflare(200, 'Just a moment...'), false, 'página norma
 marcar('desafio do Cloudflare é reconhecido e vira instrução de baixar o arquivo à mão')
 
 // ------------------------------------------------------------
-// 12. Rotas HTTP
+// 12. Busca do NRRsf sob demanda
+//
+// O valor só existe na ficha individual, e o portal cai. O que se
+// garante aqui: uma ida por CA, ninguém pagando ida perdida durante um
+// bloqueio, e o CA que falhou voltando para a fila em vez de sumir.
+// ------------------------------------------------------------
+
+const fichaDoPortal = (nrrsfBruto: string | null): FichaCa => ({
+  numeroCa: '11512',
+  nrrsfBruto,
+  bandas: nrrsfBruto ? { '125': '21' } : {},
+  validadeBruta: null,
+  situacaoBruta: null,
+  equipamento: 'PROTETOR AUDITIVO',
+  referencia: null,
+})
+
+const gravacoes: { numeroCa: string; nrrsfDb: number | null; bandas: string | null }[] = []
+const gravarFicha = async (numeroCa: string, nrrsfDb: number | null, bandas: string | null) => {
+  gravacoes.push({ numeroCa, nrrsfDb, bandas })
+}
+
+// 12.1 — dois peritos no mesmo CA fazem uma ida só ao portal
+let idasAoPortal = 0
+const buscadorFeliz = criarBuscadorNrrsf({
+  buscar: async () => {
+    idasAoPortal += 1
+    return fichaDoPortal('17 dB')
+  },
+  gravar: gravarFicha,
+  pausaEntreRepescagensMs: 0,
+})
+const juntos = await Promise.all([buscadorFeliz.garantir('11512'), buscadorFeliz.garantir('11512')])
+assert.deepEqual(juntos[0], { estado: 'encontrado', nrrsfDb: 17 })
+assert.deepEqual(juntos[1], { estado: 'encontrado', nrrsfDb: 17 })
+assert.equal(idasAoPortal, 1)
+assert.equal(gravacoes.length, 1)
+assert.equal(gravacoes[0]?.nrrsfDb, 17)
+assert.ok(gravacoes[0]?.bandas?.includes('125'), 'a tabela de atenuação vem junto')
+assert.deepEqual(buscadorFeliz.situacao().naFila, [], 'deu certo, nada a repescar')
+
+// 12.2 — ficha sem a coluna: registra a visita para não tentar de novo
+gravacoes.length = 0
+const semColuna = criarBuscadorNrrsf({
+  buscar: async () => fichaDoPortal(null),
+  gravar: gravarFicha,
+  pausaEntreRepescagensMs: 0,
+})
+assert.deepEqual(await semColuna.garantir('11512'), { estado: 'sem_valor_na_ficha' })
+assert.equal(gravacoes.length, 1)
+assert.equal(gravacoes[0]?.nrrsfDb, null)
+assert.deepEqual(semColuna.situacao().naFila, [])
+
+// 12.3 — CA que o portal não conhece não vira gravação nem fila
+gravacoes.length = 0
+const semCa = criarBuscadorNrrsf({
+  buscar: async () => null,
+  gravar: gravarFicha,
+  pausaEntreRepescagensMs: 0,
+})
+assert.deepEqual(await semCa.garantir('99999999'), { estado: 'ca_inexistente' })
+assert.equal(gravacoes.length, 0)
+assert.deepEqual(semCa.situacao().naFila, [])
+
+// 12.4 — Cloudflare abre o disjuntor; o perito ainda pode forçar
+let instante = 1_000_000
+let tentativasBloqueadas = 0
+const comBloqueio = criarBuscadorNrrsf({
+  buscar: async () => {
+    tentativasBloqueadas += 1
+    throw new ErroDesafioCloudflare()
+  },
+  gravar: gravarFicha,
+  agora: () => instante,
+  pausaAposBloqueioMs: 600_000,
+  // Sem timer: a repescagem é exercitada na mão, e o smoke não
+  // fica com relógio pendurado.
+  pausaEntreRepescagensMs: 0,
+})
+
+assert.deepEqual(await comBloqueio.garantir('11512'), { estado: 'portal_bloqueado' })
+assert.deepEqual(comBloqueio.situacao().naFila, ['11512'], 'o CA volta para a fila')
+assert.equal(comBloqueio.situacao().portalBloqueadoAte, instante + 600_000)
+
+assert.deepEqual(await comBloqueio.garantir('18189'), { estado: 'portal_bloqueado' })
+assert.equal(tentativasBloqueadas, 1, 'durante a pausa ninguém paga ida perdida ao portal')
+assert.deepEqual(comBloqueio.situacao().naFila, ['11512', '18189'])
+
+assert.deepEqual(await comBloqueio.garantir('11512', true), { estado: 'portal_bloqueado' })
+assert.equal(tentativasBloqueadas, 2, 'pedido do perito passa por cima da pausa')
+
+instante += 600_001
+assert.deepEqual(await comBloqueio.garantir('18189'), { estado: 'portal_bloqueado' })
+assert.equal(tentativasBloqueadas, 3, 'passada a pausa, volta a tentar sozinho')
+
+// 12.5 — falha comum: insiste algumas vezes e desiste
+const comFalha = criarBuscadorNrrsf({
+  buscar: async () => {
+    throw new Error('conexão caiu')
+  },
+  gravar: gravarFicha,
+  tentativasPorCa: 2,
+  pausaEntreRepescagensMs: 0,
+})
+assert.deepEqual(await comFalha.garantir('11512'), { estado: 'falhou' })
+assert.deepEqual(await comFalha.garantir('11512'), { estado: 'falhou' })
+assert.deepEqual(comFalha.situacao().naFila, ['11512'])
+assert.deepEqual(await comFalha.garantir('11512'), { estado: 'falhou' })
+assert.deepEqual(comFalha.situacao().naFila, [], 'depois de insistir demais, o CA sai da fila')
+
+// 12.6 — portal fora do ar não vira fila crescendo sem limite
+const filaCheia = criarBuscadorNrrsf({
+  buscar: async () => {
+    throw new Error('conexão caiu')
+  },
+  gravar: gravarFicha,
+  tamanhoMaximoDaFila: 2,
+  pausaEntreRepescagensMs: 0,
+})
+for (const numero of ['11512', '18189', '11882']) await filaCheia.garantir(numero)
+assert.deepEqual(filaCheia.situacao().naFila, ['11512', '18189'])
+
+// 12.7 — a gravação em si precisa de banco; o que dá para garantir sem
+// ele é que o SQL compartilhado nunca encosta no valor do perito.
+const fonteNrrsf = await readFile(new URL('../src/services/caepi/nrrsf.ts', import.meta.url), 'utf8')
+assert.ok(fonteNrrsf.includes(`WHERE "cas_atenuacao"."fonte" <> 'PERITO'`))
+assert.ok(fonteNrrsf.includes('COALESCE(EXCLUDED."nrrsfDb"'), 'ficha sem valor não apaga o que já havia')
+const fonteSync = await readFile(new URL('../src/services/caepi/sync.ts', import.meta.url), 'utf8')
+assert.ok(
+  fonteSync.includes('gravarAtenuacaoDaFicha'),
+  'o lote e a busca sob demanda gravam pelo mesmo caminho',
+)
+marcar('NRRsf é buscado na hora, uma vez por CA, com disjuntor no bloqueio e fila para tentar de novo')
+
+// ------------------------------------------------------------
+// 13. Rotas HTTP
 // ------------------------------------------------------------
 
 const chamadas: { metodo: string; argumentos: unknown[] }[] = []
 let atenuacaoGravada: { nrrsfDb: number | null; observacao: string | null } | null = null
 
+// O CA 11512 é o caso real: protetor auditivo sem NRRsf no espelho. É
+// ele que a rota tem de ir buscar na ficha do MTE, em vez de deixar o
+// perito baixar o certificado à mão.
+let atenuacaoDoPortal: Atenuacao | null = null
+
 const repositorioFalso: RepositorioCaepi = {
   async homologacoesDe(numeroCa) {
     chamadas.push({ metodo: 'homologacoesDe', argumentos: [numeroCa] })
-    return numeroCa === '14168' ? historico : []
+    return numeroCa === '14168' || numeroCa === '11512' ? historico : []
   },
   async atenuacaoDe(numeroCa) {
     chamadas.push({ metodo: 'atenuacaoDe', argumentos: [numeroCa] })
+    if (numeroCa === '11512') return atenuacaoDoPortal
     return {
       numeroCa,
       nrrsfDb: 17,
@@ -448,10 +593,29 @@ const repositorioFalso: RepositorioCaepi = {
   },
 }
 
+// Buscador injetado: nenhum teste pode acabar batendo no portal do MTE.
+const buscadorFalso: Buscador = {
+  async garantir(numeroCa, forcar = false) {
+    chamadas.push({ metodo: 'garantir', argumentos: [numeroCa, forcar] })
+    atenuacaoDoPortal = {
+      numeroCa,
+      nrrsfDb: 13,
+      fonte: 'CAEPI',
+      bandas: null,
+      observacao: null,
+      fichaConsultadaEm: new Date('2026-08-22T10:00:00Z'),
+      atualizadoEm: new Date('2026-08-22T10:00:00Z'),
+    }
+    return { estado: 'encontrado', nrrsfDb: 13 }
+  },
+  situacao: () => ({ portalBloqueadoAte: 0, naFila: [] }),
+  pararRepescagem: () => {},
+}
+
 const app = express()
 app.use(express.json())
 app.use(cookieParser())
-app.use('/caepi', criarCaepiRouter(repositorioFalso))
+app.use('/caepi', criarCaepiRouter(repositorioFalso, buscadorFalso))
 app.use(tratarErros)
 
 const servidor = await new Promise<ReturnType<typeof app.listen>>((resolver) => {
@@ -473,18 +637,19 @@ try {
       headers: { cookie: `dr_sessao=${token}`, 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
     })
 
-  // 12.1 — sem sessão não passa nada
+  // 13.1 — sem sessão não passa nada
   assert.equal((await fetch(`${base}/caepi/cas/14168`)).status, 401)
   assert.equal((await fetch(`${base}/caepi/status`)).status, 401)
   assert.equal(chamadas.length, 0, 'nenhuma consulta ao repositório antes de autenticar')
 
-  // 12.2 — ficha do CA na data da perícia
+  // 13.2 — ficha do CA na data da perícia
   const resposta = await pedir('/caepi/cas/014168?em=2010-06-01')
   assert.equal(resposta.status, 200)
   const ficha = (await resposta.json()) as {
     numeroCa: string
     dataReferencia: string
     exigeNrrsf: boolean
+    buscaNrrsf: string
     temHistorico: boolean
     vigente: { processo: string; validade: { valido: boolean; motivo: string } }
     homologacoes: { processo: string; validade: { valido: boolean } }[]
@@ -502,20 +667,52 @@ try {
   assert.equal(ficha.atenuacao.nrrsfDb, 17)
   assert.equal(ficha.atenuacao.fonte, 'PERITO')
 
-  // 12.3 — sem ?em= a referência é hoje, e a resposta diz qual data usou
+  // 13.2b — CA com NRRsf do perito não vai ao portal
+  assert.equal(ficha.buscaNrrsf, 'ja_tinha', 'com valor gravado não se incomoda o portal do MTE')
+  assert.equal(chamadas.some((c) => c.metodo === 'garantir'), false)
+
+  // 13.2c — o caso do CA 11512: sem NRRsf no espelho, a rota busca a
+  // ficha na hora e devolve o valor já gravado.
+  const semNrrsf = await pedir('/caepi/cas/11512?em=2010-06-01')
+  assert.equal(semNrrsf.status, 200)
+  const buscada = (await semNrrsf.json()) as {
+    buscaNrrsf: string
+    atenuacao: { nrrsfDb: number; fonte: string } | null
+  }
+  assert.equal(buscada.buscaNrrsf, 'encontrado')
+  assert.equal(buscada.atenuacao?.nrrsfDb, 13, 'o valor da ficha volta na mesma resposta')
+  assert.equal(buscada.atenuacao?.fonte, 'CAEPI')
+  assert.deepEqual(chamadas.find((c) => c.metodo === 'garantir')?.argumentos, ['11512', false])
+
+  // 13.2d — já tendo valor, só busca de novo se o perito pedir
+  const deNovo = (await (await pedir('/caepi/cas/11512?buscarNrrsf=forcar')).json()) as { buscaNrrsf: string }
+  assert.equal(deNovo.buscaNrrsf, 'encontrado')
+  assert.deepEqual(
+    chamadas.filter((c) => c.metodo === 'garantir').at(-1)?.argumentos,
+    ['11512', true],
+    'o pedido do perito ignora a pausa automática',
+  )
+  assert.equal(
+    ((await (await pedir('/caepi/cas/11512')).json()) as { buscaNrrsf: string }).buscaNrrsf,
+    'ja_tinha',
+    'sem forçar, o valor já buscado basta',
+  )
+  assert.equal((await pedir('/caepi/cas/11512?buscarNrrsf=sim')).status, 422)
+
+  // 13.3 — sem ?em= a referência é hoje, e a resposta diz qual data usou
   const semData = (await (await pedir('/caepi/cas/14168')).json()) as { dataReferencia: string }
   assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(semData.dataReferencia))
 
-  // 12.4 — CA inexistente explica o que fazer
+  // 13.4 — CA inexistente explica o que fazer
   const inexistente = await pedir('/caepi/cas/99999999')
   assert.equal(inexistente.status, 404)
   assert.ok(((await inexistente.json()) as { erro: string }).erro.includes('manualmente'))
 
-  // 12.5 — entradas inválidas
+  // 13.5 — entradas inválidas
   assert.equal((await pedir('/caepi/cas/abc')).status, 400)
   assert.equal((await pedir('/caepi/cas/14168?em=01/06/2010')).status, 422)
 
-  // 12.6 — busca repassa os filtros já normalizados
+  // 13.6 — busca repassa os filtros já normalizados
   const listagem = await pedir('/caepi/cas?q=3m&anexo=Anexo%201&auditivo=1&em=2010-06-01&limite=5')
   assert.equal(listagem.status, 200)
   const lista = (await listagem.json()) as {
@@ -534,7 +731,7 @@ try {
     limite: 5,
   })
 
-  // 12.7 — NRRsf do perito: aceita vírgula, recusa fora de faixa, permite limpar
+  // 13.7 — NRRsf do perito: aceita vírgula, recusa fora de faixa, permite limpar
   const gravado = await pedir('/caepi/cas/14168/atenuacao', {
     method: 'PATCH',
     body: JSON.stringify({ nrrsfDb: '21,5', observacao: '  Medido em campo.  ' }),
@@ -563,11 +760,11 @@ try {
     'não grava NRRsf para CA que não existe na base',
   )
 
-  // 12.8 — status
+  // 13.8 — status
   const status = (await (await pedir('/caepi/status')).json()) as { totais: { cas: number } }
   assert.equal(status.totais.cas, 42321)
 
-  // 12.9 — carga da base pelo painel: quem pode e o que é aceito.
+  // 13.9 — carga da base pelo painel: quem pode e o que é aceito.
   //
   // Só as recusas são exercitadas aqui, e de propósito: todas param
   // antes de `sincronizar`, que precisa de banco. A carga em si é o
@@ -603,7 +800,7 @@ try {
 marcar('rotas exigem sessão, respondem na data de referência, validam NRRsf e só deixam admin trocar a base')
 
 // ------------------------------------------------------------
-// 13. Sincronização de ponta a ponta (sem banco)
+// 14. Sincronização de ponta a ponta (sem banco)
 // ------------------------------------------------------------
 
 const { sincronizarBase } = await import('../src/services/caepi/sync.js')
@@ -652,7 +849,7 @@ assert.ok(TAMANHO_LOTE * COLUNAS_CSV.length < 65535)
 marcar('sincronização agrega o CSV, mescla o mesmo CA e grava em lotes de 500')
 
 // ------------------------------------------------------------
-// 14. Leitura do .csv.gz do portal
+// 15. Leitura do .csv.gz do portal
 //
 // É o caminho que a produção usa (`sync:caepi --arquivo`). O arquivo
 // do MTE traz lixo colado depois do fim do membro gzip: o gunzip
