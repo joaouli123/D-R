@@ -667,6 +667,104 @@ describe('consulta ao CAEPI', () => {
     expect(screen.getByText('Validade conferida em hoje')).toBeDefined()
     expect(screen.getByText(/Preencha a data da vistoria/)).toBeDefined()
   })
+
+  /**
+   * O NRRsf quase nunca chega antes do EPI: o perito adiciona o protetor
+   * ao laudo e só depois o número aparece — numa segunda tentativa do
+   * portal ou digitado da ficha do MTE. Aqui o agente precisa de estado
+   * de verdade; com onChange de mentira o EPI nunca chega ao agente e o
+   * teste passaria sem provar nada.
+   */
+  function Laudo({ aoMudar }: { aoMudar: (agente: AgenteAvaliado) => void }) {
+    const [agente, setAgente] = useState<AgenteAvaliado>(AGENTE_RUIDO)
+    return (
+      <EpiSelector
+        agente={agente}
+        dataReferencia="2022-05-01"
+        onChange={(atualizado) => { setAgente(atualizado); aoMudar(atualizado) }}
+      />
+    )
+  }
+
+  /**
+   * Adicionar ao laudo limpa a consulta, então o perito digita o CA de
+   * novo para mexer no NRRsf — é por esse caminho que o número chega
+   * atrasado, e é ele que precisa ser testado.
+   */
+  async function comEpiNoLaudo(inicial: api.FichaCa, aoVoltar = inicial) {
+    const user = userEvent.setup()
+    const aoMudar = vi.fn()
+    vi.mocked(api.epis.listar).mockResolvedValue([])
+    vi.mocked(api.caepi.consultar).mockResolvedValue(inicial)
+
+    render(<Laudo aoMudar={aoMudar} />)
+    await user.type(screen.getByLabelText('Número do CA'), '11882')
+    await user.click(screen.getByRole('button', { name: 'Consultar CA' }))
+    await user.click(await screen.findByRole('button', { name: 'Adicionar ao laudo' }))
+
+    vi.mocked(api.caepi.consultar).mockResolvedValue(aoVoltar)
+    await user.type(screen.getByLabelText('Número do CA'), '11882')
+    await user.click(screen.getByRole('button', { name: 'Consultar CA' }))
+    await screen.findByRole('button', { name: 'Já adicionado' })
+    return { user, aoMudar }
+  }
+
+  it('leva ao EPI já no laudo o NRRsf que o perito digitou depois', async () => {
+    const { user } = await comEpiNoLaudo(ficha({ buscaNrrsf: 'sem_valor_na_ficha', atenuacao: null }))
+    expect(screen.getByText('Atenuação (NRRsf): não informada')).toBeDefined()
+
+    vi.mocked(api.caepi.salvarNrrsf).mockResolvedValue({
+      numeroCa: '11882',
+      nrrsfDb: 21,
+      fonte: 'PERITO',
+      observacao: null,
+      atualizadoEm: '2026-08-22T12:00:00.000Z',
+    })
+    await user.type(screen.getByLabelText('NRRsf (atenuação do protetor)'), '21')
+    await user.click(screen.getByRole('button', { name: 'Salvar NRRsf' }))
+
+    // Sem isto o perito preenche o número, vê a ficha certa na tela e o
+    // laudo sai com o protetor sem atenuação nenhuma.
+    expect(await screen.findByText('Atenuação (NRRsf): 21 dB')).toBeDefined()
+  })
+
+  it('leva ao EPI já no laudo o NRRsf que o portal devolveu na segunda tentativa', async () => {
+    const { user } = await comEpiNoLaudo(ficha({ buscaNrrsf: 'portal_bloqueado', atenuacao: null }))
+    expect(screen.getByText('Atenuação (NRRsf): não informada')).toBeDefined()
+
+    vi.mocked(api.caepi.consultar).mockResolvedValue(ficha({
+      buscaNrrsf: 'encontrado',
+      atenuacao: { nrrsfDb: 15, fonte: 'CAEPI', bandas: null, observacao: null, fichaConsultadaEm: null },
+    }))
+    await user.click(screen.getByRole('button', { name: 'Buscar no MTE' }))
+
+    expect(await screen.findByText('Atenuação (NRRsf): 15 dB')).toBeDefined()
+  })
+
+  it('não apaga a atenuação do laudo quando a nova consulta volta sem NRRsf', async () => {
+    await comEpiNoLaudo(ficha(), ficha({ buscaNrrsf: 'portal_bloqueado', atenuacao: null }))
+
+    expect(await screen.findByText(/recusando consultas automáticas/)).toBeDefined()
+    // O portal ter falhado não desmente o número que já estava no laudo.
+    expect(screen.getByText('Atenuação (NRRsf): 17 dB')).toBeDefined()
+  })
+
+  it('apaga também no EPI do laudo quando o perito apaga o NRRsf', async () => {
+    const { user } = await comEpiNoLaudo(ficha())
+    expect(screen.getByText('Atenuação (NRRsf): 17 dB')).toBeDefined()
+
+    vi.mocked(api.caepi.salvarNrrsf).mockResolvedValue({
+      numeroCa: '11882',
+      nrrsfDb: null,
+      fonte: 'PERITO',
+      observacao: null,
+      atualizadoEm: '2026-08-22T12:00:00.000Z',
+    })
+    await user.clear(screen.getByLabelText('NRRsf (atenuação do protetor)'))
+    await user.click(screen.getByRole('button', { name: 'Salvar NRRsf' }))
+
+    expect(await screen.findByText('Atenuação (NRRsf): não informada')).toBeDefined()
+  })
 })
 
 describe('compatibilidade de agentes sem referencia especializada', () => {

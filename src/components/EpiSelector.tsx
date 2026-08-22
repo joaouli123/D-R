@@ -129,6 +129,35 @@ function valeTentarDeNovo(estado: api.EstadoBuscaNrrsf | null): boolean {
   return estado === 'portal_bloqueado' || estado === 'falhou'
 }
 
+/**
+ * O NRRsf que só aparece depois — porque o portal do MTE demorou a
+ * responder, ou porque o perito digitou o número do certificado — tem de
+ * alcançar o EPI que já foi para o laudo. Sem isso o perito preenche o
+ * valor, vê o número na ficha e o laudo segue com o protetor sem
+ * atenuação: o mesmo "não puxou" do CA 11512, só que mais escondido.
+ *
+ * Devolve null quando nada muda, para não disparar gravação à toa.
+ */
+function comNrrsfAtualizado(
+  epis: EpiSelecionado[],
+  numeroCa: string,
+  nrrsfDb: number | null,
+): EpiSelecionado[] | null {
+  let mudou = false
+  const atualizados = epis.map((epi) => {
+    const ehDesteCa =
+      epi.caUnico === numeroCa || epi.caPecaFacial === numeroCa || epi.caFiltroCartucho === numeroCa
+    if (!ehDesteCa || (epi.nivelProtecaoDb ?? null) === nrrsfDb) return epi
+    mudou = true
+    return {
+      ...epi,
+      nivelProtecaoDb: nrrsfDb,
+      metodoAtenuacao: nrrsfDb == null ? null : ('NRRsf' as const),
+    }
+  })
+  return mudou ? atualizados : null
+}
+
 export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorProps) {
   const tituloId = useId()
   const caId = useId()
@@ -159,6 +188,10 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
   const [statusBase, setStatusBase] = useState<api.StatusCaepi | null>(null)
 
   const requisicaoAtual = useRef(0)
+  // O agente de agora, para as respostas que chegam depois. A consulta ao
+  // CA leva segundos e o perito continua digitando: devolver o agente
+  // capturado no clique apagaria o que ele escreveu nesse meio-tempo.
+  const agenteAtual = useRef(agente)
   const selecionados = agente.epis ?? []
   const limiteAtingido = selecionados.length >= 10
   const categoriaProtecao = categoriaProtecaoDoAgente(agente)
@@ -228,6 +261,17 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
     return () => { vivo = false }
   }, [])
 
+  useEffect(() => {
+    agenteAtual.current = agente
+  })
+
+  /** Leva o NRRsf recém-conhecido aos EPIs deste CA que já estão no laudo. */
+  function propagarNrrsf(numeroDoCa: string, nrrsfDb: number | null) {
+    const agora = agenteAtual.current
+    const atualizados = comNrrsfAtualizado(agora.epis ?? [], numeroDoCa, nrrsfDb)
+    if (atualizados) onChange({ ...agora, epis: atualizados })
+  }
+
   function limparConsultaCa() {
     setFicha(null)
     setNumeroCa('')
@@ -269,6 +313,9 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
       if (!forcar || valorVindo != null) {
         setNrrsf(valorVindo == null ? '' : String(valorVindo).replace('.', ','))
       }
+      // Só quando veio valor: uma consulta que voltou sem NRRsf não é
+      // motivo para apagar a atenuação de um EPI que já está no laudo.
+      if (valorVindo != null) propagarNrrsf(encontrada.numeroCa, valorVindo)
     } catch (e) {
       setFicha(null)
       setErroCa(e instanceof api.ErroApi
@@ -307,6 +354,9 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
           fichaConsultadaEm: ficha.atenuacao?.fichaConsultadaEm ?? null,
         },
       })
+      // Aqui o apagar também vale: foi o perito quem decidiu tirar o
+      // número, e o EPI do laudo não pode continuar exibindo o antigo.
+      propagarNrrsf(ficha.numeroCa, salvo.nrrsfDb)
       setAvisoNrrsf(salvo.nrrsfDb == null
         ? 'NRRsf apagado.'
         : `NRRsf de ${emDb(salvo.nrrsfDb)} salvo. Fica guardado para as próximas perícias com este CA.`)
