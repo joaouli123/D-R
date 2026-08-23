@@ -320,7 +320,7 @@ export default function Clientes() {
             {empresas.filter((e) => usosDe(e.id) > 0).length}{' '}
             {empresas.filter((e) => usosDe(e.id) > 0).length === 1
               ? 'empresa é reclamada em algum processo e será mantida'
-              : 'empresas são reclamadas em algum processo e serão mantidas'}
+              : 'empresas são reclamadas em algum processo e serão mantidas'}{' '}
             — um parecer já emitido não pode perder a identificação da parte.
           </p>
         )}
