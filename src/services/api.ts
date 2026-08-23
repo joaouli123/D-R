@@ -284,6 +284,23 @@ export interface StatusCaepi {
     comNrrsf: number
     nrrsfDoPerito: number
   }
+  /**
+   * Varredura de fundo que busca o NRRsf no portal do MTE.
+   * Opcional porque o front pode subir antes da API que a introduziu.
+   */
+  colheitaNrrsf?: {
+    ligada: boolean
+    rodando: boolean
+    ultima: {
+      pendentes: number
+      consultadas: number
+      comNrrsf: number
+      falhas: number
+      motivo: 'concluida' | 'portal_bloqueado' | 'muitas_falhas' | 'teto_da_rodada' | 'cancelada'
+      terminadaEm: string
+    } | null
+    proximaEm: string | null
+  } | null
 }
 
 export interface ResultadoImportacaoCaepi {
@@ -493,6 +510,16 @@ export const empresas = {
     ehRest ? http<Empresa>('/empresas', { method: 'POST', body: JSON.stringify(e) }) : delay(e),
   remover: (id: string) =>
     ehRest ? http<void>(`/empresas/${id}`, { method: 'DELETE' }) : delay(undefined),
+  /** Limpa os cadastros de teste. Empresa citada em processo é mantida. */
+  limpar: () =>
+    ehRest
+      ? http<LimpezaEmpresas>('/empresas', { method: 'DELETE' })
+      : delay({ excluidas: 0, mantidas: [] }),
+}
+
+export interface LimpezaEmpresas {
+  excluidas: number
+  mantidas: { id: string; razaoSocial: string; cnpj: string; processos: number }[]
 }
 
 // ---------------- Módulo C/D/E — Perícias ----------------

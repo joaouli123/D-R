@@ -41,6 +41,16 @@ const schema = z.object({
     .min(1)
     .default('cDZHYzlZa0JadVREZDJCendQbXY6SkJlTzNjLV9TRENyQk1RdnFKZGRQdw=='),
 
+  /// Varredura de fundo que busca no portal do MTE o NRRsf dos
+  /// protetores auditivos que ainda não têm valor. Ligada por padrão:
+  /// sem ela o perito só descobre a falta na hora de montar o laudo, e
+  /// aí depende de o portal estar respondendo naquele minuto. Defina
+  /// "0" para desligar.
+  COLHEITA_NRRSF: z
+    .enum(['0', '1'])
+    .default('1')
+    .transform((valor) => valor === '1'),
+
   /// Credenciais transacionais da Brevo (antiga Sendinblue).
   BREVO_API_KEY: z.string().optional(),
   BREVO_SMTP_HOST: z.string().default('smtp-relay.brevo.com'),

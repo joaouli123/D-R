@@ -22,6 +22,7 @@ interface AppState {
   empresas: Empresa[]
   salvarEmpresa: (e: Empresa) => Promise<Empresa>
   removerEmpresa: (id: string) => Promise<void>
+  limparEmpresas: () => Promise<api.LimpezaEmpresas>
 
   // Módulos C/D/E
   pericias: Pericia[]
@@ -251,6 +252,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // como reclamada em seguida.
       salvarEmpresa: upsert(empresas, setEmpresas, api.empresas.salvar),
       removerEmpresa: remover(empresas, setEmpresas, api.empresas.remover),
+      // Sem atualização otimista: quem fica na lista é decisão do
+      // servidor (empresa citada em processo não sai), então a tela
+      // espera a resposta em vez de adivinhar.
+      limparEmpresas: async () => {
+        const resultado = await api.empresas.limpar()
+        setEmpresas((atual) => atual.filter((e) => resultado.mantidas.some((m) => m.id === e.id)))
+        return resultado
+      },
 
       pericias,
       salvarPericia: upsert(pericias, setPericias, api.pericias.salvar),

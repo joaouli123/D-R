@@ -31,6 +31,30 @@ function numero(valor: number): string {
   return valor.toLocaleString('pt-BR')
 }
 
+/**
+ * O que dizer sobre a varredura do NRRsf.
+ *
+ * "Faltam 300 protetores sem atenuação" não diz nada sozinho: pode ser
+ * uma varredura andando normalmente ou uma parada há uma semana. É a
+ * diferença entre esperar e ir buscar o número no certificado — então
+ * a tela precisa dizer qual dos dois é o caso.
+ */
+function recadoDaColheita(colheita: api.StatusCaepi['colheitaNrrsf']): string {
+  if (!colheita || !colheita.ligada) return 'Busca automática desligada.'
+  if (colheita.rodando) return 'Buscando os que faltam no portal do MTE agora.'
+
+  const ultima = colheita.ultima
+  if (!ultima) return 'A primeira varredura ainda não rodou.'
+
+  if (ultima.motivo === 'portal_bloqueado' || ultima.motivo === 'muitas_falhas') {
+    return `O portal do MTE recusou as consultas automáticas em ${formatDateTime(ultima.terminadaEm)}. O sistema tenta de novo sozinho.`
+  }
+  if (ultima.motivo === 'concluida') {
+    return `Varredura concluída em ${formatDateTime(ultima.terminadaEm)} — não há protetor pendente de consulta.`
+  }
+  return `Última varredura em ${formatDateTime(ultima.terminadaEm)}: ${numero(ultima.consultadas)} fichas lidas. O sistema continua sozinho.`
+}
+
 export function BaseCaepiCard({ podeAtualizar }: { podeAtualizar: boolean }) {
   const toast = useToast()
   const [status, setStatus] = useState<api.StatusCaepi | null>(null)
@@ -118,6 +142,18 @@ export function BaseCaepiCard({ podeAtualizar }: { podeAtualizar: boolean }) {
               </div>
             ))}
           </dl>
+        )}
+
+        {totais && !vazia && (
+          <p className="mb-5 text-[13px] text-ink-600">
+            NRRsf preenchido em{' '}
+            <strong>
+              {numero(totais.comNrrsf)} de {numero(totais.protetoresAuditivos)}
+            </strong>{' '}
+            protetores auditivos ({numero(totais.nrrsfDoPerito)}{' '}
+            {totais.nrrsfDoPerito === 1 ? 'informado' : 'informados'} pelo perito).{' '}
+            {recadoDaColheita(status?.colheitaNrrsf)}
+          </p>
         )}
 
         {ultima && (

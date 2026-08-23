@@ -16,12 +16,14 @@ import type { Empresa } from '@/types'
 // ============================================================
 
 export default function Clientes() {
-  const { empresas, removerEmpresa, pericias } = useApp()
+  const { empresas, removerEmpresa, limparEmpresas, pericias } = useApp()
   const toast = useToast()
   const navigate = useNavigate()
   const [busca, setBusca] = useState('')
   const [editando, setEditando] = useState<Empresa | null>(null)
   const [confirmar, setConfirmar] = useState<Empresa | null>(null)
+  const [confirmarLimpeza, setConfirmarLimpeza] = useState(false)
+  const [limpando, setLimpando] = useState(false)
   /** Empresa escolhida no atalho "usar em perícia", e o processo de destino. */
   const [vinculando, setVinculando] = useState<Empresa | null>(null)
   const [destino, setDestino] = useState('')
@@ -51,6 +53,34 @@ export default function Clientes() {
   }
 
   /**
+   * Apaga os cadastros de teste de uma vez, para começar a operação
+   * com a base limpa. Quem está em processo fica — e a tela diz quais
+   * ficaram, senão o perito conta as empresas, vê que sobraram e não
+   * entende por quê.
+   */
+  async function limparTudo() {
+    setLimpando(true)
+    try {
+      const { excluidas, mantidas } = await limparEmpresas()
+      setConfirmarLimpeza(false)
+      if (mantidas.length === 0) {
+        toast(`${excluidas} ${excluidas === 1 ? 'empresa excluída' : 'empresas excluídas'}.`, 'info')
+      } else {
+        toast(
+          `${excluidas} ${excluidas === 1 ? 'empresa excluída' : 'empresas excluídas'}. ` +
+            `${mantidas.length} ${mantidas.length === 1 ? 'ficou' : 'ficaram'} por estar em processo: ` +
+            mantidas.map((m) => m.razaoSocial).join(', '),
+          'info',
+        )
+      }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Não foi possível limpar os cadastros.', 'error')
+    } finally {
+      setLimpando(false)
+    }
+  }
+
+  /**
    * Leva a empresa para a perícia escolhida. Ela chega já selecionada como
    * reclamada porque a escolha foi explícita aqui — o editor de perícia é
    * que nunca escolhe empresa por conta própria.
@@ -68,9 +98,20 @@ export default function Clientes() {
         title="Clientes e Empresas"
         description="Cadastro reutilizável — a empresa é registrada uma única vez e reaproveitada em todos os processos, evitando redigitação."
         action={
-          <Button icon={<Plus size={16} />} onClick={() => setEditando(empresaVazia())}>
-            Nova empresa
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {empresas.length > 0 && (
+              <Button
+                variant="ghost"
+                icon={<Trash2 size={16} />}
+                onClick={() => setConfirmarLimpeza(true)}
+              >
+                Limpar cadastros
+              </Button>
+            )}
+            <Button icon={<Plus size={16} />} onClick={() => setEditando(empresaVazia())}>
+              Nova empresa
+            </Button>
+          </div>
         }
       />
 
@@ -247,6 +288,40 @@ export default function Clientes() {
             Esta empresa é reclamada em {usosDe(confirmar.id)}{' '}
             {usosDe(confirmar.id) === 1 ? 'processo' : 'processos'} e não poderá ser excluída — um
             parecer já emitido não pode perder a identificação da parte.
+          </p>
+        )}
+      </Modal>
+
+      {/* Limpeza da base de testes, antes dos cadastros oficiais. */}
+      <Modal
+        open={confirmarLimpeza}
+        onClose={() => setConfirmarLimpeza(false)}
+        title="Limpar cadastros"
+        subtitle="Para começar a operação com a base zerada."
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" disabled={limpando} onClick={() => setConfirmarLimpeza(false)}>
+              Cancelar
+            </Button>
+            <Button variant="danger" disabled={limpando} onClick={() => void limparTudo()}>
+              {limpando ? 'Limpando…' : 'Apagar cadastros'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink-600">
+          Serão apagadas as <strong>{empresas.length}</strong>{' '}
+          {empresas.length === 1 ? 'empresa cadastrada' : 'empresas cadastradas'}. Esta ação não pode
+          ser desfeita.
+        </p>
+        {empresas.filter((e) => usosDe(e.id) > 0).length > 0 && (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-[13px] text-amber-800">
+            {empresas.filter((e) => usosDe(e.id) > 0).length}{' '}
+            {empresas.filter((e) => usosDe(e.id) > 0).length === 1
+              ? 'empresa é reclamada em algum processo e será mantida'
+              : 'empresas são reclamadas em algum processo e serão mantidas'}
+            — um parecer já emitido não pode perder a identificação da parte.
           </p>
         )}
       </Modal>

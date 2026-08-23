@@ -81,6 +81,51 @@ empresasRouter.post(
 )
 
 /**
+ * DELETE /empresas — limpa os cadastros de uma vez.
+ *
+ * Existe para o começo da operação: quem testou o sistema acumulou
+ * empresas de mentira e precisa de base limpa para os cadastros
+ * oficiais. Apagar uma por uma é trabalho manual puro, e trabalho
+ * manual puro é exatamente o que este sistema não deveria pedir.
+ *
+ * A mesma regra do DELETE individual continua valendo: empresa citada
+ * como reclamada não é apagada. Só que aqui ela não vira erro — vira
+ * lista na resposta, com o número de processos de cada uma, para a
+ * tela poder dizer o que ficou e por quê em vez de só falhar.
+ */
+empresasRouter.delete(
+  '/',
+  rota(async (_req, res) => {
+    const empresas = await prisma.empresa.findMany({
+      orderBy: { razaoSocial: 'asc' },
+      select: {
+        id: true,
+        razaoSocial: true,
+        cnpj: true,
+        _count: { select: { reclamadas: true } },
+      },
+    })
+
+    const livres = empresas.filter((e) => e._count.reclamadas === 0)
+    const emUso = empresas.filter((e) => e._count.reclamadas > 0)
+
+    const { count } = await prisma.empresa.deleteMany({
+      where: { id: { in: livres.map((e) => e.id) } },
+    })
+
+    res.json({
+      excluidas: count,
+      mantidas: emUso.map((e) => ({
+        id: e.id,
+        razaoSocial: e.razaoSocial,
+        cnpj: e.cnpj,
+        processos: e._count.reclamadas,
+      })),
+    })
+  }),
+)
+
+/**
  * DELETE /empresas/:id
  * Recusa a exclusão de empresa citada como reclamada — um parecer
  * já emitido não pode perder a identificação da parte.

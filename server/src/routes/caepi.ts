@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { exigirPerfil, exigirSessao, sessaoDe } from '../auth.js'
 import { ErroHttp, parametro, rota } from '../erros.js'
 import { descomprimirCsvCaepi, pareceComprimido } from '../services/caepi/arquivo.js'
+import { colheitaNrrsf, type Colheita } from '../services/caepi/colheita.js'
 import { avaliar, escolherHomologacao, hojeIso } from '../services/caepi/consulta.js'
 import { normalizarNumeroCa, normalizarNrrsf } from '../services/caepi/normalizar.js'
 import { buscadorNrrsf, type Buscador, type EstadoBuscaNrrsf } from '../services/caepi/nrrsf.js'
@@ -68,15 +69,21 @@ function exigirNumeroCa(bruto: string): string {
 export function criarCaepiRouter(
   repositorio: RepositorioCaepi = repositorioPrisma,
   buscador: Buscador = buscadorNrrsf,
+  colheita: Colheita = colheitaNrrsf,
 ) {
   const caepiRouter = Router()
   caepiRouter.use(exigirSessao)
 
   // Quando o espelho foi atualizado pela última vez e o que tem dentro.
+  //
+  // Vai junto o estado da colheita de NRRsf. Sem isso, "faltam 300
+  // protetores sem atenuação" é indistinguível de "a varredura está
+  // parada há uma semana" — e a diferença entre as duas é justamente o
+  // que decide se o perito espera ou se preenche na mão.
   caepiRouter.get(
     '/status',
     rota(async (_req, res) => {
-      res.json(await repositorio.status(hojeIso()))
+      res.json({ ...(await repositorio.status(hojeIso())), colheitaNrrsf: colheita.situacao() })
     }),
   )
 

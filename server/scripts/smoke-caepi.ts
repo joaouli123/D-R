@@ -39,6 +39,7 @@ const { escolherHomologacao, montarTsQuery, EXPRESSAO_BUSCA } = await import('..
 const { montarBusca } = await import('../src/services/caepi/repositorio.js')
 const { ehDesafioCloudflare, ErroDesafioCloudflare, extrairFicha } = await import('../src/services/caepi/portal.js')
 const { criarBuscadorNrrsf } = await import('../src/services/caepi/nrrsf.js')
+const { criarColheita } = await import('../src/services/caepi/colheita.js')
 const { criarCaepiRouter } = await import('../src/routes/caepi.js')
 const { tratarErros } = await import('../src/erros.js')
 
@@ -529,6 +530,115 @@ assert.ok(
   'o lote e a busca sob demanda gravam pelo mesmo caminho',
 )
 marcar('NRRsf é buscado na hora, uma vez por CA, com disjuntor no bloqueio e fila para tentar de novo')
+
+// ------------------------------------------------------------
+// 12b. Colheita: a varredura que enche a base antes do perito chegar
+//
+// A base inteira tem ~540 protetores auditivos, então varrer todos é
+// barato. O que precisa estar garantido: parar no primeiro desafio do
+// Cloudflare em vez de queimar os 540 numa parede, e sinalizar
+// corretamente se sobrou fila — é o motivo que decide se a próxima
+// passada volta em um minuto ou daqui a uma hora.
+// ------------------------------------------------------------
+
+// 12b.1 — caminho feliz: varre tudo e conclui
+gravacoes.length = 0
+const colheitaFeliz = criarColheita({
+  listarPendentes: async () => ['11512', '18189', '11882'],
+  buscar: async (numeroCa) => ({ ...fichaDoPortal('17 dB'), numeroCa }),
+  gravar: gravarFicha,
+  pausaEntreCasMs: 0,
+  tetoPorRodada: 120,
+})
+assert.deepEqual(await colheitaFeliz.rodada(), {
+  pendentes: 3,
+  consultadas: 3,
+  comNrrsf: 3,
+  falhas: 0,
+  motivo: 'concluida',
+})
+assert.deepEqual(gravacoes.map((g) => g.numeroCa), ['11512', '18189', '11882'])
+assert.equal(colheitaFeliz.situacao().ultima?.motivo, 'concluida')
+
+// 12b.2 — Cloudflare no meio: para na hora, sem gastar os que faltam
+gravacoes.length = 0
+let visitados = 0
+const colheitaBloqueada = criarColheita({
+  listarPendentes: async () => ['11512', '18189', '11882'],
+  buscar: async (numeroCa) => {
+    visitados += 1
+    if (visitados > 1) throw new ErroDesafioCloudflare()
+    return { ...fichaDoPortal('17 dB'), numeroCa }
+  },
+  gravar: gravarFicha,
+  pausaEntreCasMs: 0,
+})
+const bloqueada = await colheitaBloqueada.rodada()
+assert.equal(bloqueada.motivo, 'portal_bloqueado')
+assert.equal(bloqueada.consultadas, 1)
+assert.equal(visitados, 2, 'o desafio interrompe a rodada — não se insiste com os 540 CAs')
+assert.equal(gravacoes.length, 1, 'só o que deu certo antes do bloqueio foi gravado')
+
+// 12b.3 — sobrou fila: o motivo precisa dizer isso, senão a próxima
+// passada só voltaria daqui a doze horas com a base pela metade
+const colheitaComFila = criarColheita({
+  listarPendentes: async () => ['11512', '18189'],
+  buscar: async (numeroCa) => ({ ...fichaDoPortal('17 dB'), numeroCa }),
+  gravar: gravarFicha,
+  pausaEntreCasMs: 0,
+  tetoPorRodada: 2,
+})
+assert.equal((await colheitaComFila.rodada()).motivo, 'teto_da_rodada')
+
+// 12b.4 — falha comum repetida encerra a rodada; ficha sem NRRsf não
+const colheitaQueCai = criarColheita({
+  listarPendentes: async () => ['1', '2', '3', '4', '5', '6'],
+  buscar: async () => {
+    throw new Error('conexão caiu')
+  },
+  gravar: gravarFicha,
+  pausaEntreCasMs: 0,
+  falhasSeguidasParaParar: 3,
+})
+const caiu = await colheitaQueCai.rodada()
+assert.equal(caiu.motivo, 'muitas_falhas')
+assert.equal(caiu.falhas, 3, 'desiste depois de três seguidas, não depois dos seis')
+
+gravacoes.length = 0
+const colheitaSemValor = criarColheita({
+  listarPendentes: async () => ['11512'],
+  buscar: async (numeroCa) => ({ ...fichaDoPortal(null), numeroCa }),
+  gravar: gravarFicha,
+  pausaEntreCasMs: 0,
+})
+const semValor = await colheitaSemValor.rodada()
+assert.equal(semValor.comNrrsf, 0)
+assert.equal(semValor.motivo, 'concluida')
+assert.equal(gravacoes.length, 1, 'a visita é registrada mesmo sem NRRsf, senão volta para sempre')
+assert.equal(gravacoes[0]?.nrrsfDb, null)
+
+// 12b.5 — cancelamento no encerramento do servidor para de verdade
+const cancelador = new AbortController()
+cancelador.abort()
+const cancelada = await criarColheita({
+  listarPendentes: async () => ['11512', '18189'],
+  buscar: async (numeroCa) => ({ ...fichaDoPortal('17 dB'), numeroCa }),
+  gravar: gravarFicha,
+  pausaEntreCasMs: 0,
+}).rodada(cancelador.signal)
+assert.equal(cancelada.motivo, 'cancelada')
+assert.equal(cancelada.consultadas, 0)
+
+// 12b.6 — a fila sai da mesma consulta do lote: só protetor auditivo
+// sem valor, e nunca um CA cujo NRRsf veio do perito.
+assert.ok(fonteSync.includes('o."exigeNrrsf" = TRUE'))
+assert.ok(fonteSync.includes('a."nrrsfDb" IS NULL'))
+const fonteColheita = await readFile(new URL('../src/services/caepi/colheita.ts', import.meta.url), 'utf8')
+assert.ok(
+  fonteColheita.includes('listarPendentesDeNrrsf'),
+  'a varredura e o lote precisam enxergar a mesma fila',
+)
+marcar('colheita varre os protetores pendentes, para no desafio do Cloudflare e diz se sobrou fila')
 
 // ------------------------------------------------------------
 // 13. Rotas HTTP

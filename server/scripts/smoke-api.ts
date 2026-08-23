@@ -39,6 +39,14 @@ const CASOS: Caso[] = [
   // e nenhuma dessas chamadas chega ao banco.
   { nome: 'perícias exigem sessão', caminho: '/pericias', statusEsperado: 401, contem: 'login' },
   { nome: 'empresas exigem sessão', caminho: '/empresas', statusEsperado: 401 },
+  // A limpeza em massa apaga cadastros: sem sessão ela não pode nem
+  // ser roteada, muito menos chegar ao deleteMany.
+  {
+    nome: 'limpar empresas exige sessão',
+    caminho: '/empresas',
+    metodo: 'DELETE',
+    statusEsperado: 401,
+  },
   { nome: 'documentos exigem sessão', caminho: '/documentos', statusEsperado: 401 },
   { nome: 'quesitos exigem sessão', caminho: '/quesitos', statusEsperado: 401 },
   { nome: 'textos exigem sessão', caminho: '/textos', statusEsperado: 401 },
