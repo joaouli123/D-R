@@ -211,7 +211,15 @@ export function criarColheita(opcoes: OpcoesColheita = {}): Colheita {
     cancelador = new AbortController()
     let motivo: MotivoParada = 'muitas_falhas'
     try {
-      motivo = (await rodada(cancelador.signal)).motivo
+      const r = await rodada(cancelador.signal)
+      motivo = r.motivo
+      // Uma linha por rodada porque isto roda sozinho e sem ninguém
+      // olhando: depois, "o NRRsf não veio" precisa ser investigável
+      // no log. O painel diz o mesmo, mas só para quem está logado.
+      console.log(
+        `· colheita de NRRsf: ${r.consultadas}/${r.pendentes} fichas lidas, ` +
+          `${r.comNrrsf} com valor, ${r.falhas} ${r.falhas === 1 ? 'falha' : 'falhas'} — ${r.motivo}`,
+      )
     } catch (erro) {
       // Banco fora do ar, por exemplo. Não derruba o servidor: espera
       // como se o portal tivesse recusado e tenta de novo.
