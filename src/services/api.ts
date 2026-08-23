@@ -517,6 +517,10 @@ export interface DadosCnpj {
   situacaoDesde: string | null
   cnae: string | null
   cnaeDescricao: string | null
+  /** Grau do Anexo I da NR-04 para a classe do CNAE — null se o CNAE não veio. */
+  grauRisco: '1' | '2' | '3' | '4' | null
+  /** A classe que deu o grau ("53.10-5"), para o perito conferir a premissa. */
+  grauRiscoClasse: string | null
   naturezaJuridica: string | null
   porte: string | null
   abertura: string | null

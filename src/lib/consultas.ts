@@ -14,8 +14,10 @@ import { formatDate } from '@/lib/utils'
 //   · busca pelo botão é pedido explícito de atualizar, e aí o dado
 //     oficial substitui o que estiver lá.
 //
-// A UF foge à regra do "só se estiver vazio": ela nasce com "SP" no
-// formulário, e esse "SP" é padrão de tela, não algo digitado.
+// UF e grau de risco fogem à regra do "só se estiver vazio": o
+// formulário nasce com "SP" e com grau 3, e esses valores são padrão
+// de tela, não algo digitado. Como a busca automática só sai em
+// cadastro em branco, o que está neles ali é sempre o padrão.
 // ============================================================
 
 export const digitos = (valor: string) => (valor ?? '').replace(/\D/g, '')
@@ -30,6 +32,7 @@ type CampoDaReceita =
   | 'razaoSocial'
   | 'nomeFantasia'
   | 'cnae'
+  | 'grauRisco'
   | 'endereco'
   | 'numero'
   | 'complemento'
@@ -46,12 +49,12 @@ export interface OpcoesPreenchimento {
   sobrescrever?: boolean
 }
 
-function apenasVazios<C extends string>(
-  vindos: Partial<Record<C, string>>,
-  jaTem: (campo: C) => boolean,
-): Partial<Record<C, string>> {
-  const patch: Partial<Record<C, string>> = {}
-  for (const campo of Object.keys(vindos) as C[]) {
+/** Campos que o formulário já traz preenchidos por conta própria. */
+const PADRAO_DE_TELA = new Set<CampoDaReceita>(['uf', 'grauRisco'])
+
+function apenasVazios<T extends object>(vindos: T, jaTem: (campo: keyof T) => boolean): T {
+  const patch = {} as T
+  for (const campo of Object.keys(vindos) as (keyof T)[]) {
     if (!jaTem(campo)) patch[campo] = vindos[campo]
   }
   return patch
@@ -63,8 +66,8 @@ export function patchDaReceita(
   dados: DadosCnpj,
   opcoes: OpcoesPreenchimento = {},
 ): Partial<Empresa> {
-  const vindos: Partial<Record<CampoDaReceita, string>> = {}
-  const por = (campo: CampoDaReceita, valor: string | null | undefined) => {
+  const vindos: Partial<Pick<Empresa, CampoDaReceita>> = {}
+  const por = (campo: Exclude<CampoDaReceita, 'grauRisco'>, valor: string | null | undefined) => {
     const limpo = String(valor ?? '').trim()
     if (limpo) vindos[campo] = limpo
   }
@@ -72,6 +75,10 @@ export function patchDaReceita(
   por('razaoSocial', dados.razaoSocial)
   por('nomeFantasia', dados.nomeFantasia)
   por('cnae', dados.cnae)
+  // Grau do Anexo I da NR-04 para a classe deste CNAE. É transcrição
+  // de norma, não estimativa — mas o perito confere pela atividade do
+  // setor avaliado, que nem sempre é a atividade principal da empresa.
+  if (dados.grauRisco) vindos.grauRisco = dados.grauRisco
   por('endereco', dados.endereco)
   por('numero', dados.numero)
   por('complemento', dados.complemento)
@@ -87,7 +94,7 @@ export function patchDaReceita(
 
   if (opcoes.sobrescrever) return vindos
 
-  return apenasVazios(vindos, (campo) => campo !== 'uf' && !vazio(atual[campo]))
+  return apenasVazios(vindos, (campo) => !PADRAO_DE_TELA.has(campo) && !vazio(atual[campo]))
 }
 
 /** Vara e comarca a partir do que o CNJ publica. As partes, não: ver `aviso`. */
@@ -114,6 +121,17 @@ export function resumoDaReceita(dados: DadosCnpj): string {
   ]
     .filter((parte) => !!parte && String(parte).trim())
     .join(' · ')
+}
+
+/**
+ * De onde saiu o grau de risco preenchido. O perito precisa ver a
+ * premissa: o grau é o da classe do CNAE principal, e o setor avaliado
+ * pode ter atividade diferente da que a empresa registrou.
+ */
+export function origemDoGrauRisco(dados: DadosCnpj): string | null {
+  if (!dados.grauRisco) return null
+  const classe = dados.grauRiscoClasse ? ` para a classe ${dados.grauRiscoClasse}` : ''
+  return `Grau de risco ${dados.grauRisco} pelo Anexo I da NR-04${classe} — confira pela atividade do setor avaliado.`
 }
 
 /** A empresa está baixada, suspensa ou inapta? O laudo precisa saber. */

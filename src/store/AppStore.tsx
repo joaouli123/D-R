@@ -20,7 +20,7 @@ interface AppState {
 
   // Módulo B
   empresas: Empresa[]
-  salvarEmpresa: (e: Empresa) => Promise<void>
+  salvarEmpresa: (e: Empresa) => Promise<Empresa>
   removerEmpresa: (id: string) => Promise<void>
 
   // Módulos C/D/E
@@ -246,9 +246,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       },
 
       empresas,
-      salvarEmpresa: async (e) => {
-        await upsert(empresas, setEmpresas, api.empresas.salvar)(e)
-      },
+      // Devolve a empresa como o servidor gravou: quem cadastra de
+      // dentro da perícia precisa do registro salvo para vinculá-lo
+      // como reclamada em seguida.
+      salvarEmpresa: upsert(empresas, setEmpresas, api.empresas.salvar),
       removerEmpresa: remover(empresas, setEmpresas, api.empresas.remover),
 
       pericias,

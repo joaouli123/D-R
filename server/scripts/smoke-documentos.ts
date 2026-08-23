@@ -58,7 +58,10 @@ const empresa = {
   atualizadoEm: new Date(),
 } as Empresa
 
-const pericia = {
+// Guardado sem o cast para que os casos derivados (a perícia enxuta
+// lá embaixo) consigam alterar campos de `tecnico` sem brigar com o
+// JsonValue do Prisma.
+const periciaBase = {
   id: 'per-1',
   numeroProcesso: '1001234-56.2025.5.02.0071',
   vara: '71ª Vara do Trabalho de São Paulo',
@@ -268,7 +271,9 @@ const pericia = {
     },
   ],
   fotos: [],
-} as unknown as PericiaCompleta
+}
+
+const pericia = periciaBase as unknown as PericiaCompleta
 
 const doc = (tipo: string, titulo: string, conteudo: unknown): DocumentoGerado =>
   ({
@@ -600,6 +605,32 @@ async function main() {
   const numeros = [...htmlParecer.matchAll(/<h2>(\d+)\./g)].map((m) => Number(m[1]))
   const sequencial = numeros.length > 0 && numeros.every((n, i) => n === i + 1)
 
+  // ── Perícia enxuta: só insalubridade, sem quesitos e sem
+  // divergências. Três seções finais e duas subseções deixam de
+  // existir, e é aqui que a numeração escrita à mão pulava de "11."
+  // para "13." no documento entregue ao juízo.
+  const periciaEnxuta = {
+    ...periciaBase,
+    modalidade: 'insalubridade',
+    tecnico: { ...periciaBase.tecnico, respostasQuesitos: '', divergenciasFaticas: '' },
+  } as unknown as PericiaCompleta
+  const docEnxuto = doc('parecer', 'Parecer Técnico Pericial — Insalubridade', null)
+  const htmlEnxuto = await montarHtml(docEnxuto, periciaEnxuta, [empresa], perito)
+  const zipEnxuto = await JSZip.loadAsync(await gerarDocx(docEnxuto, periciaEnxuta, [empresa], perito))
+  const xmlEnxuto = await zipEnxuto.file('word/document.xml')!.async('string')
+
+  const numerosEnxuto = [...htmlEnxuto.matchAll(/<h2>(\d+)\./g)].map((m) => Number(m[1]))
+  const subsecoesEnxuto = [...htmlEnxuto.matchAll(/<h3>7\.(\d+)\./g)].map((m) => Number(m[1]))
+  const sequencialEnxuto =
+    numerosEnxuto.length > 0 &&
+    numerosEnxuto.every((n, i) => n === i + 1) &&
+    subsecoesEnxuto.every((n, i) => n === i + 1)
+  assert.match(htmlEnxuto, /<h2>11\. NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO<\/h2>/)
+  assert.match(htmlEnxuto, /<h2>12\. ENCERRAMENTO<\/h2>/, 'sem NR-16 e sem quesitos, o encerramento é a 12ª seção')
+  assert.doesNotMatch(htmlEnxuto, /<h3>7\.[34]\./, 'subseções ausentes não podem deixar buraco na numeração')
+  assert.ok(xmlEnxuto.includes('12. ENCERRAMENTO'), 'o DOCX precisa numerar igual ao PDF do mesmo documento')
+  assert.ok(!xmlEnxuto.includes('14. ENCERRAMENTO'), 'o DOCX não pode manter o número fixo antigo')
+
   console.log('\n' + resumo.join('\n'))
   console.log(`\nescape de HTML no conteúdo: ${escapou ? 'ok' : 'FALHOU'}`)
   console.log(`enquadramentos NR-15:       ${enquadramentos ? 'ok' : 'FALHOU'}`)
@@ -608,9 +639,22 @@ async function main() {
   console.log(
     `numeração das seções:       ${sequencial ? `ok (1..${numeros.length})` : `FALHOU → ${numeros.join(', ')}`}`,
   )
+  console.log(
+    `numeração sem NR-16/quesitos: ${
+      sequencialEnxuto ? `ok (1..${numerosEnxuto.length})` : `FALHOU → ${numerosEnxuto.join(', ')}`
+    }`,
+  )
   console.log(`arquivos em: ${path.resolve(SAIDA)}\n`)
 
-  if (!escapou || !enquadramentos || !escapouEnquadramento || !unidadeSemRepeticao || !sequencial) process.exitCode = 1
+  if (
+    !escapou ||
+    !enquadramentos ||
+    !escapouEnquadramento ||
+    !unidadeSemRepeticao ||
+    !sequencial ||
+    !sequencialEnxuto
+  )
+    process.exitCode = 1
 
   await encerrarBrowser()
 }

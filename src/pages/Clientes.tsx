@@ -1,48 +1,27 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Briefcase, Building2, MapPin, Pencil, Plus, Search, Trash2, User } from 'lucide-react'
-import { Badge, Button, Card, EmptyState, Input, Modal, Select } from '@/components/ui'
+import { Badge, Button, Card, EmptyState, Modal, Select } from '@/components/ui'
 import { useToast } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
-import { BuscaCnpj, type OrigemConsulta } from '@/components/BuscaCnpj'
+import { empresaVazia, ModalEmpresa } from '@/components/ModalEmpresa'
 import { useApp } from '@/store/AppStore'
-import type { DadosCnpj } from '@/services/api'
 import type { Empresa } from '@/types'
-import { patchDaReceita } from '@/lib/consultas'
-import { uid, UFS } from '@/lib/utils'
 
 // ============================================================
 // MÓDULO B — Cadastro de Empresas (reutilizável entre processos)
+//
+// O formulário em si mora em `ModalEmpresa`: é o mesmo cadastro que a
+// perícia abre quando o perito precisa registrar a reclamada na hora.
 // ============================================================
 
-const vazia = (): Empresa => ({
-  id: uid('emp'),
-  razaoSocial: '',
-  nomeFantasia: '',
-  cnpj: '',
-  cnae: '',
-  grauRisco: '3',
-  endereco: '',
-  numero: '',
-  bairro: '',
-  cidade: '',
-  uf: 'SP',
-  cep: '',
-  contatoNome: '',
-  contatoEmail: '',
-  contatoTelefone: '',
-  ramoAtividade: '',
-  criadoEm: new Date().toISOString().slice(0, 10),
-})
-
 export default function Clientes() {
-  const { empresas, salvarEmpresa, removerEmpresa, pericias } = useApp()
+  const { empresas, removerEmpresa, pericias } = useApp()
   const toast = useToast()
   const navigate = useNavigate()
   const [busca, setBusca] = useState('')
   const [editando, setEditando] = useState<Empresa | null>(null)
   const [confirmar, setConfirmar] = useState<Empresa | null>(null)
-  const [salvando, setSalvando] = useState(false)
   /** Empresa escolhida no atalho "usar em perícia", e o processo de destino. */
   const [vinculando, setVinculando] = useState<Empresa | null>(null)
   const [destino, setDestino] = useState('')
@@ -58,26 +37,6 @@ export default function Clientes() {
   const usosDe = (id: string) =>
     pericias.filter((p) => p.reclamadas.some((r) => r.empresaId === id)).length
 
-  async function salvar() {
-    if (!editando) return
-    if (!editando.razaoSocial.trim() || !editando.cnpj.trim()) {
-      toast('Razão social e CNPJ são obrigatórios.', 'error')
-      return
-    }
-
-    setSalvando(true)
-    try {
-      await salvarEmpresa(editando)
-      toast('Empresa salva. Já pode ser reutilizada em qualquer processo.')
-      setEditando(null)
-    } catch (e) {
-      // Ex.: CNPJ já cadastrado — a mensagem vem do servidor.
-      toast(e instanceof Error ? e.message : 'Não foi possível salvar a empresa.', 'error')
-    } finally {
-      setSalvando(false)
-    }
-  }
-
   async function excluir() {
     if (!confirmar) return
     try {
@@ -89,26 +48,6 @@ export default function Clientes() {
       toast(e instanceof Error ? e.message : 'Não foi possível excluir.', 'error')
       setConfirmar(null)
     }
-  }
-
-  const set = (patch: Partial<Empresa>) => setEditando((e) => (e ? { ...e, ...patch } : e))
-
-  /**
-   * Cadastro da Receita chegando no formulário. O patch é calculado
-   * dentro do setEditando porque a consulta é assíncrona: entre pedir
-   * e receber, o perito pode ter digitado em outro campo.
-   */
-  function aplicarDadosDaReceita(dados: DadosCnpj, origem: OrigemConsulta) {
-    setEditando((atual) =>
-      atual
-        ? { ...atual, ...patchDaReceita(atual, dados, { sobrescrever: origem === 'manual' }) }
-        : atual,
-    )
-    toast(
-      origem === 'manual'
-        ? 'Cadastro atualizado com os dados da Receita Federal.'
-        : 'Dados da empresa preenchidos pela Receita Federal.',
-    )
   }
 
   /**
@@ -129,7 +68,7 @@ export default function Clientes() {
         title="Clientes e Empresas"
         description="Cadastro reutilizável — a empresa é registrada uma única vez e reaproveitada em todos os processos, evitando redigitação."
         action={
-          <Button icon={<Plus size={16} />} onClick={() => setEditando(vazia())}>
+          <Button icon={<Plus size={16} />} onClick={() => setEditando(empresaVazia())}>
             Nova empresa
           </Button>
         }
@@ -152,7 +91,7 @@ export default function Clientes() {
             title="Nenhuma empresa encontrada"
             description="Cadastre a primeira empresa para reutilizá-la nos processos."
             action={
-              <Button icon={<Plus size={16} />} onClick={() => setEditando(vazia())}>
+              <Button icon={<Plus size={16} />} onClick={() => setEditando(empresaVazia())}>
                 Nova empresa
               </Button>
             }
@@ -240,136 +179,15 @@ export default function Clientes() {
       )}
 
       {/* Modal de cadastro/edição */}
-      <Modal
-        open={!!editando}
-        onClose={() => setEditando(null)}
-        title={editando && empresas.some((e) => e.id === editando.id) ? 'Editar empresa' : 'Nova empresa'}
-        subtitle="Os dados abaixo alimentam automaticamente o cabeçalho dos documentos gerados."
-        size="lg"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setEditando(null)} disabled={salvando}>
-              Cancelar
-            </Button>
-            <Button loading={salvando} onClick={() => void salvar()}>
-              Salvar empresa
-            </Button>
-          </>
-        }
-      >
-        {editando && (
-          <div className="space-y-4">
-            {/* O CNPJ vem primeiro porque é ele que preenche o resto. */}
-            <BuscaCnpj
-              valor={editando.cnpj}
-              onChange={(cnpj) => set({ cnpj })}
-              onDados={aplicarDadosDaReceita}
-              autoBuscar={!editando.razaoSocial.trim()}
-            />
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input
-                label="Razão social"
-                required
-                value={editando.razaoSocial}
-                onChange={(e) => set({ razaoSocial: e.target.value })}
-              />
-              <Input
-                label="Nome fantasia"
-                value={editando.nomeFantasia}
-                onChange={(e) => set({ nomeFantasia: e.target.value })}
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input
-                label="CNAE"
-                value={editando.cnae}
-                onChange={(e) => set({ cnae: e.target.value })}
-                placeholder="00.00-0-00"
-              />
-              <Select
-                label="Grau de risco"
-                value={editando.grauRisco}
-                onChange={(e) => set({ grauRisco: e.target.value as Empresa['grauRisco'] })}
-                // A Receita não publica grau de risco: ele sai da NR-04
-                // conforme a atividade avaliada, e essa leitura é do perito.
-                hint="Conforme NR-04 — confira pela atividade avaliada."
-              >
-                <option value="1">Grau 1</option>
-                <option value="2">Grau 2</option>
-                <option value="3">Grau 3</option>
-                <option value="4">Grau 4</option>
-              </Select>
-            </div>
-
-            <Input
-              label="Ramo de atividade"
-              value={editando.ramoAtividade}
-              onChange={(e) => set({ ramoAtividade: e.target.value })}
-              hint="Texto reaproveitado na seção 'Descrição da Empresa' do parecer."
-            />
-
-            <div className="border-t border-ink-100 pt-4">
-              <p className="section-title mb-3">Endereço</p>
-              <div className="grid gap-4 sm:grid-cols-6">
-                <Input
-                  label="Logradouro"
-                  className="sm:col-span-4"
-                  value={editando.endereco}
-                  onChange={(e) => set({ endereco: e.target.value })}
-                />
-                <Input
-                  label="Número"
-                  value={editando.numero}
-                  onChange={(e) => set({ numero: e.target.value })}
-                />
-                <Input label="CEP" value={editando.cep} onChange={(e) => set({ cep: e.target.value })} />
-                <Input
-                  label="Bairro"
-                  className="sm:col-span-2"
-                  value={editando.bairro}
-                  onChange={(e) => set({ bairro: e.target.value })}
-                />
-                <Input
-                  label="Cidade"
-                  className="sm:col-span-3"
-                  value={editando.cidade}
-                  onChange={(e) => set({ cidade: e.target.value })}
-                />
-                <Select label="UF" value={editando.uf} onChange={(e) => set({ uf: e.target.value })}>
-                  {UFS.map((uf) => (
-                    <option key={uf}>{uf}</option>
-                  ))}
-                </Select>
-              </div>
-            </div>
-
-            <div className="border-t border-ink-100 pt-4">
-              <p className="section-title mb-3">Contato</p>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <Input
-                  label="Responsável"
-                  value={editando.contatoNome}
-                  onChange={(e) => set({ contatoNome: e.target.value })}
-                />
-                <Input
-                  label="E-mail"
-                  type="email"
-                  value={editando.contatoEmail}
-                  onChange={(e) => set({ contatoEmail: e.target.value })}
-                />
-                <Input
-                  label="Telefone"
-                  value={editando.contatoTelefone}
-                  onChange={(e) => set({ contatoTelefone: e.target.value })}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
-
+      {editando && (
+        <ModalEmpresa
+          key={editando.id}
+          inicial={editando}
+          titulo={empresas.some((e) => e.id === editando.id) ? 'Editar empresa' : 'Nova empresa'}
+          subtitulo="Os dados abaixo alimentam automaticamente o cabeçalho dos documentos gerados."
+          onFechar={() => setEditando(null)}
+        />
+      )}
       {/* Atalho: da empresa para o processo em que ela é reclamada. */}
       <Modal
         open={!!vinculando}

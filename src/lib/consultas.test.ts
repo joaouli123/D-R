@@ -4,6 +4,7 @@ import {
   cnpjCompleto,
   digitos,
   numeroProcessoCompleto,
+  origemDoGrauRisco,
   outrasInstancias,
   patchDaReceita,
   patchDoProcesso,
@@ -23,6 +24,8 @@ const RECEITA: DadosCnpj = {
   situacaoDesde: '2005-11-03',
   cnae: '25.11-0-00',
   cnaeDescricao: 'Fabricacao de estruturas metalicas',
+  grauRisco: '4',
+  grauRiscoClasse: '25.11-0',
   naturezaJuridica: 'Sociedade Empresaria Limitada',
   porte: 'DEMAIS',
   abertura: '2005-11-03',
@@ -127,6 +130,20 @@ describe('patchDaReceita', () => {
     expect(patch.uf).toBe('MG')
   })
 
+  it('o grau de risco do formulário também é padrão de tela: o da NR-04 entra por cima', () => {
+    const patch = patchDaReceita(empresa({ grauRisco: '3' }), RECEITA)
+    expect(patch.grauRisco).toBe('4')
+  })
+
+  it('CNAE fora da tabela da NR-04 não mexe no grau que está na tela', () => {
+    const patch = patchDaReceita(empresa({ grauRisco: '3' }), {
+      ...RECEITA,
+      grauRisco: null,
+      grauRiscoClasse: null,
+    })
+    expect('grauRisco' in patch).toBe(false)
+  })
+
   it('pelo botão, o dado oficial substitui o que estava lá', () => {
     const atual = empresa({ razaoSocial: 'Aurora (matriz)', bairro: 'Centro' })
     const patch = patchDaReceita(atual, RECEITA, { sobrescrever: true })
@@ -178,6 +195,13 @@ describe('resumos de conferência', () => {
     expect(situacaoIrregular(RECEITA)).toBe(false)
     expect(situacaoIrregular({ ...RECEITA, situacao: 'BAIXADA' })).toBe(true)
     expect(situacaoIrregular({ ...RECEITA, situacao: null })).toBe(false)
+  })
+
+  it('mostra de qual classe da NR-04 saiu o grau de risco', () => {
+    expect(origemDoGrauRisco(RECEITA)).toBe(
+      'Grau de risco 4 pelo Anexo I da NR-04 para a classe 25.11-0 — confira pela atividade do setor avaliado.',
+    )
+    expect(origemDoGrauRisco({ ...RECEITA, grauRisco: null })).toBeNull()
   })
 
   it('resume o processo', () => {

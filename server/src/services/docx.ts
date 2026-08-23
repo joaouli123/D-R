@@ -33,6 +33,7 @@ import {
   extenso,
   mascaraCnpj,
   montarApresentacaoAgente,
+  numeradorDeSecoes,
   hoje,
   ATUACAO,
 } from './documento-comum.js'
@@ -417,6 +418,10 @@ async function docParecer(
     t.conclusaoPericulosidade?.trim() || (pericia.modalidade === 'periculosidade' ? t.conclusao : '')
   const encerramento = t.encerramento?.trim() || t.observacoesAdicionais
 
+  // Mesmo contador do HTML: as seções finais são condicionais e o
+  // DOCX precisa sair numerado igual ao PDF do mesmo documento.
+  const num = numeradorDeSecoes()
+
   const filhos: (Paragraph | Table)[] = [
     ...enderecamentoDoParecer(pericia.vara, pericia.comarca, t.enderecamento),
     tabela([
@@ -434,14 +439,14 @@ async function docParecer(
     h1(titulo, true),
     h3('APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA'),
     ...blocos(t.apresentacao),
-    h2('1. OBJETO DA PERÍCIA E DADOS CONTRATUAIS'),
+    h2(num.secao('OBJETO DA PERÍCIA E DADOS CONTRATUAIS')),
     ...blocos(t.objetivoPericia),
     tabela([
       fichaLinha('Função / Cargo', pericia.funcaoReclamante || '—'),
       fichaLinha('Data de admissão', data(pericia.admissao)),
       fichaLinha('Data de desligamento', pericia.demissao ? data(pericia.demissao) : 'Contrato vigente'),
     ]),
-    h2('2. DA DILIGÊNCIA TÉCNICA PERICIAL'),
+    h2(num.secao('DA DILIGÊNCIA TÉCNICA PERICIAL')),
     p(
       `A vistoria técnica foi realizada em ${extenso(pericia.dataVistoria)}${
         pericia.horaVistoria ? `, às ${pericia.horaVistoria}` : ''
@@ -475,32 +480,32 @@ async function docParecer(
   }
 
   filhos.push(
-    h2('3. DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA'),
+    h2(num.secao('DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA')),
     ...blocos(t.descricaoEmpresa),
-    h3('3.1. Instalações Físicas'),
+    h3(num.sub('Instalações Físicas')),
     ...blocos(t.descricaoAmbiente),
   )
   filhos.push(...(await fotosDasSecoes(['ambiente'])))
   filhos.push(
-    h2('4. CRITÉRIOS TÉCNICOS PARA AVALIAÇÃO PERICIAL'),
+    h2(num.secao('CRITÉRIOS TÉCNICOS PARA AVALIAÇÃO PERICIAL')),
     ...blocos(t.normasReferencias),
-    h2('5. METODOLOGIA DE AVALIAÇÃO'),
+    h2(num.secao('METODOLOGIA DE AVALIAÇÃO')),
     ...blocos(t.equipamentosAnalisados),
-    h2('6. DESCRIÇÃO DO POSTO DE TRABALHO, MÁQUINAS, FERRAMENTAS E PRODUTOS'),
-    h3('6.1. Características do Posto de Trabalho'),
+    h2(num.secao('DESCRIÇÃO DO POSTO DE TRABALHO, MÁQUINAS, FERRAMENTAS E PRODUTOS')),
+    h3(num.sub('Características do Posto de Trabalho')),
     ...blocos(t.descricaoPostoTrabalho || t.descricaoAmbiente),
   )
   filhos.push(...(await fotosDasSecoes(['atividades'])))
-  filhos.push(h3('6.2. Máquinas, Ferramentas e Equipamentos Utilizados'), ...blocos(t.maquinasFerramentas))
+  filhos.push(h3(num.sub('Máquinas, Ferramentas e Equipamentos Utilizados')), ...blocos(t.maquinasFerramentas))
   filhos.push(...(await fotosDasSecoes(['equipamentos'])))
   filhos.push(
-    h3('6.3. Constatações da Vistoria Pericial'),
+    h3(num.sub('Constatações da Vistoria Pericial')),
     ...blocos(t.informacoesLevantadas),
-    h3('6.4. Produtos Utilizados Habitualmente nas Atividades'),
+    h3(num.sub('Produtos Utilizados Habitualmente nas Atividades')),
     ...blocos(t.produtosUtilizados),
   )
   filhos.push(...(await fotosDasSecoes(['produtos'])))
-  filhos.push(h2('7. HISTÓRICO LABORAL, PERÍODOS E ATIVIDADES HABITUAIS EXERCIDAS'))
+  filhos.push(h2(num.secao('HISTÓRICO LABORAL, PERÍODOS E ATIVIDADES HABITUAIS EXERCIDAS')))
 
   if (t.periodos?.length) {
     filhos.push(
@@ -529,7 +534,7 @@ async function docParecer(
     )
   }
 
-  filhos.push(h3('7.1. Atividades Efetivamente Exercidas'), ...blocos(t.atividadesFuncoes))
+  filhos.push(h3(num.sub('Atividades Efetivamente Exercidas')), ...blocos(t.atividadesFuncoes))
 
   const adicionarAgentes = (lista: typeof agentes) => {
     if (!lista.length) {
@@ -556,17 +561,17 @@ async function docParecer(
   }
 
   if (temInsalubridade) {
-    filhos.push(h3('7.2. NR-15 — Avaliação da Exposição Ocupacional'))
+    filhos.push(h3(num.sub('NR-15 — Avaliação da Exposição Ocupacional')))
     adicionarAgentes(agentesNr15)
   }
   if (temPericulosidade) {
-    filhos.push(h3('7.3. NR-16 — Avaliação das Atividades e Operações Perigosas'))
+    filhos.push(h3(num.sub('NR-16 — Avaliação das Atividades e Operações Perigosas')))
     adicionarAgentes(agentesNr16)
   }
-  if (t.divergenciasFaticas?.trim()) filhos.push(h3('7.4. Divergências Fáticas'), ...blocos(t.divergenciasFaticas))
+  if (t.divergenciasFaticas?.trim()) filhos.push(h3(num.sub('Divergências Fáticas')), ...blocos(t.divergenciasFaticas))
   filhos.push(...(await fotosDasSecoes(['documentos'])))
 
-  filhos.push(h2('8. DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)'))
+  filhos.push(h2(num.secao('DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)')))
   let temProtecao = false
   for (const agente of agentes) {
     const apresentacao = montarApresentacaoAgente(agente)
@@ -584,15 +589,15 @@ async function docParecer(
   filhos.push(...(await fotosDasSecoes(['epi'])))
 
   filhos.push(
-    h2('9. DAS PROTEÇÕES COLETIVAS'),
+    h2(num.secao('DAS PROTEÇÕES COLETIVAS')),
     ...blocos(t.protecoesColetivas),
-    h2('10. ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS'),
+    h2(num.secao('ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS')),
     ...blocos(t.analiseTecnica),
   )
-  if (temInsalubridade) filhos.push(h2('11. NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO'), ...blocos(conclusaoNr15))
-  if (temPericulosidade) filhos.push(h2('12. NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO'), ...blocos(conclusaoNr16))
-  if (t.respostasQuesitos?.trim()) filhos.push(h2('13. RESPOSTAS AOS QUESITOS TÉCNICOS'), ...blocos(t.respostasQuesitos))
-  filhos.push(h2('14. ENCERRAMENTO'), ...blocosComProximo(encerramento))
+  if (temInsalubridade) filhos.push(h2(num.secao('NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr15))
+  if (temPericulosidade) filhos.push(h2(num.secao('NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr16))
+  if (t.respostasQuesitos?.trim()) filhos.push(h2(num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')), ...blocos(t.respostasQuesitos))
+  filhos.push(h2(num.secao('ENCERRAMENTO')), ...blocosComProximo(encerramento))
 
   filhos.push(
     pSemRecuo(

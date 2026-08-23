@@ -182,6 +182,34 @@ export function emParagrafos(texto?: string | null): string[] {
 export const VAZIO = '[Seção não preenchida]'
 
 /**
+ * Numera as seções do parecer na ordem em que elas realmente entram no
+ * documento.
+ *
+ * Algumas seções são condicionais — uma perícia só de insalubridade não
+ * tem a conclusão da NR-16, e nem todo processo traz quesitos. Com os
+ * números escritos à mão, o documento entregue ao juízo pulava de "11."
+ * para "13.". Contar aqui mantém HTML e DOCX numerando igual.
+ *
+ * `sub` numera dentro da última seção aberta (7.1, 7.2…) e recomeça a
+ * cada seção nova.
+ */
+export function numeradorDeSecoes() {
+  let secaoAtual = 0
+  let subAtual = 0
+  return {
+    secao(titulo: string): string {
+      secaoAtual += 1
+      subAtual = 0
+      return `${secaoAtual}. ${titulo}`
+    },
+    sub(titulo: string): string {
+      subAtual += 1
+      return `${secaoAtual}.${subAtual}. ${titulo}`
+    },
+  }
+}
+
+/**
  * Acrescenta a unidade informada pela referência normativa apenas quando o
  * limite ainda não a traz. Referências com mais de uma unidade (ex.: ppm |
  * mg/m³) são consideradas cobertas quando todos os seus componentes já

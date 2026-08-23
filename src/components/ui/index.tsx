@@ -93,14 +93,23 @@ function FieldWrap({
   error,
   required,
   errorId,
+  campoId,
   children,
-}: FieldProps & { errorId?: string; children: React.ReactNode }) {
+}: FieldProps & { errorId?: string; campoId?: string; children: React.ReactNode }) {
   return (
     <div className="w-full">
       {label && (
-        <label className="label">
+        // `htmlFor` de verdade: sem ele o leitor de tela anuncia o campo
+        // sem nome e clicar no rótulo não põe o cursor dentro.
+        <label className="label" htmlFor={campoId}>
           {label}
-          {required && <span className="text-red-600 ml-0.5">*</span>}
+          {/* O asterisco é sinal visual; quem lê por áudio recebe a
+              obrigatoriedade pelo aria-required do próprio campo. */}
+          {required && (
+            <span className="text-red-600 ml-0.5" aria-hidden="true">
+              *
+            </span>
+          )}
         </label>
       )}
       {children}
@@ -125,11 +134,22 @@ export function Input({
   ...props
 }: React.InputHTMLAttributes<HTMLInputElement> & FieldProps) {
   const errorId = React.useId()
+  const autoId = React.useId()
+  const campoId = props.id ?? autoId
   return (
-    <FieldWrap label={label} hint={hint} error={error} required={required} errorId={error ? errorId : undefined}>
+    <FieldWrap
+      label={label}
+      hint={hint}
+      error={error}
+      required={required}
+      errorId={error ? errorId : undefined}
+      campoId={campoId}
+    >
       <input
         {...props}
+        id={campoId}
         className={cn(inputBase, 'h-10', error && 'border-red-500', className)}
+        aria-required={required || props['aria-required']}
         aria-invalid={error ? true : props['aria-invalid']}
         aria-describedby={error ? errorId : props['aria-describedby']}
       />
@@ -146,12 +166,16 @@ export function Textarea({
   rows = 4,
   ...props
 }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & FieldProps) {
+  const autoId = React.useId()
+  const campoId = props.id ?? autoId
   return (
-    <FieldWrap label={label} hint={hint} error={error} required={required}>
+    <FieldWrap label={label} hint={hint} error={error} required={required} campoId={campoId}>
       <textarea
         rows={rows}
         className={cn(inputBase, 'py-2.5 leading-relaxed resize-y', error && 'border-red-500', className)}
         {...props}
+        id={campoId}
+        aria-required={required || props['aria-required']}
       />
     </FieldWrap>
   )
@@ -166,9 +190,16 @@ export function Select({
   children,
   ...props
 }: React.SelectHTMLAttributes<HTMLSelectElement> & FieldProps) {
+  const autoId = React.useId()
+  const campoId = props.id ?? autoId
   return (
-    <FieldWrap label={label} hint={hint} error={error} required={required}>
-      <select className={cn(inputBase, 'h-10 pr-8', error && 'border-red-500', className)} {...props}>
+    <FieldWrap label={label} hint={hint} error={error} required={required} campoId={campoId}>
+      <select
+        className={cn(inputBase, 'h-10 pr-8', error && 'border-red-500', className)}
+        {...props}
+        id={campoId}
+        aria-required={required || props['aria-required']}
+      >
         {children}
       </select>
     </FieldWrap>

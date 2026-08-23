@@ -38,11 +38,13 @@ import type { OrigemConsulta } from '@/components/BuscaCnpj'
 import { DocumentoPreview } from '@/components/DocumentoPreview'
 import { AgenteNr15Fields } from '@/components/AgenteNr15Fields'
 import { EpiSelector } from '@/components/EpiSelector'
+import { empresaVazia, ModalEmpresa } from '@/components/ModalEmpresa'
 import { useApp } from '@/store/AppStore'
 import * as api from '@/services/api'
 import type { DadosProcesso } from '@/services/api'
 import type {
   AgenteAvaliado,
+  Empresa,
   Foto,
   Participante,
   Pericia,
@@ -180,6 +182,8 @@ export default function PericiaEditor() {
   /** Documento já emitido para esta perícia — reemitir atualiza, não duplica. */
   const [documentoId, setDocumentoId] = useState<string | null>(null)
   const [anexo, setAnexo] = useState<string | undefined>()
+  /** Cadastro de reclamada aberto de dentro da perícia — null = fechado. */
+  const [empresaNova, setEmpresaNova] = useState<Empresa | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const fotoRef = useRef<HTMLInputElement>(null)
   const [secaoFotoAtual, setSecaoFotoAtual] = useState<SecaoFoto>('ambiente')
@@ -531,38 +535,53 @@ export default function PericiaEditor() {
           <Card>
             <CardHeader
               title="Empresas reclamadas"
-              subtitle="Sem limite de quantidade — selecione empresas já cadastradas (Módulo B)."
+              subtitle="Sem limite de quantidade — selecione empresas já cadastradas (Módulo B) ou cadastre uma na hora."
               icon={<Building2 size={18} />}
               action={
-                <Button
-                  size="sm"
-                  variant="outline"
-                  icon={<Plus size={14} />}
-                  disabled={livres.length === 0}
-                  onClick={() =>
-                    set({
-                      reclamadas: [
-                        ...p.reclamadas,
-                        {
-                          id: uid('rec'),
-                          // Em branco de propósito. Dizer que uma empresa é
-                          // reclamada neste processo é decisão do perito, não
-                          // consequência de ter clicado em "Adicionar".
-                          empresaId: '',
-                          principal: p.reclamadas.length === 0,
-                        },
-                      ],
-                    })
-                  }
-                >
-                  Adicionar
-                </Button>
+                <div className="flex flex-wrap justify-end gap-2">
+                  {/* Empresa que ainda não existe no Módulo B: cadastra aqui e
+                      já entra vinculada — quem descobriu a reclamada durante a
+                      diligência não precisa sair do processo e voltar. */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    icon={<Building2 size={14} />}
+                    onClick={() => setEmpresaNova(empresaVazia())}
+                  >
+                    Cadastrar empresa
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    icon={<Plus size={14} />}
+                    disabled={livres.length === 0}
+                    onClick={() =>
+                      set({
+                        reclamadas: [
+                          ...p.reclamadas,
+                          {
+                            id: uid('rec'),
+                            // Em branco de propósito. Dizer que uma empresa é
+                            // reclamada neste processo é decisão do perito, não
+                            // consequência de ter clicado em "Adicionar".
+                            empresaId: '',
+                            principal: p.reclamadas.length === 0,
+                          },
+                        ],
+                      })
+                    }
+                  >
+                    Adicionar
+                  </Button>
+                </div>
               }
             />
             <div className="space-y-3 p-5">
               {p.reclamadas.length === 0 && (
                 <p className="text-sm text-ink-500">
-                  Nenhuma reclamada vinculada. Clique em <strong>Adicionar</strong> para vincular.
+                  Nenhuma reclamada vinculada. Clique em <strong>Adicionar</strong> para escolher uma
+                  empresa já cadastrada, ou em <strong>Cadastrar empresa</strong> — a nova entra
+                  vinculada direto neste processo.
                 </p>
               )}
               {p.reclamadas.map((r, i) => (
@@ -609,6 +628,19 @@ export default function PericiaEditor() {
               ))}
             </div>
           </Card>
+
+          {empresaNova && (
+            <ModalEmpresa
+              key={empresaNova.id}
+              inicial={empresaNova}
+              titulo="Nova empresa reclamada"
+              subtitulo="A empresa é salva no cadastro (Módulo B) e já entra vinculada a este processo."
+              onFechar={() => setEmpresaNova(null)}
+              onSalvo={(salva) =>
+                set({ reclamadas: comEmpresaVinculada(p.reclamadas, salva.id, uid('rec')) })
+              }
+            />
+          )}
 
           {/* Participantes */}
           <Card>

@@ -17,6 +17,7 @@ import {
   extenso,
   mascaraCnpj,
   montarApresentacaoAgente,
+  numeradorDeSecoes,
   hoje,
   ATUACAO,
 } from './documento-comum.js'
@@ -355,71 +356,76 @@ export async function htmlDoParecer(
     t.conclusaoPericulosidade?.trim() || (pericia.modalidade === 'periculosidade' ? t.conclusao : '')
   const encerramento = t.encerramento?.trim() || t.observacoesAdicionais
 
+  // Numeração contada, não escrita à mão: as seções finais são
+  // condicionais e o documento não pode pular de "11." para "13.".
+  const num = numeradorDeSecoes()
+
   const partes: string[] = [
     enderecamentoDoParecer(pericia.vara, pericia.comarca, t.enderecamento),
     identificacao,
     `<h1>${esc(titulo)}</h1>`,
     '<h3 class="titulo-qualificacao">APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA</h3>',
     blocoConteudo(paragrafos(t.apresentacao)),
-    '<h2>1. OBJETO DA PERÍCIA E DADOS CONTRATUAIS</h2>',
+    `<h2>${num.secao('OBJETO DA PERÍCIA E DADOS CONTRATUAIS')}</h2>`,
     blocoConteudo(paragrafos(t.objetivoPericia) + dadosContratuais),
-    '<h2>2. DA DILIGÊNCIA TÉCNICA PERICIAL</h2>',
+    `<h2>${num.secao('DA DILIGÊNCIA TÉCNICA PERICIAL')}</h2>`,
     blocoConteudo(textoVistoria + tabelaParticipantes),
-    '<h2>3. DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA</h2>',
+    `<h2>${num.secao('DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA')}</h2>`,
     blocoConteudo(
       paragrafos(t.descricaoEmpresa) +
-        '<h3>3.1. Instalações Físicas</h3>' +
+        `<h3>${num.sub('Instalações Físicas')}</h3>` +
         paragrafos(t.descricaoAmbiente) +
         fotosAmbiente,
     ),
-    '<h2>4. CRITÉRIOS TÉCNICOS PARA AVALIAÇÃO PERICIAL</h2>',
+    `<h2>${num.secao('CRITÉRIOS TÉCNICOS PARA AVALIAÇÃO PERICIAL')}</h2>`,
     blocoConteudo(paragrafos(t.normasReferencias)),
-    '<h2>5. METODOLOGIA DE AVALIAÇÃO</h2>',
+    `<h2>${num.secao('METODOLOGIA DE AVALIAÇÃO')}</h2>`,
     blocoConteudo(paragrafos(t.equipamentosAnalisados)),
-    '<h2>6. DESCRIÇÃO DO POSTO DE TRABALHO, MÁQUINAS, FERRAMENTAS E PRODUTOS</h2>',
+    `<h2>${num.secao('DESCRIÇÃO DO POSTO DE TRABALHO, MÁQUINAS, FERRAMENTAS E PRODUTOS')}</h2>`,
     blocoConteudo(
-      '<h3>6.1. Características do Posto de Trabalho</h3>' +
+      `<h3>${num.sub('Características do Posto de Trabalho')}</h3>` +
         paragrafos(t.descricaoPostoTrabalho || t.descricaoAmbiente) +
         fotosAtividades +
-        '<h3>6.2. Máquinas, Ferramentas e Equipamentos Utilizados</h3>' +
+        `<h3>${num.sub('Máquinas, Ferramentas e Equipamentos Utilizados')}</h3>` +
         paragrafos(t.maquinasFerramentas) +
         fotosEquipamentos +
-        '<h3>6.3. Constatações da Vistoria Pericial</h3>' +
+        `<h3>${num.sub('Constatações da Vistoria Pericial')}</h3>` +
         paragrafos(t.informacoesLevantadas) +
-        '<h3>6.4. Produtos Utilizados Habitualmente nas Atividades</h3>' +
+        `<h3>${num.sub('Produtos Utilizados Habitualmente nas Atividades')}</h3>` +
         paragrafos(t.produtosUtilizados) +
         fotosProdutos,
     ),
-    '<h2>7. HISTÓRICO LABORAL, PERÍODOS E ATIVIDADES HABITUAIS EXERCIDAS</h2>',
+    `<h2>${num.secao('HISTÓRICO LABORAL, PERÍODOS E ATIVIDADES HABITUAIS EXERCIDAS')}</h2>`,
     blocoConteudo(
       tabelaPeriodos +
-        '<h3>7.1. Atividades Efetivamente Exercidas</h3>' +
+        `<h3>${num.sub('Atividades Efetivamente Exercidas')}</h3>` +
         paragrafos(t.atividadesFuncoes) +
         (temInsalubridade
-          ? '<h3>7.2. NR-15 — Avaliação da Exposição Ocupacional</h3>' + tabelaAgentes(agentesNr15)
+          ? `<h3>${num.sub('NR-15 — Avaliação da Exposição Ocupacional')}</h3>` + tabelaAgentes(agentesNr15)
           : '') +
         (temPericulosidade
-          ? '<h3>7.3. NR-16 — Avaliação das Atividades e Operações Perigosas</h3>' + tabelaAgentes(agentesNr16)
+          ? `<h3>${num.sub('NR-16 — Avaliação das Atividades e Operações Perigosas')}</h3>` +
+            tabelaAgentes(agentesNr16)
           : '') +
         (t.divergenciasFaticas?.trim()
-          ? '<h3>7.4. Divergências Fáticas</h3>' + paragrafos(t.divergenciasFaticas)
+          ? `<h3>${num.sub('Divergências Fáticas')}</h3>` + paragrafos(t.divergenciasFaticas)
           : '') +
         fotosDocumentos,
     ),
-    '<h2>8. DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)</h2>',
+    `<h2>${num.secao('DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)')}</h2>`,
     blocoConteudo(blocoProtecoes + fotosEpis),
-    '<h2>9. DAS PROTEÇÕES COLETIVAS</h2>',
+    `<h2>${num.secao('DAS PROTEÇÕES COLETIVAS')}</h2>`,
     blocoConteudo(paragrafos(t.protecoesColetivas)),
-    '<h2>10. ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS</h2>',
+    `<h2>${num.secao('ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS')}</h2>`,
     blocoConteudo(paragrafos(t.analiseTecnica)),
   ]
 
-  if (temInsalubridade) partes.push('<h2>11. NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO</h2>', blocoConteudo(paragrafos(conclusaoNr15)))
-  if (temPericulosidade) partes.push('<h2>12. NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO</h2>', blocoConteudo(paragrafos(conclusaoNr16)))
-  if (t.respostasQuesitos?.trim()) partes.push('<h2>13. RESPOSTAS AOS QUESITOS TÉCNICOS</h2>', blocoConteudo(paragrafos(t.respostasQuesitos)))
+  if (temInsalubridade) partes.push(`<h2>${num.secao('NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')}</h2>`, blocoConteudo(paragrafos(conclusaoNr15)))
+  if (temPericulosidade) partes.push(`<h2>${num.secao('NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO')}</h2>`, blocoConteudo(paragrafos(conclusaoNr16)))
+  if (t.respostasQuesitos?.trim()) partes.push(`<h2>${num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')}</h2>`, blocoConteudo(paragrafos(t.respostasQuesitos)))
 
   partes.push(
-    '<h2>14. ENCERRAMENTO</h2>',
+    `<h2>${num.secao('ENCERRAMENTO')}</h2>`,
     blocoConteudo(paragrafos(encerramento)),
     '<p class="sem-recuo" style="margin-top:24px">Sendo o que se apresenta para o momento, o signatário coloca-se à disposição deste MM. Juízo para os esclarecimentos que se fizerem necessários.</p>',
     assinatura(perito, pericia.comarca),

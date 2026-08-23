@@ -41,6 +41,8 @@ const {
 const { limparCacheDeMunicipios, municipioPorCodigo } = await import(
   '../src/services/consultas/ibge.js'
 )
+const { grauDeRiscoDoCnae } = await import('../src/services/consultas/nr04.js')
+const { GRAU_POR_CLASSE_CNAE } = await import('../src/services/consultas/nr04-anexo1.js')
 const { criarCache, FonteIndisponivel } = await import('../src/services/consultas/fonte.js')
 const { ErroHttp } = await import('../src/erros.js')
 
@@ -107,6 +109,32 @@ confere(() => assert.equal(montarLogradouro('AVENIDA', 'PAULISTA'), 'AVENIDA PAU
 confere(() => assert.equal(montarLogradouro('RUA', 'RUA DAS FLORES'), 'RUA DAS FLORES'))
 confere(() => assert.equal(montarLogradouro(null, 'PRACA DA SE'), 'PRACA DA SE'))
 
+// ---------------- Grau de risco (Anexo I da NR-04) ----------------
+
+// Conferidos linha a linha no PDF oficial da norma.
+confere(() => assert.deepEqual(grauDeRiscoDoCnae('53.10-5-01'), { grau: '2', classe: '53.10-5' }))
+confere(() => assert.deepEqual(grauDeRiscoDoCnae('6920601'), { grau: '1', classe: '69.20-6' }))
+confere(() => assert.equal(grauDeRiscoDoCnae('25.11-0-00')?.grau, '4'))
+confere(() => assert.equal(grauDeRiscoDoCnae('41.20-4-00')?.grau, '3'))
+// A subclasse herda o grau da classe: os dois CNAEs abaixo são a
+// mesma classe 47.11-3, e é dela que o grau sai.
+confere(() => assert.equal(grauDeRiscoDoCnae('47.11-3-01')?.grau, '2'))
+confere(() => assert.equal(grauDeRiscoDoCnae('47.11-3-02')?.grau, '2'))
+// Sem CNAE, ou com CNAE que não existe na norma, o campo fica com o
+// perito — chutar grau de risco é pior que não preencher.
+confere(() => assert.equal(grauDeRiscoDoCnae(''), null))
+confere(() => assert.equal(grauDeRiscoDoCnae(null), null))
+confere(() => assert.equal(grauDeRiscoDoCnae('99.99-9-99'), null))
+// A tabela inteira do Anexo I, sem buraco e sem grau inventado.
+confere(() => assert.equal(Object.keys(GRAU_POR_CLASSE_CNAE).length, 673))
+confere(() =>
+  assert.ok(
+    Object.entries(GRAU_POR_CLASSE_CNAE).every(
+      ([classe, grau]) => /^\d{2}\.\d{2}-\d$/.test(classe) && ['1', '2', '3', '4'].includes(grau),
+    ),
+  ),
+)
+
 const RESPOSTA_BRASILAPI = {
   cnpj: '34028316000103',
   razao_social: 'EMPRESA BRASILEIRA DE CORREIOS E TELEGRAFOS',
@@ -138,6 +166,10 @@ const mapeado = mapearCnpj(RESPOSTA_BRASILAPI, {
 confere(() => assert.equal(mapeado.razaoSocial, 'EMPRESA BRASILEIRA DE CORREIOS E TELEGRAFOS'))
 confere(() => assert.equal(mapeado.cnpjFormatado, '34.028.316/0001-03'))
 confere(() => assert.equal(mapeado.cnae, '53.10-5-01'))
+// O grau vem da classe do CNAE, e a resposta diz de qual classe saiu.
+confere(() => assert.equal(mapeado.grauRisco, '2'))
+confere(() => assert.equal(mapeado.grauRiscoClasse, '53.10-5'))
+confere(() => assert.equal(mapearCnpj({ ...RESPOSTA_BRASILAPI, cnae_fiscal: null }).grauRisco, null))
 confere(() => assert.equal(mapeado.endereco, 'SBN QUADRA 01 BLOCO A'))
 // A cidade é o único campo trocado pelo nome do IBGE; o resto fica
 // como a Receita registra, que é a forma que vai para a qualificação.

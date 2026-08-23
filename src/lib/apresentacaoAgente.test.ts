@@ -62,4 +62,27 @@ describe('montarApresentacaoAgente', () => {
     expect(apresentacao.linhas).toContainEqual({ rotulo: 'CAS', valor: '75-07-0' })
     expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'Eficácia comprovada', valor: 'Sim', destaque: 'positivo' })
   })
+
+  it('vários EPIs no mesmo agente saem um a um — não é privilégio do ruído', () => {
+    // O trabalhador recebe respirador e luva pelo mesmo agente químico:
+    // o parecer precisa nomear cada CA, senão a defesa de um deles fica
+    // sem lastro no documento.
+    const apresentacao = montarApresentacaoAgente({
+      id: 'quimico-2', nome: 'Hidróxido de sódio', tipo: 'quimico', criterio: 'qualitativo',
+      anexoNr15: 'ANEXO_13', cas: '1310-73-2',
+      epis: [
+        { categoria: 'Proteção respiratória', modelo: 'Respirador PFF2', marca: '3M', caUnico: '5657' },
+        { categoria: 'Proteção das mãos', modelo: 'Luva nitrílica', marca: 'Volk', caUnico: '28956' },
+      ],
+      epiEficaz: true,
+    })
+
+    expect(apresentacao.protecoes).toHaveLength(2)
+    expect(apresentacao.protecoes[0]?.titulo).toContain('1')
+    expect(apresentacao.protecoes[1]?.titulo).toContain('2')
+    expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'Modelo', valor: 'Respirador PFF2' })
+    expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'CA', valor: '5657' })
+    expect(apresentacao.protecoes[1]?.linhas).toContainEqual({ rotulo: 'Modelo', valor: 'Luva nitrílica' })
+    expect(apresentacao.protecoes[1]?.linhas).toContainEqual({ rotulo: 'CA', valor: '28956' })
+  })
 })

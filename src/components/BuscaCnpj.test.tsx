@@ -27,6 +27,8 @@ const AURORA: DadosCnpj = {
   situacaoDesde: '2005-11-03',
   cnae: '25.11-0-00',
   cnaeDescricao: 'Fabricacao de estruturas metalicas',
+  grauRisco: '4',
+  grauRiscoClasse: '25.11-0',
   naturezaJuridica: 'Sociedade Empresaria Limitada',
   porte: 'DEMAIS',
   abertura: '2005-11-03',
@@ -127,6 +129,16 @@ describe('BuscaCnpj', () => {
     await user.type(campo(), '{backspace}1')
 
     expect(consultarCnpj).toHaveBeenCalledTimes(1)
+  })
+
+  it('diz de qual classe da NR-04 veio o grau de risco preenchido', async () => {
+    const user = userEvent.setup()
+    consultarCnpj.mockResolvedValue(AURORA)
+    render(<Campo />)
+
+    await user.type(campo(), '11222333000181')
+
+    expect(await screen.findByText(/Grau de risco 4 pelo Anexo I da NR-04 para a classe 25.11-0/)).toBeDefined()
   })
 
   it('empresa baixada é apontada — pode não ser a reclamada do processo', async () => {

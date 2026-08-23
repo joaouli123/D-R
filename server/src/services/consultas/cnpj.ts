@@ -12,14 +12,17 @@
 // lugar de "SAO PAULO"), porque esse campo vira "Cidade/UF" no
 // cabeçalho e na comarca.
 //
-// Nada aqui decide grau de risco: o grau vem da NR-04 e depende do
-// CNAE *principal da atividade avaliada*, o que é leitura do perito,
-// não dedução automática de cadastro.
+// O grau de risco acompanha o CNAE: o Anexo I da NR-04 dá um grau a
+// cada classe da CNAE 2.0, e a resposta diz de qual classe o grau
+// saiu. Escolher a atividade que responde pelo setor avaliado segue
+// sendo leitura do perito — a consulta entrega a premissa, não a
+// conclusão.
 // ============================================================
 
 import { ErroHttp } from '../../erros.js'
 import { buscarJson, criarCache, FonteIndisponivel, type OpcoesBusca } from './fonte.js'
 import { municipioPorCodigo } from './ibge.js'
+import { grauDeRiscoDoCnae, type GrauRisco } from './nr04.js'
 
 const URL_BASE = 'https://brasilapi.com.br/api/cnpj/v1'
 
@@ -32,6 +35,10 @@ export interface DadosCnpj {
   situacaoDesde: string | null
   cnae: string | null
   cnaeDescricao: string | null
+  /** Grau do Anexo I da NR-04 para a classe do CNAE — null se o CNAE não veio. */
+  grauRisco: GrauRisco | null
+  /** A classe que deu o grau ("53.10-5"), para o perito conferir a premissa. */
+  grauRiscoClasse: string | null
   naturezaJuridica: string | null
   porte: string | null
   abertura: string | null
@@ -134,6 +141,7 @@ export function mapearCnpj(
 ): DadosCnpj {
   const d = (bruto ?? {}) as Record<string, unknown>
   const numero = normalizarCnpj(String(d.cnpj ?? '')) ?? ''
+  const risco = grauDeRiscoDoCnae(String(d.cnae_fiscal ?? ''))
 
   return {
     cnpj: numero,
@@ -144,6 +152,8 @@ export function mapearCnpj(
     situacaoDesde: texto(d.data_situacao_cadastral),
     cnae: formatarCnae(d.cnae_fiscal),
     cnaeDescricao: texto(d.cnae_fiscal_descricao),
+    grauRisco: risco?.grau ?? null,
+    grauRiscoClasse: risco?.classe ?? null,
     naturezaJuridica: texto(d.natureza_juridica),
     porte: texto(d.porte),
     abertura: texto(d.data_inicio_atividade),
