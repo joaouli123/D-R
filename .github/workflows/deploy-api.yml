@@ -43,11 +43,16 @@ jobs:
           # POST, não GET: esta versão do Coolify responde 405 ao GET,
           # ainda que a documentação da API mostre o verbo antigo.
           # --connect-timeout + --retry: às vezes o painel fica alguns
-          # segundos inacessível a partir do runner (curl 28). Em vez de
+          # minutos inacessível a partir do runner (curl 28). Em vez de
           # falhar o job e disparar e-mail de alarme, tenta de novo —
           # cada tentativa desiste em 20s no lugar de travar ~135s.
+          #
+          # 5 tentativas em 10s não bastaram em 23/08/2026: o job falhou
+          # com 28 e a API ficou para trás até alguém disparar o deploy
+          # à mão. Com 8 e 20s a janela coberta passa de ~1 para ~4 min,
+          # que é a ordem de grandeza dos blips já vistos.
           resposta=$(curl -sS --fail-with-body -X POST \
-            --connect-timeout 20 --retry 5 --retry-delay 10 --retry-all-errors \
+            --connect-timeout 20 --retry 8 --retry-delay 20 --retry-all-errors \
             -H "Authorization: Bearer $COOLIFY_TOKEN" \
             "$COOLIFY_URL/api/v1/deploy?uuid=$APP_UUID")
 
