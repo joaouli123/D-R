@@ -107,8 +107,12 @@ model Pericia {
   reclamante       String        @default("")
   cpfReclamante    String?
   funcaoReclamante String?
-  admissao         String?
-  demissao         String?
+
+  /// Marco de onde se contam os cinco anos do periodo avaliado.
+  dataAjuizamento String?
+
+  admissao String?
+  demissao String?
   dataVistoria     String?
   horaVistoria     String?
   localVistoria    String?

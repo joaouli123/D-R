@@ -15,9 +15,12 @@ import {
   data,
   emParagrafos,
   extenso,
+  intervaloDoPeriodo,
   mascaraCnpj,
   montarApresentacaoAgente,
+  motivoDoPeriodo,
   numeradorDeSecoes,
+  periodoAvaliacaoDocumento,
   hoje,
   ATUACAO,
 } from './documento-comum.js'
@@ -114,6 +117,7 @@ const CSS = `
   p { margin: 0 0 8px; text-indent: 1.25cm; }
   p.sem-recuo { text-indent: 0; }
   p.vazio { font-style: italic; color: ${css(MARCA.tinta400)}; text-indent: 0; }
+  .nota { font-size: 8.5pt; color: ${css(MARCA.tinta500)}; }
   table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10pt; page-break-inside: avoid; }
   th, td { border: 1px solid var(--documento-borda); padding: 6px 9px; vertical-align: top; text-align: left; text-indent: 0; }
   th { background: var(--documento-tabela); color: var(--documento-titulo); font-weight: 700; }
@@ -257,11 +261,18 @@ export async function htmlDoParecer(
     ${solidarias.map((e) => linha('Reclamada', `${esc(e.razaoSocial)} — CNPJ ${esc(mascaraCnpj(e.cnpj))}`)).join('')}
   </tbody></table>`
 
+  // O período avaliado só entra quando a data de ajuizamento existe:
+  // sem ela a conta dos cinco anos não fecha, e uma janela chutada no
+  // laudo é pior do que janela nenhuma.
+  const periodo = periodoAvaliacaoDocumento(pericia)
+
   const dadosContratuais = `
   <table><tbody>
     ${linha('Função / Cargo', esc(pericia.funcaoReclamante || '—'))}
     ${linha('Data de admissão', data(pericia.admissao))}
     ${linha('Data de desligamento', pericia.demissao ? data(pericia.demissao) : 'Contrato vigente')}
+    ${pericia.dataAjuizamento ? linha('Ajuizamento da ação', data(pericia.dataAjuizamento)) : ''}
+    ${periodo ? linha('Período avaliado', `${esc(intervaloDoPeriodo(periodo))}<br><span class="nota">${esc(motivoDoPeriodo(periodo, pericia.dataAjuizamento))}</span>`) : ''}
   </tbody></table>`
 
   const tabelaParticipantes = pericia.participantes.length

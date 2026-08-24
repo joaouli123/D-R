@@ -64,6 +64,7 @@ import {
 import { patchDoProcesso } from '@/lib/consultas'
 import { aplicarAnexo, usaAtenuacaoRuido } from '@/lib/nr15'
 import { dadosPapel, PAPEIS } from '@/lib/participantes'
+import { intervaloDoPeriodo, motivoDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
 import { comEmpresaVinculada, empresasLivres, opcoesDaLinha } from '@/lib/reclamadas'
 import { uid } from '@/lib/utils'
 
@@ -111,6 +112,7 @@ function novaPericia(responsavelId: string): Pericia {
     reclamante: '',
     cpfReclamante: '',
     funcaoReclamante: '',
+    dataAjuizamento: '',
     admissao: '',
     demissao: '',
     reclamadas: [],
@@ -154,6 +156,35 @@ function novaPericia(responsavelId: string): Pericia {
     },
     fotos: [],
   }
+}
+
+/**
+ * O período que a empresa precisa cobrir com PGR e laudos ambientais.
+ *
+ * Sai calculado em vez de digitado porque a conta é sempre a mesma e o
+ * erro nela é caro: pedir o documento de um ano prescrito, ou deixar de
+ * pedir o do primeiro ano que conta. Aparece só quando há data de
+ * ajuizamento — antes disso não há o que calcular.
+ */
+function PeriodoAvaliado({ pericia }: { pericia: Pericia }) {
+  const periodo = periodoAvaliacaoEmpresa(pericia)
+  if (!periodo) return null
+
+  return (
+    <div
+      className={`sm:col-span-2 lg:col-span-4 rounded-lg border px-3 py-2.5 ${
+        periodo.foraDoPrazo ? 'border-amber-200 bg-amber-50' : 'border-ink-200 bg-ink-50'
+      }`}
+    >
+      <p className="text-xs font-semibold uppercase tracking-wide text-navy-700">
+        Período de avaliação da empresa
+      </p>
+      <p className="mt-1 text-sm font-medium text-ink-900">{intervaloDoPeriodo(periodo)}</p>
+      <p className={`mt-0.5 text-xs leading-5 ${periodo.foraDoPrazo ? 'text-amber-900' : 'text-ink-600'}`}>
+        {motivoDoPeriodo(periodo, pericia.dataAjuizamento)}
+      </p>
+    </div>
+  )
 }
 
 export default function PericiaEditor() {
@@ -225,8 +256,8 @@ export default function PericiaEditor() {
     }))
     toast(
       origem === 'manual'
-        ? 'Vara e comarca atualizadas com os dados do CNJ.'
-        : 'Vara e comarca preenchidas pela base pública do CNJ.',
+        ? 'Vara, comarca e data de ajuizamento atualizadas com os dados do CNJ.'
+        : 'Vara, comarca e data de ajuizamento preenchidas pela base pública do CNJ.',
     )
   }
 
@@ -482,6 +513,13 @@ export default function PericiaEditor() {
                 onChange={(e) => set({ comarca: e.target.value })}
                 placeholder="São Paulo/SP"
               />
+              <Input
+                label="Ajuizamento da ação"
+                type="date"
+                value={p.dataAjuizamento ?? ''}
+                onChange={(e) => set({ dataAjuizamento: e.target.value })}
+                hint="Vem da consulta ao CNJ. Define o período que a empresa precisa cobrir."
+              />
               <Select
                 label="Modalidade da perícia"
                 value={p.modalidade}
@@ -528,6 +566,7 @@ export default function PericiaEditor() {
                 onChange={(e) => set({ demissao: e.target.value })}
                 hint="Deixe vazio se o contrato está ativo."
               />
+              <PeriodoAvaliado pericia={p} />
             </div>
           </Card>
 

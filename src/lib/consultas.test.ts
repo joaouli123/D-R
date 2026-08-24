@@ -150,28 +150,44 @@ describe('patchDaReceita', () => {
 })
 
 describe('patchDoProcesso', () => {
-  it('traz vara e comarca da perícia nova', () => {
+  it('traz vara, comarca e ajuizamento da perícia nova', () => {
     expect(patchDoProcesso(pericia(), PROCESSO)).toEqual({
       vara: '11ª Vara do Trabalho de São Paulo',
       comarca: 'São Paulo/SP',
+      dataAjuizamento: '2022-02-23',
     })
+  })
+
+  it('corta a hora do ajuizamento: o campo da tela é só data', () => {
+    expect(patchDoProcesso(pericia(), PROCESSO).dataAjuizamento).toBe('2022-02-23')
   })
 
   it('não mexe na vara já preenchida quando a busca foi automática', () => {
     const atual = pericia({ vara: '11ª VT/SP' })
-    expect(patchDoProcesso(atual, PROCESSO)).toEqual({ comarca: 'São Paulo/SP' })
-  })
-
-  it('pelo botão, atualiza as duas', () => {
-    const atual = pericia({ vara: '11ª VT/SP', comarca: 'SP' })
-    expect(patchDoProcesso(atual, PROCESSO, { sobrescrever: true })).toEqual({
-      vara: '11ª Vara do Trabalho de São Paulo',
+    expect(patchDoProcesso(atual, PROCESSO)).toEqual({
       comarca: 'São Paulo/SP',
+      dataAjuizamento: '2022-02-23',
     })
   })
 
-  it('processo sem órgão identificado não devolve patch nenhum', () => {
-    expect(patchDoProcesso(pericia(), { ...PROCESSO, vara: null, comarca: null })).toEqual({})
+  it('não reescreve o ajuizamento que o perito já corrigiu à mão', () => {
+    const atual = pericia({ dataAjuizamento: '2022-01-05' })
+    expect('dataAjuizamento' in patchDoProcesso(atual, PROCESSO)).toBe(false)
+  })
+
+  it('pelo botão, atualiza as três', () => {
+    const atual = pericia({ vara: '11ª VT/SP', comarca: 'SP', dataAjuizamento: '2022-01-05' })
+    expect(patchDoProcesso(atual, PROCESSO, { sobrescrever: true })).toEqual({
+      vara: '11ª Vara do Trabalho de São Paulo',
+      comarca: 'São Paulo/SP',
+      dataAjuizamento: '2022-02-23',
+    })
+  })
+
+  it('processo sem órgão nem ajuizamento não devolve patch nenhum', () => {
+    expect(
+      patchDoProcesso(pericia(), { ...PROCESSO, vara: null, comarca: null, dataAjuizamento: null }),
+    ).toEqual({})
   })
 })
 

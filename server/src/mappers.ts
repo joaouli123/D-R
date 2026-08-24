@@ -76,6 +76,7 @@ export function periciaParaApi(p: PericiaCompleta) {
     reclamante: p.reclamante,
     cpfReclamante: p.cpfReclamante ?? '',
     funcaoReclamante: p.funcaoReclamante ?? '',
+    dataAjuizamento: p.dataAjuizamento ?? '',
     admissao: p.admissao ?? '',
     demissao: p.demissao ?? '',
     dataVistoria: p.dataVistoria ?? '',

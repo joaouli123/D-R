@@ -31,9 +31,12 @@ import {
   data,
   emParagrafos,
   extenso,
+  intervaloDoPeriodo,
   mascaraCnpj,
   montarApresentacaoAgente,
+  motivoDoPeriodo,
   numeradorDeSecoes,
+  periodoAvaliacaoDocumento,
   hoje,
   ATUACAO,
 } from './documento-comum.js'
@@ -198,6 +201,32 @@ const fichaLinha = (rotulo: string, valor: string) =>
     children: [
       celula(rotulo, { cabecalho: true, larguraDxa: COLUNAS_FICHA[0] }),
       celula(valor, { larguraDxa: COLUNAS_FICHA[1] }),
+    ],
+  })
+
+/**
+ * Ficha com uma segunda linha explicativa na mesma célula. `\n` não
+ * quebra linha em DOCX — a quebra é propriedade do run seguinte.
+ */
+const fichaLinhaComNota = (rotulo: string, valor: string, nota: string) =>
+  new TableRow({
+    children: [
+      celula(rotulo, { cabecalho: true, larguraDxa: COLUNAS_FICHA[0] }),
+      new TableCell({
+        borders: BORDAS,
+        shading: { fill: MARCA.documentoFundo },
+        width: { size: COLUNAS_FICHA[1], type: WidthType.DXA },
+        margins: { top: 60, bottom: 60, left: 120, right: 120 },
+        children: [
+          new Paragraph({
+            spacing: { after: 0 },
+            children: [
+              texto(valor, { tamanho: 20 }),
+              texto(nota, { tamanho: 17, cor: MARCA.tinta500, quebraAntes: 1 }),
+            ],
+          }),
+        ],
+      }),
     ],
   })
 
@@ -422,6 +451,10 @@ async function docParecer(
   // DOCX precisa sair numerado igual ao PDF do mesmo documento.
   const num = numeradorDeSecoes()
 
+  // Sem data de ajuizamento a conta dos cinco anos não fecha, e uma
+  // janela chutada no laudo é pior do que janela nenhuma.
+  const periodo = periodoAvaliacaoDocumento(pericia)
+
   const filhos: (Paragraph | Table)[] = [
     ...enderecamentoDoParecer(pericia.vara, pericia.comarca, t.enderecamento),
     tabela([
@@ -445,6 +478,14 @@ async function docParecer(
       fichaLinha('Função / Cargo', pericia.funcaoReclamante || '—'),
       fichaLinha('Data de admissão', data(pericia.admissao)),
       fichaLinha('Data de desligamento', pericia.demissao ? data(pericia.demissao) : 'Contrato vigente'),
+      ...(pericia.dataAjuizamento ? [fichaLinha('Ajuizamento da ação', data(pericia.dataAjuizamento))] : []),
+      ...(periodo
+        ? [fichaLinhaComNota(
+            'Período avaliado',
+            intervaloDoPeriodo(periodo),
+            motivoDoPeriodo(periodo, pericia.dataAjuizamento),
+          )]
+        : []),
     ]),
     h2(num.secao('DA DILIGÊNCIA TÉCNICA PERICIAL')),
     p(

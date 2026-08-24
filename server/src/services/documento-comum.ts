@@ -137,6 +137,92 @@ export function extenso(iso?: string | null): string {
 
 export const hoje = (): string => new Date().toISOString().slice(0, 10)
 
+// ---- Período de avaliação da empresa ------------------------------------
+// O laudo avalia os cinco anos anteriores ao ajuizamento da ação, ou o
+// que houver a partir da admissão, se ela for posterior a esse marco.
+//
+// Espelha `src/lib/periodoAvaliacao.ts`. Os dois precisam mudar juntos:
+// a tela mostra o período ao perito, este arquivo imprime o que vai ao
+// juízo.
+
+export interface PeriodoAvaliacaoDocumento {
+  inicio: string
+  fim?: string
+  motivoInicio: 'prescricao' | 'admissao'
+  marcoPrescricional: string
+  foraDoPrazo: boolean
+}
+
+const DATA_ISO = /^\d{4}-\d{2}-\d{2}/
+
+function comoDataIso(valor?: string | null): string {
+  const limpo = (valor ?? '').trim()
+  return DATA_ISO.test(limpo) ? limpo.slice(0, 10) : ''
+}
+
+/**
+ * A mesma data, tantos anos antes. Ajuizamento em 29/02 não existe cinco
+ * anos antes: o corte cai no último dia de fevereiro daquele ano.
+ */
+export function subtrairAnos(iso: string, anos: number): string {
+  const [ano, mes, dia] = iso.split('-').map(Number)
+  if (!ano || !mes || !dia) return iso
+  const alvo = ano - anos
+  const ultimoDiaDoMes = new Date(Date.UTC(alvo, mes, 0)).getUTCDate()
+  const doisDigitos = (n: number) => String(n).padStart(2, '0')
+  return `${alvo}-${doisDigitos(mes)}-${doisDigitos(Math.min(dia, ultimoDiaDoMes))}`
+}
+
+/** Sem data de ajuizamento não há conta a fazer — melhor nada que errado. */
+export function periodoAvaliacaoDocumento(pericia: {
+  dataAjuizamento?: string | null
+  admissao?: string | null
+  demissao?: string | null
+}): PeriodoAvaliacaoDocumento | null {
+  const ajuizamento = comoDataIso(pericia.dataAjuizamento)
+  if (!ajuizamento) return null
+
+  const marcoPrescricional = subtrairAnos(ajuizamento, 5)
+  const admissao = comoDataIso(pericia.admissao)
+  const demissao = comoDataIso(pericia.demissao)
+
+  const comecaNaAdmissao = Boolean(admissao) && admissao > marcoPrescricional
+
+  return {
+    inicio: comecaNaAdmissao ? admissao : marcoPrescricional,
+    fim: demissao || undefined,
+    motivoInicio: comecaNaAdmissao ? 'admissao' : 'prescricao',
+    marcoPrescricional,
+    foraDoPrazo: Boolean(demissao) && demissao < marcoPrescricional,
+  }
+}
+
+export function intervaloDoPeriodo(periodo: PeriodoAvaliacaoDocumento): string {
+  if (periodo.foraDoPrazo) return 'Nenhum — contrato encerrado antes do marco prescricional'
+  const inicio = data(periodo.inicio)
+  return periodo.fim ? `${inicio} a ${data(periodo.fim)}` : `${inicio} até o fim do contrato`
+}
+
+/**
+ * Por que o período é esse. O intervalo sozinho parece arbitrário para
+ * quem lê o documento e não fez a conta.
+ */
+export function motivoDoPeriodo(
+  periodo: PeriodoAvaliacaoDocumento,
+  dataAjuizamento?: string | null,
+): string {
+  const ajuizamento = comoDataIso(dataAjuizamento)
+  const referencia = ajuizamento ? ` (${data(ajuizamento)})` : ''
+
+  if (periodo.foraDoPrazo) {
+    return `O contrato encerrou-se antes de ${data(periodo.marcoPrescricional)}, marco dos cinco anos anteriores ao ajuizamento da ação${referencia}.`
+  }
+  if (periodo.motivoInicio === 'admissao') {
+    return `Contado da admissão, posterior ao marco de ${data(periodo.marcoPrescricional)} — cinco anos anteriores ao ajuizamento da ação${referencia}.`
+  }
+  return `Cinco anos anteriores ao ajuizamento da ação${referencia}.`
+}
+
 // ---- Máscaras de documentos e contatos ----------------------------------
 // Formatam apenas quando a contagem de dígitos bate; caso contrário devolvem
 // o valor original limpo (ou "—"), para nunca inventar um número inválido.

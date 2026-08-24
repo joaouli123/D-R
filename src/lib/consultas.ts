@@ -97,15 +97,24 @@ export function patchDaReceita(
   return apenasVazios(vindos, (campo) => !PADRAO_DE_TELA.has(campo) && !vazio(atual[campo]))
 }
 
-/** Vara e comarca a partir do que o CNJ publica. As partes, não: ver `aviso`. */
+/**
+ * Vara, comarca e data de ajuizamento a partir do que o CNJ publica. As
+ * partes, não: ver `aviso`.
+ *
+ * O ajuizamento entra junto porque é dele que sai o período avaliado —
+ * pedir ao perito para copiar a data que a própria consulta acabou de
+ * mostrar seria transcrição manual de um dado já em mãos.
+ */
 export function patchDoProcesso(
   atual: Pericia,
   dados: DadosProcesso,
   opcoes: OpcoesPreenchimento = {},
 ): Partial<Pericia> {
-  const vindos: Partial<Record<'vara' | 'comarca', string>> = {}
+  const vindos: Partial<Record<'vara' | 'comarca' | 'dataAjuizamento', string>> = {}
   if (dados.vara?.trim()) vindos.vara = dados.vara.trim()
   if (dados.comarca?.trim()) vindos.comarca = dados.comarca.trim()
+  // O campo da tela é `type="date"`: só a parte da data serve.
+  if (dados.dataAjuizamento?.trim()) vindos.dataAjuizamento = dados.dataAjuizamento.slice(0, 10)
 
   if (opcoes.sobrescrever) return vindos
 

@@ -2,6 +2,7 @@ import type { Empresa, Pericia, SecaoFoto, Usuario } from '@/types'
 import { extenso, formatDate, maskCNPJ } from '@/lib/utils'
 import { dadosPapel } from '@/lib/participantes'
 import { montarApresentacaoAgente } from '@/lib/apresentacaoAgente'
+import { intervaloDoPeriodo, motivoDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
 
 // ============================================================
 // MÓDULO H — Prévia fiel do Parecer/Laudo.
@@ -40,6 +41,10 @@ export function DocumentoPreview({
     .filter((reclamada) => !reclamada.principal)
     .map((reclamada) => empresas.find((empresa) => empresa.id === reclamada.empresaId))
     .filter(Boolean) as Empresa[]
+
+  // Sem data de ajuizamento a conta dos cinco anos não fecha, e a linha
+  // simplesmente não aparece — janela chutada no laudo é pior que nenhuma.
+  const periodo = periodoAvaliacaoEmpresa(pericia)
 
   const fotosOrdenadas = [...pericia.fotos].sort((a, b) => a.ordem - b.ordem)
   const numeroDaFoto = new Map(fotosOrdenadas.map((foto, indice) => [foto.id, indice + 1]))
@@ -176,6 +181,21 @@ export function DocumentoPreview({
           <tr><th>Função / Cargo</th><td>{pericia.funcaoReclamante || '—'}</td></tr>
           <tr><th>Data de admissão</th><td>{formatDate(pericia.admissao)}</td></tr>
           <tr><th>Data de desligamento</th><td>{pericia.demissao ? formatDate(pericia.demissao) : 'Contrato vigente'}</td></tr>
+          {pericia.dataAjuizamento && (
+            <tr><th>Ajuizamento da ação</th><td>{formatDate(pericia.dataAjuizamento)}</td></tr>
+          )}
+          {periodo && (
+            <tr>
+              <th>Período avaliado</th>
+              <td>
+                {intervaloDoPeriodo(periodo)}
+                <br />
+                <span className="text-[0.85em] text-ink-500">
+                  {motivoDoPeriodo(periodo, pericia.dataAjuizamento)}
+                </span>
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
 

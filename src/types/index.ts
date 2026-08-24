@@ -99,6 +99,12 @@ export interface Pericia {
   reclamante: string
   cpfReclamante?: string
   funcaoReclamante?: string
+  /**
+   * Quando a ação foi ajuizada. Vem da consulta pública do CNJ e é o
+   * marco de onde se conta a janela de cinco anos que a empresa
+   * precisa cobrir com PGR e laudos ambientais.
+   */
+  dataAjuizamento?: string
   admissao?: string
   demissao?: string
   reclamadas: Reclamada[]

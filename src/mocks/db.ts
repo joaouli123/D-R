@@ -166,6 +166,7 @@ export const PERICIAS: Pericia[] = [
     reclamante: 'José Aparecido da Silva',
     cpfReclamante: '123.456.789-00',
     funcaoReclamante: 'Operador de Máquinas',
+    dataAjuizamento: '2025-04-22',
     admissao: '2018-03-12',
     demissao: '2024-11-08',
     reclamadas: [{ id: 'rec-1', empresaId: 'emp-1', principal: true }],
@@ -198,6 +199,7 @@ export const PERICIAS: Pericia[] = [
     comarca: 'São Paulo/SP',
     reclamante: 'Maria Aparecida Ferreira',
     funcaoReclamante: 'Técnica de Enfermagem',
+    dataAjuizamento: '2025-09-10',
     admissao: '2016-08-01',
     demissao: '2025-02-28',
     reclamadas: [{ id: 'rec-2', empresaId: 'emp-3', principal: true }],
@@ -222,6 +224,7 @@ export const PERICIAS: Pericia[] = [
     comarca: 'São Paulo/SP',
     reclamante: 'Carlos Eduardo Nunes',
     funcaoReclamante: 'Motorista Carreteiro',
+    dataAjuizamento: '2024-10-03',
     admissao: '2019-01-15',
     demissao: '2025-06-30',
     reclamadas: [
@@ -250,6 +253,9 @@ export const PERICIAS: Pericia[] = [
     comarca: 'São Paulo/SP',
     reclamante: 'Anderson Lopes Ribeiro',
     funcaoReclamante: 'Frentista',
+    // Admissão depois do marco dos cinco anos: aqui o período avaliado
+    // começa na admissão, e não na prescrição.
+    dataAjuizamento: '2026-02-18',
     admissao: '2021-04-05',
     reclamadas: [{ id: 'rec-5', empresaId: 'emp-4', principal: true }],
     participantes: [],

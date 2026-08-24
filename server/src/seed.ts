@@ -196,6 +196,7 @@ async function seedDemo(responsavelId: string) {
       reclamante: 'José Aparecido da Silva',
       cpfReclamante: '123.456.789-00',
       funcaoReclamante: 'Operador de Máquinas',
+      dataAjuizamento: '2025-04-22',
       admissao: '2018-03-12',
       demissao: '2024-11-08',
       dataVistoria: '2026-07-15',
