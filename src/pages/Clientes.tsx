@@ -180,10 +180,7 @@ export default function Clientes() {
                 </div>
                 <div className="flex gap-2">
                   <dt className="w-16 shrink-0 text-ink-400">CNAE</dt>
-                  <dd className="text-ink-700">
-                    {e.cnae || '—'}{' '}
-                    {e.grauRisco && <Badge tone="gray">Grau {e.grauRisco}</Badge>}
-                  </dd>
+                  <dd className="text-ink-700">{e.cnae || '—'}</dd>
                 </div>
                 <div className="flex gap-2">
                   <dt className="w-16 shrink-0 pt-0.5 text-ink-400">

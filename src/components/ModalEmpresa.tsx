@@ -26,7 +26,6 @@ export const empresaVazia = (): Empresa => ({
   nomeFantasia: '',
   cnpj: '',
   cnae: '',
-  grauRisco: '3',
   endereco: '',
   numero: '',
   bairro: '',
@@ -136,35 +135,26 @@ export function ModalEmpresa({ inicial, titulo, subtitulo, onFechar, onSalvo }: 
           />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        {/*
+          Sem grau de risco: o dado não tem uso neste tipo de documento
+          e pedi-lo só custava atenção do perito. A coluna e a consulta
+          continuam de pé para os projetos que forem usá-lo.
+        */}
+        <div className="grid gap-4 sm:grid-cols-3">
           <Input
             label="CNAE"
             value={empresa.cnae}
             onChange={(e) => set({ cnae: e.target.value })}
             placeholder="00.00-0-00"
           />
-          <Select
-            label="Grau de risco"
-            value={empresa.grauRisco}
-            onChange={(e) => set({ grauRisco: e.target.value as Empresa['grauRisco'] })}
-            // A busca do CNPJ já traz o grau que o Anexo I da NR-04 dá à
-            // classe do CNAE. Qual atividade responde pelo setor avaliado
-            // continua sendo leitura do perito — daí o convite a conferir.
-            hint="Vem do Anexo I da NR-04 pela classe do CNAE — confira pela atividade do setor avaliado."
-          >
-            <option value="1">Grau 1</option>
-            <option value="2">Grau 2</option>
-            <option value="3">Grau 3</option>
-            <option value="4">Grau 4</option>
-          </Select>
+          <Input
+            label="Ramo de atividade"
+            className="sm:col-span-2"
+            value={empresa.ramoAtividade}
+            onChange={(e) => set({ ramoAtividade: e.target.value })}
+            hint="Texto reaproveitado na seção 'Descrição da Empresa' do parecer."
+          />
         </div>
-
-        <Input
-          label="Ramo de atividade"
-          value={empresa.ramoAtividade}
-          onChange={(e) => set({ ramoAtividade: e.target.value })}
-          hint="Texto reaproveitado na seção 'Descrição da Empresa' do parecer."
-        />
 
         <div className="border-t border-ink-100 pt-4">
           <p className="section-title mb-3">Endereço</p>

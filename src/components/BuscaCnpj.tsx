@@ -3,13 +3,7 @@ import { AlertTriangle, Building2, Search } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import * as api from '@/services/api'
 import type { DadosCnpj } from '@/services/api'
-import {
-  cnpjCompleto,
-  digitos,
-  origemDoGrauRisco,
-  resumoDaReceita,
-  situacaoIrregular,
-} from '@/lib/consultas'
+import { cnpjCompleto, digitos, resumoDaReceita, situacaoIrregular } from '@/lib/consultas'
 import { maskCNPJ } from '@/lib/utils'
 
 // ============================================================
@@ -138,9 +132,6 @@ export function BuscaCnpj({ valor, onChange, onDados, autoBuscar = false, classN
               </span>
             </span>
           </p>
-          {origemDoGrauRisco(dados) && (
-            <p className="mt-1.5 text-emerald-800">{origemDoGrauRisco(dados)}</p>
-          )}
           {situacaoIrregular(dados) && (
             <p className="mt-1.5 font-semibold text-amber-800">
               Atenção: situação cadastral {dados.situacao} — confirme se é a empresa correta do

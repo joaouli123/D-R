@@ -131,14 +131,15 @@ describe('BuscaCnpj', () => {
     expect(consultarCnpj).toHaveBeenCalledTimes(1)
   })
 
-  it('diz de qual classe da NR-04 veio o grau de risco preenchido', async () => {
+  it('não fala em grau de risco: o dado saiu deste tipo de documento', async () => {
     const user = userEvent.setup()
     consultarCnpj.mockResolvedValue(AURORA)
     render(<Campo />)
 
     await user.type(campo(), '11222333000181')
+    await screen.findByText(/METALURGICA AURORA LTDA/)
 
-    expect(await screen.findByText(/Grau de risco 4 pelo Anexo I da NR-04 para a classe 25.11-0/)).toBeDefined()
+    expect(screen.queryByText(/Grau de risco/)).toBeNull()
   })
 
   it('empresa baixada é apontada — pode não ser a reclamada do processo', async () => {
