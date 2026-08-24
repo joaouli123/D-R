@@ -2,7 +2,7 @@ import { labelAnexoNr15 } from '@/content/anexosNr15'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
 import type { AgenteAvaliado, EpiSelecionado } from '@/types'
 
-import { medicaoAdotada } from './medicoes'
+import { FONTE_RUIDO, medicaoAdotada } from './medicoes'
 import { usaAtenuacaoRuido } from './nr15'
 import { calcularProtecaoAuditiva, protecaoDoConjunto } from './protecaoAuditiva'
 
@@ -55,15 +55,30 @@ export function formatarMedicaoAgente(agente: AgenteAvaliado): string {
 function linhasOrigemMedicao(agente: AgenteAvaliado): LinhaAgente[] {
   const adotada = medicaoAdotada(agente)
   const doPerito = agente.valorMedido?.trim() ?? ''
-  const daEmpresa = agente.medicaoEmpresa?.trim() ?? ''
+  const daEmpresa = agente.medicaoEmpresa?.trim() || agente.medicaoEmpresaAte?.trim() || ''
   const origemExplicita = (agente.origemMedicao ?? 'perito') !== 'perito'
   if (!daEmpresa && !origemExplicita) return []
 
+  // Com faixa, o número adotado sozinho esconde de onde saiu: quem lê
+  // precisa ver o intervalo e a razão de o laudo ficar com o topo. O
+  // "adotada a maior" só entra quando é essa medição que prevalece —
+  // dizê-lo de uma medição descartada seria afirmar o contrário do que
+  // o documento conclui.
+  const faixa = adotada.faixaEmpresa
+  const intervalo = faixa && `entre ${comUnidade(faixa.de)} e ${comUnidade(faixa.ate, agente.unidadeMedicao)}`
+  const medicaoDaEmpresa = intervalo
+    ? adotada.origem === 'perito' ? intervalo : `${intervalo} — adotada a maior`
+    : comUnidade(adotada.origem === 'perito' ? daEmpresa : adotada.valor, agente.unidadeMedicao)
+
   return [
     { rotulo: 'Origem da medição', valor: adotada.rotuloOrigem, ...(adotada.divergente ? { destaque: 'aviso' as const } : {}) },
+    { rotulo: 'Base da medição', valor: adotada.notaOrigem },
     ...(adotada.fonte ? [{ rotulo: 'Documento da empresa', valor: adotada.fonte }] : []),
     ...(daEmpresa && adotada.origem === 'perito'
-      ? [{ rotulo: 'Medição da empresa (não adotada)', valor: comUnidade(daEmpresa, agente.unidadeMedicao) }]
+      ? [{ rotulo: 'Medição da empresa (não adotada)', valor: medicaoDaEmpresa }]
+      : []),
+    ...(faixa && adotada.origem !== 'perito'
+      ? [{ rotulo: 'Faixa informada pela empresa', valor: medicaoDaEmpresa }]
       : []),
     ...(doPerito && adotada.origem !== 'perito'
       ? [{ rotulo: 'Medição do perito (não adotada)', valor: comUnidade(doPerito, agente.unidadeMedicao) }]
@@ -134,7 +149,11 @@ export function montarApresentacaoAgente(agente: AgenteAvaliado): ApresentacaoAg
     ...((regra?.exibeCas ?? Boolean(agente.cas)) && agente.cas ? [{ rotulo: 'CAS', valor: agente.cas }] : []),
     ...(agente.atividadeEnquadrada?.trim() ? [{ rotulo: 'Atividade ou referência normativa', valor: agente.atividadeEnquadrada.trim() }] : []),
     ...(agente.limiteTolerancia?.trim() ? [{ rotulo: 'Limite de tolerância', valor: agente.limiteTolerancia.trim() }] : []),
-    ...((regra?.exibeMedicao ?? Boolean(agente.valorMedido || agente.medicaoEmpresa || agente.medido))
+    // A frase inteira, não o rótulo: o documento é lido por quem não
+    // acompanhou a diligência, e "Ruído de fundo" sozinho não explica
+    // por que o nível medido não vem de máquina nenhuma.
+    ...(agente.fonteRuido ? [{ rotulo: 'Fonte do ruído', valor: FONTE_RUIDO[agente.fonteRuido].frase }] : []),
+    ...((regra?.exibeMedicao ?? Boolean(agente.valorMedido || agente.medicaoEmpresa || agente.medicaoEmpresaAte || agente.medido))
       ? [{ rotulo: 'Medição registrada', valor: formatarMedicaoAgente(agente) }, ...linhasOrigemMedicao(agente)]
       : []),
   ]

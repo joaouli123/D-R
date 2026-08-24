@@ -145,6 +145,15 @@ export interface EpiSelecionado {
  */
 export type OrigemMedicao = 'perito' | 'empresa' | 'nao_informado'
 
+/**
+ * De onde vem o ruído do local avaliado.
+ *
+ * Sem isso, o laudo que mede 58 dB(A) num escritório fica igual ao que
+ * mede 58 dB(A) ao lado de uma prensa desligada no dia da diligência —
+ * e a conclusão sobre habitualidade depende justamente dessa diferença.
+ */
+export type FonteRuido = 'maquinas' | 'ruido_fundo' | 'administrativa'
+
 export interface AgenteAvaliado {
   id: UUID
   nome: string
@@ -158,10 +167,14 @@ export interface AgenteAvaliado {
   medido?: string
   /** Medição do perito na diligência. */
   valorMedido?: string
-  /** Medição da empresa (PGR, LTCAT, laudo ambiental). */
+  /** Medição da empresa (PGR, laudo ambiental). Início da faixa, se houver. */
   medicaoEmpresa?: string
+  /** Fim da faixa, quando a medição da empresa variou. O laudo adota a maior. */
+  medicaoEmpresaAte?: string
   /** Documento de onde saiu a medição da empresa. Ex.: "PGR 2024". */
   fonteMedicaoEmpresa?: string
+  /** Fonte do ruído no local. Só para os Anexos 1 e 2 da NR-15. */
+  fonteRuido?: FonteRuido
   /** Qual das duas o laudo adota. Ausente = perito, como sempre foi. */
   origemMedicao?: OrigemMedicao
   unidadeMedicao?: UnidadeMedicao

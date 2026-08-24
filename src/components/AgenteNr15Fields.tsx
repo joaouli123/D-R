@@ -2,11 +2,18 @@ import { useEffect, useState } from 'react'
 
 import { anexoNr15PorId, ATIVIDADES_ANEXO_13, ATIVIDADES_ANEXO_14, SUBSTANCIAS_ANEXO_11 } from '@/content/anexosNr15'
 import type { ReferenciaNormativa, UnidadeMedicao } from '@/content/nr15/tipos'
-import { medicaoAdotada, normalizarNumeroMedido, unidadesDisponiveis } from '@/lib/medicoes'
+import {
+  FONTE_RUIDO,
+  medicaoAdotada,
+  NOTA_ORIGEM_MEDICAO,
+  ROTULO_ORIGEM_MEDICAO,
+  normalizarNumeroMedido,
+  unidadesDisponiveis,
+} from '@/lib/medicoes'
 import { aplicarReferencia } from '@/lib/nr15'
 import { protecaoDoConjunto } from '@/lib/protecaoAuditiva'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
-import type { AgenteAvaliado, OrigemMedicao } from '@/types'
+import type { AgenteAvaliado, FonteRuido, OrigemMedicao } from '@/types'
 import { Input, Select } from './ui'
 import { BuscaNormativa } from './BuscaNormativa'
 
@@ -16,11 +23,9 @@ const CONFIGURACOES = {
   ANEXO_14: { itens: ATIVIDADES_ANEXO_14, titulo: 'Atividade do Anexo 14', placeholder: 'Busque por atividade biológica' },
 } as const
 
-const OPCOES_ORIGEM: { valor: OrigemMedicao; rotulo: string }[] = [
-  { valor: 'perito', rotulo: 'Avaliação do perito em diligência' },
-  { valor: 'empresa', rotulo: 'Avaliação da empresa (PGR / laudo ambiental)' },
-  { valor: 'nao_informado', rotulo: 'Não informado pelo perito' },
-]
+const OPCOES_ORIGEM: OrigemMedicao[] = ['perito', 'empresa', 'nao_informado']
+
+const OPCOES_FONTE_RUIDO: FonteRuido[] = ['maquinas', 'ruido_fundo', 'administrativa']
 
 interface AgenteNr15FieldsProps {
   agente: AgenteAvaliado
@@ -36,12 +41,15 @@ interface AgenteNr15FieldsProps {
  */
 function CampoNumerico({
   label,
+  rotuloAcessivel,
   valor,
   hint,
   placeholder,
   onConfirmar,
 }: {
   label: string
+  /** Quando o rótulo visível é curto demais para identificar o campo. */
+  rotuloAcessivel?: string
   valor?: string
   hint?: string
   placeholder?: string
@@ -71,7 +79,7 @@ function CampoNumerico({
   return (
     <Input
       label={label}
-      aria-label={label}
+      aria-label={rotuloAcessivel ?? label}
       inputMode="decimal"
       value={texto}
       error={erro}
@@ -98,7 +106,10 @@ function OrigemDaMedicao({
   const adotada = medicaoAdotada(agente)
   const sufixo = unidade ? ` (${unidade})` : ''
 
-  function definirNumero(campo: 'valorMedido' | 'medicaoEmpresa', normalizado: string | null) {
+  function definirNumero(
+    campo: 'valorMedido' | 'medicaoEmpresa' | 'medicaoEmpresaAte',
+    normalizado: string | null,
+  ) {
     if (normalizado == null) {
       const { [campo]: _removido, ...semValor } = agente
       onChange(semValor)
@@ -112,45 +123,71 @@ function OrigemDaMedicao({
 
   return (
     <div className="mt-3 border-t border-ink-200 pt-3">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-navy-700">Origem da medição</p>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-navy-700">Avaliação da medição</p>
       <div className="grid gap-3 sm:grid-cols-2">
         <Select
           label="Medição adotada no laudo"
           aria-label="Origem da medição adotada no laudo"
           className="sm:col-span-2"
           value={origem}
-          hint={origem === 'nao_informado'
-            ? 'O laudo registra que o perito não mediu e adota a avaliação da empresa.'
-            : 'Define qual número entra no cálculo e na conclusão.'}
+          hint={NOTA_ORIGEM_MEDICAO[origem]}
           onChange={(evento) => onChange({ ...agente, origemMedicao: evento.target.value as OrigemMedicao })}
         >
           {OPCOES_ORIGEM.map((opcao) => (
-            <option key={opcao.valor} value={opcao.valor}>{opcao.rotulo}</option>
+            <option key={opcao} value={opcao}>{ROTULO_ORIGEM_MEDICAO[opcao]}</option>
           ))}
         </Select>
 
         <CampoNumerico
-          label={`Medição do perito${sufixo}`}
+          label={`Medição em perícia${sufixo}`}
           valor={agente.valorMedido}
           hint={origem === 'perito' ? 'Adotada no laudo.' : 'Registrada para comparação.'}
           onConfirmar={(normalizado) => definirNumero('valorMedido', normalizado)}
         />
-        <CampoNumerico
-          label={`Medição da empresa${sufixo}`}
-          valor={agente.medicaoEmpresa}
-          hint={origem === 'perito' ? 'Registrada para comparação.' : 'Adotada no laudo.'}
-          onConfirmar={(normalizado) => definirNumero('medicaoEmpresa', normalizado)}
-        />
+
+        {/*
+          A medição da empresa raramente é um número só: o PGR cobre
+          anos e o nível varia. Dois campos em vez de um texto livre
+          porque o número precisa continuar entrando no cálculo — e a
+          conclusão sai pelo topo da faixa, o pior cenário do período.
+        */}
+        <div>
+          <div className="grid grid-cols-2 gap-3">
+            <CampoNumerico
+              label={`Medição da empresa${sufixo}`}
+              valor={agente.medicaoEmpresa}
+              onConfirmar={(normalizado) => definirNumero('medicaoEmpresa', normalizado)}
+            />
+            <CampoNumerico
+              label="até"
+              rotuloAcessivel="Medição da empresa até"
+              valor={agente.medicaoEmpresaAte}
+              onConfirmar={(normalizado) => definirNumero('medicaoEmpresaAte', normalizado)}
+            />
+          </div>
+          <p className="mt-1.5 text-xs text-ink-500">
+            {origem === 'perito' ? 'Registrada para comparação.' : 'Adotada no laudo.'} Preencha o
+            “até” só quando a medição variou no período — o laudo considera a maior.
+          </p>
+        </div>
         <Input
           label="Documento da empresa"
           aria-label="Documento de origem da medição da empresa"
           className="sm:col-span-2"
           value={agente.fonteMedicaoEmpresa ?? ''}
-          placeholder="Ex.: PGR 2024, LTCAT de 12/03/2023, laudo ambiental"
+          placeholder="Ex.: PGR 2024, laudo ambiental de 12/03/2023"
           hint="Sai no laudo junto da medição da empresa."
           onChange={(evento) => onChange({ ...agente, fonteMedicaoEmpresa: evento.target.value })}
         />
       </div>
+
+      {adotada.faixaEmpresa && (
+        <p role="status" className="mt-2 text-xs leading-5 text-ink-600">
+          Medição da empresa entre {adotada.faixaEmpresa.de.replace('.', ',')} e{' '}
+          {adotada.faixaEmpresa.ate.replace('.', ',')}
+          {unidade ? ` ${unidade}` : ''} — o laudo considera a maior.
+        </p>
+      )}
 
       {adotada.divergente && (
         <p role="status" className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs leading-5 text-amber-900">
@@ -158,6 +195,39 @@ function OrigemDaMedicao({
           apresenta a outra ao lado — justifique a escolha na análise técnica.
         </p>
       )}
+    </div>
+  )
+}
+
+/**
+ * A fonte do ruído do local, só nos anexos de ruído. É o que separa o
+ * escritório silencioso do galpão cuja prensa estava parada no dia da
+ * diligência — dois locais que a medição sozinha descreve igual.
+ */
+function FonteDoRuido({ agente, onChange }: AgenteNr15FieldsProps) {
+  const escolhida = agente.fonteRuido
+
+  return (
+    <div className="mt-3 border-t border-ink-200 pt-3">
+      <Select
+        label="Fonte do ruído"
+        aria-label="Fonte do ruído"
+        value={escolhida ?? ''}
+        hint={escolhida ? FONTE_RUIDO[escolhida].frase : 'A frase escolhida sai no laudo, junto do agente.'}
+        onChange={(evento) => {
+          if (!evento.target.value) {
+            const { fonteRuido: _semFonte, ...semFonte } = agente
+            onChange(semFonte)
+            return
+          }
+          onChange({ ...agente, fonteRuido: evento.target.value as FonteRuido })
+        }}
+      >
+        <option value="">— não informada —</option>
+        {OPCOES_FONTE_RUIDO.map((opcao) => (
+          <option key={opcao} value={opcao}>{FONTE_RUIDO[opcao].rotulo}</option>
+        ))}
+      </Select>
     </div>
   )
 }
@@ -283,6 +353,7 @@ function CamposGenericos({
           />
         )}
       </div>
+      {regra?.calculo === 'ruido_nrrsf' && <FonteDoRuido agente={agente} onChange={onChange} />}
       {regra?.exibeMedicao && <OrigemDaMedicao agente={agente} onChange={onChange} unidade={unidadeMedicao} />}
       {agente.medido && regra?.exibeMedicao && !agente.valorMedido && (
         <p role="alert" className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-900">

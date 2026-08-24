@@ -26,9 +26,9 @@ describe('campos específicos do Anexo 1', () => {
     const onChange = vi.fn()
     render(<AgenteNr15Fields agente={RUIDO} onChange={onChange} />)
 
-    const medicao = screen.getByRole('textbox', { name: 'Medição do perito (dB(A))' })
+    const medicao = screen.getByRole('textbox', { name: 'Medição em perícia (dB(A))' })
     expect(medicao.getAttribute('inputmode')).toBe('decimal')
-    expect(screen.getByText('Medição do perito (dB(A))')).toBeDefined()
+    expect(screen.getByText('Medição em perícia (dB(A))')).toBeDefined()
     expect(screen.queryByRole('textbox', { name: 'Unidade da medição' })).toBeNull()
     expect(screen.getByDisplayValue('85 dB(A) para jornada de 8h/dia (q=5)').getAttribute('readonly')).not.toBeNull()
 
@@ -57,7 +57,7 @@ describe('campos específicos do Anexo 1', () => {
 
   it('não mostra medição numérica para anexo qualitativo', () => {
     render(<AgenteNr15Fields agente={{ ...RUIDO, anexoNr15: 'ANEXO_07', nome: 'Radiação', criterio: 'qualitativo' }} onChange={() => undefined} />)
-    expect(screen.queryByRole('textbox', { name: /^Medição do perito/ })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: /^Medição em perícia/ })).toBeNull()
   })
 
   it('calcula com o protetor mais atenuante quando há vários associados', () => {
@@ -115,5 +115,68 @@ describe('origem da medição', () => {
     )
 
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ origemMedicao: 'nao_informado' }))
+  })
+
+  it('grava o topo da faixa da empresa sem apagar o início', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<AgenteNr15Fields agente={{ ...RUIDO, medicaoEmpresa: '83', origemMedicao: 'empresa' }} onChange={onChange} />)
+
+    await user.type(screen.getByRole('textbox', { name: 'Medição da empresa até' }), '88,5')
+    await user.tab()
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ medicaoEmpresa: '83', medicaoEmpresaAte: '88.5' }),
+    )
+  })
+
+  it('com faixa, calcula pela maior e diz isso na tela', () => {
+    render(<AgenteNr15Fields agente={{
+      ...RUIDO,
+      medicaoEmpresa: '83',
+      medicaoEmpresaAte: '88',
+      origemMedicao: 'empresa',
+      epis: [{ categoria: 'Protetor auditivo', modelo: 'Concha CA 11882', caUnico: '11882', nivelProtecaoDb: 17 }],
+    }} onChange={() => undefined} />)
+
+    // 88 − 17, não 83 − 17: o laudo parte do pior cenário do período.
+    expect((screen.getByRole('textbox', { name: 'Resultado após proteção' }) as HTMLInputElement).value).toBe('71 dB(A)')
+    expect(screen.getByText(/entre 83 e 88 dB\(A\) — o laudo considera a maior/)).toBeDefined()
+  })
+})
+
+describe('fonte do ruído', () => {
+  it('mostra a frase que vai ao laudo assim que a fonte é escolhida', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<AgenteNr15Fields agente={RUIDO} onChange={onChange} />)
+
+    const seletor = screen.getByRole('combobox', { name: 'Fonte do ruído' })
+    await user.selectOptions(seletor, 'administrativa')
+
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ fonteRuido: 'administrativa' }))
+
+    cleanup()
+    render(<AgenteNr15Fields agente={{ ...RUIDO, fonteRuido: 'administrativa' }} onChange={onChange} />)
+    expect(screen.getByText(/Ambiente destinado a atividades administrativas/)).toBeDefined()
+  })
+
+  it('volta a não informar a fonte sem deixar o campo vazio gravado', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<AgenteNr15Fields agente={{ ...RUIDO, fonteRuido: 'maquinas' }} onChange={onChange} />)
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Fonte do ruído' }), '')
+
+    expect(onChange).toHaveBeenLastCalledWith(expect.not.objectContaining({ fonteRuido: expect.anything() }))
+  })
+
+  it('não pergunta a fonte do ruído em agente que não é de ruído', () => {
+    render(<AgenteNr15Fields
+      agente={{ ...RUIDO, anexoNr15: 'ANEXO_11', nome: 'Acetaldeído', unidadeMedicao: 'ppm' }}
+      onChange={() => undefined}
+    />)
+
+    expect(screen.queryByRole('combobox', { name: 'Fonte do ruído' })).toBeNull()
   })
 })

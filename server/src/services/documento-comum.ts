@@ -253,8 +253,10 @@ export interface AgenteDocumento {
   medido?: string
   valorMedido?: string
   medicaoEmpresa?: string
+  medicaoEmpresaAte?: string
   fonteMedicaoEmpresa?: string
   origemMedicao?: OrigemMedicaoDocumento
+  fonteRuido?: FonteRuidoDocumento
   unidadeMedicao?: 'ppm' | 'mg/m³' | '% O₂ em volume' | 'dB(A)' | 'dB(C)' | 'dB(Linear)' | 'IBUTG °C' | 'mSv/ano' | 'm/s²' | 'm/s¹·⁷⁵' | 'fibras/cm³'
   epis?: EpiDocumento[]
   epiEficaz?: boolean
@@ -265,21 +267,56 @@ export interface AgenteDocumento {
 export type OrigemMedicaoDocumento = 'perito' | 'empresa' | 'nao_informado'
 
 export const ROTULO_ORIGEM_MEDICAO: Record<OrigemMedicaoDocumento, string> = {
-  perito: 'Avaliação do perito em diligência',
-  empresa: 'Avaliação da empresa (PGR / laudo ambiental)',
-  nao_informado: 'Não informado pelo perito — adotada a avaliação da empresa',
+  perito: 'Perito — medição em perícia',
+  empresa: 'Empresa — medição do período avaliado (PGR / laudos ambientais)',
+  nao_informado: 'Não informado pelo perito — adotada a medição da empresa',
+}
+
+export const NOTA_ORIGEM_MEDICAO: Record<OrigemMedicaoDocumento, string> = {
+  perito: 'Medição a ser informada no laudo pericial do perito.',
+  empresa: 'Medição conforme registros apresentados junto ao processo.',
+  nao_informado: 'Medição conforme registros apresentados junto ao processo.',
+}
+
+export type FonteRuidoDocumento = 'maquinas' | 'ruido_fundo' | 'administrativa'
+
+export const FONTE_RUIDO: Record<FonteRuidoDocumento, { rotulo: string; frase: string }> = {
+  maquinas: {
+    rotulo: 'Máquinas e equipamentos',
+    frase: 'Ruído proveniente de máquinas, equipamentos e demais dispositivos existentes no local.',
+  },
+  ruido_fundo: {
+    rotulo: 'Ruído de fundo',
+    frase: 'Não há fonte direta de ruído no local. O nível identificado corresponde ao ruído de fundo.',
+  },
+  administrativa: {
+    rotulo: 'Atividade administrativa',
+    frase:
+      'Não há fonte de ruído relevante. Ambiente destinado a atividades administrativas, sem operação de máquinas ou equipamentos.',
+  },
 }
 
 export interface MedicaoAdotadaDocumento {
   valor: string
   origem: OrigemMedicaoDocumento
   rotuloOrigem: string
+  notaOrigem: string
   fonte?: string
+  faixaEmpresa?: { de: string; ate: string }
   divergente: boolean
+}
+
+function maiorMedicao(a: string, b: string): string {
+  if (!a) return b
+  if (!b) return a
+  return Number(b) > Number(a) ? b : a
 }
 
 /**
  * Qual medição o documento adota.
+ *
+ * A medição da empresa pode vir como faixa; quando vem, adota-se o topo
+ * — é o pior cenário do período avaliado.
  *
  * Espelha `medicaoAdotada` de `src/lib/medicoes.ts`. Os dois precisam
  * mudar juntos: a tela mostra uma conclusão ao perito, este arquivo
@@ -288,13 +325,22 @@ export interface MedicaoAdotadaDocumento {
 export function medicaoAdotadaDocumento(agente: AgenteDocumento): MedicaoAdotadaDocumento {
   const origem: OrigemMedicaoDocumento = agente.origemMedicao ?? 'perito'
   const doPerito = agente.valorMedido?.trim() ?? ''
-  const daEmpresa = agente.medicaoEmpresa?.trim() ?? ''
+  const deEmpresa = agente.medicaoEmpresa?.trim() ?? ''
+  const ateEmpresa = agente.medicaoEmpresaAte?.trim() ?? ''
+  const daEmpresa = maiorMedicao(deEmpresa, ateEmpresa)
   const fonte = agente.fonteMedicaoEmpresa?.trim() || undefined
+  const faixaEmpresa =
+    deEmpresa && ateEmpresa && Number(deEmpresa) !== Number(ateEmpresa)
+      ? { de: deEmpresa, ate: ateEmpresa }
+      : undefined
   const divergente = Boolean(doPerito && daEmpresa && Number(doPerito) !== Number(daEmpresa))
   const rotuloOrigem = ROTULO_ORIGEM_MEDICAO[origem]
+  const notaOrigem = NOTA_ORIGEM_MEDICAO[origem]
 
-  if (origem === 'perito') return { valor: doPerito, origem, rotuloOrigem, divergente }
-  return { valor: daEmpresa, origem, rotuloOrigem, fonte, divergente }
+  if (origem === 'perito') {
+    return { valor: doPerito, origem, rotuloOrigem, notaOrigem, faixaEmpresa, divergente }
+  }
+  return { valor: daEmpresa, origem, rotuloOrigem, notaOrigem, fonte, faixaEmpresa, divergente }
 }
 
 function comUnidadeMedicao(valor: string, unidade?: string): string {
@@ -446,7 +492,11 @@ export function montarApresentacaoAgente(agente: AgenteDocumento): ApresentacaoA
     ...(!ruido && agente.cas?.trim() ? [{ rotulo: 'CAS', valor: agente.cas.trim() }] : []),
     ...(agente.atividadeEnquadrada?.trim() ? [{ rotulo: 'Atividade ou referência normativa', valor: agente.atividadeEnquadrada.trim() }] : []),
     ...(agente.limiteTolerancia?.trim() ? [{ rotulo: 'Limite de tolerância', valor: limiteComUnidade(agente.limiteTolerancia, agente.unidadeLimite) }] : []),
-    ...(!qualitativo && (agente.valorMedido || agente.medicaoEmpresa || agente.medido)
+    // A frase inteira, não o rótulo: o documento é lido por quem não
+    // acompanhou a diligência, e "Ruído de fundo" sozinho não explica
+    // por que o nível medido não vem de máquina nenhuma.
+    ...(agente.fonteRuido ? [{ rotulo: 'Fonte do ruído', valor: FONTE_RUIDO[agente.fonteRuido].frase }] : []),
+    ...(!qualitativo && (agente.valorMedido || agente.medicaoEmpresa || agente.medicaoEmpresaAte || agente.medido)
       ? [{ rotulo: 'Medição registrada', valor: formatarMedicao(agente) }, ...linhasOrigemMedicao(agente)]
       : []),
   ]
@@ -472,14 +522,29 @@ export function montarApresentacaoAgente(agente: AgenteDocumento): ApresentacaoA
 function linhasOrigemMedicao(agente: AgenteDocumento): LinhaApresentacaoAgente[] {
   const adotada = medicaoAdotadaDocumento(agente)
   const doPerito = agente.valorMedido?.trim() ?? ''
-  const daEmpresa = agente.medicaoEmpresa?.trim() ?? ''
+  const daEmpresa = agente.medicaoEmpresa?.trim() || agente.medicaoEmpresaAte?.trim() || ''
   if (!daEmpresa && adotada.origem === 'perito') return []
+
+  // Com faixa, o número adotado sozinho esconde de onde saiu: quem lê
+  // precisa ver o intervalo e a razão de o laudo ficar com o topo. O
+  // "adotada a maior" só entra quando é essa medição que prevalece —
+  // dizê-lo de uma medição descartada seria afirmar o contrário do que
+  // o documento conclui.
+  const faixa = adotada.faixaEmpresa
+  const intervalo = faixa && `entre ${comUnidadeMedicao(faixa.de)} e ${comUnidadeMedicao(faixa.ate, agente.unidadeMedicao)}`
+  const medicaoDaEmpresa = intervalo
+    ? adotada.origem === 'perito' ? intervalo : `${intervalo} — adotada a maior`
+    : comUnidadeMedicao(adotada.origem === 'perito' ? daEmpresa : adotada.valor, agente.unidadeMedicao)
 
   return [
     { rotulo: 'Origem da medição', valor: adotada.rotuloOrigem, ...(adotada.divergente ? { destaque: 'aviso' as const } : {}) },
+    { rotulo: 'Base da medição', valor: adotada.notaOrigem },
     ...(adotada.fonte ? [{ rotulo: 'Documento da empresa', valor: adotada.fonte }] : []),
     ...(daEmpresa && adotada.origem === 'perito'
-      ? [{ rotulo: 'Medição da empresa (não adotada)', valor: comUnidadeMedicao(daEmpresa, agente.unidadeMedicao) }]
+      ? [{ rotulo: 'Medição da empresa (não adotada)', valor: medicaoDaEmpresa }]
+      : []),
+    ...(faixa && adotada.origem !== 'perito'
+      ? [{ rotulo: 'Faixa informada pela empresa', valor: medicaoDaEmpresa }]
       : []),
     ...(doPerito && adotada.origem !== 'perito'
       ? [{ rotulo: 'Medição do perito (não adotada)', valor: comUnidadeMedicao(doPerito, agente.unidadeMedicao) }]

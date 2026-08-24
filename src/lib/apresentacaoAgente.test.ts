@@ -85,4 +85,58 @@ describe('montarApresentacaoAgente', () => {
     expect(apresentacao.protecoes[1]?.linhas).toContainEqual({ rotulo: 'Modelo', valor: 'Luva nitrílica' })
     expect(apresentacao.protecoes[1]?.linhas).toContainEqual({ rotulo: 'CA', valor: '28956' })
   })
+
+  it('sem medição da empresa, não há o que explicar sobre a origem', () => {
+    const apresentacao = montarApresentacaoAgente(ruido)
+
+    expect(apresentacao.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'Origem da medição' }))
+    expect(apresentacao.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'Base da medição' }))
+  })
+
+  it('escreve a fonte do ruído por extenso, não o rótulo do seletor', () => {
+    const apresentacao = montarApresentacaoAgente({ ...ruido, fonteRuido: 'ruido_fundo' })
+
+    expect(apresentacao.linhas).toContainEqual({
+      rotulo: 'Fonte do ruído',
+      valor: 'Não há fonte direta de ruído no local. O nível identificado corresponde ao ruído de fundo.',
+    })
+  })
+
+  it('adota o topo da faixa da empresa e mostra o intervalo inteiro', () => {
+    const apresentacao = montarApresentacaoAgente({
+      ...ruido,
+      valorMedido: undefined,
+      origemMedicao: 'empresa',
+      medicaoEmpresa: '83',
+      medicaoEmpresaAte: '88.5',
+      fonteMedicaoEmpresa: 'PGR 2024',
+    })
+
+    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Medição registrada', valor: '88,5 dB(A)' })
+    expect(apresentacao.linhas).toContainEqual({
+      rotulo: 'Faixa informada pela empresa',
+      valor: 'entre 83 e 88,5 dB(A) — adotada a maior',
+    })
+    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Documento da empresa', valor: 'PGR 2024' })
+    expect(apresentacao.linhas).toContainEqual({
+      rotulo: 'Base da medição',
+      valor: 'Medição conforme registros apresentados junto ao processo.',
+    })
+  })
+
+  it('com a do perito adotada, a da empresa entra como faixa não adotada', () => {
+    const apresentacao = montarApresentacaoAgente({
+      ...ruido, medicaoEmpresa: '83', medicaoEmpresaAte: '88.5',
+    })
+
+    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Medição registrada', valor: '90 dB(A)' })
+    // Sem "adotada a maior": a medição da empresa não prevaleceu aqui.
+    expect(apresentacao.linhas).toContainEqual({
+      rotulo: 'Medição da empresa (não adotada)',
+      valor: 'entre 83 e 88,5 dB(A)',
+    })
+    expect(apresentacao.linhas).toContainEqual({
+      rotulo: 'Origem da medição', valor: 'Perito — medição em perícia', destaque: 'aviso',
+    })
+  })
 })

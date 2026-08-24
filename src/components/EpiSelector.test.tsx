@@ -788,7 +788,7 @@ describe('compatibilidade de agentes sem referencia especializada', () => {
 
     const limite = screen.getByRole('textbox', { name: 'Limite de tolerância' }) as HTMLInputElement
     expect(limite.value).toBe('Exposicao habitual')
-    expect(screen.queryByRole('textbox', { name: /^Medição do perito/ })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: /^Medição em perícia/ })).toBeNull()
     expect(screen.getByRole('alert').textContent).toContain('referência normativa salva')
     expect(onChange).not.toHaveBeenCalled()
   })
@@ -831,7 +831,7 @@ describe('medição estruturada', () => {
     expect(limite.value).toBe('140 mg/m³')
     expect(limite.readOnly).toBe(true)
 
-    const valor = screen.getByRole('textbox', { name: 'Medição do perito (mg/m³)' }) as HTMLInputElement
+    const valor = screen.getByRole('textbox', { name: 'Medição em perícia (mg/m³)' }) as HTMLInputElement
     expect(valor.inputMode).toBe('decimal')
     await user.type(valor, '12,5')
     await user.tab()
@@ -874,7 +874,7 @@ describe('medição estruturada', () => {
     const onChange = vi.fn()
     render(<Harness inicial={AGENTE_BASE} onChange={onChange} />)
 
-    const valor = screen.getByRole('textbox', { name: 'Medição do perito' })
+    const valor = screen.getByRole('textbox', { name: 'Medição em perícia' })
     await user.type(valor, 'doze')
     await user.tab()
 
@@ -893,7 +893,7 @@ describe('medição estruturada', () => {
     expect(screen.getByRole('alert').textContent).toContain('12 ppm (pico)')
     expect(onChange).not.toHaveBeenCalled()
 
-    await user.type(screen.getByRole('textbox', { name: 'Medição do perito' }), '12,5')
+    await user.type(screen.getByRole('textbox', { name: 'Medição em perícia' }), '12,5')
     await user.tab()
 
     const corrigido = onChange.mock.calls[onChange.mock.calls.length - 1]?.[0] as AgenteAvaliado

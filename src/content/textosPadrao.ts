@@ -122,7 +122,7 @@ function normasReferencias(pericia: Pericia): string {
 
 function metodologia(pericia: Pericia): string {
   return paragrafos(
-    'Os trabalhos periciais foram conduzidos em três etapas: (i) inspeção do local de trabalho, com observação direta do ambiente e das atividades habitualmente executadas; (ii) entrevista com o(a) reclamante e com os representantes da reclamada presentes à diligência; e (iii) análise da documentação técnica apresentada, tais como PGR, PCMSO, LTCAT, laudos ambientais, ordens de serviço, fichas de entrega de EPI e respectivos Certificados de Aprovação.',
+    'Os trabalhos periciais foram conduzidos em três etapas: (i) inspeção do local de trabalho, com observação direta do ambiente e das atividades habitualmente executadas; (ii) entrevista com o(a) reclamante e com os representantes da reclamada presentes à diligência; e (iii) análise da documentação técnica apresentada, tais como PGR, PCMSO, laudos ambientais, ordens de serviço, fichas de entrega de EPI e respectivos Certificados de Aprovação.',
     pericia.modalidade !== 'periculosidade' &&
       'A caracterização de cada agente seguiu o critério fixado pelo respectivo Anexo da NR-15: qualitativo, quando o enquadramento decorre da atividade ou da operação executada, e quantitativo, quando depende da comparação da medição obtida com o limite de tolerância previsto na norma. Nas avaliações quantitativas foram adotadas as metodologias das Normas de Higiene Ocupacional da FUNDACENTRO aplicáveis a cada agente.',
     pericia.modalidade !== 'periculosidade' &&

@@ -56,11 +56,14 @@ export const agenteSchema = z.object({
   limiteTolerancia: texto.optional(),
   medido: texto.optional(),
   valorMedido: z.string().regex(/^-?\d+(\.\d+)?$/).optional(),
-  // A medição da empresa (PGR, LTCAT) convive com a do perito: o laudo
-  // guarda as duas e diz qual adotou.
+  // A medição da empresa (PGR, laudos ambientais) convive com a do
+  // perito: o laudo guarda as duas e diz qual adotou. Quando ela variou
+  // no período, vem como faixa — e o `Ate` é o topo, que é o adotado.
   medicaoEmpresa: z.string().regex(/^-?\d+(\.\d+)?$/).optional(),
+  medicaoEmpresaAte: z.string().regex(/^-?\d+(\.\d+)?$/).optional(),
   fonteMedicaoEmpresa: texto.optional(),
   origemMedicao: z.enum(['perito', 'empresa', 'nao_informado']).optional(),
+  fonteRuido: z.enum(['maquinas', 'ruido_fundo', 'administrativa']).optional(),
   unidadeMedicao: z.enum([
     'ppm', 'mg/m³', '% O₂ em volume', 'dB(A)', 'dB(C)', 'dB(Linear)',
     'IBUTG °C', 'mSv/ano', 'm/s²', 'm/s¹·⁷⁵', 'fibras/cm³',
