@@ -61,14 +61,23 @@ export function aplicarAnexo(agente: AgenteAvaliado, anexoId: string): AgenteAva
   const { cas, ...baseSemCas } = baseComReferencia
   const base = regra?.exibeCas === false ? baseSemCas : baseComReferencia
 
-  if (!anexo) return { ...base, anexoNr15: anexoId }
+  // O campo "Agente" fica em somente leitura quando o anexo impõe o nome
+  // (agenteFixo) ou quando há referência escolhida — nesses dois casos o que
+  // está escrito não foi digitado pelo perito, é herança do anexo anterior.
+  // Sem limpar, trocar do Anexo 1 para o 11 deixava "Ruído contínuo ou
+  // intermitente" preso num agente químico. Nome digitado à mão sobrevive.
+  const regraAnterior = obterRegraAnexo(agente.anexoNr15)
+  const nomeImposto = Boolean(agente.referenciaNormativaId) || agente.nome === regraAnterior?.agenteFixo
+  const nomeHerdado = mudouAnexo && nomeImposto ? '' : base.nome
+
+  if (!anexo) return { ...base, anexoNr15: anexoId, nome: nomeHerdado }
 
   const { grau, ...anexoSemGrau } = anexo
 
   return {
     ...base,
     anexoNr15: anexo.id,
-    nome: regra?.agenteFixo ?? base.nome,
+    nome: regra?.agenteFixo ?? nomeHerdado,
     tipo: anexoSemGrau.tipo,
     criterio: anexoSemGrau.criterio,
     limiteTolerancia: anexoSemGrau.limiteTolerancia,

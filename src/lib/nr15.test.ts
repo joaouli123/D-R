@@ -297,6 +297,67 @@ describe('aplicarAnexo', () => {
       observacao: 'Jornada completa',
     })
   })
+
+  it('limpa o agente imposto pelo anexo anterior ao cair num anexo de escolha livre', () => {
+    const agente = aplicarAnexo({
+      id: 'a1',
+      nome: 'Ruído contínuo ou intermitente',
+      tipo: 'fisico',
+      criterio: 'quantitativo',
+      anexoNr15: 'ANEXO_01',
+    }, 'ANEXO_11')
+
+    expect(agente.nome).toBe('')
+    expect(agente.anexoNr15).toBe('ANEXO_11')
+  })
+
+  it('limpa o agente vindo da referência quando o anexo muda', () => {
+    expect(aplicarAnexo({
+      id: 'a1',
+      nome: 'Ácido Nítrico',
+      tipo: 'quimico',
+      criterio: 'quantitativo',
+      anexoNr15: 'ANEXO_11',
+      referenciaNormativaId: 'ANEXO_11_ACIDO_NITRICO',
+    }, 'ANEXO_13').nome).toBe('')
+  })
+
+  it('limpa o agente imposto também quando o perito tira o anexo', () => {
+    expect(aplicarAnexo({
+      id: 'a1',
+      nome: 'Calor',
+      tipo: 'fisico',
+      criterio: 'quantitativo',
+      anexoNr15: 'ANEXO_03',
+    }, '').nome).toBe('')
+  })
+
+  it('preserva o agente que o perito digitou à mão', () => {
+    expect(aplicarAnexo({
+      id: 'a1',
+      nome: 'Névoas de óleo mineral',
+      tipo: 'quimico',
+      criterio: 'qualitativo',
+      anexoNr15: 'ANEXO_13',
+    }, 'ANEXO_11').nome).toBe('Névoas de óleo mineral')
+
+    expect(aplicarAnexo({
+      id: 'a1',
+      nome: 'Poeira de madeira',
+      tipo: 'quimico',
+      criterio: 'qualitativo',
+    }, 'ANEXO_11').nome).toBe('Poeira de madeira')
+  })
+
+  it('o anexo de agente fixo sempre reescreve o nome, venha de onde vier', () => {
+    expect(aplicarAnexo({
+      id: 'a1',
+      nome: 'Névoas de óleo mineral',
+      tipo: 'quimico',
+      criterio: 'qualitativo',
+      anexoNr15: 'ANEXO_11',
+    }, 'ANEXO_01').nome).toBe('Ruído contínuo ou intermitente')
+  })
 })
 
 describe('aplicarReferencia', () => {
