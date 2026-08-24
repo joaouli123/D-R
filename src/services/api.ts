@@ -510,15 +510,19 @@ export const empresas = {
     ehRest ? http<Empresa>('/empresas', { method: 'POST', body: JSON.stringify(e) }) : delay(e),
   remover: (id: string) =>
     ehRest ? http<void>(`/empresas/${id}`, { method: 'DELETE' }) : delay(undefined),
-  /** Limpa os cadastros de teste. Empresa citada em processo é mantida. */
-  limpar: () =>
+  /**
+   * Limpa os cadastros de teste. Empresa citada em processo é mantida,
+   * a menos que `comRascunhos` leve junto os rascunhos que a prendem.
+   */
+  limpar: (comRascunhos = false) =>
     ehRest
-      ? http<LimpezaEmpresas>('/empresas', { method: 'DELETE' })
-      : delay({ excluidas: 0, mantidas: [] }),
+      ? http<LimpezaEmpresas>(`/empresas${comRascunhos ? '?rascunhos=1' : ''}`, { method: 'DELETE' })
+      : delay({ excluidas: 0, rascunhosExcluidos: 0, mantidas: [] }),
 }
 
 export interface LimpezaEmpresas {
   excluidas: number
+  rascunhosExcluidos: number
   mantidas: { id: string; razaoSocial: string; cnpj: string; processos: number }[]
 }
 

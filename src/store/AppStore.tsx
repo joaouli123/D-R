@@ -22,7 +22,7 @@ interface AppState {
   empresas: Empresa[]
   salvarEmpresa: (e: Empresa) => Promise<Empresa>
   removerEmpresa: (id: string) => Promise<void>
-  limparEmpresas: () => Promise<api.LimpezaEmpresas>
+  limparEmpresas: (comRascunhos?: boolean) => Promise<api.LimpezaEmpresas>
 
   // Módulos C/D/E
   pericias: Pericia[]
@@ -255,9 +255,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Sem atualização otimista: quem fica na lista é decisão do
       // servidor (empresa citada em processo não sai), então a tela
       // espera a resposta em vez de adivinhar.
-      limparEmpresas: async () => {
-        const resultado = await api.empresas.limpar()
+      limparEmpresas: async (comRascunhos = false) => {
+        const resultado = await api.empresas.limpar(comRascunhos)
         setEmpresas((atual) => atual.filter((e) => resultado.mantidas.some((m) => m.id === e.id)))
+        // A limpeza com rascunhos apaga perícias no servidor. Refletir
+        // aqui pela mesma regra que o servidor aplicou evita recarregar
+        // a lista inteira só para descobrir o que já se sabe.
+        if (resultado.rascunhosExcluidos > 0) {
+          setPericias((atual) =>
+            atual.filter((p) => p.status !== 'rascunho' || p.reclamadas.length === 0),
+          )
+        }
         return resultado
       },
 

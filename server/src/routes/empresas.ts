@@ -4,6 +4,7 @@ import { exigirSessao } from '../auth.js'
 import { ErroHttp, parametro, rota } from '../erros.js'
 import { empresaParaApi } from '../mappers.js'
 import { prisma } from '../prisma.js'
+import { apagarUpload } from '../services/armazenamento.js'
 
 export const empresasRouter = Router()
 empresasRouter.use(exigirSessao)
@@ -92,10 +93,38 @@ empresasRouter.post(
  * como reclamada não é apagada. Só que aqui ela não vira erro — vira
  * lista na resposta, com o número de processos de cada uma, para a
  * tela poder dizer o que ficou e por quê em vez de só falhar.
+ *
+ * `?rascunhos=1` estende a limpeza aos rascunhos que citam empresa.
+ * Foi o que travou o começo da operação: as empresas de teste ficaram
+ * presas a perícias de teste, e a tela só sabia dizer que elas ficaram
+ * — sem caminho para desfazer o nó. Rascunho não é parecer emitido,
+ * então pode sair; perícia em andamento, concluída ou entregue nunca
+ * é tocada aqui, e as empresas que ela cita continuam protegidas.
+ * Rascunho sem nenhuma reclamada não entra: não prende ninguém, e
+ * apagá-lo seria ir além do que a tela ofereceu.
  */
 empresasRouter.delete(
   '/',
-  rota(async (_req, res) => {
+  rota(async (req, res) => {
+    let rascunhosExcluidos = 0
+
+    if (req.query.rascunhos === '1') {
+      const presos = await prisma.pericia.findMany({
+        where: { status: 'rascunho', reclamadas: { some: {} } },
+        select: { id: true, fotos: { select: { arquivo: true } } },
+      })
+
+      if (presos.length > 0) {
+        const ids = presos.map((p) => p.id)
+        const { count } = await prisma.pericia.deleteMany({ where: { id: { in: ids } } })
+        rascunhosExcluidos = count
+        // Os arquivos só saem depois que o banco confirmou: o registro
+        // é a verdade, e foto órfã em disco custa menos que foto
+        // apagada de perícia que continuou existindo.
+        await Promise.all(presos.flatMap((p) => p.fotos.map((f) => apagarUpload(f.arquivo))))
+      }
+    }
+
     const empresas = await prisma.empresa.findMany({
       orderBy: { razaoSocial: 'asc' },
       select: {
@@ -115,6 +144,7 @@ empresasRouter.delete(
 
     res.json({
       excluidas: count,
+      rascunhosExcluidos,
       mantidas: emUso.map((e) => ({
         id: e.id,
         razaoSocial: e.razaoSocial,

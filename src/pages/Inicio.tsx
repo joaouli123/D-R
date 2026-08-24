@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
@@ -10,12 +11,14 @@ import {
   Plus,
   ScrollText,
   ShieldAlert,
+  Trash2,
   TrendingUp,
 } from 'lucide-react'
-import { Badge, Button, Card, CardHeader } from '@/components/ui'
+import { Badge, Button, Card, CardHeader, Modal, useToast } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { useApp } from '@/store/AppStore'
 import { formatDate } from '@/lib/utils'
+import type { Pericia } from '@/types'
 
 // ============================================================
 // INÍCIO — replica a tela de referência do Contratante:
@@ -68,8 +71,22 @@ const DOCUMENTOS_MENU = [
 ]
 
 export default function Inicio() {
-  const { usuario, pericias, documentos, empresas } = useApp()
+  const { usuario, pericias, documentos, empresas, removerPericia } = useApp()
   const navigate = useNavigate()
+  const toast = useToast()
+  const [confirmar, setConfirmar] = useState<Pericia | null>(null)
+
+  async function excluir() {
+    if (!confirmar) return
+    try {
+      await removerPericia(confirmar.id)
+      toast('Perícia excluída.', 'info')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Não foi possível excluir.', 'error')
+    } finally {
+      setConfirmar(null)
+    }
+  }
 
   const emAndamento = pericias.filter((p) => p.status === 'em_andamento').length
   const rascunhos = documentos.filter((d) => d.status === 'rascunho').length
@@ -142,35 +159,50 @@ export default function Inicio() {
           />
           <div className="divide-y divide-ink-100">
             {emAberto.map((p) => (
-              <Link
+              <div
                 key={p.id}
-                to={`/pericias/${p.id}`}
-                className="group flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-brand-50/60"
+                className="group flex items-center gap-2 px-5 py-3.5 transition-colors hover:bg-brand-50/60"
               >
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-ink-900">
-                      {p.reclamante || '(sem reclamante)'}
+                {/*
+                  O botão de excluir fica fora do link, não dentro: é o
+                  atalho para descartar o teste sem ter de caçar a
+                  perícia na lista, e clicar nele nunca pode abrir o
+                  editor por tabela.
+                */}
+                <Link to={`/pericias/${p.id}`} className="flex min-w-0 flex-1 items-center gap-4">
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-ink-900">
+                        {p.reclamante || '(sem reclamante)'}
+                      </span>
+                      <Badge tone={p.status === 'rascunho' ? 'amber' : 'navy'}>
+                        {p.status === 'rascunho' ? 'Rascunho' : 'Em andamento'}
+                      </Badge>
                     </span>
-                    <Badge tone={p.status === 'rascunho' ? 'amber' : 'navy'}>
-                      {p.status === 'rascunho' ? 'Rascunho' : 'Em andamento'}
-                    </Badge>
+                    <span className="mt-0.5 block font-mono text-[12.5px] text-ink-500">
+                      {p.numeroProcesso || '(sem número de processo)'}
+                    </span>
+                    <span className="mt-0.5 block text-[12px] text-ink-400">
+                      Salva em {formatDate(p.atualizadoEm)}
+                    </span>
                   </span>
-                  <span className="mt-0.5 block font-mono text-[12.5px] text-ink-500">
-                    {p.numeroProcesso || '(sem número de processo)'}
+                  <span className="hidden shrink-0 text-[13px] font-semibold text-brand-700 sm:block">
+                    Continuar
                   </span>
-                  <span className="mt-0.5 block text-[12px] text-ink-400">
-                    Salva em {formatDate(p.atualizadoEm)}
-                  </span>
-                </span>
-                <span className="hidden shrink-0 text-[13px] font-semibold text-brand-700 sm:block">
-                  Continuar
-                </span>
-                <ArrowRight
-                  size={17}
-                  className="shrink-0 text-ink-300 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-700"
+                  <ArrowRight
+                    size={17}
+                    className="shrink-0 text-ink-300 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-700"
+                  />
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0 text-red-600 hover:bg-red-50"
+                  icon={<Trash2 size={14} />}
+                  onClick={() => setConfirmar(p)}
+                  aria-label={`Excluir perícia de ${p.reclamante || 'reclamante não informado'}`}
                 />
-              </Link>
+              </div>
             ))}
           </div>
         </Card>
@@ -244,6 +276,29 @@ export default function Inicio() {
           </div>
         </Card>
       </div>
+
+      <Modal
+        open={!!confirmar}
+        onClose={() => setConfirmar(null)}
+        title="Excluir perícia"
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmar(null)}>
+              Cancelar
+            </Button>
+            <Button variant="danger" onClick={() => void excluir()}>
+              Excluir
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink-600">
+          Excluir a perícia de <strong>{confirmar?.reclamante || '(sem reclamante)'}</strong>
+          {confirmar?.numeroProcesso ? `, processo ${confirmar.numeroProcesso}` : ''}? Documentos já
+          gerados permanecem no histórico.
+        </p>
+      </Modal>
     </>
   )
 }

@@ -34,8 +34,14 @@ const empresa = (id: string, razaoSocial: string): Empresa => ({
 })
 
 /** Perícia mínima que cita `empresaId` como reclamada. */
-const periciaCom = (empresaId: string) =>
-  ({ id: 'per-1', reclamadas: [{ empresaId }] }) as unknown as Pericia
+const periciaCom = (empresaId: string, status: Pericia['status'] = 'concluida') =>
+  ({
+    id: `per-${empresaId}`,
+    reclamante: 'FULANO DE TAL',
+    numeroProcesso: '1000675-40.2026.5.02.0264',
+    status,
+    reclamadas: [{ empresaId }],
+  }) as unknown as Pericia
 
 function montar(empresas: Empresa[], pericias: Pericia[] = []) {
   vi.mocked(useApp).mockReturnValue({
@@ -83,18 +89,28 @@ describe('Clientes — limpeza dos cadastros de teste', () => {
 
     await user.click(screen.getByRole('button', { name: 'Limpar cadastros' }))
 
-    expect(screen.getByText(/é reclamada em algum processo e será mantida/)).toBeDefined()
+    expect(screen.getByText(/é reclamada em um processo e será mantida/)).toBeDefined()
+  })
+
+  it('nomeia o processo que prende o cadastro, senão a sobra vira mistério', async () => {
+    const user = userEvent.setup()
+    montar([empresa('e1', 'ALFA LTDA'), empresa('e2', 'BETA LTDA')], [periciaCom('e2')])
+
+    await user.click(screen.getByRole('button', { name: 'Limpar cadastros' }))
+
+    expect(screen.getByText('FULANO DE TAL')).toBeDefined()
+    expect(screen.getByText('1000675-40.2026.5.02.0264')).toBeDefined()
   })
 
   it('confirmada, apaga e diz quantas saíram', async () => {
     const user = userEvent.setup()
-    limparEmpresas.mockResolvedValue({ excluidas: 2, mantidas: [] })
+    limparEmpresas.mockResolvedValue({ excluidas: 2, rascunhosExcluidos: 0, mantidas: [] })
     montar([empresa('e1', 'ALFA LTDA'), empresa('e2', 'BETA LTDA')])
 
     await user.click(screen.getByRole('button', { name: 'Limpar cadastros' }))
     await user.click(screen.getByRole('button', { name: 'Apagar cadastros' }))
 
-    expect(limparEmpresas).toHaveBeenCalledTimes(1)
+    expect(limparEmpresas).toHaveBeenCalledWith(false)
     expect(await screen.findByText('2 empresas excluídas.')).toBeDefined()
   })
 
@@ -102,6 +118,7 @@ describe('Clientes — limpeza dos cadastros de teste', () => {
     const user = userEvent.setup()
     limparEmpresas.mockResolvedValue({
       excluidas: 1,
+      rascunhosExcluidos: 0,
       mantidas: [{ id: 'e2', razaoSocial: 'BETA LTDA', cnpj: '11222333000181', processos: 1 }],
     })
     montar([empresa('e1', 'ALFA LTDA'), empresa('e2', 'BETA LTDA')], [periciaCom('e2')])
@@ -111,6 +128,31 @@ describe('Clientes — limpeza dos cadastros de teste', () => {
 
     const aviso = await screen.findByText(/1 empresa excluída/)
     expect(aviso.textContent).toContain('1 ficou por estar em processo: BETA LTDA')
+  })
+
+  it('rascunho que prende cadastro pode sair junto, por escolha explícita', async () => {
+    const user = userEvent.setup()
+    limparEmpresas.mockResolvedValue({ excluidas: 2, rascunhosExcluidos: 1, mantidas: [] })
+    montar(
+      [empresa('e1', 'ALFA LTDA'), empresa('e2', 'BETA LTDA')],
+      [periciaCom('e2', 'rascunho')],
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Limpar cadastros' }))
+    await user.click(screen.getByRole('checkbox'))
+    await user.click(screen.getByRole('button', { name: 'Apagar cadastros' }))
+
+    expect(limparEmpresas).toHaveBeenCalledWith(true)
+    expect(await screen.findByText('2 empresas excluídas e 1 rascunho excluído.')).toBeDefined()
+  })
+
+  it('perícia concluída não oferece varrer rascunho — não há rascunho a varrer', async () => {
+    const user = userEvent.setup()
+    montar([empresa('e1', 'ALFA LTDA'), empresa('e2', 'BETA LTDA')], [periciaCom('e2')])
+
+    await user.click(screen.getByRole('button', { name: 'Limpar cadastros' }))
+
+    expect(screen.queryByRole('checkbox')).toBeNull()
   })
 
   it('falha do servidor não some com a janela sem explicação', async () => {

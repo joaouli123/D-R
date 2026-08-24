@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Briefcase, Building2, MapPin, Pencil, Plus, Search, Trash2, User } from 'lucide-react'
-import { Badge, Button, Card, EmptyState, Modal, Select } from '@/components/ui'
+import { Badge, Button, Card, Checkbox, EmptyState, Modal, Select } from '@/components/ui'
 import { useToast } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { empresaVazia, ModalEmpresa } from '@/components/ModalEmpresa'
@@ -24,6 +24,7 @@ export default function Clientes() {
   const [confirmar, setConfirmar] = useState<Empresa | null>(null)
   const [confirmarLimpeza, setConfirmarLimpeza] = useState(false)
   const [limpando, setLimpando] = useState(false)
+  const [levarRascunhos, setLevarRascunhos] = useState(false)
   /** Empresa escolhida no atalho "usar em perícia", e o processo de destino. */
   const [vinculando, setVinculando] = useState<Empresa | null>(null)
   const [destino, setDestino] = useState('')
@@ -38,6 +39,19 @@ export default function Clientes() {
 
   const usosDe = (id: string) =>
     pericias.filter((p) => p.reclamadas.some((r) => r.empresaId === id)).length
+
+  /**
+   * As perícias que seguram algum cadastro. Dizer só "3 empresas serão
+   * mantidas" transforma a limpeza em adivinhação: o perito conta as
+   * que sobraram e não tem como saber onde elas estão presas. Aqui a
+   * tela nomeia o processo, e o nó fica visível.
+   */
+  const prendendo = useMemo(
+    () => pericias.filter((p) => p.reclamadas.some((r) => empresas.some((e) => e.id === r.empresaId))),
+    [pericias, empresas],
+  )
+  const rascunhosPrendendo = prendendo.filter((p) => p.status === 'rascunho')
+  const presas = empresas.filter((e) => usosDe(e.id) > 0)
 
   async function excluir() {
     if (!confirmar) return
@@ -61,13 +75,18 @@ export default function Clientes() {
   async function limparTudo() {
     setLimpando(true)
     try {
-      const { excluidas, mantidas } = await limparEmpresas()
+      const { excluidas, rascunhosExcluidos, mantidas } = await limparEmpresas(levarRascunhos)
       setConfirmarLimpeza(false)
+      setLevarRascunhos(false)
+      const empresasExcluidas = `${excluidas} ${excluidas === 1 ? 'empresa excluída' : 'empresas excluídas'}`
+      const comRascunhos = rascunhosExcluidos
+        ? `${empresasExcluidas} e ${rascunhosExcluidos} ${rascunhosExcluidos === 1 ? 'rascunho excluído' : 'rascunhos excluídos'}`
+        : empresasExcluidas
       if (mantidas.length === 0) {
-        toast(`${excluidas} ${excluidas === 1 ? 'empresa excluída' : 'empresas excluídas'}.`, 'info')
+        toast(`${comRascunhos}.`, 'info')
       } else {
         toast(
-          `${excluidas} ${excluidas === 1 ? 'empresa excluída' : 'empresas excluídas'}. ` +
+          `${comRascunhos}. ` +
             `${mantidas.length} ${mantidas.length === 1 ? 'ficou' : 'ficaram'} por estar em processo: ` +
             mantidas.map((m) => m.razaoSocial).join(', '),
           'info',
@@ -315,14 +334,50 @@ export default function Clientes() {
           {empresas.length === 1 ? 'empresa cadastrada' : 'empresas cadastradas'}. Esta ação não pode
           ser desfeita.
         </p>
-        {empresas.filter((e) => usosDe(e.id) > 0).length > 0 && (
-          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-[13px] text-amber-800">
-            {empresas.filter((e) => usosDe(e.id) > 0).length}{' '}
-            {empresas.filter((e) => usosDe(e.id) > 0).length === 1
-              ? 'empresa é reclamada em algum processo e será mantida'
-              : 'empresas são reclamadas em algum processo e serão mantidas'}{' '}
-            — um parecer já emitido não pode perder a identificação da parte.
-          </p>
+
+        {presas.length > 0 && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-[13px] text-amber-800">
+            <p>
+              {presas.length}{' '}
+              {presas.length === 1
+                ? 'empresa é reclamada em um processo e será mantida'
+                : 'empresas são reclamadas em processos e serão mantidas'}{' '}
+              — um parecer já emitido não pode perder a identificação da parte.
+            </p>
+            <ul className="mt-2 space-y-1">
+              {prendendo.map((p) => (
+                <li key={p.id} className="flex flex-wrap items-baseline gap-x-1.5">
+                  <span className="font-medium">{p.reclamante || '(sem reclamante)'}</span>
+                  <span className="font-mono text-[12px] text-amber-700">
+                    {p.numeroProcesso || '(sem número)'}
+                  </span>
+                  {p.status === 'rascunho' && <Badge tone="amber">Rascunho</Badge>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/*
+          O nó do começo da operação: as empresas de teste ficam presas a
+          perícias de teste. Rascunho não é parecer emitido, então pode
+          sair junto — mas por escolha explícita, e nunca perícia em
+          andamento, concluída ou entregue.
+        */}
+        {rascunhosPrendendo.length > 0 && (
+          <div className="mt-3 border-t border-ink-100 pt-3">
+            <Checkbox
+              checked={levarRascunhos}
+              disabled={limpando}
+              onChange={(evento) => setLevarRascunhos(evento.target.checked)}
+              label={
+                rascunhosPrendendo.length === 1
+                  ? 'Apagar também o rascunho que prende esse cadastro'
+                  : `Apagar também os ${rascunhosPrendendo.length} rascunhos que prendem esses cadastros`
+              }
+              description="Só rascunhos. Perícia em andamento, concluída ou entregue continua intacta, e as empresas que ela cita continuam protegidas."
+            />
+          </div>
         )}
       </Modal>
     </>
