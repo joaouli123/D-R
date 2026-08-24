@@ -66,8 +66,12 @@ export function aplicarAnexo(agente: AgenteAvaliado, anexoId: string): AgenteAva
   // está escrito não foi digitado pelo perito, é herança do anexo anterior.
   // Sem limpar, trocar do Anexo 1 para o 11 deixava "Ruído contínuo ou
   // intermitente" preso num agente químico. Nome digitado à mão sobrevive.
+  //
+  // Basta o anexo anterior ter agenteFixo: comparar com o texto da regra
+  // deixaria escapar a perícia salva quando o texto era outro, e a tela nem
+  // mostra o nome guardado nesses anexos — ela mostra o da regra.
   const regraAnterior = obterRegraAnexo(agente.anexoNr15)
-  const nomeImposto = Boolean(agente.referenciaNormativaId) || agente.nome === regraAnterior?.agenteFixo
+  const nomeImposto = Boolean(agente.referenciaNormativaId) || Boolean(regraAnterior?.agenteFixo)
   const nomeHerdado = mudouAnexo && nomeImposto ? '' : base.nome
 
   if (!anexo) return { ...base, anexoNr15: anexoId, nome: nomeHerdado }

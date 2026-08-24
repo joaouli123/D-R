@@ -311,6 +311,16 @@ describe('aplicarAnexo', () => {
     expect(agente.anexoNr15).toBe('ANEXO_11')
   })
 
+  it('limpa também o agente salvo com texto antigo, não só o texto atual da regra', () => {
+    expect(aplicarAnexo({
+      id: 'a1',
+      nome: 'Ruído contínuo/intermitente (redação antiga)',
+      tipo: 'fisico',
+      criterio: 'quantitativo',
+      anexoNr15: 'ANEXO_01',
+    }, 'ANEXO_11').nome).toBe('')
+  })
+
   it('limpa o agente vindo da referência quando o anexo muda', () => {
     expect(aplicarAnexo({
       id: 'a1',
