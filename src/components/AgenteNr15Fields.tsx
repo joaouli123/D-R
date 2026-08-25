@@ -4,6 +4,7 @@ import { anexoNr15PorId, ATIVIDADES_ANEXO_13, ATIVIDADES_ANEXO_14, SUBSTANCIAS_A
 import type { ReferenciaNormativa, UnidadeMedicao } from '@/content/nr15/tipos'
 import {
   FONTE_RUIDO,
+  tipoMedicaoEmpresaDe,
   medicaoAdotada,
   NOTA_ORIGEM_MEDICAO,
   ROTULO_ORIGEM_MEDICAO,
@@ -13,7 +14,7 @@ import {
 import { aplicarReferencia } from '@/lib/nr15'
 import { protecaoDoConjunto } from '@/lib/protecaoAuditiva'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
-import type { AgenteAvaliado, FonteRuido, OrigemMedicao } from '@/types'
+import type { AgenteAvaliado, FonteRuido, OrigemMedicao, TipoMedicaoEmpresa } from '@/types'
 import { Input, Select } from './ui'
 import { BuscaNormativa } from './BuscaNormativa'
 
@@ -104,6 +105,7 @@ function OrigemDaMedicao({
 }: AgenteNr15FieldsProps & { unidade?: string }) {
   const origem: OrigemMedicao = agente.origemMedicao ?? 'perito'
   const adotada = medicaoAdotada(agente)
+  const formaEmpresa = tipoMedicaoEmpresaDe(agente)
   const sufixo = unidade ? ` (${unidade})` : ''
 
   function definirNumero(
@@ -119,6 +121,28 @@ function OrigemDaMedicao({
     // número, ele só confundiria o documento.
     const { medido: _legado, ...semLegado } = agente
     onChange({ ...semLegado, [campo]: normalizado })
+  }
+
+  function definirFormaEmpresa(forma: TipoMedicaoEmpresa) {
+    if (forma === 'registros_processo') {
+      const {
+        medicaoEmpresa: _medicaoEmpresa,
+        medicaoEmpresaAte: _medicaoEmpresaAte,
+        ...semNumerosEmpresa
+      } = agente
+      onChange({
+        ...semNumerosEmpresa,
+        tipoMedicaoEmpresa: forma,
+        ...(!agente.valorMedido ? { origemMedicao: 'nao_informado' as const } : {}),
+      })
+      return
+    }
+    if (forma === 'valor') {
+      const { medicaoEmpresaAte: _medicaoEmpresaAte, ...semFimDaFaixa } = agente
+      onChange({ ...semFimDaFaixa, tipoMedicaoEmpresa: forma })
+      return
+    }
+    onChange({ ...agente, tipoMedicaoEmpresa: forma })
   }
 
   return (
@@ -145,31 +169,57 @@ function OrigemDaMedicao({
           onConfirmar={(normalizado) => definirNumero('valorMedido', normalizado)}
         />
 
+        <Select
+          label="Forma da medição da empresa"
+          value={formaEmpresa}
+          onChange={(evento) => definirFormaEmpresa(evento.target.value as TipoMedicaoEmpresa)}
+        >
+          <option value="valor">Medição da empresa — valor único</option>
+          <option value="faixa">Medição da empresa — entre dois valores</option>
+          <option value="registros_processo">Medição conforme registros apresentados junto ao processo</option>
+        </Select>
+
         {/*
           A medição da empresa raramente é um número só: o PGR cobre
           anos e o nível varia. Dois campos em vez de um texto livre
           porque o número precisa continuar entrando no cálculo — e a
           conclusão sai pelo topo da faixa, o pior cenário do período.
         */}
-        <div>
-          <div className="grid grid-cols-2 gap-3">
-            <CampoNumerico
-              label={`Medição da empresa${sufixo}`}
-              valor={agente.medicaoEmpresa}
-              onConfirmar={(normalizado) => definirNumero('medicaoEmpresa', normalizado)}
-            />
-            <CampoNumerico
-              label="até"
-              rotuloAcessivel="Medição da empresa até"
-              valor={agente.medicaoEmpresaAte}
-              onConfirmar={(normalizado) => definirNumero('medicaoEmpresaAte', normalizado)}
-            />
+        {formaEmpresa === 'valor' && (
+          <CampoNumerico
+            label={`Medição da empresa${sufixo}`}
+            valor={agente.medicaoEmpresa}
+            hint={origem === 'perito' ? 'Registrada para comparação.' : 'Adotada no laudo.'}
+            onConfirmar={(normalizado) => definirNumero('medicaoEmpresa', normalizado)}
+          />
+        )}
+        {formaEmpresa === 'faixa' && (
+          <div className="sm:col-span-2">
+            <div className="grid grid-cols-2 gap-3">
+              <CampoNumerico
+                label={`Medição da empresa — de${sufixo}`}
+                rotuloAcessivel={`Medição da empresa${sufixo}`}
+                valor={agente.medicaoEmpresa}
+                onConfirmar={(normalizado) => definirNumero('medicaoEmpresa', normalizado)}
+              />
+              <CampoNumerico
+                label={`Até${sufixo}`}
+                rotuloAcessivel="Medição da empresa até"
+                valor={agente.medicaoEmpresaAte}
+                onConfirmar={(normalizado) => definirNumero('medicaoEmpresaAte', normalizado)}
+              />
+            </div>
+            <p className="mt-1.5 text-xs text-ink-500">
+              {origem === 'perito' ? 'Registrada para comparação.' : 'Adotada no laudo.'} O cálculo
+              considera o maior valor da faixa.
+            </p>
           </div>
-          <p className="mt-1.5 text-xs text-ink-500">
-            {origem === 'perito' ? 'Registrada para comparação.' : 'Adotada no laudo.'} Preencha o
-            “até” só quando a medição variou no período — o laudo considera a maior.
-          </p>
-        </div>
+        )}
+        {formaEmpresa === 'registros_processo' && (
+          <div className="rounded-lg border border-ink-200 bg-white px-3 py-2.5 text-sm text-ink-700">
+            Medição conforme registros apresentados junto ao processo.
+          </div>
+        )}
         <Input
           label="Documento da empresa"
           aria-label="Documento de origem da medição da empresa"

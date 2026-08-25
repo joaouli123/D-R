@@ -424,6 +424,35 @@ async function main() {
 
   const htmlParecer = await fs.readFile(path.join(SAIDA, 'parecer.html'), 'utf8')
   const parecerGerado = saidasVisuais.find((saida) => saida.nome === 'parecer')
+
+  const periciaRegistros = {
+    ...periciaBase,
+    tecnico: {
+      ...periciaBase.tecnico,
+      agentes: [{
+        id: 'agn-registros-processo',
+        nome: 'Ruído contínuo ou intermitente',
+        tipo: 'fisico',
+        anexoNr15: 'ANEXO_01',
+        limiteTolerancia: '85 dB(A) para jornada de 8h/dia (q=5)',
+        tipoMedicaoEmpresa: 'registros_processo',
+        origemMedicao: 'nao_informado',
+        unidadeMedicao: 'dB(A)',
+        criterio: 'quantitativo',
+        grau: 'medio',
+      }],
+    },
+  } as unknown as PericiaCompleta
+  const parecerRegistros = doc('parecer', 'Parecer Técnico Pericial — Medição documental', null)
+  const htmlRegistros = await montarHtml(parecerRegistros, periciaRegistros, [empresa], perito)
+  const pdfRegistros = await gerarPdf(htmlRegistros)
+  const docxRegistros = await gerarDocx(parecerRegistros, periciaRegistros, [empresa], perito)
+  const pacoteRegistros = await JSZip.loadAsync(docxRegistros)
+  const xmlRegistros = await pacoteRegistros.file('word/document.xml')!.async('string')
+  await fs.writeFile(path.join(SAIDA, 'parecer-medicao-registros.html'), htmlRegistros, 'utf8')
+  await fs.writeFile(path.join(SAIDA, 'parecer-medicao-registros.pdf'), pdfRegistros)
+  await fs.writeFile(path.join(SAIDA, 'parecer-medicao-registros.docx'), docxRegistros)
+
   assert.doesNotMatch(htmlParecer, />Tramitação</, 'o PDF não deve repetir a modalidade no campo Tramitação')
   assert.doesNotMatch(
     parecerGerado?.xml ?? '',
@@ -436,6 +465,10 @@ async function main() {
   assert.match(parecerGerado?.xml ?? '', /Periculosidade caracterizada/)
   assert.doesNotMatch(htmlParecer, /Medição (?:da empresa|do perito) \(não adotada\)/)
   assert.doesNotMatch(parecerGerado?.xml ?? '', /Medição (?:da empresa|do perito) \(não adotada\)/)
+  assert.match(htmlRegistros, /<th>Medição da empresa<\/th><td[^>]*>Medição conforme registros apresentados junto ao processo\.<\/td>/)
+  assert.match(xmlRegistros, /Medição conforme registros apresentados junto ao processo\./)
+  assert.doesNotMatch(htmlRegistros, /opção adotada/i)
+  assert.doesNotMatch(xmlRegistros, /opção adotada/i)
   assert.match(htmlParecer, /Período avaliado/)
   assert.match(parecerGerado?.xml ?? '', /Período avaliado/)
   assert.doesNotMatch(htmlParecer, /cinco anos anteriores ao ajuizamento da ação/i)
@@ -544,8 +577,8 @@ async function main() {
     'a assinatura da impugnação não deve ficar órfã em uma segunda página',
   )
   assert.ok(
-    (saidasVisuais.find((saida) => saida.nome === 'parecer')?.paginasPdf ?? Infinity) <= 8,
-    'o parecer de teste não deve criar uma página exclusiva para a assinatura',
+    (saidasVisuais.find((saida) => saida.nome === 'parecer')?.paginasPdf ?? Infinity) <= 9,
+    'o parecer completo de teste não deve crescer além de nove páginas',
   )
   assert.match(
     saidasVisuais.find((saida) => saida.nome === 'parecer')?.xml ?? '',

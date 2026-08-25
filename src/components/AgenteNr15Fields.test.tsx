@@ -101,6 +101,28 @@ describe('origem da medição', () => {
     expect(screen.queryByText('Medição adotada no laudo')).toBeNull()
   })
 
+  it('permite escolher registros do processo como terceira forma da medição da empresa', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<AgenteNr15Fields agente={{
+      ...RUIDO,
+      medicaoEmpresa: '83',
+      medicaoEmpresaAte: '88.5',
+    }} onChange={onChange} />)
+
+    const seletor = screen.getByRole('combobox', { name: 'Forma da medição da empresa' })
+    expect(seletor.querySelectorAll('option')).toHaveLength(3)
+    expect(seletor.textContent).toContain('Medição conforme registros apresentados junto ao processo')
+
+    await user.selectOptions(seletor, 'registros_processo')
+
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      tipoMedicaoEmpresa: 'registros_processo',
+    }))
+    expect(onChange).toHaveBeenLastCalledWith(expect.not.objectContaining({ medicaoEmpresa: expect.anything() }))
+    expect(onChange).toHaveBeenLastCalledWith(expect.not.objectContaining({ medicaoEmpresaAte: expect.anything() }))
+  })
+
   it('grava a medição da empresa sem apagar a do perito', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
@@ -128,7 +150,12 @@ describe('origem da medição', () => {
   it('grava o topo da faixa da empresa sem apagar o início', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    render(<AgenteNr15Fields agente={{ ...RUIDO, medicaoEmpresa: '83', origemMedicao: 'empresa' }} onChange={onChange} />)
+    render(<AgenteNr15Fields agente={{
+      ...RUIDO,
+      medicaoEmpresa: '83',
+      tipoMedicaoEmpresa: 'faixa',
+      origemMedicao: 'empresa',
+    }} onChange={onChange} />)
 
     await user.type(screen.getByRole('textbox', { name: 'Medição da empresa até' }), '88,5')
     await user.tab()

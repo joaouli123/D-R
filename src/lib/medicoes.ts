@@ -1,7 +1,33 @@
 import type { ReferenciaNormativa, UnidadeMedicao } from '@/content/nr15/tipos'
-import type { AgenteAvaliado, FonteRuido, OrigemMedicao } from '@/types'
+import type { AgenteAvaliado, FonteRuido, OrigemMedicao, TipoMedicaoEmpresa } from '@/types'
 
 const UNIDADES_MEDICAO: readonly UnidadeMedicao[] = ['ppm', 'mg/m³', '% O₂ em volume']
+
+export const TEXTO_MEDICAO_REGISTROS_PROCESSO =
+  'Medição conforme registros apresentados junto ao processo.'
+
+export function tipoMedicaoEmpresaDe(
+  agente: Pick<AgenteAvaliado, 'tipoMedicaoEmpresa' | 'medicaoEmpresaAte'>,
+): TipoMedicaoEmpresa {
+  return agente.tipoMedicaoEmpresa ?? (agente.medicaoEmpresaAte ? 'faixa' : 'valor')
+}
+
+export function formatarMedicaoEmpresa(
+  agente: Pick<AgenteAvaliado, 'tipoMedicaoEmpresa' | 'medicaoEmpresa' | 'medicaoEmpresaAte'>,
+  unidade?: string,
+): string | null {
+  const tipo = tipoMedicaoEmpresaDe(agente)
+  if (tipo === 'registros_processo') return TEXTO_MEDICAO_REGISTROS_PROCESSO
+
+  const de = agente.medicaoEmpresa?.trim() ?? ''
+  const ate = agente.medicaoEmpresaAte?.trim() ?? ''
+  const comUnidade = (valor: string) => `${valor.replace('.', ',')}${unidade ? ` ${unidade}` : ''}`
+  if (tipo === 'faixa' && de && ate && Number(de) !== Number(ate)) {
+    return `entre ${de.replace('.', ',')} e ${comUnidade(ate)}`
+  }
+  const valor = de || ate
+  return valor ? comUnidade(valor) : null
+}
 
 export const ROTULO_ORIGEM_MEDICAO: Record<OrigemMedicao, string> = {
   perito: 'Perito — medição em perícia',

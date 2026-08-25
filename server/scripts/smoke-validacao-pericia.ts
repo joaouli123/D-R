@@ -62,6 +62,17 @@ const agenteComValorMedidoInvalido = {
   unidadeMedicao: 'ppm',
 }
 
+const agenteComMedicaoDosRegistros = {
+  ...agenteLegado,
+  tipoMedicaoEmpresa: 'registros_processo',
+  origemMedicao: 'nao_informado',
+}
+
+const agenteComTipoMedicaoEmpresaInvalido = {
+  ...agenteLegado,
+  tipoMedicaoEmpresa: 'texto_livre',
+}
+
 const medicoesPorUnidade = [
   'ppm', 'mg/m³', '% O₂ em volume', 'dB(A)', 'dB(C)', 'dB(Linear)',
   'IBUTG °C', 'mSv/ano', 'm/s²', 'm/s¹·⁷⁵', 'fibras/cm³',
@@ -132,6 +143,8 @@ const completo = agenteSchema.safeParse(agenteCompleto)
 const enumInvalido = agenteSchema.safeParse(agenteComEnumInvalido)
 const medicaoEEpi = agenteSchema.safeParse(agenteComMedicaoEEpi)
 const valorMedidoInvalido = agenteSchema.safeParse(agenteComValorMedidoInvalido)
+const medicaoDosRegistros = agenteSchema.safeParse(agenteComMedicaoDosRegistros)
+const tipoMedicaoEmpresaInvalido = agenteSchema.safeParse(agenteComTipoMedicaoEmpresaInvalido)
 const muitosEpis = agenteSchema.safeParse(agenteComMuitosEpis)
 const epiSemCamposObrigatorios = agenteSchema.safeParse(agenteComEpiSemCamposObrigatorios)
 const epiComCamposObrigatoriosVazios = agenteSchema.safeParse(agenteComEpiComCamposObrigatoriosVazios)
@@ -173,6 +186,13 @@ const resultados = [
   {
     nome: 'valor medido não numérico é rejeitado',
     ok: !valorMedidoInvalido.success,
+  },
+  {
+    nome: 'terceira forma da medição da empresa é preservada e enum inválido é rejeitado',
+    ok:
+      medicaoDosRegistros.success &&
+      medicaoDosRegistros.data.tipoMedicaoEmpresa === 'registros_processo' &&
+      !tipoMedicaoEmpresaInvalido.success,
   },
   {
     nome: 'todas as unidades estruturadas dos anexos são aceitas',

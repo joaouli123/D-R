@@ -114,8 +114,8 @@ describe('montarApresentacaoAgente', () => {
 
     expect(apresentacao.linhas).toContainEqual({ rotulo: 'Medição registrada', valor: '88,5 dB(A)' })
     expect(apresentacao.linhas).toContainEqual({
-      rotulo: 'Faixa informada pela empresa',
-      valor: 'entre 83 e 88,5 dB(A) — adotada a maior',
+      rotulo: 'Medição da empresa',
+      valor: 'entre 83 e 88,5 dB(A)',
     })
     expect(apresentacao.linhas).toContainEqual({ rotulo: 'Documento da empresa', valor: 'PGR 2024' })
     expect(apresentacao.linhas).toContainEqual({
@@ -152,6 +152,20 @@ describe('montarApresentacaoAgente', () => {
     expect(apresentacao.linhas).not.toContainEqual(
       expect.objectContaining({ rotulo: 'Medição do perito (não adotada)' }),
     )
+  })
+
+  it('apresenta a terceira alternativa da empresa com o texto aprovado', () => {
+    const apresentacao = montarApresentacaoAgente({
+      ...ruido,
+      tipoMedicaoEmpresa: 'registros_processo',
+      fonteMedicaoEmpresa: 'Documentos juntados aos autos',
+    } as AgenteAvaliado)
+
+    expect(apresentacao.linhas).toContainEqual({
+      rotulo: 'Medição da empresa',
+      valor: 'Medição conforme registros apresentados junto ao processo.',
+    })
+    expect(JSON.stringify(apresentacao)).not.toMatch(/opção adotada/i)
   })
 
   it('monta a matriz própria da NR-16 sem propriedades da NR-15', () => {

@@ -62,6 +62,7 @@ export const agenteSchema = z.object({
   // no período, vem como faixa — e o `Ate` é o topo, que é o adotado.
   medicaoEmpresa: z.string().regex(/^-?\d+(\.\d+)?$/).optional(),
   medicaoEmpresaAte: z.string().regex(/^-?\d+(\.\d+)?$/).optional(),
+  tipoMedicaoEmpresa: z.enum(['valor', 'faixa', 'registros_processo']).optional(),
   fonteMedicaoEmpresa: texto.optional(),
   origemMedicao: z.enum(['perito', 'empresa', 'nao_informado']).optional(),
   fonteRuido: z.enum(['maquinas', 'ruido_fundo', 'administrativa']).optional(),

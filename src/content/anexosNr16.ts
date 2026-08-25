@@ -118,6 +118,7 @@ export function aplicarAnexoNr16(agente: AgenteAvaliado, id: string): AgenteAval
     valorMedido: _valorMedido,
     medicaoEmpresa: _medicaoEmpresa,
     medicaoEmpresaAte: _medicaoEmpresaAte,
+    tipoMedicaoEmpresa: _tipoMedicaoEmpresa,
     fonteMedicaoEmpresa: _fonteEmpresa,
     origemMedicao: _origem,
     fonteRuido: _fonteRuido,

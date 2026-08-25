@@ -150,6 +150,7 @@ export interface EpiSelecionado {
  * empresa, e o laudo registra isso em vez de fingir uma medição.
  */
 export type OrigemMedicao = 'perito' | 'empresa' | 'nao_informado'
+export type TipoMedicaoEmpresa = 'valor' | 'faixa' | 'registros_processo'
 
 /**
  * De onde vem o ruído do local avaliado.
@@ -181,6 +182,8 @@ export interface AgenteAvaliado {
   medicaoEmpresa?: string
   /** Fim da faixa, quando a medição da empresa variou. O laudo adota a maior. */
   medicaoEmpresaAte?: string
+  /** Como a medição apresentada pela empresa deve aparecer no documento. */
+  tipoMedicaoEmpresa?: TipoMedicaoEmpresa
   /** Documento de onde saiu a medição da empresa. Ex.: "PGR 2024". */
   fonteMedicaoEmpresa?: string
   /** Fonte do ruído no local. Só para os Anexos 1 e 2 da NR-15. */

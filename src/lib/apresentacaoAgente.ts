@@ -3,7 +3,7 @@ import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
 import type { AgenteAvaliado, EpiSelecionado } from '@/types'
 import { labelAnexoNr16 } from '@/content/anexosNr16'
 
-import { FONTE_RUIDO, medicaoAdotada } from './medicoes'
+import { FONTE_RUIDO, formatarMedicaoEmpresa, medicaoAdotada, tipoMedicaoEmpresaDe } from './medicoes'
 import { usaAtenuacaoRuido } from './nr15'
 import { calcularProtecaoAuditiva, protecaoDoConjunto } from './protecaoAuditiva'
 
@@ -57,6 +57,9 @@ function comUnidade(valor: string, unidade?: string): string {
 export function formatarMedicaoAgente(agente: AgenteAvaliado): string {
   const valor = medicaoAdotada(agente).valor
   if (valor) return comUnidade(valor, agente.unidadeMedicao)
+  if (tipoMedicaoEmpresaDe(agente) === 'registros_processo') {
+    return formatarMedicaoEmpresa(agente, agente.unidadeMedicao) ?? '—'
+  }
   return agente.medido?.trim() || '—'
 }
 
@@ -67,27 +70,17 @@ export function formatarMedicaoAgente(agente: AgenteAvaliado): string {
  */
 function linhasOrigemMedicao(agente: AgenteAvaliado): LinhaAgente[] {
   const adotada = medicaoAdotada(agente)
-  const daEmpresa = agente.medicaoEmpresa?.trim() || agente.medicaoEmpresaAte?.trim() || ''
+  const medicaoEmpresa = formatarMedicaoEmpresa(agente, agente.unidadeMedicao)
   const origemExplicita = (agente.origemMedicao ?? 'perito') !== 'perito'
-  if (!daEmpresa && !origemExplicita) return []
-
-  // Com faixa, o número adotado sozinho esconde de onde saiu: quem lê
-  // precisa ver o intervalo e a razão de o laudo ficar com o topo. O
-  // "adotada a maior" só entra quando é essa medição que prevalece —
-  // dizê-lo de uma medição descartada seria afirmar o contrário do que
-  // o documento conclui.
-  const faixa = adotada.faixaEmpresa
-  const intervalo = faixa && `entre ${comUnidade(faixa.de)} e ${comUnidade(faixa.ate, agente.unidadeMedicao)}`
-  const medicaoDaEmpresa = intervalo
-    ? adotada.origem === 'perito' ? intervalo : `${intervalo} — adotada a maior`
-    : comUnidade(adotada.origem === 'perito' ? daEmpresa : adotada.valor, agente.unidadeMedicao)
+  if (!medicaoEmpresa && !origemExplicita) return []
+  const somenteRegistros = tipoMedicaoEmpresaDe(agente) === 'registros_processo' && !adotada.valor
 
   return [
     { rotulo: 'Origem da medição', valor: adotada.rotuloOrigem, ...(adotada.divergente ? { destaque: 'aviso' as const } : {}) },
     { rotulo: 'Base da medição', valor: adotada.notaOrigem },
     ...(adotada.fonte ? [{ rotulo: 'Documento da empresa', valor: adotada.fonte }] : []),
-    ...(faixa && adotada.origem !== 'perito'
-      ? [{ rotulo: 'Faixa informada pela empresa', valor: medicaoDaEmpresa }]
+    ...(medicaoEmpresa && !somenteRegistros
+      ? [{ rotulo: 'Medição da empresa', valor: medicaoEmpresa }]
       : []),
   ]
 }
@@ -175,6 +168,8 @@ export function montarApresentacaoAgente(agente: AgenteAvaliado): ApresentacaoAg
   }
 
   const regra = obterRegraAnexo(agente.anexoNr15)
+  const somenteRegistrosEmpresa =
+    tipoMedicaoEmpresaDe(agente) === 'registros_processo' && !medicaoAdotada(agente).valor
   const linhas: LinhaAgente[] = [
     ...(agente.anexoNr15 ? [{ rotulo: 'Anexo NR-15', valor: labelAnexoNr15(agente.anexoNr15) }] : []),
     { rotulo: 'Natureza', valor: NATUREZA[agente.tipo] ?? agente.tipo },
@@ -187,8 +182,11 @@ export function montarApresentacaoAgente(agente: AgenteAvaliado): ApresentacaoAg
     // acompanhou a diligência, e "Ruído de fundo" sozinho não explica
     // por que o nível medido não vem de máquina nenhuma.
     ...(agente.fonteRuido ? [{ rotulo: 'Fonte do ruído', valor: FONTE_RUIDO[agente.fonteRuido].frase }] : []),
-    ...((regra?.exibeMedicao ?? Boolean(agente.valorMedido || agente.medicaoEmpresa || agente.medicaoEmpresaAte || agente.medido))
-      ? [{ rotulo: 'Medição registrada', valor: formatarMedicaoAgente(agente) }, ...linhasOrigemMedicao(agente)]
+    ...((regra?.exibeMedicao ?? Boolean(agente.valorMedido || agente.medicaoEmpresa || agente.medicaoEmpresaAte || agente.medido || agente.tipoMedicaoEmpresa === 'registros_processo'))
+      ? [{
+          rotulo: somenteRegistrosEmpresa ? 'Medição da empresa' : 'Medição registrada',
+          valor: formatarMedicaoAgente(agente),
+        }, ...linhasOrigemMedicao(agente)]
       : []),
   ]
 
