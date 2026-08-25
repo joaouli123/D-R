@@ -124,19 +124,68 @@ describe('montarApresentacaoAgente', () => {
     })
   })
 
-  it('com a do perito adotada, a da empresa entra como faixa não adotada', () => {
+  it('com a do perito adotada, registra a origem sem repetir a faixa descartada', () => {
     const apresentacao = montarApresentacaoAgente({
       ...ruido, medicaoEmpresa: '83', medicaoEmpresaAte: '88.5',
     })
 
     expect(apresentacao.linhas).toContainEqual({ rotulo: 'Medição registrada', valor: '90 dB(A)' })
-    // Sem "adotada a maior": a medição da empresa não prevaleceu aqui.
-    expect(apresentacao.linhas).toContainEqual({
-      rotulo: 'Medição da empresa (não adotada)',
-      valor: 'entre 83 e 88,5 dB(A)',
-    })
+    expect(apresentacao.linhas).not.toContainEqual(
+      expect.objectContaining({ rotulo: 'Medição da empresa (não adotada)' }),
+    )
     expect(apresentacao.linhas).toContainEqual({
       rotulo: 'Origem da medição', valor: 'Perito — medição em perícia', destaque: 'aviso',
     })
+  })
+
+  it('resume a medição escolhida sem repetir no parecer as alternativas descartadas', () => {
+    const apresentacao = montarApresentacaoAgente({
+      ...ruido,
+      medicaoEmpresa: '83',
+      medicaoEmpresaAte: '88.5',
+      origemMedicao: 'perito',
+    })
+
+    expect(apresentacao.linhas).not.toContainEqual(
+      expect.objectContaining({ rotulo: 'Medição da empresa (não adotada)' }),
+    )
+    expect(apresentacao.linhas).not.toContainEqual(
+      expect.objectContaining({ rotulo: 'Medição do perito (não adotada)' }),
+    )
+  })
+
+  it('monta a matriz própria da NR-16 sem propriedades da NR-15', () => {
+    const apresentacao = montarApresentacaoAgente({
+      id: 'periculosidade-1',
+      nome: 'Inflamáveis',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      anexoNr16: 'ANEXO_02',
+      atividadeEnquadrada: 'Operação em bomba de abastecimento',
+      areaRisco: 'Área de operação da bomba de inflamáveis líquidos',
+      exposicaoPericulosidade: 'intermitente',
+      resultadoPericulosidade: 'caracterizada',
+    } as AgenteAvaliado)
+
+    expect(apresentacao.titulo).toBe('Inflamáveis')
+    expect(apresentacao.linhas).toContainEqual({
+      rotulo: 'Anexo NR-16',
+      valor: 'Anexo 2 — Atividades e Operações Perigosas com Inflamáveis',
+    })
+    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Adicional', valor: '30%' })
+    expect(apresentacao.linhas).toContainEqual({
+      rotulo: 'Condição ou área de risco',
+      valor: 'Área de operação da bomba de inflamáveis líquidos',
+    })
+    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Exposição', valor: 'Intermitente' })
+    expect(apresentacao.linhas).toContainEqual({
+      rotulo: 'Resultado técnico',
+      valor: 'Periculosidade caracterizada',
+      destaque: 'negativo',
+    })
+    expect(apresentacao.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'Anexo NR-15' }))
+    expect(apresentacao.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'Grau' }))
+    expect(apresentacao.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'CAS' }))
+    expect(apresentacao.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'Limite de tolerância' }))
   })
 })

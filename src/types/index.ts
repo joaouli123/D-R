@@ -159,6 +159,8 @@ export type OrigemMedicao = 'perito' | 'empresa' | 'nao_informado'
  * e a conclusão sobre habitualidade depende justamente dessa diferença.
  */
 export type FonteRuido = 'maquinas' | 'ruido_fundo' | 'administrativa'
+export type ExposicaoPericulosidade = 'permanente' | 'intermitente' | 'eventual'
+export type ResultadoPericulosidade = 'caracterizada' | 'nao_caracterizada' | 'prejudicada'
 
 export interface AgenteAvaliado {
   id: UUID
@@ -166,6 +168,8 @@ export interface AgenteAvaliado {
   tipo: 'quimico' | 'fisico' | 'biologico' | 'periculosidade'
   cas?: string
   anexoNr15?: string // Anexo 1, 3, 11, 12, 13, 13-A, 14...
+  /** Anexo próprio da NR-16. Não reutiliza o seletor da NR-15. */
+  anexoNr16?: string
   referenciaNormativaId?: string
   atividadeEnquadrada?: string
   unidadeLimite?: string
@@ -181,6 +185,12 @@ export interface AgenteAvaliado {
   fonteMedicaoEmpresa?: string
   /** Fonte do ruído no local. Só para os Anexos 1 e 2 da NR-15. */
   fonteRuido?: FonteRuido
+  /** Condição ou delimitação da área de risco examinada na NR-16. */
+  areaRisco?: string
+  /** Frequência com que o trabalhador se expõe à condição perigosa. */
+  exposicaoPericulosidade?: ExposicaoPericulosidade
+  /** Resultado da avaliação do enquadramento na NR-16. */
+  resultadoPericulosidade?: ResultadoPericulosidade
   /** Qual das duas o laudo adota. Ausente = perito, como sempre foi. */
   origemMedicao?: OrigemMedicao
   unidadeMedicao?: UnidadeMedicao

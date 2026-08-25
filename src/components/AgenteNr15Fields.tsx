@@ -126,8 +126,8 @@ function OrigemDaMedicao({
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-navy-700">Avaliação da medição</p>
       <div className="grid gap-3 sm:grid-cols-2">
         <Select
-          label="Medição adotada no laudo"
-          aria-label="Origem da medição adotada no laudo"
+          label="Origem da medição"
+          aria-label="Origem da medição"
           className="sm:col-span-2"
           value={origem}
           hint={NOTA_ORIGEM_MEDICAO[origem]}

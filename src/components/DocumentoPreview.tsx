@@ -80,6 +80,15 @@ export function DocumentoPreview({
   const agentesNr16 = t.agentes.filter((agente) => agente.tipo === 'periculosidade')
   const temInsalubridade = pericia.modalidade !== 'periculosidade'
   const temPericulosidade = pericia.modalidade !== 'insalubridade'
+  let indiceSubsecao7 = 1
+  const numeroAvaliacaoNr15 = temInsalubridade ? `7.${++indiceSubsecao7}` : null
+  const numeroAvaliacaoNr16 = temPericulosidade ? `7.${++indiceSubsecao7}` : null
+  const numeroDivergencias = t.divergenciasFaticas?.trim() ? `7.${++indiceSubsecao7}` : null
+  let indiceSecaoFinal = 10
+  const numeroConclusaoNr15 = temInsalubridade ? ++indiceSecaoFinal : null
+  const numeroConclusaoNr16 = temPericulosidade ? ++indiceSecaoFinal : null
+  const numeroQuesitos = t.respostasQuesitos?.trim() ? ++indiceSecaoFinal : null
+  const numeroEncerramento = ++indiceSecaoFinal
   const conclusaoNr15 =
     t.conclusaoInsalubridade?.trim() ||
     (pericia.modalidade === 'insalubridade' || !t.conclusaoPericulosidade?.trim()
@@ -262,9 +271,9 @@ export function DocumentoPreview({
       )}
       <h3>7.1. Atividades Efetivamente Exercidas</h3>
       <Paragrafos texto={t.atividadesFuncoes} />
-      {temInsalubridade && <><h3>7.2. NR-15 — Avaliação da Exposição Ocupacional</h3>{agentesSemProtecoes(agentesNr15)}</>}
-      {temPericulosidade && <><h3>7.3. NR-16 — Avaliação das Atividades e Operações Perigosas</h3>{agentesSemProtecoes(agentesNr16)}</>}
-      {t.divergenciasFaticas?.trim() && <><h3>7.4. Divergências Fáticas</h3><Paragrafos texto={t.divergenciasFaticas} /></>}
+      {temInsalubridade && <><h3>{numeroAvaliacaoNr15}. NR-15 — Avaliação da Exposição Ocupacional</h3>{agentesSemProtecoes(agentesNr15)}</>}
+      {temPericulosidade && <><h3>{numeroAvaliacaoNr16}. NR-16 — Avaliação das Atividades e Operações Perigosas</h3>{agentesSemProtecoes(agentesNr16)}</>}
+      {numeroDivergencias && <><h3>{numeroDivergencias}. Divergências Fáticas</h3><Paragrafos texto={t.divergenciasFaticas} /></>}
       {fotosDasSecoes(['documentos'])}
 
       <h2>8. Dos Equipamentos de Proteção Individual (NR-06)</h2>
@@ -286,14 +295,14 @@ export function DocumentoPreview({
       <h2>9. Das Proteções Coletivas</h2>
       <Paragrafos texto={t.protecoesColetivas} />
 
-      <h2>10. Análise Técnica dos Agentes Identificados</h2>
+      <h2>10. {pericia.modalidade === 'insalubridade' ? 'Análise Técnica dos Agentes Identificados' : pericia.modalidade === 'periculosidade' ? 'Análise Técnica das Atividades e Riscos Identificados' : 'Análise Técnica dos Agentes, Atividades e Riscos Identificados'}</h2>
       <Paragrafos texto={t.analiseTecnica} />
 
-      {temInsalubridade && <><h2>11. NR-15 — Conclusão e Fundamentação</h2><Paragrafos texto={conclusaoNr15} /></>}
-      {temPericulosidade && <><h2>12. NR-16 — Conclusão e Fundamentação</h2><Paragrafos texto={conclusaoNr16} /></>}
-      {t.respostasQuesitos?.trim() && <><h2>13. Respostas aos Quesitos Técnicos</h2><Paragrafos texto={t.respostasQuesitos} /></>}
+      {numeroConclusaoNr15 && <><h2>{numeroConclusaoNr15}. NR-15 — Conclusão e Fundamentação</h2><Paragrafos texto={conclusaoNr15} /></>}
+      {numeroConclusaoNr16 && <><h2>{numeroConclusaoNr16}. NR-16 — Conclusão e Fundamentação</h2><Paragrafos texto={conclusaoNr16} /></>}
+      {numeroQuesitos && <><h2>{numeroQuesitos}. Respostas aos Quesitos Técnicos</h2><Paragrafos texto={t.respostasQuesitos} /></>}
 
-      <h2>14. Encerramento</h2>
+      <h2>{numeroEncerramento}. Encerramento</h2>
       <Paragrafos texto={encerramento} />
       <p className="mt-6 no-indent">
         Sendo o que se apresenta para o momento, o signatário coloca-se à disposição deste MM. Juízo

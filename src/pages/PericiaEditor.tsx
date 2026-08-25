@@ -37,6 +37,7 @@ import { BuscaProcesso } from '@/components/BuscaProcesso'
 import type { OrigemConsulta } from '@/components/BuscaCnpj'
 import { DocumentoPreview } from '@/components/DocumentoPreview'
 import { AgenteNr15Fields } from '@/components/AgenteNr15Fields'
+import { PericulosidadeNr16Fields } from '@/components/PericulosidadeNr16Fields'
 import { EpiSelector } from '@/components/EpiSelector'
 import { empresaVazia, ModalEmpresa } from '@/components/ModalEmpresa'
 import { useApp } from '@/store/AppStore'
@@ -87,7 +88,7 @@ const PASSOS = [
   // "e EPIs" no rótulo porque é ali que o perito associa o equipamento —
   // o nome antigo escondia metade da etapa. Curto porque a trilha do
   // topo trunca o que não cabe.
-  { label: 'Agentes e EPIs', description: 'Módulo D' },
+  { label: 'Avaliações e EPIs', description: 'Módulo D' },
   { label: 'Fotografias', description: 'Módulo E' },
   { label: 'Conclusão', description: 'Módulo D' },
   { label: 'Documento', description: 'Módulos G–I' },
@@ -299,6 +300,13 @@ export default function PericiaEditor() {
   }
 
   const docsDaPericia = documentos.filter((d) => d.periciaId === p.id)
+  const avaliacoesVisiveis = p.tecnico.agentes.filter((avaliacao) =>
+    p.modalidade === 'ambas'
+      ? true
+      : p.modalidade === 'periculosidade'
+        ? avaliacao.tipo === 'periculosidade'
+        : avaliacao.tipo !== 'periculosidade',
+  )
 
   // Reabrir uma perícia já documentada continua o mesmo documento.
   useEffect(() => {
@@ -956,35 +964,68 @@ export default function PericiaEditor() {
         <div className="space-y-4">
           <Card>
             <CardHeader
-              title="Agentes ambientais e EPIs"
-              subtitle="Cadastre os agentes identificados, o enquadramento normativo e a proteção individual associada a cada um."
+              title="Avaliações de insalubridade e periculosidade"
+              subtitle="A modalidade escolhida no processo define as matrizes NR-15 e NR-16 exibidas nesta etapa."
               icon={<FileText size={18} />}
               action={
-                <Button
-                  size="sm"
-                  variant="outline"
-                  icon={<Plus size={14} />}
-                  onClick={() =>
-                    setT({
-                      agentes: [
-                        ...p.tecnico.agentes,
-                        {
-                          id: uid('agn'),
-                          nome: '',
-                          tipo: 'quimico',
-                          criterio: 'qualitativo',
-                          grau: 'medio',
-                        } as AgenteAvaliado,
-                      ],
-                    })
-                  }
-                >
-                  Novo agente
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  {p.modalidade !== 'periculosidade' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      icon={<Plus size={14} />}
+                      onClick={() => setT({
+                        agentes: [...p.tecnico.agentes, {
+                          id: uid('agn'), nome: '', tipo: 'quimico', criterio: 'qualitativo', grau: 'medio',
+                        } as AgenteAvaliado],
+                      })}
+                    >
+                      Novo agente NR-15
+                    </Button>
+                  )}
+                  {p.modalidade !== 'insalubridade' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      icon={<Plus size={14} />}
+                      onClick={() => setT({
+                        agentes: [...p.tecnico.agentes, {
+                          id: uid('ris'), nome: '', tipo: 'periculosidade', criterio: 'qualitativo',
+                        } as AgenteAvaliado],
+                      })}
+                    >
+                      Nova avaliação NR-16
+                    </Button>
+                  )}
+                </div>
               }
             />
             <div className="space-y-3 p-5">
-              {p.tecnico.agentes.map((a) => {
+              {avaliacoesVisiveis.map((a) => {
+                if (a.tipo === 'periculosidade') {
+                  return (
+                    <div key={a.id} className="rounded-lg border border-ink-200 border-l-4 border-l-amber-500 p-3">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <ol aria-label="Fluxo técnico da periculosidade" className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+                          <li className="text-amber-700">Risco</li><li aria-hidden="true">→</li><li>Enquadramento</li><li aria-hidden="true">→</li><li>Conclusão</li>
+                        </ol>
+                        <Button
+                          variant="ghost"
+                          className="text-red-600 hover:bg-red-50"
+                          icon={<Trash2 size={15} />}
+                          onClick={() => setT({ agentes: p.tecnico.agentes.filter((x) => x.id !== a.id) })}
+                          aria-label="Remover avaliação NR-16"
+                        />
+                      </div>
+                      <PericulosidadeNr16Fields
+                        avaliacao={a}
+                        onChange={(avaliacaoAtualizada) => setT({
+                          agentes: p.tecnico.agentes.map((x) => x.id === a.id ? avaliacaoAtualizada : x),
+                        })}
+                      />
+                    </div>
+                  )
+                }
                 const referenciaNormativaSelecionada = Boolean(a.referenciaNormativaId)
                 const regraAnexo = obterRegraAnexo(a.anexoNr15)
                 const agenteFixo = Boolean(regraAnexo?.agenteFixo)
@@ -1085,7 +1126,6 @@ export default function PericiaEditor() {
                       <option value="quimico">Químico</option>
                       <option value="fisico">Físico</option>
                       <option value="biologico">Biológico</option>
-                      <option value="periculosidade">Periculosidade</option>
                     </Select>
                     <Select
                       label="Critério"
@@ -1136,8 +1176,8 @@ export default function PericiaEditor() {
                   )}
                 </div>
               )})}
-              {p.tecnico.agentes.length === 0 && (
-                <p className="text-sm text-ink-500">Nenhum agente cadastrado.</p>
+              {avaliacoesVisiveis.length === 0 && (
+                <p className="text-sm text-ink-500">Nenhuma avaliação cadastrada para a modalidade selecionada.</p>
               )}
             </div>
           </Card>
@@ -1245,14 +1285,24 @@ export default function PericiaEditor() {
               { campo: 'informacoesLevantadas', secao: 'generico', label: 'Histórico laboral e informações levantadas na vistoria', rows: 5 },
               { campo: 'divergenciasFaticas', secao: 'generico', label: 'Divergências fáticas', rows: 5 },
               { campo: 'protecoesColetivas', secao: 'analise', label: 'Proteções coletivas', rows: 5 },
-              { campo: 'analiseTecnica', secao: 'analise', label: 'Análise técnica dos agentes', rows: 8 },
+              {
+                campo: 'analiseTecnica',
+                secao: 'analise',
+                label: p.modalidade === 'insalubridade'
+                  ? 'Análise técnica dos agentes'
+                  : p.modalidade === 'periculosidade'
+                    ? 'Análise técnica das atividades e riscos'
+                    : 'Análise técnica dos agentes, atividades e riscos',
+                rows: 8,
+              },
               { campo: 'conclusaoInsalubridade', secao: 'conclusao', label: 'Conclusão — NR-15 (Insalubridade)', rows: 6 },
               { campo: 'conclusaoPericulosidade', secao: 'conclusao', label: 'Conclusão — NR-16 (Periculosidade)', rows: 6 },
               { campo: 'respostasQuesitos', secao: 'conclusao', label: 'Respostas aos quesitos', rows: 8 },
               { campo: 'encerramento', secao: 'conclusao', label: 'Encerramento', rows: 5 },
-              { campo: 'conclusao', secao: 'conclusao', label: 'Conclusão geral (compatibilidade com documentos anteriores)', rows: 6 },
-              { campo: 'observacoesAdicionais', secao: 'generico', label: 'Observações adicionais (compatibilidade)', rows: 3 },
             ] as const
+          ).filter((f) =>
+            (f.campo !== 'conclusaoInsalubridade' || p.modalidade !== 'periculosidade') &&
+            (f.campo !== 'conclusaoPericulosidade' || p.modalidade !== 'insalubridade'),
           ).map((f) => {
             const campoPadrao = campoPadraoDe(f.campo)
             return (

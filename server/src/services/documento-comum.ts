@@ -332,6 +332,7 @@ export interface AgenteDocumento {
   tipo?: string
   cas?: string
   anexoNr15?: string
+  anexoNr16?: string
   referenciaNormativaId?: string
   atividadeEnquadrada?: string
   unidadeLimite?: string
@@ -343,6 +344,9 @@ export interface AgenteDocumento {
   fonteMedicaoEmpresa?: string
   origemMedicao?: OrigemMedicaoDocumento
   fonteRuido?: FonteRuidoDocumento
+  areaRisco?: string
+  exposicaoPericulosidade?: 'permanente' | 'intermitente' | 'eventual'
+  resultadoPericulosidade?: 'caracterizada' | 'nao_caracterizada' | 'prejudicada'
   unidadeMedicao?: 'ppm' | 'mg/m³' | '% O₂ em volume' | 'dB(A)' | 'dB(C)' | 'dB(Linear)' | 'IBUTG °C' | 'mSv/ano' | 'm/s²' | 'm/s¹·⁷⁵' | 'fibras/cm³'
   epis?: EpiDocumento[]
   epiEficaz?: boolean
@@ -493,6 +497,31 @@ function anexoLegivel(anexo?: string): string {
   return anexo ? (rotulos[anexo] ?? anexo) : ''
 }
 
+function anexoNr16Legivel(anexo?: string): string {
+  const rotulos: Record<string, string> = {
+    ANEXO_01: 'Anexo 1 — Atividades e Operações Perigosas com Explosivos',
+    ANEXO_02: 'Anexo 2 — Atividades e Operações Perigosas com Inflamáveis',
+    ANEXO_03: 'Anexo 3 — Segurança Pessoal ou Patrimonial',
+    ANEXO_04: 'Anexo 4 — Atividades e Operações Perigosas com Energia Elétrica',
+    ANEXO_05: 'Anexo 5 — Atividades Perigosas em Motocicleta',
+    ANEXO_06: 'Anexo 6 — Agentes das Autoridades de Trânsito',
+    ANEXO_RADIACOES: 'Anexo sem número — Radiações Ionizantes ou Substâncias Radioativas',
+  }
+  return anexo ? (rotulos[anexo] ?? anexo) : ''
+}
+
+const EXPOSICAO_PERICULOSIDADE: Record<string, string> = {
+  permanente: 'Permanente',
+  intermitente: 'Intermitente',
+  eventual: 'Eventual ou por tempo extremamente reduzido',
+}
+
+const RESULTADO_PERICULOSIDADE: Record<string, { valor: string; destaque: LinhaApresentacaoAgente['destaque'] }> = {
+  caracterizada: { valor: 'Periculosidade caracterizada', destaque: 'negativo' },
+  nao_caracterizada: { valor: 'Periculosidade não caracterizada', destaque: 'positivo' },
+  prejudicada: { valor: 'Avaliação prejudicada por insuficiência de elementos', destaque: 'aviso' },
+}
+
 /**
  * Anexos julgados pela conta "medição − NRRsf": o 1 (contínuo ou
  * intermitente) e o 2 (impacto). Espelha `usaAtenuacaoRuido` do front —
@@ -568,6 +597,34 @@ function protecaoDocumento(
 }
 
 export function montarApresentacaoAgente(agente: AgenteDocumento): ApresentacaoAgenteDocumento {
+  if (agente.tipo === 'periculosidade') {
+    const resultado = agente.resultadoPericulosidade
+      ? RESULTADO_PERICULOSIDADE[agente.resultadoPericulosidade]
+      : undefined
+    return {
+      titulo: agente.nome || 'Risco de periculosidade não informado',
+      linhas: [
+        ...(agente.anexoNr16 ? [{ rotulo: 'Anexo NR-16', valor: anexoNr16Legivel(agente.anexoNr16) }] : []),
+        { rotulo: 'Natureza', valor: 'Periculosidade' },
+        { rotulo: 'Critério', valor: 'Qualitativo' },
+        { rotulo: 'Adicional', valor: '30%' },
+        ...(agente.atividadeEnquadrada?.trim()
+          ? [{ rotulo: 'Atividade ou operação avaliada', valor: agente.atividadeEnquadrada.trim() }]
+          : []),
+        ...(agente.areaRisco?.trim()
+          ? [{ rotulo: 'Condição ou área de risco', valor: agente.areaRisco.trim() }]
+          : []),
+        ...(agente.exposicaoPericulosidade
+          ? [{ rotulo: 'Exposição', valor: EXPOSICAO_PERICULOSIDADE[agente.exposicaoPericulosidade]! }]
+          : []),
+        ...(resultado
+          ? [{ rotulo: 'Resultado técnico', valor: resultado.valor, destaque: resultado.destaque }]
+          : []),
+      ],
+      protecoes: [],
+    }
+  }
+
   const ruido = ANEXOS_RUIDO.has(agente.anexoNr15 ?? '')
   const qualitativo = agente.criterio === 'qualitativo'
   const linhas: LinhaApresentacaoAgente[] = [
@@ -607,7 +664,6 @@ export function montarApresentacaoAgente(agente: AgenteDocumento): ApresentacaoA
  */
 function linhasOrigemMedicao(agente: AgenteDocumento): LinhaApresentacaoAgente[] {
   const adotada = medicaoAdotadaDocumento(agente)
-  const doPerito = agente.valorMedido?.trim() ?? ''
   const daEmpresa = agente.medicaoEmpresa?.trim() || agente.medicaoEmpresaAte?.trim() || ''
   if (!daEmpresa && adotada.origem === 'perito') return []
 
@@ -626,14 +682,8 @@ function linhasOrigemMedicao(agente: AgenteDocumento): LinhaApresentacaoAgente[]
     { rotulo: 'Origem da medição', valor: adotada.rotuloOrigem, ...(adotada.divergente ? { destaque: 'aviso' as const } : {}) },
     { rotulo: 'Base da medição', valor: adotada.notaOrigem },
     ...(adotada.fonte ? [{ rotulo: 'Documento da empresa', valor: adotada.fonte }] : []),
-    ...(daEmpresa && adotada.origem === 'perito'
-      ? [{ rotulo: 'Medição da empresa (não adotada)', valor: medicaoDaEmpresa }]
-      : []),
     ...(faixa && adotada.origem !== 'perito'
       ? [{ rotulo: 'Faixa informada pela empresa', valor: medicaoDaEmpresa }]
-      : []),
-    ...(doPerito && adotada.origem !== 'perito'
-      ? [{ rotulo: 'Medição do perito (não adotada)', valor: comUnidadeMedicao(doPerito, agente.unidadeMedicao) }]
       : []),
   ]
 }

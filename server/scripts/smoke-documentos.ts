@@ -129,6 +129,9 @@ const periciaBase = {
         cas: 'não aplicável',
         limiteTolerancia: '85 dB(A) para jornada de 8h/dia (q=5)',
         valorMedido: '90',
+        medicaoEmpresa: '83',
+        medicaoEmpresaAte: '88.5',
+        origemMedicao: 'perito',
         unidadeMedicao: 'dB(A)',
         epis: [{
           categoria: 'Proteção auditiva', modelo: 'Protetor auditivo CA 11882', marca: 'Não informada',
@@ -232,6 +235,17 @@ const periciaBase = {
         atividadeEnquadrada: 'Trabalho ou operações, em contato permanente com: lixo urbano (coleta e industrialização).',
         criterio: 'qualitativo',
         grau: 'maximo',
+      },
+      {
+        id: 'ris-16-inflamaveis',
+        nome: 'Inflamáveis',
+        tipo: 'periculosidade',
+        anexoNr16: 'ANEXO_02',
+        atividadeEnquadrada: 'Operação em postos de serviço e bombas de abastecimento',
+        areaRisco: 'Área de operação da bomba de inflamáveis líquidos',
+        exposicaoPericulosidade: 'intermitente',
+        resultadoPericulosidade: 'caracterizada',
+        criterio: 'qualitativo',
       },
     ],
     normasReferencias:
@@ -415,6 +429,61 @@ async function main() {
     />Tramitação</,
     'o DOCX não deve repetir a modalidade no campo Tramitação',
   )
+  assert.match(htmlParecer, /Anexo 2 — Atividades e Operações Perigosas com Inflamáveis/)
+  assert.match(htmlParecer, /Periculosidade caracterizada/)
+  assert.match(parecerGerado?.xml ?? '', /Anexo 2 — Atividades e Operações Perigosas com Inflamáveis/)
+  assert.match(parecerGerado?.xml ?? '', /Periculosidade caracterizada/)
+  assert.doesNotMatch(htmlParecer, /Medição (?:da empresa|do perito) \(não adotada\)/)
+  assert.doesNotMatch(parecerGerado?.xml ?? '', /Medição (?:da empresa|do perito) \(não adotada\)/)
+
+  const periciaPericulosidade = {
+    ...periciaBase,
+    modalidade: 'periculosidade',
+    tecnico: {
+      ...periciaBase.tecnico,
+      agentes: periciaBase.tecnico.agentes.filter((agente) => agente.tipo === 'periculosidade'),
+      objetivoPericia:
+        'Apurar a existência, ou não, de atividades ou operações perigosas, nos termos do artigo 193 da CLT e da NR-16 da Portaria MTb nº 3.214/78.',
+      normasReferencias: 'NR-16 — Atividades e Operações Perigosas, e seus Anexos.',
+      equipamentosAnalisados:
+        'Avaliação qualitativa das atividades, da área de risco e da frequência de exposição observadas na diligência.',
+      analiseTecnica:
+        'A operação em bomba de abastecimento foi examinada em conjunto com a delimitação da área de risco e a exposição intermitente constatada.',
+      conclusaoInsalubridade: '',
+      conclusaoPericulosidade: 'Caracteriza-se a periculosidade nos termos do Anexo 2 da NR-16.',
+      respostasQuesitos: '',
+    },
+  } as unknown as PericiaCompleta
+  const documentoPericulosidade = doc(
+    'parecer',
+    'Parecer Técnico Pericial — Periculosidade',
+    null,
+  )
+  const htmlPericulosidade = await montarHtml(
+    documentoPericulosidade,
+    periciaPericulosidade,
+    [empresa],
+    perito,
+  )
+  const docxPericulosidade = await gerarDocx(
+    documentoPericulosidade,
+    periciaPericulosidade,
+    [empresa],
+    perito,
+  )
+  const pdfPericulosidade = await gerarPdf(htmlPericulosidade)
+  const pacotePericulosidade = await JSZip.loadAsync(docxPericulosidade)
+  const xmlPericulosidade = await pacotePericulosidade.file('word/document.xml')!.async('string')
+  await fs.writeFile(path.join(SAIDA, 'parecer-periculosidade.html'), htmlPericulosidade, 'utf8')
+  await fs.writeFile(path.join(SAIDA, 'parecer-periculosidade.docx'), docxPericulosidade)
+  await fs.writeFile(path.join(SAIDA, 'parecer-periculosidade.pdf'), pdfPericulosidade)
+
+  for (const conteudo of [htmlPericulosidade, xmlPericulosidade]) {
+    assert.doesNotMatch(conteudo, /NR-15 — (?:AVALIAÇÃO|CONCLUSÃO)/i)
+    assert.match(conteudo, /7\.2\. NR-16 — (?:Avaliação|AVALIAÇÃO)/)
+    assert.match(conteudo, /11\. NR-16 — (?:Conclusão|CONCLUSÃO)/)
+    assert.match(conteudo, /12\. (?:Encerramento|ENCERRAMENTO)/)
+  }
 
   for (const saida of saidasVisuais) {
     assert.doesNotMatch(
@@ -572,7 +641,7 @@ async function main() {
     '7. HISTÓRICO LABORAL, PERÍODOS E ATIVIDADES HABITUAIS EXERCIDAS',
     '8. DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)',
     '9. DAS PROTEÇÕES COLETIVAS',
-    '10. ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS',
+    '10. ANÁLISE TÉCNICA DOS AGENTES, ATIVIDADES E RISCOS IDENTIFICADOS',
     '11. NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO',
     '12. NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO',
     '13. RESPOSTAS AOS QUESITOS TÉCNICOS',

@@ -440,6 +440,11 @@ async function docParecer(
   const agentesNr16 = agentes.filter((agente) => agente.tipo === 'periculosidade')
   const temInsalubridade = pericia.modalidade !== 'periculosidade'
   const temPericulosidade = pericia.modalidade !== 'insalubridade'
+  const tituloAnalise = pericia.modalidade === 'insalubridade'
+    ? 'ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS'
+    : pericia.modalidade === 'periculosidade'
+      ? 'ANÁLISE TÉCNICA DAS ATIVIDADES E RISCOS IDENTIFICADOS'
+      : 'ANÁLISE TÉCNICA DOS AGENTES, ATIVIDADES E RISCOS IDENTIFICADOS'
   const conclusaoNr15 =
     t.conclusaoInsalubridade?.trim() ||
     (pericia.modalidade === 'insalubridade' || !t.conclusaoPericulosidade?.trim() ? t.conclusao : '')
@@ -632,7 +637,7 @@ async function docParecer(
   filhos.push(
     h2(num.secao('DAS PROTEÇÕES COLETIVAS')),
     ...blocos(t.protecoesColetivas),
-    h2(num.secao('ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS')),
+    h2(num.secao(tituloAnalise)),
     ...blocos(t.analiseTecnica),
   )
   if (temInsalubridade) filhos.push(h2(num.secao('NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr15))

@@ -93,6 +93,14 @@ describe('origem da medição', () => {
     expect((screen.getByRole('textbox', { name: 'Medição da empresa (dB(A))' }) as HTMLInputElement).value).toBe('83')
   })
 
+  it('apresenta as três alternativas sob o rótulo enxuto de origem da medição', () => {
+    render(<AgenteNr15Fields agente={RUIDO} onChange={() => undefined} />)
+
+    const seletor = screen.getByRole('combobox', { name: 'Origem da medição' })
+    expect(seletor.querySelectorAll('option')).toHaveLength(3)
+    expect(screen.queryByText('Medição adotada no laudo')).toBeNull()
+  })
+
   it('grava a medição da empresa sem apagar a do perito', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
@@ -110,7 +118,7 @@ describe('origem da medição', () => {
     render(<AgenteNr15Fields agente={{ ...RUIDO, medicaoEmpresa: '83' }} onChange={onChange} />)
 
     await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Origem da medição adotada no laudo' }),
+      screen.getByRole('combobox', { name: 'Origem da medição' }),
       'nao_informado',
     )
 

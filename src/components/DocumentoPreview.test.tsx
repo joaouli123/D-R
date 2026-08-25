@@ -197,7 +197,7 @@ describe('DocumentoPreview', () => {
       '7. Histórico Laboral, Períodos e Atividades Habituais Exercidas',
       '8. Dos Equipamentos de Proteção Individual (NR-06)',
       '9. Das Proteções Coletivas',
-      '10. Análise Técnica dos Agentes Identificados',
+      '10. Análise Técnica dos Agentes, Atividades e Riscos Identificados',
       '11. NR-15 — Conclusão e Fundamentação',
       '12. NR-16 — Conclusão e Fundamentação',
       '13. Respostas aos Quesitos Técnicos',
@@ -212,5 +212,38 @@ describe('DocumentoPreview', () => {
     }
     expect(html).not.toContain('Relatório Fotográfico')
     expect(html).not.toContain('Tramitação')
+  })
+
+  it('em parecer só de periculosidade omite a NR-15 e renumera as seções finais', () => {
+    const somentePericulosidade = {
+      ...pericia,
+      modalidade: 'periculosidade',
+      tecnico: {
+        ...pericia.tecnico,
+        respostasQuesitos: '',
+        agentes: [{
+          id: 'risco-inflamaveis',
+          nome: 'Inflamáveis',
+          tipo: 'periculosidade',
+          criterio: 'qualitativo',
+          anexoNr16: 'ANEXO_02',
+          atividadeEnquadrada: 'Operação em bomba de abastecimento',
+          areaRisco: 'Área de operação da bomba',
+          exposicaoPericulosidade: 'intermitente',
+          resultadoPericulosidade: 'caracterizada',
+        }],
+      },
+    } satisfies Pericia
+
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={somentePericulosidade} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    expect(html).toContain('7.2. NR-16 — Avaliação das Atividades e Operações Perigosas')
+    expect(html).not.toContain('NR-15 — Avaliação da Exposição Ocupacional')
+    expect(html).not.toContain('NR-15 — Conclusão e Fundamentação')
+    expect(html).toContain('11. NR-16 — Conclusão e Fundamentação')
+    expect(html).toContain('12. Encerramento')
+    expect(html).not.toContain('14. Encerramento')
   })
 })

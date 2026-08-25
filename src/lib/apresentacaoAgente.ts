@@ -1,6 +1,7 @@
 import { labelAnexoNr15 } from '@/content/anexosNr15'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
 import type { AgenteAvaliado, EpiSelecionado } from '@/types'
+import { labelAnexoNr16 } from '@/content/anexosNr16'
 
 import { FONTE_RUIDO, medicaoAdotada } from './medicoes'
 import { usaAtenuacaoRuido } from './nr15'
@@ -33,6 +34,18 @@ const NATUREZA: Record<string, string> = {
   quimico: 'Químico', fisico: 'Físico', biologico: 'Biológico', periculosidade: 'Periculosidade',
 }
 
+const EXPOSICAO_PERICULOSIDADE = {
+  permanente: 'Permanente',
+  intermitente: 'Intermitente',
+  eventual: 'Eventual ou por tempo extremamente reduzido',
+} as const
+
+const RESULTADO_PERICULOSIDADE = {
+  caracterizada: { valor: 'Periculosidade caracterizada', destaque: 'negativo' as const },
+  nao_caracterizada: { valor: 'Periculosidade não caracterizada', destaque: 'positivo' as const },
+  prejudicada: { valor: 'Avaliação prejudicada por insuficiência de elementos', destaque: 'aviso' as const },
+} as const
+
 function numeroDocumento(valor: number | string): string {
   return String(valor).replace('.', ',')
 }
@@ -54,7 +67,6 @@ export function formatarMedicaoAgente(agente: AgenteAvaliado): string {
  */
 function linhasOrigemMedicao(agente: AgenteAvaliado): LinhaAgente[] {
   const adotada = medicaoAdotada(agente)
-  const doPerito = agente.valorMedido?.trim() ?? ''
   const daEmpresa = agente.medicaoEmpresa?.trim() || agente.medicaoEmpresaAte?.trim() || ''
   const origemExplicita = (agente.origemMedicao ?? 'perito') !== 'perito'
   if (!daEmpresa && !origemExplicita) return []
@@ -74,14 +86,8 @@ function linhasOrigemMedicao(agente: AgenteAvaliado): LinhaAgente[] {
     { rotulo: 'Origem da medição', valor: adotada.rotuloOrigem, ...(adotada.divergente ? { destaque: 'aviso' as const } : {}) },
     { rotulo: 'Base da medição', valor: adotada.notaOrigem },
     ...(adotada.fonte ? [{ rotulo: 'Documento da empresa', valor: adotada.fonte }] : []),
-    ...(daEmpresa && adotada.origem === 'perito'
-      ? [{ rotulo: 'Medição da empresa (não adotada)', valor: medicaoDaEmpresa }]
-      : []),
     ...(faixa && adotada.origem !== 'perito'
       ? [{ rotulo: 'Faixa informada pela empresa', valor: medicaoDaEmpresa }]
-      : []),
-    ...(doPerito && adotada.origem !== 'perito'
-      ? [{ rotulo: 'Medição do perito (não adotada)', valor: comUnidade(doPerito, agente.unidadeMedicao) }]
       : []),
   ]
 }
@@ -140,6 +146,34 @@ function linhasProtecao(
 }
 
 export function montarApresentacaoAgente(agente: AgenteAvaliado): ApresentacaoAgente {
+  if (agente.tipo === 'periculosidade') {
+    const resultado = agente.resultadoPericulosidade
+      ? RESULTADO_PERICULOSIDADE[agente.resultadoPericulosidade]
+      : undefined
+    return {
+      titulo: agente.nome || 'Risco de periculosidade não informado',
+      linhas: [
+        ...(agente.anexoNr16 ? [{ rotulo: 'Anexo NR-16', valor: labelAnexoNr16(agente.anexoNr16) }] : []),
+        { rotulo: 'Natureza', valor: 'Periculosidade' },
+        { rotulo: 'Critério', valor: 'Qualitativo' },
+        { rotulo: 'Adicional', valor: '30%' },
+        ...(agente.atividadeEnquadrada?.trim()
+          ? [{ rotulo: 'Atividade ou operação avaliada', valor: agente.atividadeEnquadrada.trim() }]
+          : []),
+        ...(agente.areaRisco?.trim()
+          ? [{ rotulo: 'Condição ou área de risco', valor: agente.areaRisco.trim() }]
+          : []),
+        ...(agente.exposicaoPericulosidade
+          ? [{ rotulo: 'Exposição', valor: EXPOSICAO_PERICULOSIDADE[agente.exposicaoPericulosidade] }]
+          : []),
+        ...(resultado
+          ? [{ rotulo: 'Resultado técnico', valor: resultado.valor, destaque: resultado.destaque }]
+          : []),
+      ],
+      protecoes: [],
+    }
+  }
+
   const regra = obterRegraAnexo(agente.anexoNr15)
   const linhas: LinhaAgente[] = [
     ...(agente.anexoNr15 ? [{ rotulo: 'Anexo NR-15', valor: labelAnexoNr15(agente.anexoNr15) }] : []),

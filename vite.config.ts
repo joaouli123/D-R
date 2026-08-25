@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
+import { configDefaults } from 'vitest/config'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_')
@@ -14,6 +15,9 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     resolve: {
       alias: { '@': path.resolve(__dirname, './src') },
+    },
+    test: {
+      exclude: [...configDefaults.exclude, '.worktrees/**'],
     },
     server: {
       port: 5173,

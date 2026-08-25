@@ -50,6 +50,7 @@ export const agenteSchema = z.object({
   tipo: z.enum(['quimico', 'fisico', 'biologico', 'periculosidade']),
   cas: texto.optional(),
   anexoNr15: texto.optional(),
+  anexoNr16: texto.optional(),
   referenciaNormativaId: texto.optional(),
   atividadeEnquadrada: texto.optional(),
   unidadeLimite: texto.optional(),
@@ -64,6 +65,9 @@ export const agenteSchema = z.object({
   fonteMedicaoEmpresa: texto.optional(),
   origemMedicao: z.enum(['perito', 'empresa', 'nao_informado']).optional(),
   fonteRuido: z.enum(['maquinas', 'ruido_fundo', 'administrativa']).optional(),
+  areaRisco: texto.optional(),
+  exposicaoPericulosidade: z.enum(['permanente', 'intermitente', 'eventual']).optional(),
+  resultadoPericulosidade: z.enum(['caracterizada', 'nao_caracterizada', 'prejudicada']).optional(),
   unidadeMedicao: z.enum([
     'ppm', 'mg/m³', '% O₂ em volume', 'dB(A)', 'dB(C)', 'dB(Linear)',
     'IBUTG °C', 'mSv/ano', 'm/s²', 'm/s¹·⁷⁵', 'fibras/cm³',

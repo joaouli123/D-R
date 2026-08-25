@@ -315,6 +315,11 @@ export async function htmlDoParecer(
   const agentesNr16 = agentes.filter((agente) => agente.tipo === 'periculosidade')
   const temInsalubridade = pericia.modalidade !== 'periculosidade'
   const temPericulosidade = pericia.modalidade !== 'insalubridade'
+  const tituloAnalise = pericia.modalidade === 'insalubridade'
+    ? 'ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS'
+    : pericia.modalidade === 'periculosidade'
+      ? 'ANÁLISE TÉCNICA DAS ATIVIDADES E RISCOS IDENTIFICADOS'
+      : 'ANÁLISE TÉCNICA DOS AGENTES, ATIVIDADES E RISCOS IDENTIFICADOS'
 
   const tabelaAgentes = (lista: typeof agentes) => lista.length
     ? lista.map((agente) => {
@@ -427,7 +432,7 @@ export async function htmlDoParecer(
     blocoConteudo(blocoProtecoes + fotosEpis),
     `<h2>${num.secao('DAS PROTEÇÕES COLETIVAS')}</h2>`,
     blocoConteudo(paragrafos(t.protecoesColetivas)),
-    `<h2>${num.secao('ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS')}</h2>`,
+    `<h2>${num.secao(tituloAnalise)}</h2>`,
     blocoConteudo(paragrafos(t.analiseTecnica)),
   ]
 
