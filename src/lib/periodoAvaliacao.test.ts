@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   intervaloDoPeriodo,
-  motivoDoPeriodo,
   periodoAvaliacaoEmpresa,
   subtrairAnos,
 } from './periodoAvaliacao'
@@ -118,7 +117,6 @@ describe('periodoAvaliacaoEmpresa', () => {
     expect(periodo).toMatchObject({ inicio: '2021-05-26', motivoInicio: 'prescricao' })
   })
 })
-
 describe('intervaloDoPeriodo', () => {
   const doExemplo = (extras: Parameters<typeof periodoAvaliacaoEmpresa>[0]) =>
     periodoAvaliacaoEmpresa({ dataAjuizamento: '2026-05-26', ...extras })!
@@ -141,47 +139,13 @@ describe('intervaloDoPeriodo', () => {
   })
 })
 
-describe('motivoDoPeriodo', () => {
-  it('cita o ajuizamento quando o corte foi a prescrição', () => {
+describe('texto exibido para o período', () => {
+  it('devolve somente o intervalo calculado, sem justificativa adicional', () => {
     const periodo = periodoAvaliacaoEmpresa({
-      dataAjuizamento: '2026-05-26',
-      admissao: '2020-03-10',
+      dataAjuizamento: '2026-06-10',
+      admissao: '2020-01-01',
     })!
 
-    expect(motivoDoPeriodo(periodo, '2026-05-26')).toBe(
-      'Cinco anos anteriores ao ajuizamento da ação (26/05/2026).',
-    )
-  })
-
-  it('explica quando o início veio da admissão', () => {
-    const periodo = periodoAvaliacaoEmpresa({
-      dataAjuizamento: '2026-05-26',
-      admissao: '2023-02-01',
-    })!
-
-    expect(motivoDoPeriodo(periodo, '2026-05-26')).toBe(
-      'Contado da admissão, posterior ao marco de 26/05/2021 — cinco anos anteriores ao ajuizamento da ação (26/05/2026).',
-    )
-  })
-
-  it('avisa quando o contrato ficou inteiro fora do prazo', () => {
-    const periodo = periodoAvaliacaoEmpresa({
-      dataAjuizamento: '2026-05-26',
-      admissao: '2014-01-10',
-      demissao: '2019-08-20',
-    })!
-
-    expect(motivoDoPeriodo(periodo, '2026-05-26')).toBe(
-      'O contrato encerrou-se antes de 26/05/2021, marco dos cinco anos anteriores ao ajuizamento da ação (26/05/2026).',
-    )
-  })
-
-  it('omite a referência entre parênteses quando a data não veio junto', () => {
-    const periodo = periodoAvaliacaoEmpresa({
-      dataAjuizamento: '2026-05-26',
-      admissao: '2020-03-10',
-    })!
-
-    expect(motivoDoPeriodo(periodo)).toBe('Cinco anos anteriores ao ajuizamento da ação.')
+    expect(intervaloDoPeriodo(periodo)).toBe('10/06/2021 até o fim do contrato')
   })
 })

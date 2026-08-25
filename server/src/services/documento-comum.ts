@@ -203,26 +203,6 @@ export function intervaloDoPeriodo(periodo: PeriodoAvaliacaoDocumento): string {
   return periodo.fim ? `${inicio} a ${data(periodo.fim)}` : `${inicio} até o fim do contrato`
 }
 
-/**
- * Por que o período é esse. O intervalo sozinho parece arbitrário para
- * quem lê o documento e não fez a conta.
- */
-export function motivoDoPeriodo(
-  periodo: PeriodoAvaliacaoDocumento,
-  dataAjuizamento?: string | null,
-): string {
-  const ajuizamento = comoDataIso(dataAjuizamento)
-  const referencia = ajuizamento ? ` (${data(ajuizamento)})` : ''
-
-  if (periodo.foraDoPrazo) {
-    return `O contrato encerrou-se antes de ${data(periodo.marcoPrescricional)}, marco dos cinco anos anteriores ao ajuizamento da ação${referencia}.`
-  }
-  if (periodo.motivoInicio === 'admissao') {
-    return `Contado da admissão, posterior ao marco de ${data(periodo.marcoPrescricional)} — cinco anos anteriores ao ajuizamento da ação${referencia}.`
-  }
-  return `Cinco anos anteriores ao ajuizamento da ação${referencia}.`
-}
-
 // ---- Máscaras de documentos e contatos ----------------------------------
 // Formatam apenas quando a contagem de dígitos bate; caso contrário devolvem
 // o valor original limpo (ou "—"), para nunca inventar um número inválido.

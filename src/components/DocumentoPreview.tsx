@@ -2,7 +2,7 @@ import type { Empresa, Pericia, SecaoFoto, Usuario } from '@/types'
 import { extenso, formatDate, maskCNPJ } from '@/lib/utils'
 import { dadosPapel } from '@/lib/participantes'
 import { montarApresentacaoAgente } from '@/lib/apresentacaoAgente'
-import { intervaloDoPeriodo, motivoDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
+import { intervaloDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
 
 // ============================================================
 // MÓDULO H — Prévia fiel do Parecer/Laudo.
@@ -196,13 +196,7 @@ export function DocumentoPreview({
           {periodo && (
             <tr>
               <th>Período avaliado</th>
-              <td>
-                {intervaloDoPeriodo(periodo)}
-                <br />
-                <span className="text-[0.85em] text-ink-500">
-                  {motivoDoPeriodo(periodo, pericia.dataAjuizamento)}
-                </span>
-              </td>
+              <td>{intervaloDoPeriodo(periodo)}</td>
             </tr>
           )}
         </tbody>

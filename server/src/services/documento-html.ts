@@ -18,7 +18,6 @@ import {
   intervaloDoPeriodo,
   mascaraCnpj,
   montarApresentacaoAgente,
-  motivoDoPeriodo,
   numeradorDeSecoes,
   periodoAvaliacaoDocumento,
   hoje,
@@ -272,7 +271,7 @@ export async function htmlDoParecer(
     ${linha('Data de admissão', data(pericia.admissao))}
     ${linha('Data de desligamento', pericia.demissao ? data(pericia.demissao) : 'Contrato vigente')}
     ${pericia.dataAjuizamento ? linha('Ajuizamento da ação', data(pericia.dataAjuizamento)) : ''}
-    ${periodo ? linha('Período avaliado', `${esc(intervaloDoPeriodo(periodo))}<br><span class="nota">${esc(motivoDoPeriodo(periodo, pericia.dataAjuizamento))}</span>`) : ''}
+    ${periodo ? linha('Período avaliado', esc(intervaloDoPeriodo(periodo))) : ''}
   </tbody></table>`
 
   const tabelaParticipantes = pericia.participantes.length

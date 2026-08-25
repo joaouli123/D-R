@@ -65,7 +65,7 @@ import {
 import { patchDoProcesso } from '@/lib/consultas'
 import { aplicarAnexo, usaAtenuacaoRuido } from '@/lib/nr15'
 import { dadosPapel, PAPEIS } from '@/lib/participantes'
-import { intervaloDoPeriodo, motivoDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
+import { intervaloDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
 import { comEmpresaVinculada, empresasLivres, opcoesDaLinha } from '@/lib/reclamadas'
 import { uid } from '@/lib/utils'
 
@@ -181,9 +181,6 @@ function PeriodoAvaliado({ pericia }: { pericia: Pericia }) {
         Período de avaliação da empresa
       </p>
       <p className="mt-1 text-sm font-medium text-ink-900">{intervaloDoPeriodo(periodo)}</p>
-      <p className={`mt-0.5 text-xs leading-5 ${periodo.foraDoPrazo ? 'text-amber-900' : 'text-ink-600'}`}>
-        {motivoDoPeriodo(periodo, pericia.dataAjuizamento)}
-      </p>
     </div>
   )
 }

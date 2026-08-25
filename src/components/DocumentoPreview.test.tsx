@@ -10,6 +10,7 @@ const pericia = {
   comarca: 'São Paulo/SP',
   reclamante: 'Pessoa reclamante',
   admissao: '2020-01-01',
+  dataAjuizamento: '2026-06-10',
   reclamadas: [],
   participantes: [],
   dataVistoria: '2026-08-14',
@@ -212,6 +213,15 @@ describe('DocumentoPreview', () => {
     }
     expect(html).not.toContain('Relatório Fotográfico')
     expect(html).not.toContain('Tramitação')
+  })
+
+  it('mostra o período calculado sem repetir a justificativa legal', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={pericia} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    expect(html).toContain('10/06/2021 até o fim do contrato')
+    expect(html).not.toContain('Cinco anos anteriores ao ajuizamento da ação')
   })
 
   it('em parecer só de periculosidade omite a NR-15 e renumera as seções finais', () => {

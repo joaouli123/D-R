@@ -93,20 +93,3 @@ export function intervaloDoPeriodo(periodo: PeriodoAvaliacao): string {
   const inicio = formatDate(periodo.inicio)
   return periodo.fim ? `${inicio} a ${formatDate(periodo.fim)}` : `${inicio} até o fim do contrato`
 }
-
-/**
- * Por que o período é esse. Vai junto do intervalo no documento: o
- * intervalo sozinho parece arbitrário para quem lê e não fez a conta.
- */
-export function motivoDoPeriodo(periodo: PeriodoAvaliacao, dataAjuizamento?: string): string {
-  const ajuizamento = comoData(dataAjuizamento)
-  const referencia = ajuizamento ? ` (${formatDate(ajuizamento)})` : ''
-
-  if (periodo.foraDoPrazo) {
-    return `O contrato encerrou-se antes de ${formatDate(periodo.marcoPrescricional)}, marco dos cinco anos anteriores ao ajuizamento da ação${referencia}.`
-  }
-  if (periodo.motivoInicio === 'admissao') {
-    return `Contado da admissão, posterior ao marco de ${formatDate(periodo.marcoPrescricional)} — cinco anos anteriores ao ajuizamento da ação${referencia}.`
-  }
-  return `Cinco anos anteriores ao ajuizamento da ação${referencia}.`
-}

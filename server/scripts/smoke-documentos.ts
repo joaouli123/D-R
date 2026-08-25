@@ -71,6 +71,7 @@ const periciaBase = {
   funcaoReclamante: 'Operador de Máquinas',
   admissao: '2018-03-12',
   demissao: '2024-11-08',
+  dataAjuizamento: '2026-06-10',
   dataVistoria: '2026-07-15',
   horaVistoria: '09:30',
   localVistoria: 'Rodovia Anhanguera, km 32 — Cajamar/SP',
@@ -435,6 +436,10 @@ async function main() {
   assert.match(parecerGerado?.xml ?? '', /Periculosidade caracterizada/)
   assert.doesNotMatch(htmlParecer, /Medição (?:da empresa|do perito) \(não adotada\)/)
   assert.doesNotMatch(parecerGerado?.xml ?? '', /Medição (?:da empresa|do perito) \(não adotada\)/)
+  assert.match(htmlParecer, /Período avaliado/)
+  assert.match(parecerGerado?.xml ?? '', /Período avaliado/)
+  assert.doesNotMatch(htmlParecer, /cinco anos anteriores ao ajuizamento da ação/i)
+  assert.doesNotMatch(parecerGerado?.xml ?? '', /cinco anos anteriores ao ajuizamento da ação/i)
 
   const periciaPericulosidade = {
     ...periciaBase,
