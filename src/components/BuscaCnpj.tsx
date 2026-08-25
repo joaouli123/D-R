@@ -130,6 +130,12 @@ export function BuscaCnpj({ valor, onChange, onDados, autoBuscar = false, classN
               <span className="block text-emerald-800">
                 {dados.fonte} · confira os campos antes de salvar.
               </span>
+              {dados.grauRisco && (
+                <span className="block text-emerald-800">
+                  Grau de risco NR-04: {dados.grauRisco}
+                  {dados.grauRiscoClasse ? ` · classe CNAE ${dados.grauRiscoClasse}` : ''}.
+                </span>
+              )}
             </span>
           </p>
           {situacaoIrregular(dados) && (

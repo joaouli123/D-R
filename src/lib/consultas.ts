@@ -19,10 +19,9 @@ import { formatDate } from '@/lib/utils'
 // automática só sai em cadastro em branco, o que está ali é sempre o
 // padrão.
 //
-// O grau de risco da NR-04 sai daqui de propósito: não tem uso neste
-// tipo de documento. O servidor continua devolvendo `grauRisco` na
-// consulta e a coluna continua no banco — a decisão foi não mostrar
-// nem preencher, não desmontar o caminho.
+// O grau de risco vem do Anexo I da NR-04, usando a classe do CNAE
+// principal devolvido pela consulta. Ele continua editável porque o
+// perito pode precisar registrar uma classificação diferente.
 // ============================================================
 
 export const digitos = (valor: string) => (valor ?? '').replace(/\D/g, '')
@@ -54,7 +53,7 @@ export interface OpcoesPreenchimento {
 }
 
 /** Campos que o formulário já traz preenchidos por conta própria. */
-const PADRAO_DE_TELA = new Set<CampoDaReceita>(['uf'])
+const PADRAO_DE_TELA = new Set<keyof Empresa>(['uf'])
 
 function apenasVazios<T extends object>(vindos: T, jaTem: (campo: keyof T) => boolean): T {
   const patch = {} as T
@@ -70,7 +69,7 @@ export function patchDaReceita(
   dados: DadosCnpj,
   opcoes: OpcoesPreenchimento = {},
 ): Partial<Empresa> {
-  const vindos: Partial<Pick<Empresa, CampoDaReceita>> = {}
+  const vindos: Partial<Pick<Empresa, CampoDaReceita | 'grauRisco'>> = {}
   const por = (campo: CampoDaReceita, valor: string | null | undefined) => {
     const limpo = String(valor ?? '').trim()
     if (limpo) vindos[campo] = limpo
@@ -79,6 +78,7 @@ export function patchDaReceita(
   por('razaoSocial', dados.razaoSocial)
   por('nomeFantasia', dados.nomeFantasia)
   por('cnae', dados.cnae)
+  if (dados.grauRisco) vindos.grauRisco = dados.grauRisco
   por('endereco', dados.endereco)
   por('numero', dados.numero)
   por('complemento', dados.complemento)

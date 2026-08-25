@@ -131,7 +131,7 @@ describe('BuscaCnpj', () => {
     expect(consultarCnpj).toHaveBeenCalledTimes(1)
   })
 
-  it('não fala em grau de risco: o dado saiu deste tipo de documento', async () => {
+  it('informa o grau de risco e a classe CNAE usados no cálculo', async () => {
     const user = userEvent.setup()
     consultarCnpj.mockResolvedValue(AURORA)
     render(<Campo />)
@@ -139,7 +139,7 @@ describe('BuscaCnpj', () => {
     await user.type(campo(), '11222333000181')
     await screen.findByText(/METALURGICA AURORA LTDA/)
 
-    expect(screen.queryByText(/Grau de risco/)).toBeNull()
+    expect(screen.getByText(/Grau de risco NR-04: 4 · classe CNAE 25.11-0/)).toBeDefined()
   })
 
   it('empresa baixada é apontada — pode não ser a reclamada do processo', async () => {

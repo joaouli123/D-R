@@ -135,18 +135,29 @@ export function ModalEmpresa({ inicial, titulo, subtitulo, onFechar, onSalvo }: 
           />
         </div>
 
-        {/*
-          Sem grau de risco: o dado não tem uso neste tipo de documento
-          e pedi-lo só custava atenção do perito. A coluna e a consulta
-          continuam de pé para os projetos que forem usá-lo.
-        */}
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-4">
           <Input
             label="CNAE"
             value={empresa.cnae}
             onChange={(e) => set({ cnae: e.target.value })}
             placeholder="00.00-0-00"
           />
+          <Select
+            label="Grau de risco"
+            value={empresa.grauRisco ?? ''}
+            onChange={(e) => set({
+              grauRisco: e.target.value
+                ? e.target.value as NonNullable<Empresa['grauRisco']>
+                : undefined,
+            })}
+            hint="NR-04, conforme a classe do CNAE; ajuste se necessário."
+          >
+            <option value="">Não informado</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </Select>
           <Input
             label="Ramo de atividade"
             className="sm:col-span-2"

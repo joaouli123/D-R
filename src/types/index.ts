@@ -30,11 +30,7 @@ export interface Empresa {
   nomeFantasia?: string
   cnpj: string
   cnae?: string
-  /**
-   * Grau da NR-04. Fora da tela e do documento: não tem uso no parecer
-   * nem no laudo. O campo fica de pé — com o que já foi gravado — para
-   * os projetos que forem usá-lo.
-   */
+  /** Grau da classe CNAE conforme o Anexo I da NR-04. */
   grauRisco?: '1' | '2' | '3' | '4'
   endereco: string
   numero?: string

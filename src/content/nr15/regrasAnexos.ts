@@ -7,6 +7,7 @@ export type CalculoAnexoNr15 = 'nenhum' | 'comparacao_limite' | 'ruido_nrrsf'
 
 export interface RegraAnexoNr15 {
   agenteFixo?: string
+  casFixo?: string
   tipoFixo?: AgenteAvaliado['tipo']
   criterioFixo?: AgenteAvaliado['criterio']
   limiteFixo?: string
@@ -52,10 +53,32 @@ const REGRAS_ESPECIFICAS: Record<string, Partial<RegraAnexoNr15>> = {
   ANEXO_09: { agenteFixo: 'Frio', exibeMedicao: false },
   ANEXO_10: { agenteFixo: 'Umidade', exibeMedicao: false },
   ANEXO_11: { unidades: ['ppm', 'mg/m³', '% O₂ em volume'], exibeCas: true },
-  ANEXO_12_ASBESTO: { agenteFixo: 'Asbesto/Amianto', unidades: ['fibras/cm³'], unidadePadrao: 'fibras/cm³' },
-  ANEXO_12_MANGANES: { agenteFixo: 'Manganês', unidades: ['mg/m³'], unidadePadrao: 'mg/m³' },
-  ANEXO_12_SILICA: { agenteFixo: 'Sílica livre cristalizada', unidades: ['mg/m³'], unidadePadrao: 'mg/m³' },
-  ANEXO_13: { exibeMedicao: false },
+  ANEXO_12_ASBESTO: {
+    agenteFixo: 'Asbesto/Amianto',
+    casFixo: '1332-21-4',
+    unidades: ['fibras/cm³'],
+    unidadePadrao: 'fibras/cm³',
+    exibeCas: true,
+  },
+  ANEXO_12_MANGANES: {
+    agenteFixo: 'Manganês',
+    casFixo: '7439-96-5',
+    unidades: ['mg/m³'],
+    unidadePadrao: 'mg/m³',
+    exibeCas: true,
+  },
+  ANEXO_12_SILICA: {
+    agenteFixo: 'Sílica livre cristalizada',
+    casFixo: '14808-60-7',
+    unidades: ['mg/m³'],
+    unidadePadrao: 'mg/m³',
+    exibeCas: true,
+  },
+  // O Anexo 13 enquadra atividades e operações qualitativas; várias delas
+  // abrangem misturas ou mais de uma substância. O CAS fica disponível para
+  // registro quando houver um composto específico, sem inventar uma relação
+  // única para a atividade inteira.
+  ANEXO_13: { exibeCas: true, exibeMedicao: false },
   ANEXO_14: { grausPermitidos: ['medio', 'maximo'], exibeMedicao: false },
 }
 

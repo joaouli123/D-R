@@ -19,24 +19,21 @@ function referenciaPorId(
 }
 
 describe('bases normativas oficiais da NR-15', () => {
-  it('protege a lista fechada dos CAS importados da planilha', () => {
-    expect(SUBSTANCIAS_ANEXO_11.flatMap(item => item.cas ? [item.cas] : [])).toEqual([
-      '75-07-0',
-      '111-15-9',
-      '141-78-6',
-      '74-86-2',
-      '67-64-1',
-      '75-05-8',
-      '64-19-7',
-      '74-90-8',
-      '7647-01-0',
-      '7738-94-5',
-      '7664-39-3',
-      '64-18-6',
-      '96-33-3',
-      '107-13-1',
-      '123-51-3',
-    ])
+  it('mantém CAS válido e pesquisável em todos os 146 agentes do Anexo 11', () => {
+    const casValido = (cas: string) => {
+      const partes = cas.match(/^(\d{2,7})-(\d{2})-(\d)$/)
+      if (!partes) return false
+      const corpo = `${partes[1]}${partes[2]}`.split('').reverse().map(Number)
+      const digito = corpo.reduce((soma, numero, indice) => soma + numero * (indice + 1), 0) % 10
+      return digito === Number(partes[3])
+    }
+
+    expect(SUBSTANCIAS_ANEXO_11).toHaveLength(146)
+    expect(SUBSTANCIAS_ANEXO_11.every(item => item.cas && casValido(item.cas))).toBe(true)
+    expect(buscarReferenciasNr15('121-44-8')[0]).toMatchObject({
+      label: 'Trietilamina',
+      cas: '121-44-8',
+    })
   })
 
   it('protege as contagens exatas e a unicidade global dos IDs', () => {
@@ -141,8 +138,11 @@ describe('buscarReferencias', () => {
     })
   })
 
-  it('mantém agente sem CAS selecionável', () => {
-    expect(SUBSTANCIAS_ANEXO_11.find((x) => x.label === 'Álcool terc-butílico')).toBeDefined()
+  it('localiza também um agente que antes não tinha CAS', () => {
+    expect(buscarReferenciasNr15('75-65-0')[0]).toMatchObject({
+      label: 'Álcool terc-butílico',
+      cas: '75-65-0',
+    })
   })
 
   it('expõe somente categorias de proteção reconhecidas para sugerir EPIs', () => {
@@ -330,6 +330,21 @@ describe('aplicarAnexo', () => {
       anexoNr15: 'ANEXO_11',
       referenciaNormativaId: 'ANEXO_11_ACIDO_NITRICO',
     }, 'ANEXO_13').nome).toBe('')
+  })
+
+  it('preenche os CAS fixos do Anexo 12 e limpa o CAS ao entrar no Anexo 13', () => {
+    expect(aplicarAnexo({
+      id: 'a1', nome: '', tipo: 'quimico', criterio: 'quantitativo',
+    }, 'ANEXO_12_MANGANES')).toMatchObject({
+      nome: 'Manganês', cas: '7439-96-5', unidadeMedicao: 'mg/m³',
+    })
+
+    const anexo13 = aplicarAnexo({
+      id: 'a1', nome: 'Acetona', tipo: 'quimico', criterio: 'quantitativo',
+      anexoNr15: 'ANEXO_11', cas: '67-64-1',
+    }, 'ANEXO_13')
+    expect(obterRegraAnexo('ANEXO_13')?.exibeCas).toBe(true)
+    expect(anexo13).not.toHaveProperty('cas')
   })
 
   it('limpa o agente imposto também quando o perito tira o anexo', () => {

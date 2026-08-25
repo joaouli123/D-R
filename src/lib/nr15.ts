@@ -59,7 +59,10 @@ export function aplicarAnexo(agente: AgenteAvaliado, anexoId: string): AgenteAva
   const { referenciaNormativaId, atividadeEnquadrada, unidadeLimite, unidadeMedicao, ...agenteSemReferencia } = agente
   const baseComReferencia = mudouAnexo ? agenteSemReferencia : agente
   const { cas, ...baseSemCas } = baseComReferencia
-  const base = regra?.exibeCas === false ? baseSemCas : baseComReferencia
+  // Ao trocar de anexo, um CAS do agente anterior nunca pode sobreviver. Os
+  // anexos de agente fixo recebem seu identificador abaixo; nos qualitativos,
+  // o campo reabre vazio para preenchimento consciente pelo perito.
+  const base = regra?.exibeCas === false || mudouAnexo ? baseSemCas : baseComReferencia
 
   // O campo "Agente" fica em somente leitura quando o anexo impõe o nome
   // (agenteFixo) ou quando há referência escolhida — nesses dois casos o que
@@ -85,6 +88,7 @@ export function aplicarAnexo(agente: AgenteAvaliado, anexoId: string): AgenteAva
     tipo: anexoSemGrau.tipo,
     criterio: anexoSemGrau.criterio,
     limiteTolerancia: anexoSemGrau.limiteTolerancia,
+    ...(regra?.casFixo ? { cas: regra.casFixo } : {}),
     ...(regra?.unidadePadrao ? { unidadeMedicao: regra.unidadePadrao } : {}),
     ...(grau ? { grau } : { grau: undefined }),
   }

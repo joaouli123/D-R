@@ -129,10 +129,11 @@ describe('patchDaReceita', () => {
     expect(patch.uf).toBe('MG')
   })
 
-  it('o grau de risco da NR-04 não entra no cadastro — saiu do documento', () => {
+  it('traz o grau de risco correto da classe CNAE e respeita o valor editado', () => {
     const patch = patchDaReceita(empresa({ grauRisco: '3' }), RECEITA)
-    expect('grauRisco' in patch).toBe(false)
-    expect(patchDaReceita(empresa(), RECEITA, { sobrescrever: true }).grauRisco).toBeUndefined()
+    expect(patch.grauRisco).toBeUndefined()
+    expect(patchDaReceita(empresa(), RECEITA, { sobrescrever: true }).grauRisco).toBe('4')
+    expect(patchDaReceita(empresa(), RECEITA).grauRisco).toBe('4')
   })
 
   it('pelo botão, o dado oficial substitui o que estava lá', () => {

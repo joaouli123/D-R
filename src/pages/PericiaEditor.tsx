@@ -1051,7 +1051,7 @@ export default function PericiaEditor() {
                     {exibeCas && <Input
                       label="CAS"
                       value={a.cas ?? ''}
-                      disabled={referenciaNormativaSelecionada}
+                      disabled={referenciaNormativaSelecionada || Boolean(regraAnexo?.casFixo)}
                       onChange={(e) =>
                         setT({
                           agentes: p.tecnico.agentes.map((x) =>

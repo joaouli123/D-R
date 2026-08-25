@@ -26,6 +26,14 @@ const preencher = async (user: ReturnType<typeof userEvent.setup>) => {
 }
 
 describe('ModalEmpresa', () => {
+  it('permite registrar o grau de risco sem assumir grau 3 no cadastro vazio', () => {
+    render(<ModalEmpresa inicial={empresaVazia()} titulo="Nova empresa" onFechar={vi.fn()} />)
+
+    const grau = screen.getByRole('combobox', { name: /Grau de risco/ }) as HTMLSelectElement
+    expect(grau.value).toBe('')
+    expect(screen.getByRole('option', { name: 'Não informado' })).toBeDefined()
+  })
+
   it('devolve a empresa como o servidor gravou — é ela que vira reclamada', async () => {
     const user = userEvent.setup()
     const onSalvo = vi.fn()
