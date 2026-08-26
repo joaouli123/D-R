@@ -249,6 +249,10 @@ const resultados = [
     nome: 'imagem contém os dois clientes aceitos pelo healthcheck do Coolify',
     ok: dockerfile.includes('       curl \\') && dockerfile.includes('       wget \\'),
   },
+  {
+    nome: 'imagem de produção inclui os arquivos oficiais de marca',
+    ok: dockerfile.includes('COPY assets ./assets'),
+  },
 ]
 
 for (const resultado of resultados) {

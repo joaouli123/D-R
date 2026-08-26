@@ -1,6 +1,7 @@
 import type { DocumentoGerado, Empresa, Usuario } from '@prisma/client'
 import type { PericiaCompleta } from '../mappers.js'
 import { comoDataUri } from './armazenamento.js'
+import { LOGO_OFICIAL_ALT, LOGO_OFICIAL_DATA_URI } from './logo-oficial.js'
 import {
   AGENTE_LABEL,
   type ConteudoEsclarecimento,
@@ -98,22 +99,10 @@ const CSS = `
   header.marca {
     text-align: center;
     border-bottom: 2px solid ${css(MARCA.primaria)};
-    padding-bottom: 14px;
-    margin-bottom: 32px;
+    padding-bottom: 6px;
+    margin-bottom: 20px;
   }
-  .logo { font-family: Arial, sans-serif; font-weight: 800; font-size: 32pt; letter-spacing: -1px; line-height: 1; }
-  .logo .primaria { color: ${css(MARCA.primaria)}; }
-  .logo .neutra { color: ${css(MARCA.tinta900)}; }
-  .regua {
-    font-family: Arial, sans-serif;
-    font-size: 8pt; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.42em; color: ${css(MARCA.primaria)}; margin-top: 2px;
-  }
-  .tagline {
-    font-family: Arial, sans-serif;
-    font-size: 8pt; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.2em; color: ${css(MARCA.credencial)}; margin-top: 10px;
-  }
+  .logo-oficial { display: block; width: 100%; max-width: 300px; height: auto; margin: 0 auto; }
   .perito-cabecalho { font-size: 8.5pt; color: ${css(MARCA.tinta500)}; margin-top: 6px; }
   h1 {
     color: var(--documento-titulo);
@@ -206,12 +195,10 @@ function moldura(
       }</p>`
     : ''
 
-  const comMarca = opcoes.comMarca === true
+  const comMarca = opcoes.comMarca !== false
   const cabecalho = comMarca
     ? `<header class="marca">
-    <div class="logo"><span class="primaria">D</span><span class="neutra">&amp;</span><span class="primaria">R</span></div>
-    <div class="regua">— Perícia —</div>
-    <div class="tagline">Plataforma Inteligente de Perícia Trabalhista</div>
+    <img class="logo-oficial" src="${LOGO_OFICIAL_DATA_URI}" alt="${esc(LOGO_OFICIAL_ALT)}">
     ${credencial}
   </header>`
     : ''
@@ -512,7 +499,7 @@ export async function htmlDoParecer(
   )
 
   return moldura(titulo, perito, partes.join('\n'), {
-    comMarca: false,
+    comMarca: true,
     classeCorpo: 'parecer-manual',
   })
 }

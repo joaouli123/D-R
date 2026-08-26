@@ -241,9 +241,13 @@ async function main() {
   const secao9 = xml.indexOf('9. DAS PROTEÇÕES COLETIVAS')
   assert.ok(secao8 < fotoEpi && fotoEpi < secao9, 'foto de EPI deve permanecer na seção 8')
 
-  assert.equal((xml.match(/<wp:inline\b/g) ?? []).length, 6, 'todas as fotos devem ser incluídas inline')
+  assert.equal(
+    (xml.match(/<wp:inline\b/g) ?? []).length,
+    7,
+    'o logo oficial e todas as fotos devem ser incluídos inline',
+  )
   assert.doesNotMatch(xml, /<wp:anchor\b/, 'imagens flutuantes não são permitidas')
-  assert.equal(imagens.length, 6, 'cada foto deve ser incorporada ao DOCX')
+  assert.equal(imagens.length, 7, 'o logo oficial e cada foto devem ser incorporados ao DOCX')
   assert.match(xml, /Figura 1 — Vista geral do ambiente de trabalho/)
   assert.match(xml, /Figura 2 — Detalhe vertical do ambiente/)
   assert.match(xml, /Figura 6 — Detalhe dos equipamentos de proteção apresentados durante a vistoria/)
@@ -255,7 +259,7 @@ async function main() {
     'cada figura deve formar um bloco indivisível para respeitar as margens na quebra de página',
   )
 
-  console.log('DOCX layout: 6 imagens inline, legendas vinculadas e tabelas em DXA — ok')
+  console.log('DOCX layout: logo oficial e 6 fotos inline, legendas vinculadas e tabelas em DXA — ok')
   console.log(`arquivo de inspeção: ${path.join(SAIDA, 'parecer-layout.docx')}`)
   console.log(`PDF de inspeção: ${path.join(SAIDA, 'parecer-layout.pdf')}`)
 }

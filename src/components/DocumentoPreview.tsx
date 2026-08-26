@@ -3,6 +3,7 @@ import { extenso, formatDate, maskCNPJ } from '@/lib/utils'
 import { dadosPapel } from '@/lib/participantes'
 import { montarApresentacaoAgente } from '@/lib/apresentacaoAgente'
 import { intervaloDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
+import { Logo } from '@/components/Logo'
 
 // ============================================================
 // MÓDULO H — Prévia fiel do Parecer/Laudo.
@@ -167,6 +168,15 @@ export function DocumentoPreview({
 
   return (
     <article className="doc-sheet mx-auto w-full max-w-[820px] bg-white px-10 py-12 shadow-card print-area sm:px-14">
+      <header className="marca-oficial mb-8 border-b-2 border-[#007a3d] pb-5 text-center">
+        <Logo size="lg" className="mx-auto" />
+        {perito && (
+          <p className="no-indent mt-2 text-center text-[8.5pt] text-ink-500">
+            {perito.nome}{perito.titulo ? ` — ${perito.titulo}` : ''}
+            {perito.registroProfissional ? ` · ${perito.registroProfissional}` : ''}
+          </p>
+        )}
+      </header>
       <section className="mb-8">
         {t.enderecamento?.trim() ? (
           <Paragrafos texto={t.enderecamento} />

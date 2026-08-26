@@ -18,6 +18,7 @@ import {
 } from 'docx'
 import sharp from 'sharp'
 import type { PericiaCompleta } from '../mappers.js'
+import { LOGO_OFICIAL_ALT, LOGO_OFICIAL_JPEG } from './logo-oficial.js'
 import {
   AGENTE_LABEL,
   type ConteudoEsclarecimento,
@@ -388,6 +389,27 @@ function rodape(): Footer {
   })
 }
 
+function marcaOficial(): Paragraph {
+  return new Paragraph({
+    alignment: AlignmentType.CENTER,
+    keepNext: true,
+    border: { bottom: { style: BorderStyle.SINGLE, size: 10, color: '007A3D', space: 8 } },
+    spacing: { after: 180 },
+    children: [
+      new ImageRun({
+        type: 'jpg',
+        data: LOGO_OFICIAL_JPEG,
+        transformation: { width: 270, height: 93 },
+        altText: {
+          title: LOGO_OFICIAL_ALT,
+          description: LOGO_OFICIAL_ALT,
+          name: LOGO_OFICIAL_ALT,
+        },
+      }),
+    ],
+  })
+}
+
 function montarDocumento(filhos: (Paragraph | Table)[]): Document {
   return new Document({
     styles: { default: { document: { run: { font: FONTE, size: CORPO } } } },
@@ -401,7 +423,7 @@ function montarDocumento(filhos: (Paragraph | Table)[]): Document {
           },
         },
         footers: { default: rodape() },
-        children: filhos,
+        children: [marcaOficial(), ...filhos],
       },
     ],
   })

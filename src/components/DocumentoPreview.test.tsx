@@ -132,6 +132,7 @@ describe('DocumentoPreview', () => {
       <DocumentoPreview pericia={pericia} empresas={[]} titulo="Parecer de teste" />,
     )
 
+    expect(html).toContain('alt="D&amp;R Perícia Trabalhista — Engenharia de Segurança e Higiene Ocupacional"')
     expect(html).toContain('12,5 ppm')
     expect(html).toContain('78 ppm')
     expect(html).toMatch(/CA da peça facial<\/th><td[^>]*>4115/)

@@ -1,13 +1,14 @@
 import { cn } from '@/lib/utils'
+import logoOficial from '@/assets/logo-dr-oficial.jpeg'
 
 /**
- * Marca D&R Perícia.
- * "D" e "R" na cor de marca (azul), "&" em tom neutro, tarja "PERÍCIA" abaixo.
+ * Marca oficial aprovada da D&R Perícia Trabalhista.
+ *
+ * A arte já contém símbolo, nome e assinatura institucional. Por isso ela
+ * nunca é remontada com texto nem recebe filtros que alterem suas cores.
  */
 export function Logo({
   size = 'md',
-  invert = false,
-  showTagline = false,
   className,
 }: {
   size?: 'sm' | 'md' | 'lg' | 'xl'
@@ -16,38 +17,21 @@ export function Logo({
   className?: string
 }) {
   const sizes = {
-    sm: { mark: 'text-[19px]', rule: 'text-[7px] tracking-[0.34em]', gap: 'gap-0' },
-    md: { mark: 'text-[26px]', rule: 'text-[8px] tracking-[0.36em]', gap: 'gap-0.5' },
-    lg: { mark: 'text-[44px]', rule: 'text-[11px] tracking-[0.42em]', gap: 'gap-1' },
-    xl: { mark: 'text-[64px]', rule: 'text-[15px] tracking-[0.44em]', gap: 'gap-1.5' },
+    sm: 'w-[190px]',
+    md: 'w-[250px]',
+    lg: 'w-[340px]',
+    xl: 'w-[520px]',
   }
-  const s = sizes[size]
-  const primary = invert ? 'text-white' : 'text-brand-700'
-  const dark = invert ? 'text-white/80' : 'text-ink-900'
-  const rule = invert ? 'text-white/90' : 'text-brand-700'
 
   return (
-    <div className={cn('flex flex-col items-center leading-none', s.gap, className)}>
-      <div className={cn('font-extrabold tracking-tight', s.mark)}>
-        <span className={primary}>D</span>
-        <span className={dark}>&amp;</span>
-        <span className={primary}>R</span>
-      </div>
-      <div className={cn('flex items-center gap-1.5 font-bold uppercase', s.rule, rule)}>
-        <span className={cn('h-px w-3', invert ? 'bg-white/60' : 'bg-brand-700')} />
-        Perícia
-        <span className={cn('h-px w-3', invert ? 'bg-white/60' : 'bg-brand-700')} />
-      </div>
-      {showTagline && (
-        <p
-          className={cn(
-            'mt-3 text-center text-[11px] font-bold uppercase tracking-[0.18em]',
-            invert ? 'text-white/70' : 'text-navy-600',
-          )}
-        >
-          Plataforma Inteligente de Perícia Trabalhista
-        </p>
-      )}
+    <div className={cn('inline-flex max-w-full items-center justify-center overflow-hidden rounded bg-white p-1', sizes[size], className)}>
+      <img
+        src={logoOficial}
+        alt="D&R Perícia Trabalhista — Engenharia de Segurança e Higiene Ocupacional"
+        width={1600}
+        height={549}
+        className="h-auto w-full max-w-full object-contain"
+      />
     </div>
   )
 }

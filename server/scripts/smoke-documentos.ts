@@ -544,10 +544,10 @@ async function main() {
   }
 
   for (const saida of saidasVisuais) {
-    assert.doesNotMatch(
+    assert.match(
       saida.html,
-      /<header class="marca">/,
-      `${saida.nome}: o padrão visual deve usar abertura limpa, sem capa gráfica`,
+      /<header class="marca">[\s\S]*?<img class="logo-oficial" src="data:image\/jpeg;base64,/,
+      `${saida.nome}: o documento deve usar o logo oficial aprovado`,
     )
     assert.match(
       saida.html,
@@ -572,7 +572,12 @@ async function main() {
     assert.doesNotMatch(
       saida.xml,
       /PLATAFORMA INTELIGENTE DE PERÍCIA TRABALHISTA|— P E R Í C I A —/,
-      `${saida.nome}: DOCX deve usar abertura limpa, sem capa gráfica`,
+      `${saida.nome}: DOCX não deve reconstruir o logo oficial com texto`,
+    )
+    assert.match(
+      saida.xml,
+      /Logo oficial D&amp;R Perícia Trabalhista/,
+      `${saida.nome}: DOCX deve embutir a arte oficial como imagem`,
     )
     assert.match(
       saida.xml,
@@ -670,12 +675,13 @@ async function main() {
   )
 
   const corpoParecer = htmlParecer.match(/<body>([\s\S]*?)<\/body>/)?.[1] ?? ''
-  assert.doesNotMatch(
+  assert.match(
     corpoParecer,
-    /<header class="marca">/,
-    'parecer e laudo devem iniciar pelo endereçamento, sem capa da plataforma',
+    /<header class="marca">[\s\S]*?<img class="logo-oficial"/,
+    'parecer e laudo devem iniciar pela identidade visual oficial',
   )
   const ordemAbertura = [
+    'class="logo-oficial"',
     'EXCELENTÍSSIMO',
     'class="ficha-processual"',
     '<h1>Parecer Técnico Pericial — Insalubridade</h1>',
