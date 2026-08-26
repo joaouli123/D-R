@@ -43,10 +43,10 @@ FROM node:22-bookworm-slim AS runtime
 # fonts-dejavu-core → cobertura de caracteres de apoio
 # tini → PID 1 que encaminha SIGTERM e colhe processos órfãos do
 #   Chromium
-# curl → o Coolify nao usa o HEALTHCHECK declarado abaixo; ele monta o
-#   proprio comando com curl e executa dentro do container. Sem o
-#   binario o healthcheck falha com "curl: not found", o container
-#   nunca fica healthy e o deploy sofre rollback.
+# curl/wget → o Coolify nao usa necessariamente o HEALTHCHECK declarado
+#   abaixo; conforme a configuracao, ele monta o proprio comando com um
+#   desses clientes e executa dentro do container. Os dois precisam
+#   existir para o deploy nao sofrer rollback por falta do binario.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
        chromium \
@@ -54,6 +54,7 @@ RUN apt-get update \
        fonts-dejavu-core \
        ca-certificates \
        curl \
+       wget \
        tini \
   && rm -rf /var/lib/apt/lists/*
 

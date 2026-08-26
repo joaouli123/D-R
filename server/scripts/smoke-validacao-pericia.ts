@@ -14,6 +14,7 @@ const migracaoNumeroVistoria = readFileSync(
   'utf8',
 )
 const entrypoint = readFileSync(new URL('../docker-entrypoint.sh', import.meta.url), 'utf8')
+const dockerfile = readFileSync(new URL('../Dockerfile', import.meta.url), 'utf8')
 
 const moduloPericias = await import('../src/routes/pericias.js')
 const { agenteSchema } = moduloPericias
@@ -242,6 +243,10 @@ const resultados = [
     ok:
       migracaoNumeroVistoria.includes('ADD COLUMN IF NOT EXISTS "numeroVistoria"') &&
       entrypoint.includes('prisma migrate resolve --rolled-back "$MIGRACAO_RECUPERAVEL"'),
+  },
+  {
+    nome: 'imagem contém os dois clientes aceitos pelo healthcheck do Coolify',
+    ok: dockerfile.includes('       curl \\') && dockerfile.includes('       wget \\'),
   },
 ]
 
