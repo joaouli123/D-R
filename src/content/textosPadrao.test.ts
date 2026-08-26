@@ -67,12 +67,13 @@ function pericia(modalidade: ModalidadePericia = 'insalubridade'): Pericia {
 }
 
 describe('textosPadraoDaPericia', () => {
-  it('qualifica o perito e nomeia as partes na apresentação', () => {
+  it('qualifica o assistente técnico conforme o modelo aprovado', () => {
     const { apresentacao } = textosPadraoDaPericia(pericia(), PERITO, RECLAMADA)
 
     expect(apresentacao).toContain('Dinoel Ribeiro, Engenheiro de Segurança do Trabalho, CREA-SP 5063000000')
-    expect(apresentacao).toContain('processo nº 0010001-11.2025.5.02.0001')
-    expect(apresentacao).toContain('movido por Jhonathan da Silva em face de Cyklop do Brasil Ltda.')
+    expect(apresentacao).toContain('Assistente Técnico(a) da Reclamada')
+    expect(apresentacao).toContain('apresentar o presente PARECER TÉCNICO')
+    expect(apresentacao).not.toContain('perito(a) do Juízo')
   })
 
   it('não imprime lacuna nem "undefined" numa perícia recém-criada', () => {
@@ -83,7 +84,7 @@ describe('textosPadraoDaPericia', () => {
       expect(textos[campo]).not.toMatch(/undefined|null|___|\[\s*\]/)
       expect(textos[campo].trim().length).toBeGreaterThan(0)
     }
-    expect(textos.apresentacao).toContain('nos autos do processo em epígrafe')
+    expect(textos.apresentacao).toContain('O profissional responsável')
   })
 
   it('o objeto e as normas seguem a modalidade escolhida', () => {
@@ -93,7 +94,7 @@ describe('textosPadraoDaPericia', () => {
     expect(so15.normasReferencias).not.toContain('NR-16')
 
     const so16 = textosPadraoDaPericia(pericia('periculosidade'), PERITO)
-    expect(so16.objetivoPericia).toContain('artigo 193 da CLT')
+    expect(so16.objetivoPericia).toContain('NR-16')
     expect(so16.objetivoPericia).not.toContain('NR-15')
     expect(so16.normasReferencias).not.toContain('NR-15')
 

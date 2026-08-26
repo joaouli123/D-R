@@ -139,6 +139,15 @@ const h3 = (t: string) =>
     children: [texto(t, { negrito: true, tamanho: CORPO, cor: MARCA.documentoSecao })],
   })
 
+const h4 = (t: string) =>
+  new Paragraph({
+    heading: HeadingLevel.HEADING_3,
+    keepNext: true,
+    keepLines: true,
+    spacing: { before: 180, after: 80 },
+    children: [texto(t, { negrito: true, tamanho: 20, cor: MARCA.documentoSecao })],
+  })
+
 const blocos = (t?: string | null): Paragraph[] => {
   const partes = emParagrafos(t)
   if (!partes.length) {
@@ -150,6 +159,19 @@ const blocos = (t?: string | null): Paragraph[] => {
     ]
   }
   return partes.map(p)
+}
+
+const blocosEstruturados = (t?: string | null): Paragraph[] => {
+  const partes = emParagrafos(t)
+  if (!partes.length) return blocos(t)
+  return partes.map((parte) => {
+    const titulo = parte.trim().match(/^([45]\.\d+(?:\.\d+)?\.)\s+(.+)$/s)
+    if (!titulo) return p(parte)
+    const prefixo = titulo[1] ?? ''
+    const textoTitulo = titulo[2] ?? ''
+    const nivel = prefixo.split('.').filter(Boolean).length
+    return nivel >= 3 ? h4(`${prefixo} ${textoTitulo}`) : h3(`${prefixo} ${textoTitulo}`)
+  })
 }
 
 const blocosComProximo = (t?: string | null): Paragraph[] => {
@@ -292,6 +314,8 @@ async function figuraDocx(
 }
 
 function assinatura(perito: Usuario | null, comarca?: string | null): Paragraph[] {
+  const titulos = (perito?.titulo ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean)
+  const registros = (perito?.registroProfissional ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean)
   return [
     new Paragraph({
       alignment: AlignmentType.CENTER,
@@ -306,16 +330,17 @@ function assinatura(perito: Usuario | null, comarca?: string | null): Paragraph[
       spacing: { after: 0 },
       children: [texto(perito?.nome ?? '—', { negrito: true })],
     }),
-    new Paragraph({
+    ...titulos.map((linha) => new Paragraph({
       alignment: AlignmentType.CENTER,
       keepNext: true,
       spacing: { after: 0 },
-      children: [texto(perito?.titulo ?? '', { tamanho: 20 })],
-    }),
-    new Paragraph({
+      children: [texto(linha, { tamanho: 20 })],
+    })),
+    ...registros.map((linha, indice) => new Paragraph({
       alignment: AlignmentType.CENTER,
-      children: [texto(perito?.registroProfissional ?? '', { tamanho: 20 })],
-    }),
+      keepNext: indice < registros.length - 1,
+      children: [texto(linha, { tamanho: 20 })],
+    })),
   ]
 }
 
@@ -463,7 +488,7 @@ async function docParecer(
     p(
       `A vistoria técnica foi realizada em ${extenso(pericia.dataVistoria)}${
         pericia.horaVistoria ? `, às ${pericia.horaVistoria}` : ''
-      }, no endereço ${pericia.localVistoria || '—'}, com a presença dos participantes abaixo relacionados.`,
+      }, no endereço ${pericia.localVistoria || '—'}${pericia.setorVistoriado ? `, no setor/local ${pericia.setorVistoriado}` : ''}, com a presença dos participantes abaixo relacionados.`,
     ),
   ]
 
@@ -501,9 +526,9 @@ async function docParecer(
   filhos.push(...(await fotosDasSecoes(['ambiente'])))
   filhos.push(
     h2(num.secao('CRITÉRIOS TÉCNICOS PARA AVALIAÇÃO PERICIAL')),
-    ...blocos(t.normasReferencias),
+    ...blocosEstruturados(t.normasReferencias),
     h2(num.secao('METODOLOGIA DE AVALIAÇÃO')),
-    ...blocos(t.equipamentosAnalisados),
+    ...blocosEstruturados(t.equipamentosAnalisados),
     h2(num.secao('DESCRIÇÃO DO POSTO DE TRABALHO, MÁQUINAS, FERRAMENTAS E PRODUTOS')),
     h3(num.sub('Características do Posto de Trabalho')),
     ...blocos(t.descricaoPostoTrabalho || t.descricaoAmbiente),
@@ -581,7 +606,27 @@ async function docParecer(
     filhos.push(h3(num.sub('NR-16 — Avaliação das Atividades e Operações Perigosas')))
     adicionarAgentes(agentesNr16)
   }
-  if (t.divergenciasFaticas?.trim()) filhos.push(h3(num.sub('Divergências Fáticas')), ...blocos(t.divergenciasFaticas))
+  const temDivergencias = Boolean(
+    t.divergenciasFaticas?.trim() ||
+    t.alegacoesReclamante?.trim() ||
+    t.informacoesReclamada?.trim() ||
+    t.consideracoesDivergencias?.trim(),
+  )
+  if (temDivergencias) {
+    const cabecalho = num.sub('Divergências Fáticas')
+    const numero = cabecalho.split('. ')[0]
+    filhos.push(h3(cabecalho))
+    if (t.divergenciasFaticas?.trim()) filhos.push(...blocos(t.divergenciasFaticas))
+    if (t.alegacoesReclamante?.trim()) {
+      filhos.push(h4(`${numero}.1. Alegações do Reclamante`), ...blocos(t.alegacoesReclamante))
+    }
+    if (t.informacoesReclamada?.trim()) {
+      filhos.push(h4(`${numero}.2. Informações prestadas pela Reclamada`), ...blocos(t.informacoesReclamada))
+    }
+    if (t.consideracoesDivergencias?.trim()) {
+      filhos.push(h3(num.sub('Considerações sobre as divergências fáticas')), ...blocos(t.consideracoesDivergencias))
+    }
+  }
   filhos.push(...(await fotosDasSecoes(['documentos'])))
 
   filhos.push(h2(num.secao('DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)')))

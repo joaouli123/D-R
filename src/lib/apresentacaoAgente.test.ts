@@ -114,7 +114,7 @@ describe('montarApresentacaoAgente', () => {
 
     expect(apresentacao.linhas).toContainEqual({ rotulo: 'Medição registrada', valor: '88,5 dB(A)' })
     expect(apresentacao.linhas).toContainEqual({
-      rotulo: 'Medição da empresa',
+      rotulo: 'Medição da empresa – PGR / Laudos Ocupacionais',
       valor: 'entre 83 e 88,5 dB(A)',
     })
     expect(apresentacao.linhas).toContainEqual({ rotulo: 'Documento da empresa', valor: 'PGR 2024' })
@@ -131,7 +131,7 @@ describe('montarApresentacaoAgente', () => {
 
     expect(apresentacao.linhas).toContainEqual({ rotulo: 'Medição registrada', valor: '90 dB(A)' })
     expect(apresentacao.linhas).not.toContainEqual(
-      expect.objectContaining({ rotulo: 'Medição da empresa (não adotada)' }),
+      expect.objectContaining({ rotulo: 'Medição da empresa – PGR / Laudos Ocupacionais (não adotada)' }),
     )
     expect(apresentacao.linhas).toContainEqual({
       rotulo: 'Origem da medição', valor: 'Perito — medição em perícia', destaque: 'aviso',
@@ -147,7 +147,7 @@ describe('montarApresentacaoAgente', () => {
     })
 
     expect(apresentacao.linhas).not.toContainEqual(
-      expect.objectContaining({ rotulo: 'Medição da empresa (não adotada)' }),
+      expect.objectContaining({ rotulo: 'Medição da empresa – PGR / Laudos Ocupacionais (não adotada)' }),
     )
     expect(apresentacao.linhas).not.toContainEqual(
       expect.objectContaining({ rotulo: 'Medição do perito (não adotada)' }),
@@ -162,7 +162,7 @@ describe('montarApresentacaoAgente', () => {
     } as AgenteAvaliado)
 
     expect(apresentacao.linhas).toContainEqual({
-      rotulo: 'Medição da empresa',
+      rotulo: 'Medição da empresa – PGR / Laudos Ocupacionais',
       valor: 'Medição conforme registros apresentados junto ao processo.',
     })
     expect(JSON.stringify(apresentacao)).not.toMatch(/opção adotada/i)

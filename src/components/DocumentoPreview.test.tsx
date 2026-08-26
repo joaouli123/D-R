@@ -224,6 +224,27 @@ describe('DocumentoPreview', () => {
     expect(html).not.toContain('Cinco anos anteriores ao ajuizamento da ação')
   })
 
+  it('estrutura as versões das partes e as considerações em itens próprios', () => {
+    const comDivergencias = {
+      ...pericia,
+      tecnico: {
+        ...pericia.tecnico,
+        divergenciasFaticas: '',
+        alegacoesReclamante: 'Versão apresentada pelo reclamante.',
+        informacoesReclamada: 'Versão apresentada pela reclamada.',
+        consideracoesDivergencias: 'Síntese técnica das divergências.',
+      },
+    } satisfies Pericia
+
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={comDivergencias} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    expect(html).toContain('7.4.1. Alegações do Reclamante')
+    expect(html).toContain('7.4.2. Informações prestadas pela Reclamada')
+    expect(html).toContain('7.5. Considerações sobre as divergências fáticas')
+  })
+
   it('em parecer só de periculosidade omite a NR-15 e renumera as seções finais', () => {
     const somentePericulosidade = {
       ...pericia,

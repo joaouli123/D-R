@@ -3,12 +3,14 @@ import { exigirSessao } from '../auth.js'
 import { env } from '../env.js'
 import { parametro, rota } from '../erros.js'
 import { consultarCnpj } from '../services/consultas/cnpj.js'
+import { consultarCep } from '../services/consultas/cep.js'
 import { consultarProcesso } from '../services/consultas/processo.js'
 
 // ============================================================
 // Preenchimento automático a partir de fontes públicas.
 //
 //   GET /consultas/cnpj/:cnpj       → cadastro da empresa (Receita)
+//   GET /consultas/cep/:cep         → endereço da diligência
 //   GET /consultas/processo/:numero → dados básicos do processo (CNJ)
 //
 // A chamada às fontes sai daqui, do servidor, e não do navegador do
@@ -28,6 +30,13 @@ export function criarConsultasRouter() {
     '/cnpj/:cnpj',
     rota(async (req, res) => {
       res.json(await consultarCnpj(parametro(req, 'cnpj')))
+    }),
+  )
+
+  consultasRouter.get(
+    '/cep/:cep',
+    rota(async (req, res) => {
+      res.json(await consultarCep(parametro(req, 'cep')))
     }),
   )
 

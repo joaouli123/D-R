@@ -115,7 +115,9 @@ model Pericia {
   demissao String?
   dataVistoria     String?
   horaVistoria     String?
+  cepVistoria      String?
   localVistoria    String?
+  setorVistoriado  String?
   modalidade       Modalidade    @default(insalubridade)
   status           StatusPericia @default(rascunho)
 
@@ -165,6 +167,9 @@ enum PapelParticipante {
   advogado_reclamante
   advogado_reclamada
   preposto
+  engenheiro_sst_empresa
+  tecnico_sst_empresa
+  gestor_lideranca
   auxiliar_perito
   paradigma
   entrevistado

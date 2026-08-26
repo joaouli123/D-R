@@ -50,6 +50,9 @@ export const PAPEL: Record<string, string> = {
   advogado_reclamante: 'Advogado (a)',
   advogado_reclamada: 'Advogado (a)',
   preposto: 'Preposto',
+  engenheiro_sst_empresa: 'Eng. Segurança do Trabalho',
+  tecnico_sst_empresa: 'Téc. Segurança do Trabalho',
+  gestor_lideranca: 'Gestor Imediato / Liderança',
   auxiliar_perito: 'Auxiliar do Perito',
   paradigma: 'Paradigma',
   entrevistado: 'Entrevistado',
@@ -67,6 +70,9 @@ export const ATUACAO: Record<string, string> = {
   assistente_reclamada: 'Acompanhamento Técnico – Reclamada',
   advogado_reclamada: 'Representante Jurídico - Reclamada.',
   preposto: 'Representação da Reclamada, prestação de esclarecimentos e narrativa da defesa',
+  engenheiro_sst_empresa: 'Representação do Departamento de SST da empresa',
+  tecnico_sst_empresa: 'Representação do Departamento de SST da empresa',
+  gestor_lideranca: 'Esclarecimentos sobre atividades habituais, eventuais e demais aspectos da rotina de trabalho',
   perito_judicial: 'Condução da diligência pericial',
   auxiliar_perito: 'Auxílio e suporte ao Perito',
   paradigma: 'Demonstração das atividades exercidas',
@@ -647,7 +653,7 @@ export function montarApresentacaoAgente(agente: AgenteDocumento): ApresentacaoA
     // por que o nível medido não vem de máquina nenhuma.
     ...(agente.fonteRuido ? [{ rotulo: 'Fonte do ruído', valor: FONTE_RUIDO[agente.fonteRuido].frase }] : []),
     ...(!qualitativo && (agente.valorMedido || agente.medicaoEmpresa || agente.medicaoEmpresaAte || agente.medido || agente.tipoMedicaoEmpresa === 'registros_processo')
-      ? [{ rotulo: somenteRegistrosEmpresa ? 'Medição da empresa' : 'Medição registrada', valor: formatarMedicao(agente) }, ...linhasOrigemMedicao(agente)]
+      ? [{ rotulo: somenteRegistrosEmpresa ? 'Medição da empresa – PGR / Laudos Ocupacionais' : 'Medição registrada', valor: formatarMedicao(agente) }, ...linhasOrigemMedicao(agente)]
       : []),
   ]
 
@@ -681,7 +687,7 @@ function linhasOrigemMedicao(agente: AgenteDocumento): LinhaApresentacaoAgente[]
     { rotulo: 'Base da medição', valor: adotada.notaOrigem },
     ...(adotada.fonte ? [{ rotulo: 'Documento da empresa', valor: adotada.fonte }] : []),
     ...(medicaoEmpresa && !somenteRegistros
-      ? [{ rotulo: 'Medição da empresa', valor: medicaoEmpresa }]
+      ? [{ rotulo: 'Medição da empresa – PGR / Laudos Ocupacionais', valor: medicaoEmpresa }]
       : []),
   ]
 }
@@ -755,6 +761,9 @@ export interface TecnicoJson {
   equipamentosAnalisados: string
   informacoesLevantadas: string
   divergenciasFaticas?: string
+  alegacoesReclamante?: string
+  informacoesReclamada?: string
+  consideracoesDivergencias?: string
   protecoesColetivas?: string
   analiseTecnica: string
   conclusao: string

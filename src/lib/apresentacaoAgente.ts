@@ -80,7 +80,7 @@ function linhasOrigemMedicao(agente: AgenteAvaliado): LinhaAgente[] {
     { rotulo: 'Base da medição', valor: adotada.notaOrigem },
     ...(adotada.fonte ? [{ rotulo: 'Documento da empresa', valor: adotada.fonte }] : []),
     ...(medicaoEmpresa && !somenteRegistros
-      ? [{ rotulo: 'Medição da empresa', valor: medicaoEmpresa }]
+      ? [{ rotulo: 'Medição da empresa – PGR / Laudos Ocupacionais', valor: medicaoEmpresa }]
       : []),
   ]
 }
@@ -184,7 +184,9 @@ export function montarApresentacaoAgente(agente: AgenteAvaliado): ApresentacaoAg
     ...(agente.fonteRuido ? [{ rotulo: 'Fonte do ruído', valor: FONTE_RUIDO[agente.fonteRuido].frase }] : []),
     ...((regra?.exibeMedicao ?? Boolean(agente.valorMedido || agente.medicaoEmpresa || agente.medicaoEmpresaAte || agente.medido || agente.tipoMedicaoEmpresa === 'registros_processo'))
       ? [{
-          rotulo: somenteRegistrosEmpresa ? 'Medição da empresa' : 'Medição registrada',
+          rotulo: somenteRegistrosEmpresa
+            ? 'Medição da empresa – PGR / Laudos Ocupacionais'
+            : 'Medição registrada',
           valor: formatarMedicaoAgente(agente),
         }, ...linhasOrigemMedicao(agente)]
       : []),

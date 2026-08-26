@@ -127,7 +127,10 @@ const tecnicoNaNovaEstrutura = {
   normasReferencias: '',
   equipamentosAnalisados: '',
   informacoesLevantadas: '',
-  divergenciasFaticas: 'Versões divergentes registradas na diligência',
+  divergenciasFaticas: '',
+  alegacoesReclamante: 'Versão apresentada pelo reclamante',
+  informacoesReclamada: 'Versão apresentada pela reclamada',
+  consideracoesDivergencias: 'Síntese técnica das divergências',
   protecoesColetivas: 'Exaustão localizada',
   analiseTecnica: '',
   conclusao: '',
@@ -216,6 +219,9 @@ const resultados = [
       novaEstrutura?.success === true &&
       novaEstrutura.data?.descricaoPostoTrabalho === 'Posto de soldagem' &&
       novaEstrutura.data?.protecoesColetivas === 'Exaustão localizada' &&
+      novaEstrutura.data?.alegacoesReclamante === 'Versão apresentada pelo reclamante' &&
+      novaEstrutura.data?.informacoesReclamada === 'Versão apresentada pela reclamada' &&
+      novaEstrutura.data?.consideracoesDivergencias === 'Síntese técnica das divergências' &&
       novaEstrutura.data?.conclusaoPericulosidade === 'Não caracterizada' &&
       novaEstrutura.data?.encerramento === 'Parecer composto por folhas rubricadas.',
   },

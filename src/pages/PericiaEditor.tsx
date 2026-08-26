@@ -120,7 +120,9 @@ function novaPericia(responsavelId: string): Pericia {
     participantes: [],
     dataVistoria: '',
     horaVistoria: '',
+    cepVistoria: '',
     localVistoria: '',
+    setorVistoriado: '',
     modalidade: 'insalubridade',
     status: 'rascunho',
     responsavelId,
@@ -146,6 +148,9 @@ function novaPericia(responsavelId: string): Pericia {
       equipamentosAnalisados: '',
       informacoesLevantadas: '',
       divergenciasFaticas: '',
+      alegacoesReclamante: '',
+      informacoesReclamada: '',
+      consideracoesDivergencias: '',
       protecoesColetivas: '',
       analiseTecnica: '',
       conclusao: '',
@@ -198,7 +203,7 @@ export default function PericiaEditor() {
   const [p, setP] = useState<Pericia>(() => original ?? novaPericia(usuario?.id ?? 'usr-1'))
   const [passo, setPasso] = useState(0)
   const [titulo, setTitulo] = useState(
-    tipoDoc === 'laudo' ? 'Laudo Técnico Pericial' : 'Parecer Técnico Pericial',
+    tipoDoc === 'laudo' ? 'Laudo Técnico Pericial' : 'Parecer Técnico da Reclamada',
   )
   const [bibliotecaPara, setBibliotecaPara] = useState<{
     campo: keyof Pericia['tecnico']
@@ -216,6 +221,7 @@ export default function PericiaEditor() {
   const fileRef = useRef<HTMLInputElement>(null)
   const fotoRef = useRef<HTMLInputElement>(null)
   const [secaoFotoAtual, setSecaoFotoAtual] = useState<SecaoFoto>('ambiente')
+  const [consultandoCep, setConsultandoCep] = useState(false)
 
   useEffect(() => {
     if (original) setP(original)
@@ -257,6 +263,25 @@ export default function PericiaEditor() {
         ? 'Vara, comarca e data de ajuizamento atualizadas com os dados do CNJ.'
         : 'Vara, comarca e data de ajuizamento preenchidas pela base pública do CNJ.',
     )
+  }
+
+  async function buscarCepDaVistoria() {
+    const cep = p.cepVistoria?.replace(/\D/g, '') ?? ''
+    if (cep.length !== 8) {
+      toast('Informe os 8 dígitos do CEP da vistoria.', 'error')
+      return
+    }
+
+    setConsultandoCep(true)
+    try {
+      const dados = await api.consultas.cep(cep)
+      set({ cepVistoria: dados.cep, localVistoria: dados.enderecoCompleto })
+      toast('Endereço da vistoria preenchido pela consulta de CEP.')
+    } catch (erro) {
+      toast(erro instanceof Error ? erro.message : 'Não foi possível consultar o CEP.', 'error')
+    } finally {
+      setConsultandoCep(false)
+    }
   }
 
   const setT = (patch: Partial<Pericia['tecnico']>) =>
@@ -780,11 +805,42 @@ export default function PericiaEditor() {
                 onChange={(e) => set({ horaVistoria: e.target.value })}
               />
               <Input
-                label="Local da vistoria"
-                className="sm:col-span-2"
+                label="CEP da vistoria"
+                value={p.cepVistoria ?? ''}
+                onChange={(e) => set({ cepVistoria: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void buscarCepDaVistoria()
+                  }
+                }}
+                placeholder="00000-000"
+                maxLength={9}
+              />
+              <div className="flex items-end">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled={consultandoCep}
+                  onClick={() => void buscarCepDaVistoria()}
+                >
+                  {consultandoCep ? 'Consultando...' : 'Buscar CEP'}
+                </Button>
+              </div>
+              <Input
+                label="Endereço completo da vistoria"
+                className="sm:col-span-3"
                 value={p.localVistoria}
                 onChange={(e) => set({ localVistoria: e.target.value })}
-                placeholder="Endereço onde a diligência foi realizada"
+                placeholder="Logradouro — bairro — cidade/UF"
+                hint="Preenchido pelo CEP e editável para acrescentar número e complemento."
+              />
+              <Input
+                label="Setor / local vistoriado"
+                value={p.setorVistoriado ?? ''}
+                onChange={(e) => set({ setorVistoriado: e.target.value })}
+                placeholder="Ex.: Setor de solda"
+                hint="Informe manualmente: o CEP não identifica o setor interno da empresa."
               />
             </div>
           </Card>
@@ -1280,7 +1336,10 @@ export default function PericiaEditor() {
               { campo: 'normasReferencias', secao: 'generico', label: 'Normas e referências utilizadas', rows: 4 },
               { campo: 'equipamentosAnalisados', secao: 'generico', label: 'Metodologia, equipamentos e procedimentos analisados', rows: 4 },
               { campo: 'informacoesLevantadas', secao: 'generico', label: 'Histórico laboral e informações levantadas na vistoria', rows: 5 },
-              { campo: 'divergenciasFaticas', secao: 'generico', label: 'Divergências fáticas', rows: 5 },
+              { campo: 'divergenciasFaticas', secao: 'generico', label: 'Resumo geral das divergências fáticas (opcional)', rows: 4 },
+              { campo: 'alegacoesReclamante', secao: 'generico', label: 'Alegações do Reclamante', rows: 5 },
+              { campo: 'informacoesReclamada', secao: 'generico', label: 'Informações prestadas pela Reclamada', rows: 5 },
+              { campo: 'consideracoesDivergencias', secao: 'analise', label: 'Considerações sobre as divergências fáticas', rows: 6 },
               { campo: 'protecoesColetivas', secao: 'analise', label: 'Proteções coletivas', rows: 5 },
               {
                 campo: 'analiseTecnica',
@@ -1352,6 +1411,7 @@ export default function PericiaEditor() {
               <CardHeader title="Título do documento" subtitle="Módulo G" icon={<FileText size={18} />} />
               <div className="space-y-3 p-5">
                 <Select value={titulo} onChange={(e) => setTitulo(e.target.value)}>
+                  <option>Parecer Técnico da Reclamada</option>
                   <option>Parecer Técnico Pericial</option>
                   <option>Laudo Técnico Pericial</option>
                   <option>Parecer Técnico de Assistente</option>

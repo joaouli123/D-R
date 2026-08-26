@@ -25,6 +25,9 @@ const {
   montarLogradouro,
   normalizarCnpj,
 } = await import('../src/services/consultas/cnpj.js')
+const { consultarCep, limparCacheDeCep, mapearCep, normalizarCep } = await import(
+  '../src/services/consultas/cep.js'
+)
 const {
   AVISO_PARTES,
   cidadeDoOrgao,
@@ -82,8 +85,40 @@ async function erroDe(feito: () => Promise<unknown>): Promise<ErroDeRota> {
 
 function limparCaches() {
   limparCacheDeCnpj()
+  limparCacheDeCep()
   limparCacheDeProcessos()
   limparCacheDeMunicipios()
+}
+
+// ---------------- CEP da vistoria ----------------
+
+confere(() => assert.equal(normalizarCep('01001-000'), '01001000'))
+confere(() => assert.equal(normalizarCep('01001'), null))
+confere(() => assert.deepEqual(mapearCep({
+  cep: '01001000',
+  street: 'Praça da Sé',
+  neighborhood: 'Sé',
+  city: 'São Paulo',
+  state: 'SP',
+}), {
+  cep: '01001-000',
+  logradouro: 'Praça da Sé',
+  bairro: 'Sé',
+  cidade: 'São Paulo',
+  uf: 'SP',
+  enderecoCompleto: 'Praça da Sé — Sé — São Paulo/SP',
+  fonte: 'BrasilAPI (bases públicas de CEP)',
+}))
+
+limparCaches()
+{
+  const { buscar, chamadas } = rede(() => ({ status: 200, corpo: {
+    cep: '01001000', street: 'Praça da Sé', neighborhood: 'Sé', city: 'São Paulo', state: 'SP',
+  } }))
+  const dados = await consultarCep('01001-000', { buscar })
+  confere(() => assert.equal(dados.enderecoCompleto, 'Praça da Sé — Sé — São Paulo/SP'))
+  await consultarCep('01001000', { buscar })
+  confere(() => assert.equal(chamadas.length, 1))
 }
 
 // ---------------- CNPJ: funções puras ----------------

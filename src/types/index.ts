@@ -73,6 +73,9 @@ export interface Participante {
     | 'advogado_reclamante'
     | 'advogado_reclamada'
     | 'preposto'
+    | 'engenheiro_sst_empresa'
+    | 'tecnico_sst_empresa'
+    | 'gestor_lideranca'
     | 'auxiliar_perito'
     | 'paradigma'
     | 'entrevistado'
@@ -107,7 +110,9 @@ export interface Pericia {
   participantes: Participante[]
   dataVistoria?: string
   horaVistoria?: string
+  cepVistoria?: string
   localVistoria?: string
+  setorVistoriado?: string
   modalidade: ModalidadePericia
   status: StatusPericia
   responsavelId: UUID
@@ -225,6 +230,9 @@ export interface PreenchimentoTecnico {
   equipamentosAnalisados: string
   informacoesLevantadas: string
   divergenciasFaticas?: string
+  alegacoesReclamante?: string
+  informacoesReclamada?: string
+  consideracoesDivergencias?: string
   protecoesColetivas?: string
   analiseTecnica: string
   conclusao: string

@@ -23,6 +23,24 @@ function Paragrafos({ texto }: { texto?: string | null }) {
   )
 }
 
+function ConteudoEstruturado({ texto }: { texto?: string | null }) {
+  if (!texto?.trim()) return <p className="italic text-ink-400">[Seção não preenchida]</p>
+
+  return (
+    <>
+      {texto.split(/\n{2,}/).map((bloco, indice) => {
+        const conteudo = bloco.trim()
+        const titulo = conteudo.match(/^([45]\.\d+(?:\.\d+)?\.)\s+(.+)$/s)
+        if (!titulo) return <p key={indice}>{conteudo}</p>
+        const nivel = titulo[1].split('.').filter(Boolean).length
+        return nivel >= 3
+          ? <h4 key={indice}>{titulo[1]} {titulo[2]}</h4>
+          : <h3 key={indice}>{titulo[1]} {titulo[2]}</h3>
+      })}
+    </>
+  )
+}
+
 export function DocumentoPreview({
   pericia,
   empresas,
@@ -83,7 +101,16 @@ export function DocumentoPreview({
   let indiceSubsecao7 = 1
   const numeroAvaliacaoNr15 = temInsalubridade ? `7.${++indiceSubsecao7}` : null
   const numeroAvaliacaoNr16 = temPericulosidade ? `7.${++indiceSubsecao7}` : null
-  const numeroDivergencias = t.divergenciasFaticas?.trim() ? `7.${++indiceSubsecao7}` : null
+  const temDivergencias = Boolean(
+    t.divergenciasFaticas?.trim() ||
+    t.alegacoesReclamante?.trim() ||
+    t.informacoesReclamada?.trim() ||
+    t.consideracoesDivergencias?.trim(),
+  )
+  const numeroDivergencias = temDivergencias ? `7.${++indiceSubsecao7}` : null
+  const numeroConsideracoes = t.consideracoesDivergencias?.trim()
+    ? `7.${++indiceSubsecao7}`
+    : null
   let indiceSecaoFinal = 10
   const numeroConclusaoNr15 = temInsalubridade ? ++indiceSecaoFinal : null
   const numeroConclusaoNr16 = temPericulosidade ? ++indiceSecaoFinal : null
@@ -206,7 +233,8 @@ export function DocumentoPreview({
       <p>
         A vistoria técnica foi realizada em {extenso(pericia.dataVistoria)}
         {pericia.horaVistoria ? `, às ${pericia.horaVistoria}` : ''}, no endereço{' '}
-        {pericia.localVistoria || '—'}, com a presença dos participantes abaixo relacionados.
+        {pericia.localVistoria || '—'}
+        {pericia.setorVistoriado ? `, no setor/local ${pericia.setorVistoriado}` : ''}, com a presença dos participantes abaixo relacionados.
       </p>
       {pericia.participantes.length > 0 && (
         <table>
@@ -230,10 +258,10 @@ export function DocumentoPreview({
       {fotosDasSecoes(['ambiente'])}
 
       <h2>4. Critérios Técnicos para Avaliação Pericial</h2>
-      <Paragrafos texto={t.normasReferencias} />
+      <ConteudoEstruturado texto={t.normasReferencias} />
 
       <h2>5. Metodologia de Avaliação</h2>
-      <Paragrafos texto={t.equipamentosAnalisados} />
+      <ConteudoEstruturado texto={t.equipamentosAnalisados} />
 
       <h2>6. Descrição do Posto de Trabalho, Máquinas, Ferramentas e Produtos</h2>
       <h3>6.1. Características do Posto de Trabalho</h3>
@@ -267,7 +295,19 @@ export function DocumentoPreview({
       <Paragrafos texto={t.atividadesFuncoes} />
       {temInsalubridade && <><h3>{numeroAvaliacaoNr15}. NR-15 — Avaliação da Exposição Ocupacional</h3>{agentesSemProtecoes(agentesNr15)}</>}
       {temPericulosidade && <><h3>{numeroAvaliacaoNr16}. NR-16 — Avaliação das Atividades e Operações Perigosas</h3>{agentesSemProtecoes(agentesNr16)}</>}
-      {numeroDivergencias && <><h3>{numeroDivergencias}. Divergências Fáticas</h3><Paragrafos texto={t.divergenciasFaticas} /></>}
+      {numeroDivergencias && (
+        <>
+          <h3>{numeroDivergencias}. Divergências Fáticas</h3>
+          {t.divergenciasFaticas?.trim() && <Paragrafos texto={t.divergenciasFaticas} />}
+          {t.alegacoesReclamante?.trim() && (
+            <><h4>{numeroDivergencias}.1. Alegações do Reclamante</h4><Paragrafos texto={t.alegacoesReclamante} /></>
+          )}
+          {t.informacoesReclamada?.trim() && (
+            <><h4>{numeroDivergencias}.2. Informações prestadas pela Reclamada</h4><Paragrafos texto={t.informacoesReclamada} /></>
+          )}
+        </>
+      )}
+      {numeroConsideracoes && <><h3>{numeroConsideracoes}. Considerações sobre as divergências fáticas</h3><Paragrafos texto={t.consideracoesDivergencias} /></>}
       {fotosDasSecoes(['documentos'])}
 
       <h2>8. Dos Equipamentos de Proteção Individual (NR-06)</h2>
@@ -306,8 +346,12 @@ export function DocumentoPreview({
       <div className="mt-14 text-center">
         <div className="mx-auto w-72 border-t border-ink-800 pt-1.5">
           <p className="no-indent font-bold">{perito?.nome ?? '—'}</p>
-          <p className="no-indent text-[10pt]">{perito?.titulo ?? ''}</p>
-          <p className="no-indent text-[10pt]">{perito?.registroProfissional ?? ''}</p>
+          {(perito?.titulo ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean).map((linha) => (
+            <p key={`titulo-${linha}`} className="no-indent text-[10pt]">{linha}</p>
+          ))}
+          {(perito?.registroProfissional ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean).map((linha) => (
+            <p key={`registro-${linha}`} className="no-indent text-[10pt]">{linha}</p>
+          ))}
         </div>
       </div>
     </article>

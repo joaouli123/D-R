@@ -122,16 +122,18 @@ export default function Configuracoes() {
                 onChange={(e) => setPerfilLocal({ ...perfilLocal, nome: e.target.value })}
               />
               <Input
-                label="Titulação"
+                label="Títulos / qualificações profissionais"
                 value={perfilLocal.titulo ?? ''}
                 onChange={(e) => setPerfilLocal({ ...perfilLocal, titulo: e.target.value })}
-                placeholder="Engenheiro de Segurança do Trabalho"
+                placeholder="Engenheiro de Produção; Engenheiro de Segurança do Trabalho"
+                hint="Separe mais de uma qualificação com ponto e vírgula."
               />
               <Input
-                label="Registro profissional"
+                label="Registros profissionais (CREA / CONFEA / MTE)"
                 value={perfilLocal.registroProfissional ?? ''}
                 onChange={(e) => setPerfilLocal({ ...perfilLocal, registroProfissional: e.target.value })}
-                placeholder="CREA-SP 0000000000"
+                placeholder="CREA/SP nº 0000000000/D; MTE nº 00000/SP"
+                hint="Separe mais de um registro com ponto e vírgula."
               />
               <Input
                 label="E-mail"
@@ -384,13 +386,13 @@ export default function Configuracoes() {
               hint="Mínimo 8 caracteres. O usuário pode trocá-la depois em Meu perfil."
             />
             <Input
-              label="Titulação"
+              label="Títulos / qualificações profissionais"
               className="sm:col-span-2"
               value={novo.titulo ?? ''}
               onChange={(e) => setNovo({ ...novo, titulo: e.target.value })}
             />
             <Input
-              label="Registro profissional"
+              label="Registros profissionais (CREA / CONFEA / MTE)"
               className="sm:col-span-2"
               value={novo.registroProfissional ?? ''}
               onChange={(e) => setNovo({ ...novo, registroProfissional: e.target.value })}

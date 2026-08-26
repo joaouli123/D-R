@@ -254,7 +254,10 @@ const periciaBase = {
     equipamentosAnalisados: 'Audiodosímetro digital, termômetro de globo, fichas de EPI.',
     informacoesLevantadas:
       'Foram apresentadas fichas de entrega de EPI referentes ao período de 2019 a 2024, com lacunas em 2018.',
-    divergenciasFaticas: 'Não houve divergência relevante entre as versões apresentadas durante a diligência.',
+    divergenciasFaticas: '',
+    alegacoesReclamante: 'O Reclamante apresentou sua versão das atividades.',
+    informacoesReclamada: 'A Reclamada apresentou sua versão das atividades.',
+    consideracoesDivergencias: 'As versões foram confrontadas com os elementos técnicos disponíveis.',
     protecoesColetivas: 'Exaustão localizada junto aos pontos de geração de névoa e enclausuramento parcial.',
     analiseTecnica:
       'A exposição habitual a névoas de óleo mineral, sem neutralização comprovada, atrai o enquadramento qualitativo do Anexo 13 da NR-15.\n\nRegistra-se que o simples fornecimento de EPI não elide o adicional, nos termos das Súmulas 80 e 289 do C. TST.',
@@ -465,10 +468,14 @@ async function main() {
   assert.match(parecerGerado?.xml ?? '', /Periculosidade caracterizada/)
   assert.doesNotMatch(htmlParecer, /Medição (?:da empresa|do perito) \(não adotada\)/)
   assert.doesNotMatch(parecerGerado?.xml ?? '', /Medição (?:da empresa|do perito) \(não adotada\)/)
-  assert.match(htmlRegistros, /<th>Medição da empresa<\/th><td[^>]*>Medição conforme registros apresentados junto ao processo\.<\/td>/)
+  assert.match(htmlRegistros, /<th>Medição da empresa – PGR \/ Laudos Ocupacionais<\/th><td[^>]*>Medição conforme registros apresentados junto ao processo\.<\/td>/)
   assert.match(xmlRegistros, /Medição conforme registros apresentados junto ao processo\./)
   assert.doesNotMatch(htmlRegistros, /opção adotada/i)
   assert.doesNotMatch(xmlRegistros, /opção adotada/i)
+  assert.match(htmlParecer, /7\.4\.1\. Alegações do Reclamante/)
+  assert.match(htmlParecer, /7\.4\.2\. Informações prestadas pela Reclamada/)
+  assert.match(htmlParecer, /7\.5\. Considerações sobre as divergências fáticas/)
+  assert.match(parecerGerado?.xml ?? '', /7\.4\.1\. Alegações do Reclamante/)
   assert.match(htmlParecer, /Período avaliado/)
   assert.match(parecerGerado?.xml ?? '', /Período avaliado/)
   assert.doesNotMatch(htmlParecer, /cinco anos anteriores ao ajuizamento da ação/i)
@@ -719,7 +726,14 @@ async function main() {
   const periciaEnxuta = {
     ...periciaBase,
     modalidade: 'insalubridade',
-    tecnico: { ...periciaBase.tecnico, respostasQuesitos: '', divergenciasFaticas: '' },
+    tecnico: {
+      ...periciaBase.tecnico,
+      respostasQuesitos: '',
+      divergenciasFaticas: '',
+      alegacoesReclamante: '',
+      informacoesReclamada: '',
+      consideracoesDivergencias: '',
+    },
   } as unknown as PericiaCompleta
   const docEnxuto = doc('parecer', 'Parecer Técnico Pericial — Insalubridade', null)
   const htmlEnxuto = await montarHtml(docEnxuto, periciaEnxuta, [empresa], perito)

@@ -174,8 +174,8 @@ function OrigemDaMedicao({
           value={formaEmpresa}
           onChange={(evento) => definirFormaEmpresa(evento.target.value as TipoMedicaoEmpresa)}
         >
-          <option value="valor">Medição da empresa — valor único</option>
-          <option value="faixa">Medição da empresa — entre dois valores</option>
+          <option value="valor">Medição da empresa — PGR / Laudos Ocupacionais — valor único</option>
+          <option value="faixa">Medição da empresa — PGR / Laudos Ocupacionais — entre dois valores</option>
           <option value="registros_processo">Medição conforme registros apresentados junto ao processo</option>
         </Select>
 

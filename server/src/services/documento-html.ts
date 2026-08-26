@@ -51,6 +51,20 @@ function paragrafos(texto?: string | null): string {
   return partes.map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('')
 }
 
+function paragrafosEstruturados(texto?: string | null): string {
+  const partes = emParagrafos(texto)
+  if (!partes.length) return `<p class="vazio">${VAZIO}</p>`
+  return partes.map((parte) => {
+    const titulo = parte.trim().match(/^([45]\.\d+(?:\.\d+)?\.)\s+(.+)$/s)
+    if (!titulo) return `<p>${esc(parte).replace(/\n/g, '<br>')}</p>`
+    const prefixo = titulo[1] ?? ''
+    const textoTitulo = titulo[2] ?? ''
+    const nivel = prefixo.split('.').filter(Boolean).length
+    const tag = nivel >= 3 ? 'h4' : 'h3'
+    return `<${tag}>${esc(`${prefixo} ${textoTitulo}`)}</${tag}>`
+  }).join('')
+}
+
 const blocoConteudo = (conteudo: string): string => `<div class="bloco-conteudo">${conteudo}</div>`
 
 const linha = (rotulo: string, valor: string): string =>
@@ -126,10 +140,20 @@ const CSS = `
      técnica padrão. A classe segue existindo só para agrupar o conteúdo. */
   .bloco-conteudo { margin: 0 0 8px; }
   .agente-bloco { page-break-inside: auto; break-inside: auto; margin: 0 0 16px; }
-  .agente-resumo { page-break-inside: avoid; break-inside: avoid; }
+  /* inline-block torna título + ficha uma unidade indivisível no Chromium.
+     Só page-break-inside não bastava quando restava quase espaço suficiente
+     no rodapé: o cabeçalho da tabela ficava na página anterior. */
+  .agente-resumo {
+    display: inline-block;
+    width: 100%;
+    page-break-inside: avoid;
+    break-inside: avoid-page;
+  }
   .agente-bloco h3 { margin: 12px 0 6px; padding: 0 0 4px; color: var(--documento-titulo); border-bottom: 1px solid var(--documento-borda); page-break-after: avoid; break-after: avoid; }
   .parecer-manual .agente-bloco h3.agente-titulo { color: var(--documento-titulo); }
-  .agente-bloco table { margin: 0; page-break-inside: avoid; }
+  .agente-bloco table { margin: 0; page-break-inside: avoid; break-inside: avoid-page; }
+  .agente-bloco tr { page-break-inside: avoid; break-inside: avoid-page; }
+  .agente-bloco thead { display: table-header-group; }
   .agente-bloco th { width: 32%; }
   .protecao-bloco { margin: 10px 0 0; }
   /* Sem verde/vermelho/âmbar: o resultado se destaca só pelo negrito. */
@@ -202,13 +226,15 @@ function moldura(
 }
 
 function assinatura(perito: Usuario | null, comarca?: string | null): string {
+  const titulos = (perito?.titulo ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean)
+  const registros = (perito?.registroProfissional ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean)
   return `
   <p class="local-data">${esc(comarca || 'São Paulo/SP')}, ${extenso(hoje())}.</p>
   <div class="assinatura">
     <div class="traco">
       <p class="nome">${esc(perito?.nome ?? '—')}</p>
-      <p class="dado">${esc(perito?.titulo ?? '')}</p>
-      <p class="dado">${esc(perito?.registroProfissional ?? '')}</p>
+      ${titulos.map((linha) => `<p class="dado">${esc(linha)}</p>`).join('')}
+      ${registros.map((linha) => `<p class="dado">${esc(linha)}</p>`).join('')}
     </div>
   </div>`
 }
@@ -288,7 +314,7 @@ export async function htmlDoParecer(
 
   const textoVistoria = `<p>A vistoria técnica foi realizada em ${extenso(pericia.dataVistoria)}${
     pericia.horaVistoria ? `, às ${esc(pericia.horaVistoria)}` : ''
-  }, no endereço ${esc(pericia.localVistoria || '—')}, com a presença dos participantes abaixo relacionados.</p>`
+  }, no endereço ${esc(pericia.localVistoria || '—')}${pericia.setorVistoriado ? `, no setor/local ${esc(pericia.setorVistoriado)}` : ''}, com a presença dos participantes abaixo relacionados.</p>`
 
   const tabelaPeriodos = t.periodos?.length
     ? `<table>
@@ -370,10 +396,34 @@ export async function htmlDoParecer(
   const conclusaoNr16 =
     t.conclusaoPericulosidade?.trim() || (pericia.modalidade === 'periculosidade' ? t.conclusao : '')
   const encerramento = t.encerramento?.trim() || t.observacoesAdicionais
-
   // Numeração contada, não escrita à mão: as seções finais são
   // condicionais e o documento não pode pular de "11." para "13.".
   const num = numeradorDeSecoes()
+  const blocoDivergencias = () => {
+    const temDivergencias = Boolean(
+      t.divergenciasFaticas?.trim() ||
+      t.alegacoesReclamante?.trim() ||
+      t.informacoesReclamada?.trim() ||
+      t.consideracoesDivergencias?.trim(),
+    )
+    if (!temDivergencias) return ''
+
+    const cabecalho = num.sub('Divergências Fáticas')
+    const numero = cabecalho.split('. ')[0]
+    return (
+      `<h3>${cabecalho}</h3>` +
+      (t.divergenciasFaticas?.trim() ? paragrafos(t.divergenciasFaticas) : '') +
+      (t.alegacoesReclamante?.trim()
+        ? `<h4>${numero}.1. Alegações do Reclamante</h4>${paragrafos(t.alegacoesReclamante)}`
+        : '') +
+      (t.informacoesReclamada?.trim()
+        ? `<h4>${numero}.2. Informações prestadas pela Reclamada</h4>${paragrafos(t.informacoesReclamada)}`
+        : '') +
+      (t.consideracoesDivergencias?.trim()
+        ? `<h3>${num.sub('Considerações sobre as divergências fáticas')}</h3>${paragrafos(t.consideracoesDivergencias)}`
+        : '')
+    )
+  }
 
   const partes: string[] = [
     enderecamentoDoParecer(pericia.vara, pericia.comarca, t.enderecamento),
@@ -393,9 +443,9 @@ export async function htmlDoParecer(
         fotosAmbiente,
     ),
     `<h2>${num.secao('CRITÉRIOS TÉCNICOS PARA AVALIAÇÃO PERICIAL')}</h2>`,
-    blocoConteudo(paragrafos(t.normasReferencias)),
+    blocoConteudo(paragrafosEstruturados(t.normasReferencias)),
     `<h2>${num.secao('METODOLOGIA DE AVALIAÇÃO')}</h2>`,
-    blocoConteudo(paragrafos(t.equipamentosAnalisados)),
+    blocoConteudo(paragrafosEstruturados(t.equipamentosAnalisados)),
     `<h2>${num.secao('DESCRIÇÃO DO POSTO DE TRABALHO, MÁQUINAS, FERRAMENTAS E PRODUTOS')}</h2>`,
     blocoConteudo(
       `<h3>${num.sub('Características do Posto de Trabalho')}</h3>` +
@@ -422,9 +472,7 @@ export async function htmlDoParecer(
           ? `<h3>${num.sub('NR-16 — Avaliação das Atividades e Operações Perigosas')}</h3>` +
             tabelaAgentes(agentesNr16)
           : '') +
-        (t.divergenciasFaticas?.trim()
-          ? `<h3>${num.sub('Divergências Fáticas')}</h3>` + paragrafos(t.divergenciasFaticas)
-          : '') +
+        blocoDivergencias() +
         fotosDocumentos,
     ),
     `<h2>${num.secao('DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)')}</h2>`,

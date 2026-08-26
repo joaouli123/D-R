@@ -568,6 +568,16 @@ export interface DadosCnpj {
   fonte: string
 }
 
+export interface DadosCep {
+  cep: string
+  logradouro: string
+  bairro: string
+  cidade: string
+  uf: string
+  enderecoCompleto: string
+  fonte: string
+}
+
 export interface InstanciaProcesso {
   grau: string | null
   grauRotulo: string
@@ -604,6 +614,14 @@ const CONSULTA_SEM_BACKEND =
  * servidor; a tela só recebe o resultado já traduzido.
  */
 export const consultas = {
+  async cep(numero: string): Promise<DadosCep> {
+    if (!ehRest) {
+      await delay(null, 200)
+      throw new ErroApi(503, CONSULTA_SEM_BACKEND)
+    }
+    return http<DadosCep>(`/consultas/cep/${encodeURIComponent(numero.replace(/\D/g, ''))}`)
+  },
+
   async cnpj(numero: string): Promise<DadosCnpj> {
     if (!ehRest) {
       await delay(null, 200)
