@@ -241,6 +241,7 @@ const resultados = [
   {
     nome: 'migração do número é idempotente e recupera somente a falha conhecida',
     ok:
+      migracaoNumeroVistoria.startsWith('ALTER TABLE "pericias"') &&
       migracaoNumeroVistoria.includes('ADD COLUMN IF NOT EXISTS "numeroVistoria"') &&
       entrypoint.includes('prisma migrate resolve --rolled-back "$MIGRACAO_RECUPERAVEL"'),
   },
