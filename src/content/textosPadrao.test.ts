@@ -117,6 +117,19 @@ describe('textosPadraoDaPericia', () => {
     expect(equipamentosAnalisados).toContain('CAEPI')
     expect(equipamentosAnalisados).toContain('o de maior atenuação')
   })
+
+  it('incorpora os complementos técnicos aprovados na planilha de 26/08', () => {
+    const textos = textosPadraoDaPericia(pericia('ambas'), PERITO)
+
+    expect(textos.normasReferencias).toContain('Frequência: quantidade de ocorrências')
+    expect(textos.normasReferencias).toContain('Habitualidade: integração da atividade à rotina laboral')
+    expect(textos.normasReferencias).toContain('Líquidos Inflamáveis (Gera Direito à Periculosidade)')
+    expect(textos.normasReferencias).toContain('Diesel Automotivo Comum (S10/S500)')
+    expect(textos.criterioAvaliacaoPericulosidade).toContain('avaliação qualitativa')
+    expect(textos.notaTecnicaEpis).toContain('Primazia da Realidade')
+    expect(textos.notaTecnicaEpis).toContain('art. 369 do CPC')
+    expect(textos.protecoesColetivas).toContain('Sistemas de Ventilação e Exaustão')
+  })
 })
 
 describe('patchDeTextosPadrao', () => {
@@ -142,6 +155,18 @@ describe('patchDeTextosPadrao', () => {
     const novos = textosPadraoDaPericia(pericia('periculosidade'), PERITO, RECLAMADA)
 
     expect(patchDeTextosPadrao(tecnico, novos, anteriores).objetivoPericia).toBe(novos.objetivoPericia)
+  })
+
+  it('migra o texto normativo da versão anterior sem confundi-lo com texto do perito', () => {
+    const tecnico = {
+      ...pericia().tecnico,
+      normasReferencias:
+        'A análise da exposição deverá considerar, quando pertinentes ao agente avaliado: frequência, duração, periodicidade, habitualidade e permanência.',
+    }
+
+    const patch = patchDeTextosPadrao(tecnico, padroes, {})
+
+    expect(patch.normasReferencias).toBe(padroes.normasReferencias)
   })
 
   it('não repete o patch quando já está tudo em dia', () => {

@@ -131,6 +131,8 @@ const tecnicoNaNovaEstrutura = {
   alegacoesReclamante: 'Versão apresentada pelo reclamante',
   informacoesReclamada: 'Versão apresentada pela reclamada',
   consideracoesDivergencias: 'Síntese técnica das divergências',
+  criterioAvaliacaoPericulosidade: 'Avaliação qualitativa conforme a NR-16',
+  notaTecnicaEpis: 'Primazia da realidade e conjunto probatório',
   protecoesColetivas: 'Exaustão localizada',
   analiseTecnica: '',
   conclusao: '',
@@ -222,6 +224,8 @@ const resultados = [
       novaEstrutura.data?.alegacoesReclamante === 'Versão apresentada pelo reclamante' &&
       novaEstrutura.data?.informacoesReclamada === 'Versão apresentada pela reclamada' &&
       novaEstrutura.data?.consideracoesDivergencias === 'Síntese técnica das divergências' &&
+      novaEstrutura.data?.criterioAvaliacaoPericulosidade === 'Avaliação qualitativa conforme a NR-16' &&
+      novaEstrutura.data?.notaTecnicaEpis === 'Primazia da realidade e conjunto probatório' &&
       novaEstrutura.data?.conclusaoPericulosidade === 'Não caracterizada' &&
       novaEstrutura.data?.encerramento === 'Parecer composto por folhas rubricadas.',
   },

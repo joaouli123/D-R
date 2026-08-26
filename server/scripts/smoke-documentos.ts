@@ -75,6 +75,7 @@ const periciaBase = {
   dataVistoria: '2026-07-15',
   horaVistoria: '09:30',
   localVistoria: 'Rodovia Anhanguera, km 32 — Cajamar/SP',
+  numeroVistoria: '125',
   modalidade: 'ambas',
   status: 'em_andamento',
   responsavelId: 'usr-1',
@@ -121,6 +122,7 @@ const periciaBase = {
         anexoNr15: 'Anexo 13',
         criterio: 'qualitativo',
         grau: 'medio',
+        observacao: 'Análise técnica editável dos óleos minerais.',
       },
       {
         id: 'agn-2',
@@ -258,6 +260,9 @@ const periciaBase = {
     alegacoesReclamante: 'O Reclamante apresentou sua versão das atividades.',
     informacoesReclamada: 'A Reclamada apresentou sua versão das atividades.',
     consideracoesDivergencias: 'As versões foram confrontadas com os elementos técnicos disponíveis.',
+    criterioAvaliacaoPericulosidade:
+      'A caracterização da periculosidade é realizada mediante avaliação qualitativa.',
+    notaTecnicaEpis: 'Nota Técnica sobre a Primazia da Realidade.',
     protecoesColetivas: 'Exaustão localizada junto aos pontos de geração de névoa e enclausuramento parcial.',
     analiseTecnica:
       'A exposição habitual a névoas de óleo mineral, sem neutralização comprovada, atrai o enquadramento qualitativo do Anexo 13 da NR-15.\n\nRegistra-se que o simples fornecimento de EPI não elide o adicional, nos termos das Súmulas 80 e 289 do C. TST.',
@@ -476,6 +481,14 @@ async function main() {
   assert.match(htmlParecer, /7\.4\.2\. Informações prestadas pela Reclamada/)
   assert.match(htmlParecer, /7\.5\. Considerações sobre as divergências fáticas/)
   assert.match(parecerGerado?.xml ?? '', /7\.4\.1\. Alegações do Reclamante/)
+  assert.match(htmlParecer, /Rodovia Anhanguera, km 32 — Cajamar\/SP, nº 125/)
+  assert.match(htmlParecer, /7\.2\.1\. Agente Químico — Óleos minerais \(névoa\)/)
+  assert.match(htmlParecer, /Análise técnica editável dos óleos minerais\./)
+  assert.match(htmlParecer, /7\.3\.1\. Critério de Avaliação/)
+  assert.match(htmlParecer, /Nota Técnica sobre a Primazia da Realidade\./)
+  assert.match(parecerGerado?.xml ?? '', /7\.2\.1\. Agente Químico — Óleos minerais \(névoa\)/)
+  assert.match(parecerGerado?.xml ?? '', /7\.3\.1\. Critério de Avaliação/)
+  assert.match(parecerGerado?.xml ?? '', /Nota Técnica sobre a Primazia da Realidade\./)
   assert.match(htmlParecer, /Período avaliado/)
   assert.match(parecerGerado?.xml ?? '', /Período avaliado/)
   assert.doesNotMatch(htmlParecer, /cinco anos anteriores ao ajuizamento da ação/i)

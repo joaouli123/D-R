@@ -19,6 +19,9 @@ export const CAMPOS_COM_TEXTO_PADRAO = [
   'objetivoPericia',
   'normasReferencias',
   'equipamentosAnalisados',
+  'criterioAvaliacaoPericulosidade',
+  'notaTecnicaEpis',
+  'protecoesColetivas',
   'encerramento',
 ] as const
 
@@ -72,13 +75,32 @@ function normasReferencias(pericia: Pericia): string {
     pericia.modalidade !== 'periculosidade' && '4.1.2. Critérios Qualitativos',
     pericia.modalidade !== 'periculosidade' && 'Quando estabelecido critério qualitativo pelo respectivo Anexo, a análise deverá considerar a atividade efetivamente realizada, as condições de exposição e o correspondente enquadramento normativo. Podem compreender, conforme aplicável: condições hiperbáricas; radiações não ionizantes; frio; umidade; determinados agentes químicos; e agentes biológicos.',
     pericia.modalidade !== 'periculosidade' && '4.1.3. Frequência, Duração e Habitualidade',
-    pericia.modalidade !== 'periculosidade' && 'A análise da exposição deverá considerar, quando pertinentes ao agente avaliado: frequência, duração, periodicidade, habitualidade e permanência. Para fins de análise técnica, exposição eventual ou esporádica não deverá ser automaticamente equiparada à exposição habitual ou permanente, devendo a situação concreta ser confrontada com os critérios estabelecidos na norma específica.',
+    pericia.modalidade !== 'periculosidade' && 'A análise da exposição deverá considerar, quando pertinentes ao agente avaliado:\n• Frequência: quantidade de ocorrências da exposição em determinado período;\n• Duração: tempo efetivo de exposição em cada ocorrência;\n• Periodicidade: regularidade com que a atividade ou exposição ocorre;\n• Habitualidade: integração da atividade à rotina laboral;\n• Permanência: continuidade ou constância da exposição, conforme o critério normativo aplicável.\nPara fins de análise técnica, exposição eventual ou esporádica não deverá ser automaticamente equiparada à exposição habitual ou permanente, devendo a situação concreta ser confrontada com os critérios estabelecidos na norma específica.',
     pericia.modalidade !== 'insalubridade' && '4.2. PERICULOSIDADE – NR-16',
     pericia.modalidade !== 'insalubridade' && 'A caracterização da periculosidade deverá observar os critérios estabelecidos na NR-16 e respectivos Anexos, mediante análise da atividade ou operação efetivamente desenvolvida e do correspondente enquadramento normativo. Serão considerados, conforme aplicável: atividade efetivamente desempenhada; natureza da condição de risco; área de risco; ingresso ou permanência na área de risco; frequência e forma de exposição; condições reais de trabalho; e enquadramento específico no respectivo Anexo da NR-16.',
     pericia.modalidade !== 'insalubridade' && 'A mera proximidade, possibilidade de contato ou existência de fonte de risco no estabelecimento não constitui, isoladamente, comprovação de condição perigosa.',
     pericia.modalidade !== 'insalubridade' && '4.2.1. Anexos da NR-16',
-    pericia.modalidade !== 'insalubridade' && 'Para a análise serão considerados os respectivos Anexos da NR-16 aplicáveis ao objeto da perícia, incluindo: Anexo I – Explosivos; Anexo II – Inflamáveis; Anexo III – Segurança pessoal ou patrimonial; Anexo IV – Energia elétrica; Anexo V – Motocicleta; Anexo VI – Agentes das autoridades de trânsito; e Anexo VII – Radiações ionizantes ou substâncias radioativas.',
+    pericia.modalidade !== 'insalubridade' && 'Para a análise serão considerados os respectivos Anexos da NR-16 aplicáveis ao objeto da perícia, incluindo:\n• Anexo I – Explosivos;\n• Anexo II – Inflamáveis;\n• Anexo III – Segurança pessoal ou patrimonial;\n• Anexo IV – Energia elétrica;\n• Anexo V – Motocicleta;\n• Anexo VI – Agentes das autoridades de trânsito;\n• Anexo VII – Radiações ionizantes ou substâncias radioativas.',
+    pericia.modalidade !== 'insalubridade' && 'Nota Técnica.\nLíquidos Inflamáveis (Gera Direito à Periculosidade): são os líquidos com ponto de fulgor menor ou igual a 60 ºC (≤ 60 ºC). O Anexo 2 da NR-16 utiliza a definição técnica estabelecida na NR-20 (item 20.3.1).\nLíquidos Combustíveis (NÃO Gera Periculosidade): o item 16.7 da NR-16 define explicitamente que líquido combustível é aquele com ponto de fulgor maior que 60 ºC e inferior ou igual a 93 ºC. Portanto, se o produto estiver nessa faixa de temperatura, o trabalhador não tem direito ao adicional de 30%.\nÓleos Lubrificantes e Diesel Marítimo: possuem ponto de fulgor superior a 60 ºC. Enquadram-se estritamente como líquidos combustíveis, afastando legalmente o direito ao adicional de periculosidade.\nDiesel Automotivo Comum (S10/S500): apesar do nome comercial de combustível, seu ponto de fulgor real de fábrica fica abaixo de 60 ºC (geralmente entre 38 ºC e 55 ºC). Logo, é classificado legalmente como líquido inflamável, gerando direito à periculosidade.',
   )
+}
+
+function criterioAvaliacaoPericulosidade(): string {
+  return 'A caracterização da periculosidade é realizada mediante avaliação qualitativa, considerando as atividades efetivamente desenvolvidas, as condições de trabalho e o enquadramento nos critérios estabelecidos pela NR-16 e seus respectivos Anexos.'
+}
+
+function notaTecnicaEpis(): string {
+  return paragrafos(
+    'Nota Técnica sobre a Primazia da Realidade',
+    'A análise técnica observará a primazia da realidade, considerando as condições efetivamente existentes e as atividades realmente desempenhadas, em conjunto com os elementos documentais e demais evidências disponíveis.',
+    'Quanto aos EPIs, eventual ausência ou inconsistência formal nos registros de entrega não deve, isoladamente, presumir a inexistência de fornecimento, disponibilização ou utilização dos equipamentos, devendo ser considerado o conjunto probatório, inclusive outros meios de prova admitidos em direito, conforme art. 369 do CPC.',
+    'Tecnicamente, a análise deve privilegiar a realidade laboral efetivamente comprovada, e não exclusivamente a existência ou ausência de determinado registro formal.',
+    'Do ponto de vista técnico, a identificação dos próprios EPIs do Reclamante, por ele reconhecidos na presença de todos, constitui elemento objetivo a ser considerado na análise do fornecimento e da disponibilização dos EPIs pela empresa durante o contrato de trabalho.',
+  )
+}
+
+function protecoesColetivas(): string {
+  return 'Descrição dos dispositivos e medidas de engenharia adotadas no ambiente laboral para mitigação coletiva de riscos, tais como: Placas de Sinalização; Sistemas de Ventilação e Exaustão; Sistemas de Iluminação de Emergência.'
 }
 
 function metodologia(pericia: Pericia): string {
@@ -133,6 +155,9 @@ export function textosPadraoDaPericia(
     objetivoPericia: objetivoPericia(pericia),
     normasReferencias: normasReferencias(pericia),
     equipamentosAnalisados: metodologia(pericia),
+    criterioAvaliacaoPericulosidade: criterioAvaliacaoPericulosidade(),
+    notaTecnicaEpis: notaTecnicaEpis(),
+    protecoesColetivas: protecoesColetivas(),
     encerramento: encerramento(),
   }
 }
@@ -158,6 +183,7 @@ export function patchDeTextosPadrao(
     const padraoLegado =
       (campo === 'apresentacao' && atual.includes('nomeado(a) para atuar como perito(a) do Juízo')) ||
       (campo === 'normasReferencias' && atual.startsWith('A avaliação pericial observou os seguintes diplomas')) ||
+      (campo === 'normasReferencias' && atual.includes('agente avaliado: frequência, duração, periodicidade, habitualidade e permanência')) ||
       (campo === 'equipamentosAnalisados' && atual.startsWith('Os trabalhos periciais foram conduzidos em três etapas')) ||
       (campo === 'encerramento' && atual.startsWith('Os trabalhos periciais foram desenvolvidos com imparcialidade'))
     const doPerito = atual.trim() !== '' && atual !== anterior && !padraoLegado

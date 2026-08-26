@@ -122,6 +122,7 @@ function novaPericia(responsavelId: string): Pericia {
     horaVistoria: '',
     cepVistoria: '',
     localVistoria: '',
+    numeroVistoria: '',
     setorVistoriado: '',
     modalidade: 'insalubridade',
     status: 'rascunho',
@@ -151,6 +152,8 @@ function novaPericia(responsavelId: string): Pericia {
       alegacoesReclamante: '',
       informacoesReclamada: '',
       consideracoesDivergencias: '',
+      criterioAvaliacaoPericulosidade: '',
+      notaTecnicaEpis: '',
       protecoesColetivas: '',
       analiseTecnica: '',
       conclusao: '',
@@ -829,11 +832,17 @@ export default function PericiaEditor() {
               </div>
               <Input
                 label="Endereço completo da vistoria"
-                className="sm:col-span-3"
+                className="sm:col-span-2"
                 value={p.localVistoria}
                 onChange={(e) => set({ localVistoria: e.target.value })}
                 placeholder="Logradouro — bairro — cidade/UF"
-                hint="Preenchido pelo CEP e editável para acrescentar número e complemento."
+                hint="Preenchido pelo CEP e editável para acrescentar complemento."
+              />
+              <Input
+                label="Número"
+                value={p.numeroVistoria ?? ''}
+                onChange={(e) => set({ numeroVistoria: e.target.value })}
+                placeholder="Ex.: 125 ou s/n"
               />
               <Input
                 label="Setor / local vistoriado"
@@ -1163,6 +1172,19 @@ export default function PericiaEditor() {
                       agentes: p.tecnico.agentes.map((x) => x.id === a.id ? agenteAtualizado : x),
                     })}
                   />
+                  <div className="mt-3">
+                    <Textarea
+                      label="Texto técnico deste agente no documento (opcional)"
+                      rows={4}
+                      value={a.observacao ?? ''}
+                      onChange={(e) => setT({
+                        agentes: p.tecnico.agentes.map((x) =>
+                          x.id === a.id ? { ...x, observacao: e.target.value } : x,
+                        ),
+                      })}
+                      placeholder="Registre a avaliação, as medidas de proteção e as evidências específicas deste agente."
+                    />
+                  </div>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <Select
                       label="Natureza"
@@ -1340,6 +1362,8 @@ export default function PericiaEditor() {
               { campo: 'alegacoesReclamante', secao: 'generico', label: 'Alegações do Reclamante', rows: 5 },
               { campo: 'informacoesReclamada', secao: 'generico', label: 'Informações prestadas pela Reclamada', rows: 5 },
               { campo: 'consideracoesDivergencias', secao: 'analise', label: 'Considerações sobre as divergências fáticas', rows: 6 },
+              { campo: 'criterioAvaliacaoPericulosidade', secao: 'analise', label: 'Critério de avaliação — NR-16', rows: 4 },
+              { campo: 'notaTecnicaEpis', secao: 'analise', label: 'Nota técnica dos EPIs', rows: 7 },
               { campo: 'protecoesColetivas', secao: 'analise', label: 'Proteções coletivas', rows: 5 },
               {
                 campo: 'analiseTecnica',

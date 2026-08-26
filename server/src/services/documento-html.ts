@@ -314,7 +314,7 @@ export async function htmlDoParecer(
 
   const textoVistoria = `<p>A vistoria técnica foi realizada em ${extenso(pericia.dataVistoria)}${
     pericia.horaVistoria ? `, às ${esc(pericia.horaVistoria)}` : ''
-  }, no endereço ${esc(pericia.localVistoria || '—')}${pericia.setorVistoriado ? `, no setor/local ${esc(pericia.setorVistoriado)}` : ''}, com a presença dos participantes abaixo relacionados.</p>`
+  }, no endereço ${esc(pericia.localVistoria || '—')}${pericia.numeroVistoria ? `, nº ${esc(pericia.numeroVistoria)}` : ''}${pericia.setorVistoriado ? `, no setor/local ${esc(pericia.setorVistoriado)}` : ''}, com a presença dos participantes abaixo relacionados.</p>`
 
   const tabelaPeriodos = t.periodos?.length
     ? `<table>
@@ -346,10 +346,20 @@ export async function htmlDoParecer(
       ? 'ANÁLISE TÉCNICA DAS ATIVIDADES E RISCOS IDENTIFICADOS'
       : 'ANÁLISE TÉCNICA DOS AGENTES, ATIVIDADES E RISCOS IDENTIFICADOS'
 
-  const tabelaAgentes = (lista: typeof agentes) => lista.length
-    ? lista.map((agente) => {
+  const rotuloNatureza = (tipo?: string) => ({
+    fisico: 'Agente Físico',
+    quimico: 'Agente Químico',
+    biologico: 'Agente Biológico',
+    periculosidade: 'Atividade ou Operação Perigosa',
+  } as Record<string, string>)[tipo ?? ''] ?? 'Agente'
+
+  const tabelaAgentes = (lista: typeof agentes, prefixo?: string) => lista.length
+    ? lista.map((agente, indice) => {
         const apresentacao = montarApresentacaoAgente(agente)
-        return `<section class="agente-bloco"><div class="agente-resumo"><h3 class="agente-titulo">${esc(apresentacao.titulo)}</h3>${tabelaLinhasAgente(apresentacao.linhas, true)}</div></section>`
+        const titulo = prefixo
+          ? `${prefixo}.${indice + 1}. ${rotuloNatureza(agente.tipo)} — ${apresentacao.titulo}`
+          : apresentacao.titulo
+        return `<section class="agente-bloco"><div class="agente-resumo"><h3 class="agente-titulo">${esc(titulo)}</h3>${tabelaLinhasAgente(apresentacao.linhas, true)}</div>${agente.observacao?.trim() ? paragrafos(agente.observacao) : ''}</section>`
       }).join('')
     : '<p class="vazio">[Nenhum agente cadastrado]</p>'
 
@@ -466,17 +476,24 @@ export async function htmlDoParecer(
         `<h3>${num.sub('Atividades Efetivamente Exercidas')}</h3>` +
         paragrafos(t.atividadesFuncoes) +
         (temInsalubridade
-          ? `<h3>${num.sub('NR-15 — Avaliação da Exposição Ocupacional')}</h3>` + tabelaAgentes(agentesNr15)
+          ? (() => {
+              const cabecalho = num.sub('NR-15 — Avaliação da Exposição Ocupacional')
+              const numero = cabecalho.split('. ')[0]
+              return `<h3>${cabecalho}</h3>` + tabelaAgentes(agentesNr15, numero)
+            })()
           : '') +
         (temPericulosidade
-          ? `<h3>${num.sub('NR-16 — Avaliação das Atividades e Operações Perigosas')}</h3>` +
-            tabelaAgentes(agentesNr16)
+          ? (() => {
+              const cabecalho = num.sub('NR-16 — Avaliação das Atividades e Operações Perigosas')
+              const numero = cabecalho.split('. ')[0]
+              return `<h3>${cabecalho}</h3><h4>${numero}.1. Critério de Avaliação</h4>${paragrafos(t.criterioAvaliacaoPericulosidade)}${tabelaAgentes(agentesNr16)}`
+            })()
           : '') +
         blocoDivergencias() +
         fotosDocumentos,
     ),
     `<h2>${num.secao('DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)')}</h2>`,
-    blocoConteudo(blocoProtecoes + fotosEpis),
+    blocoConteudo(paragrafos(t.notaTecnicaEpis) + blocoProtecoes + fotosEpis),
     `<h2>${num.secao('DAS PROTEÇÕES COLETIVAS')}</h2>`,
     blocoConteudo(paragrafos(t.protecoesColetivas)),
     `<h2>${num.secao(tituloAnalise)}</h2>`,

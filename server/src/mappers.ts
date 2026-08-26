@@ -83,6 +83,7 @@ export function periciaParaApi(p: PericiaCompleta) {
     horaVistoria: p.horaVistoria ?? '',
     cepVistoria: p.cepVistoria ?? '',
     localVistoria: p.localVistoria ?? '',
+    numeroVistoria: p.numeroVistoria ?? '',
     setorVistoriado: p.setorVistoriado ?? '',
     modalidade: p.modalidade,
     status: p.status,

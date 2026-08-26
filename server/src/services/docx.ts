@@ -488,7 +488,7 @@ async function docParecer(
     p(
       `A vistoria técnica foi realizada em ${extenso(pericia.dataVistoria)}${
         pericia.horaVistoria ? `, às ${pericia.horaVistoria}` : ''
-      }, no endereço ${pericia.localVistoria || '—'}${pericia.setorVistoriado ? `, no setor/local ${pericia.setorVistoriado}` : ''}, com a presença dos participantes abaixo relacionados.`,
+      }, no endereço ${pericia.localVistoria || '—'}${pericia.numeroVistoria ? `, nº ${pericia.numeroVistoria}` : ''}${pericia.setorVistoriado ? `, no setor/local ${pericia.setorVistoriado}` : ''}, com a presença dos participantes abaixo relacionados.`,
     ),
   ]
 
@@ -574,15 +574,24 @@ async function docParecer(
 
   filhos.push(h3(num.sub('Atividades Efetivamente Exercidas')), ...blocos(t.atividadesFuncoes))
 
-  const adicionarAgentes = (lista: typeof agentes) => {
+  const rotuloNatureza = (tipo?: string) => ({
+    fisico: 'Agente Físico',
+    quimico: 'Agente Químico',
+    biologico: 'Agente Biológico',
+    periculosidade: 'Atividade ou Operação Perigosa',
+  } as Record<string, string>)[tipo ?? ''] ?? 'Agente'
+
+  const adicionarAgentes = (lista: typeof agentes, prefixo?: string) => {
     if (!lista.length) {
       filhos.push(new Paragraph({ children: [texto('[Nenhum agente cadastrado]', { italico: true })] }))
       return
     }
-    for (const agente of lista) {
+    for (const [indice, agente] of lista.entries()) {
       const apresentacao = montarApresentacaoAgente(agente)
       filhos.push(
-        h3(apresentacao.titulo),
+        prefixo
+          ? h4(`${prefixo}.${indice + 1}. ${rotuloNatureza(agente.tipo)} — ${apresentacao.titulo}`)
+          : h3(apresentacao.titulo),
         tabela([
           new TableRow({
             tableHeader: true,
@@ -595,15 +604,20 @@ async function docParecer(
           ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor)),
         ]),
       )
+      if (agente.observacao?.trim()) filhos.push(...blocos(agente.observacao))
     }
   }
 
   if (temInsalubridade) {
-    filhos.push(h3(num.sub('NR-15 — Avaliação da Exposição Ocupacional')))
-    adicionarAgentes(agentesNr15)
+    const cabecalho = num.sub('NR-15 — Avaliação da Exposição Ocupacional')
+    const numero = cabecalho.split('. ')[0]
+    filhos.push(h3(cabecalho))
+    adicionarAgentes(agentesNr15, numero)
   }
   if (temPericulosidade) {
-    filhos.push(h3(num.sub('NR-16 — Avaliação das Atividades e Operações Perigosas')))
+    const cabecalho = num.sub('NR-16 — Avaliação das Atividades e Operações Perigosas')
+    const numero = cabecalho.split('. ')[0]
+    filhos.push(h3(cabecalho), h4(`${numero}.1. Critério de Avaliação`), ...blocos(t.criterioAvaliacaoPericulosidade))
     adicionarAgentes(agentesNr16)
   }
   const temDivergencias = Boolean(
@@ -630,6 +644,7 @@ async function docParecer(
   filhos.push(...(await fotosDasSecoes(['documentos'])))
 
   filhos.push(h2(num.secao('DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)')))
+  filhos.push(...blocos(t.notaTecnicaEpis))
   let temProtecao = false
   for (const agente of agentes) {
     const apresentacao = montarApresentacaoAgente(agente)

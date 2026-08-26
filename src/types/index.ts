@@ -112,6 +112,7 @@ export interface Pericia {
   horaVistoria?: string
   cepVistoria?: string
   localVistoria?: string
+  numeroVistoria?: string
   setorVistoriado?: string
   modalidade: ModalidadePericia
   status: StatusPericia
@@ -233,6 +234,8 @@ export interface PreenchimentoTecnico {
   alegacoesReclamante?: string
   informacoesReclamada?: string
   consideracoesDivergencias?: string
+  criterioAvaliacaoPericulosidade?: string
+  notaTecnicaEpis?: string
   protecoesColetivas?: string
   analiseTecnica: string
   conclusao: string

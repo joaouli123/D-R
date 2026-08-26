@@ -245,6 +245,51 @@ describe('DocumentoPreview', () => {
     expect(html).toContain('7.5. Considerações sobre as divergências fáticas')
   })
 
+  it('mostra número do endereço, itens editáveis dos agentes e os novos textos técnicos', () => {
+    const revisada = {
+      ...pericia,
+      numeroVistoria: '125',
+      tecnico: {
+        ...pericia.tecnico,
+        notaTecnicaEpis: 'Nota Técnica sobre a Primazia da Realidade.',
+        criterioAvaliacaoPericulosidade:
+          'A caracterização da periculosidade é realizada mediante avaliação qualitativa.',
+        agentes: [
+          { ...pericia.tecnico.agentes[0], observacao: 'Análise editável do agente químico.' },
+          { ...pericia.tecnico.agentes[1], observacao: 'Análise editável do agente físico.' },
+          {
+            id: 'agente-biologico',
+            nome: 'Agentes biológicos',
+            tipo: 'biologico',
+            criterio: 'qualitativo',
+            observacao: 'Análise editável do agente biológico.',
+          },
+          {
+            id: 'risco-inflamaveis',
+            nome: 'Inflamáveis',
+            tipo: 'periculosidade',
+            criterio: 'qualitativo',
+            anexoNr16: 'ANEXO_02',
+            observacao: 'Análise editável da periculosidade.',
+          },
+        ],
+      },
+    } satisfies Pericia
+
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={revisada} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    expect(html).toContain('Local da vistoria, nº 125')
+    expect(html).toContain('7.2.1. Agente Químico — Acetaldeído')
+    expect(html).toContain('7.2.2. Agente Físico — Ruído contínuo')
+    expect(html).toContain('7.2.3. Agente Biológico — Agentes biológicos')
+    expect(html).toContain('Análise editável do agente químico.')
+    expect(html).toContain('7.3.1. Critério de Avaliação')
+    expect(html).toContain('avaliação qualitativa')
+    expect(html).toContain('Nota Técnica sobre a Primazia da Realidade.')
+  })
+
   it('em parecer só de periculosidade omite a NR-15 e renumera as seções finais', () => {
     const somentePericulosidade = {
       ...pericia,

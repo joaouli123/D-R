@@ -126,14 +126,23 @@ export function DocumentoPreview({
     (pericia.modalidade === 'periculosidade' ? t.conclusao : '')
   const encerramento = t.encerramento?.trim() || t.observacoesAdicionais
 
-  const agentesSemProtecoes = (agentes: typeof t.agentes) =>
+  const rotuloNatureza = (tipo: (typeof t.agentes)[number]['tipo']) => ({
+    fisico: 'Agente Físico',
+    quimico: 'Agente Químico',
+    biologico: 'Agente Biológico',
+    periculosidade: 'Atividade ou Operação Perigosa',
+  } as Record<(typeof t.agentes)[number]['tipo'], string>)[tipo]
+
+  const agentesSemProtecoes = (agentes: typeof t.agentes, prefixo?: string) =>
     agentes.length ? (
       <div className="space-y-4">
-        {agentes.map((agente) => {
+        {agentes.map((agente, indice) => {
           const apresentacao = montarApresentacaoAgente(agente)
           return (
             <section key={agente.id} className="agente-bloco">
-              <h3>{apresentacao.titulo}</h3>
+              {prefixo
+                ? <h4>{prefixo}.{indice + 1}. {rotuloNatureza(agente.tipo)} — {apresentacao.titulo}</h4>
+                : <h3>{apresentacao.titulo}</h3>}
               <table className="agente-propriedades">
                 <thead><tr><th>Propriedade</th><th>Informação</th></tr></thead>
                 <tbody>
@@ -142,6 +151,7 @@ export function DocumentoPreview({
                   ))}
                 </tbody>
               </table>
+              {agente.observacao?.trim() && <Paragrafos texto={agente.observacao} />}
             </section>
           )
         })}
@@ -234,6 +244,7 @@ export function DocumentoPreview({
         A vistoria técnica foi realizada em {extenso(pericia.dataVistoria)}
         {pericia.horaVistoria ? `, às ${pericia.horaVistoria}` : ''}, no endereço{' '}
         {pericia.localVistoria || '—'}
+        {pericia.numeroVistoria ? `, nº ${pericia.numeroVistoria}` : ''}
         {pericia.setorVistoriado ? `, no setor/local ${pericia.setorVistoriado}` : ''}, com a presença dos participantes abaixo relacionados.
       </p>
       {pericia.participantes.length > 0 && (
@@ -293,8 +304,13 @@ export function DocumentoPreview({
       )}
       <h3>7.1. Atividades Efetivamente Exercidas</h3>
       <Paragrafos texto={t.atividadesFuncoes} />
-      {temInsalubridade && <><h3>{numeroAvaliacaoNr15}. NR-15 — Avaliação da Exposição Ocupacional</h3>{agentesSemProtecoes(agentesNr15)}</>}
-      {temPericulosidade && <><h3>{numeroAvaliacaoNr16}. NR-16 — Avaliação das Atividades e Operações Perigosas</h3>{agentesSemProtecoes(agentesNr16)}</>}
+      {temInsalubridade && <><h3>{numeroAvaliacaoNr15}. NR-15 — Avaliação da Exposição Ocupacional</h3>{agentesSemProtecoes(agentesNr15, numeroAvaliacaoNr15 ?? undefined)}</>}
+      {temPericulosidade && <>
+        <h3>{numeroAvaliacaoNr16}. NR-16 — Avaliação das Atividades e Operações Perigosas</h3>
+        <h4>{numeroAvaliacaoNr16}.1. Critério de Avaliação</h4>
+        <Paragrafos texto={t.criterioAvaliacaoPericulosidade} />
+        {agentesSemProtecoes(agentesNr16)}
+      </>}
       {numeroDivergencias && (
         <>
           <h3>{numeroDivergencias}. Divergências Fáticas</h3>
@@ -311,6 +327,7 @@ export function DocumentoPreview({
       {fotosDasSecoes(['documentos'])}
 
       <h2>8. Dos Equipamentos de Proteção Individual (NR-06)</h2>
+      <Paragrafos texto={t.notaTecnicaEpis} />
       {protecoes.length ? protecoes.map(({ agente, apresentacao }) => (
         <section key={agente.id} className="agente-bloco">
           <h3>{apresentacao.titulo}</h3>

@@ -339,6 +339,7 @@ export interface AgenteDocumento {
   epiEficaz?: boolean
   criterio: string
   grau?: string
+  observacao?: string
 }
 
 export type OrigemMedicaoDocumento = 'perito' | 'empresa' | 'nao_informado'
@@ -764,6 +765,8 @@ export interface TecnicoJson {
   alegacoesReclamante?: string
   informacoesReclamada?: string
   consideracoesDivergencias?: string
+  criterioAvaliacaoPericulosidade?: string
+  notaTecnicaEpis?: string
   protecoesColetivas?: string
   analiseTecnica: string
   conclusao: string

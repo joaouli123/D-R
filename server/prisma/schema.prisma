@@ -117,6 +117,7 @@ model Pericia {
   horaVistoria     String?
   cepVistoria      String?
   localVistoria    String?
+  numeroVistoria   String?
   setorVistoriado  String?
   modalidade       Modalidade    @default(insalubridade)
   status           StatusPericia @default(rascunho)
