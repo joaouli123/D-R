@@ -1,2 +1,2 @@
 ALTER TABLE "Pericia"
-  ADD COLUMN "numeroVistoria" TEXT;
+  ADD COLUMN IF NOT EXISTS "numeroVistoria" TEXT;

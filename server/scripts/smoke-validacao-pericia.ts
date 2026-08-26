@@ -4,8 +4,16 @@
 //
 // Confere que registros legados continuam válidos, que os novos
 // metadados normativos são preservados e que enums inválidos são rejeitados.
+import { readFileSync } from 'node:fs'
+
 process.env.DATABASE_URL ??= 'postgresql://smoke:smoke@127.0.0.1:5432/smoke'
 process.env.JWT_SECRET ??= 'smoke-test-secret-with-at-least-32-characters'
+
+const migracaoNumeroVistoria = readFileSync(
+  new URL('../prisma/migrations/20260826104500_numero_vistoria/migration.sql', import.meta.url),
+  'utf8',
+)
+const entrypoint = readFileSync(new URL('../docker-entrypoint.sh', import.meta.url), 'utf8')
 
 const moduloPericias = await import('../src/routes/pericias.js')
 const { agenteSchema } = moduloPericias
@@ -228,6 +236,12 @@ const resultados = [
       novaEstrutura.data?.notaTecnicaEpis === 'Primazia da realidade e conjunto probatório' &&
       novaEstrutura.data?.conclusaoPericulosidade === 'Não caracterizada' &&
       novaEstrutura.data?.encerramento === 'Parecer composto por folhas rubricadas.',
+  },
+  {
+    nome: 'migração do número é idempotente e recupera somente a falha conhecida',
+    ok:
+      migracaoNumeroVistoria.includes('ADD COLUMN IF NOT EXISTS "numeroVistoria"') &&
+      entrypoint.includes('prisma migrate resolve --rolled-back "$MIGRACAO_RECUPERAVEL"'),
   },
 ]
 
