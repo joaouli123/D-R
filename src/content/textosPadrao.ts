@@ -41,7 +41,7 @@ function qualificacao(perito?: Usuario | null): string {
 }
 
 function apresentacao(_pericia: Pericia, perito?: Usuario | null, _reclamada?: Empresa): string {
-  return `${qualificacao(perito)}, qualificado(a) nos autos como Assistente Técnico(a) da Reclamada, vem, respeitosamente, apresentar o presente PARECER TÉCNICO, elaborado com base na diligência realizada, nas condições efetivamente constatadas e na documentação analisada, à luz das Normas Regulamentadoras aplicáveis, apresentando suas conclusões técnicas de forma objetiva e fundamentada.`
+  return `${qualificacao(perito)}, qualificado nos autos como Assistente Técnico da Reclamada, vem, respeitosamente, apresentar o presente PARECER TÉCNICO, elaborado com base na diligência realizada, nas condições efetivamente constatadas e na documentação analisada, à luz das Normas Regulamentadoras aplicáveis, apresentando suas conclusões técnicas de forma objetiva e fundamentada.`
 }
 
 function objetoPorModalidade(modalidade: ModalidadePericia): string {
@@ -182,6 +182,10 @@ export function patchDeTextosPadrao(
     const anterior = aplicadosAntes[campo]
     const padraoLegado =
       (campo === 'apresentacao' && atual.includes('nomeado(a) para atuar como perito(a) do Juízo')) ||
+      (campo === 'apresentacao' &&
+        atual.includes(
+          'qualificado(a) nos autos como Assistente Técnico(a) da Reclamada, vem, respeitosamente, apresentar o presente PARECER TÉCNICO, elaborado com base na diligência realizada, nas condições efetivamente constatadas e na documentação analisada, à luz das Normas Regulamentadoras aplicáveis, apresentando suas conclusões técnicas de forma objetiva e fundamentada.',
+        )) ||
       (campo === 'normasReferencias' && atual.startsWith('A avaliação pericial observou os seguintes diplomas')) ||
       (campo === 'normasReferencias' && atual.includes('agente avaliado: frequência, duração, periodicidade, habitualidade e permanência')) ||
       (campo === 'equipamentosAnalisados' && atual.startsWith('Os trabalhos periciais foram conduzidos em três etapas')) ||

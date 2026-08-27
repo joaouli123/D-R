@@ -71,7 +71,9 @@ describe('textosPadraoDaPericia', () => {
     const { apresentacao } = textosPadraoDaPericia(pericia(), PERITO, RECLAMADA)
 
     expect(apresentacao).toContain('Dinoel Ribeiro, Engenheiro de Segurança do Trabalho, CREA-SP 5063000000')
-    expect(apresentacao).toContain('Assistente Técnico(a) da Reclamada')
+    expect(apresentacao).toContain('qualificado nos autos como Assistente Técnico da Reclamada')
+    expect(apresentacao).not.toContain('qualificado(a)')
+    expect(apresentacao).not.toContain('Técnico(a)')
     expect(apresentacao).toContain('apresentar o presente PARECER TÉCNICO')
     expect(apresentacao).not.toContain('perito(a) do Juízo')
   })
@@ -167,6 +169,18 @@ describe('patchDeTextosPadrao', () => {
     const patch = patchDeTextosPadrao(tecnico, padroes, {})
 
     expect(patch.normasReferencias).toBe(padroes.normasReferencias)
+  })
+
+  it('migra a apresentação automática que ainda usa flexões entre parênteses', () => {
+    const tecnico = {
+      ...pericia().tecnico,
+      apresentacao:
+        'Dinoel Ribeiro, Engenheiro de Segurança do Trabalho, CREA-SP 5063000000, qualificado(a) nos autos como Assistente Técnico(a) da Reclamada, vem, respeitosamente, apresentar o presente PARECER TÉCNICO, elaborado com base na diligência realizada, nas condições efetivamente constatadas e na documentação analisada, à luz das Normas Regulamentadoras aplicáveis, apresentando suas conclusões técnicas de forma objetiva e fundamentada.',
+    }
+
+    const patch = patchDeTextosPadrao(tecnico, padroes, {})
+
+    expect(patch.apresentacao).toBe(padroes.apresentacao)
   })
 
   it('não repete o patch quando já está tudo em dia', () => {
