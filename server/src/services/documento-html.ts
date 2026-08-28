@@ -11,9 +11,9 @@ import {
   ORIGEM_PONTO,
   PAPEL,
   type TecnicoJson,
-  VAZIO,
   css,
   data,
+  dadosAssinaturaDocumento,
   emParagrafos,
   extenso,
   intervaloDoPeriodo,
@@ -48,13 +48,13 @@ function esc(v: unknown): string {
 
 function paragrafos(texto?: string | null): string {
   const partes = emParagrafos(texto)
-  if (!partes.length) return `<p class="vazio">${VAZIO}</p>`
+  if (!partes.length) return ''
   return partes.map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('')
 }
 
 function paragrafosEstruturados(texto?: string | null): string {
   const partes = emParagrafos(texto)
-  if (!partes.length) return `<p class="vazio">${VAZIO}</p>`
+  if (!partes.length) return ''
   return partes.map((parte) => {
     const titulo = parte.trim().match(/^([45]\.\d+(?:\.\d+)?\.)\s+(.+)$/s)
     if (!titulo) return `<p>${esc(parte).replace(/\n/g, '<br>')}</p>`
@@ -212,11 +212,15 @@ function moldura(
 </body></html>`
 }
 
-function assinatura(perito: Usuario | null, comarca?: string | null): string {
+function assinatura(
+  perito: Usuario | null,
+  cidade?: string | null,
+  dataAssinatura: string = hoje(),
+): string {
   const titulos = (perito?.titulo ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean)
   const registros = (perito?.registroProfissional ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean)
   return `
-  <p class="local-data">${esc(comarca || 'São Paulo/SP')}, ${extenso(hoje())}.</p>
+  <p class="local-data">${esc(cidade || 'São Paulo/SP')}, ${extenso(dataAssinatura)}.</p>
   <div class="assinatura">
     <div class="traco">
       <p class="nome">${esc(perito?.nome ?? '—')}</p>
@@ -257,6 +261,7 @@ export async function htmlDoParecer(
   titulo: string,
 ): Promise<string> {
   const t = pericia.tecnico as unknown as TecnicoJson
+  const fecho = dadosAssinaturaDocumento({ ...pericia, tecnico: t })
 
   const porId = new Map(empresas.map((e) => [e.id, e]))
   const principal = porId.get(pericia.reclamadas.find((r) => r.principal)?.empresaId ?? '')
@@ -348,7 +353,7 @@ export async function htmlDoParecer(
           : apresentacao.titulo
         return `<section class="agente-bloco"><div class="agente-resumo"><h3 class="agente-titulo">${esc(titulo)}</h3>${tabelaLinhasAgente(apresentacao.linhas, true)}</div>${agente.observacao?.trim() ? paragrafos(agente.observacao) : ''}</section>`
       }).join('')
-    : '<p class="vazio">[Nenhum agente cadastrado]</p>'
+    : ''
 
   const blocoProtecoes = agentes.flatMap((agente) => {
     const apresentacao = montarApresentacaoAgente(agente)
@@ -360,7 +365,7 @@ export async function htmlDoParecer(
         )
         .join('')}</section>`,
     ]
-  }).join('') || '<p class="vazio">[Nenhum EPI associado aos agentes]</p>'
+  }).join('')
 
   // Fotos viram data URI: o Chromium roda com a rede bloqueada.
   const fotosOrdenadas = [...pericia.fotos].sort((a, b) => a.ordem - b.ordem)
@@ -495,7 +500,7 @@ export async function htmlDoParecer(
     `<h2>${num.secao('ENCERRAMENTO')}</h2>`,
     blocoConteudo(paragrafos(encerramento)),
     '<p class="sem-recuo" style="margin-top:24px">Sendo o que se apresenta para o momento, o signatário coloca-se à disposição deste MM. Juízo para os esclarecimentos que se fizerem necessários.</p>',
-    assinatura(perito, pericia.comarca),
+    assinatura(perito, fecho.cidade, fecho.data),
   )
 
   return moldura(titulo, perito, partes.join('\n'), {

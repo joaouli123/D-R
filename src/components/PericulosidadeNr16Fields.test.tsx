@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { PericulosidadeNr16Fields } from './PericulosidadeNr16Fields'
+import { anexoNr16PorId } from '@/content/anexosNr16'
 import type { AgenteAvaliado } from '@/types'
 
 afterEach(cleanup)
@@ -78,6 +79,34 @@ describe('PericulosidadeNr16Fields', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: 'Resultado técnico' }), '')
     expect(onChange).toHaveBeenLastCalledWith(expect.not.objectContaining({
       resultadoPericulosidade: expect.anything(),
+    }))
+  })
+
+  it('oferece todas as atividades do quadro oficial do Anexo 2 da NR-16', () => {
+    const atividades = anexoNr16PorId('ANEXO_02')?.atividadesSugeridas ?? []
+
+    expect(atividades).toHaveLength(12)
+    expect(atividades).toContain('Reabastecimento de aeronaves')
+    expect(atividades).toContain('Transporte de inflamáveis líquidos e gasosos liquefeitos em caminhão-tanque')
+    expect(atividades).toContain('Desgaseificação, decantação e reparos de vasilhames não desgaseificados ou decantados')
+    expect(atividades).toContain('Transporte de vasilhames com inflamável líquido em quantidade total igual ou superior a 200 litros')
+  })
+
+  it('aplica os quatro textos padrão de ausência de enquadramento somente por ação do usuário', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<PericulosidadeNr16Fields
+      avaliacao={{ ...avaliacao, nome: 'Inflamáveis', anexoNr16: 'ANEXO_02' }}
+      onChange={onChange}
+    />)
+
+    await user.click(screen.getByRole('button', { name: 'Aplicar texto padrão sem enquadramento' }))
+
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      atividadeEnquadrada: 'Avaliada a atividade efetivamente desempenhada pelo trabalhador.',
+      areaRisco: 'Não identificada condição ou área de risco enquadrável na NR-16 e seus anexos.',
+      exposicaoPericulosidade: 'nao_constatada',
+      resultadoPericulosidade: 'nao_caracterizada',
     }))
   })
 })

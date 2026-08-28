@@ -433,6 +433,81 @@ async function main() {
   const htmlParecer = await fs.readFile(path.join(SAIDA, 'parecer.html'), 'utf8')
   const parecerGerado = saidasVisuais.find((saida) => saida.nome === 'parecer')
 
+  const periciaAssinatura = {
+    ...periciaBase,
+    tecnico: {
+      ...periciaBase.tecnico,
+      dataAssinatura: '2026-08-20',
+      cidadeAssinatura: 'Santo André',
+    },
+  } as unknown as PericiaCompleta
+  const htmlAssinatura = await montarHtml(
+    doc('parecer', 'Parecer Técnico Pericial — Assinatura', null),
+    periciaAssinatura,
+    [empresa],
+    perito,
+  )
+  const docxAssinatura = await gerarDocx(
+    doc('parecer', 'Parecer Técnico Pericial — Assinatura', null),
+    periciaAssinatura,
+    [empresa],
+    perito,
+  )
+  const pacoteAssinatura = await JSZip.loadAsync(docxAssinatura)
+  const xmlAssinatura = await pacoteAssinatura.file('word/document.xml')!.async('string')
+
+  assert.match(htmlAssinatura, /Santo André, 20 de agosto de 2026\./)
+  assert.match(xmlAssinatura, /Santo André, 20 de agosto de 2026\./)
+
+  const periciaSemPreenchimento = {
+    ...periciaBase,
+    modalidade: 'insalubridade',
+    tecnico: {
+      ...periciaBase.tecnico,
+      apresentacao: '',
+      objetivoPericia: '',
+      descricaoEmpresa: '',
+      descricaoAmbiente: '',
+      descricaoPostoTrabalho: '',
+      maquinasFerramentas: '',
+      produtosUtilizados: '',
+      atividadesFuncoes: '',
+      periodos: [],
+      agentes: [],
+      normasReferencias: '',
+      equipamentosAnalisados: '',
+      informacoesLevantadas: '',
+      notaTecnicaEpis: '',
+      protecoesColetivas: '',
+      analiseTecnica: '',
+      conclusao: '',
+      conclusaoInsalubridade: '',
+      respostasQuesitos: '',
+      encerramento: '',
+      observacoesAdicionais: '',
+    },
+  } as unknown as PericiaCompleta
+  const htmlSemPreenchimento = await montarHtml(
+    doc('parecer', 'Parecer Técnico Pericial — Rascunho', null),
+    periciaSemPreenchimento,
+    [empresa],
+    perito,
+  )
+  const docxSemPreenchimento = await gerarDocx(
+    doc('parecer', 'Parecer Técnico Pericial — Rascunho', null),
+    periciaSemPreenchimento,
+    [empresa],
+    perito,
+  )
+  const pacoteSemPreenchimento = await JSZip.loadAsync(docxSemPreenchimento)
+  const xmlSemPreenchimento = await pacoteSemPreenchimento.file('word/document.xml')!.async('string')
+
+  for (const conteudo of [htmlSemPreenchimento, xmlSemPreenchimento]) {
+    assert.doesNotMatch(conteudo, /\[Seção não preenchida\]/)
+    assert.doesNotMatch(conteudo, /\[Nenhum agente cadastrado\]/)
+    assert.doesNotMatch(conteudo, /\[Nenhum EPI associado aos agentes\]/)
+  }
+
   const periciaRegistros = {
     ...periciaBase,
     tecnico: {

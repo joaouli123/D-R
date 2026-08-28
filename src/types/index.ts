@@ -162,7 +162,7 @@ export type TipoMedicaoEmpresa = 'valor' | 'faixa' | 'registros_processo'
  * e a conclusão sobre habitualidade depende justamente dessa diferença.
  */
 export type FonteRuido = 'maquinas' | 'ruido_fundo' | 'administrativa'
-export type ExposicaoPericulosidade = 'permanente' | 'intermitente' | 'eventual'
+export type ExposicaoPericulosidade = 'permanente' | 'intermitente' | 'eventual' | 'nao_constatada'
 export type ResultadoPericulosidade = 'caracterizada' | 'nao_caracterizada' | 'prejudicada'
 
 export interface AgenteAvaliado {
@@ -243,6 +243,10 @@ export interface PreenchimentoTecnico {
   conclusaoPericulosidade?: string
   respostasQuesitos?: string
   encerramento?: string
+  /** Data escolhida para o fecho e a assinatura do documento. */
+  dataAssinatura?: string
+  /** Cidade escolhida para o fecho; sem valor, usa a cidade da vistoria. */
+  cidadeAssinatura?: string
   observacoesAdicionais: string
 }
 

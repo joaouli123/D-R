@@ -14,6 +14,13 @@ export interface AnexoNr16Info {
   atividadesSugeridas: string[]
 }
 
+export const PADRAO_NR16_SEM_ENQUADRAMENTO = {
+  atividadeEnquadrada: 'Avaliada a atividade efetivamente desempenhada pelo trabalhador.',
+  areaRisco: 'Não identificada condição ou área de risco enquadrável na NR-16 e seus anexos.',
+  exposicaoPericulosidade: 'nao_constatada' as const,
+  resultadoPericulosidade: 'nao_caracterizada' as const,
+}
+
 export const ANEXOS_NR16: AnexoNr16Info[] = [
   {
     id: 'ANEXO_01',
@@ -35,12 +42,18 @@ export const ANEXOS_NR16: AnexoNr16Info[] = [
     label: 'Anexo 2 — Atividades e Operações Perigosas com Inflamáveis',
     risco: 'Inflamáveis',
     atividadesSugeridas: [
-      'Produção, transporte, processamento ou armazenamento de gás liquefeito',
-      'Transporte e armazenagem de inflamáveis líquidos e gasosos liquefeitos',
-      'Carregamento ou descarga de inflamáveis',
-      'Operação ou manutenção de tanques, bombas e vasilhames',
-      'Operação em postos de serviço e bombas de abastecimento',
+      'Produção, transporte, processamento e armazenamento de gás liquefeito',
+      'Transporte e armazenagem de inflamáveis líquidos e gasosos liquefeitos e de vasilhames vazios não desgaseificados ou decantados',
+      'Reabastecimento de aeronaves',
+      'Carregamento de navios-tanques, vagões-tanques, caminhões-tanques e enchimento de vasilhames com inflamáveis',
+      'Descarga de navios-tanques, vagões-tanques, caminhões-tanques e vasilhames com inflamáveis',
+      'Operação e manutenção de navios-tanques, vagões-tanques, caminhões-tanques, bombas e vasilhames com inflamáveis',
+      'Desgaseificação, decantação e reparos de vasilhames não desgaseificados ou decantados',
       'Teste de aparelhos de consumo de gás e seus equipamentos',
+      'Transporte de inflamáveis líquidos e gasosos liquefeitos em caminhão-tanque',
+      'Transporte de vasilhames com inflamável líquido em quantidade total igual ou superior a 200 litros',
+      'Transporte de vasilhames com inflamáveis gasosos liquefeitos em quantidade total igual ou superior a 135 quilos',
+      'Operação em postos de serviço e bombas de abastecimento de inflamáveis líquidos',
     ],
   },
   {

@@ -143,6 +143,34 @@ export function extenso(iso?: string | null): string {
 
 export const hoje = (): string => new Date().toISOString().slice(0, 10)
 
+const CIDADE_COM_UF = /^(.+?)\s*\/\s*[A-Z]{2}$/i
+
+export function cidadeDaVistoriaDocumento(localVistoria?: string | null): string {
+  const endereco = localVistoria?.trim()
+  if (!endereco) return ''
+
+  const segmentos = endereco.split(/\s+[—–]\s+/).map((parte) => parte.trim()).filter(Boolean)
+  const ultimo = segmentos.at(-1) ?? ''
+  return ultimo.match(CIDADE_COM_UF)?.[1]?.trim() ?? ''
+}
+
+export function dadosAssinaturaDocumento(pericia: {
+  dataVistoria?: string | null
+  localVistoria?: string | null
+  tecnico?: { dataAssinatura?: string; cidadeAssinatura?: string } | null
+}): { cidade: string; data: string } {
+  return {
+    cidade:
+      pericia.tecnico?.cidadeAssinatura?.trim() ||
+      cidadeDaVistoriaDocumento(pericia.localVistoria) ||
+      'Santo André',
+    data:
+      pericia.tecnico?.dataAssinatura?.trim() ||
+      pericia.dataVistoria?.trim() ||
+      hoje(),
+  }
+}
+
 // ---- Período de avaliação da empresa ------------------------------------
 // O laudo avalia os cinco anos anteriores ao ajuizamento da ação, ou o
 // que houver a partir da admissão, se ela for posterior a esse marco.
@@ -251,8 +279,6 @@ export function emParagrafos(texto?: string | null): string[] {
     .filter(Boolean)
 }
 
-export const VAZIO = '[Seção não preenchida]'
-
 /**
  * Numera as seções do parecer na ordem em que elas realmente entram no
  * documento.
@@ -332,7 +358,7 @@ export interface AgenteDocumento {
   origemMedicao?: OrigemMedicaoDocumento
   fonteRuido?: FonteRuidoDocumento
   areaRisco?: string
-  exposicaoPericulosidade?: 'permanente' | 'intermitente' | 'eventual'
+  exposicaoPericulosidade?: 'permanente' | 'intermitente' | 'eventual' | 'nao_constatada'
   resultadoPericulosidade?: 'caracterizada' | 'nao_caracterizada' | 'prejudicada'
   unidadeMedicao?: 'ppm' | 'mg/m³' | '% O₂ em volume' | 'dB(A)' | 'dB(C)' | 'dB(Linear)' | 'IBUTG °C' | 'mSv/ano' | 'm/s²' | 'm/s¹·⁷⁵' | 'fibras/cm³'
   epis?: EpiDocumento[]
@@ -526,11 +552,15 @@ const EXPOSICAO_PERICULOSIDADE: Record<string, string> = {
   permanente: 'Permanente',
   intermitente: 'Intermitente',
   eventual: 'Eventual ou por tempo extremamente reduzido',
+  nao_constatada: 'Não constatada exposição a condição de risco que atenda aos critérios normativos de caracterização.',
 }
 
 const RESULTADO_PERICULOSIDADE: Record<string, { valor: string; destaque: LinhaApresentacaoAgente['destaque'] }> = {
   caracterizada: { valor: 'Periculosidade caracterizada', destaque: 'negativo' },
-  nao_caracterizada: { valor: 'Periculosidade não caracterizada', destaque: 'positivo' },
+  nao_caracterizada: {
+    valor: 'Não caracterizada periculosidade, por ausência de enquadramento nos critérios técnicos e normativos aplicáveis.',
+    destaque: 'positivo',
+  },
   prejudicada: { valor: 'Avaliação prejudicada por insuficiência de elementos', destaque: 'aviso' },
 }
 
@@ -774,6 +804,8 @@ export interface TecnicoJson {
   conclusaoPericulosidade?: string
   respostasQuesitos?: string
   encerramento?: string
+  dataAssinatura?: string
+  cidadeAssinatura?: string
   observacoesAdicionais: string
 }
 

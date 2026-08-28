@@ -66,6 +66,7 @@ import { patchDoProcesso } from '@/lib/consultas'
 import { aplicarAnexo, usaAtenuacaoRuido } from '@/lib/nr15'
 import { dadosPapel, PAPEIS } from '@/lib/participantes'
 import { intervaloDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
+import { dadosAssinatura } from '@/lib/assinaturaDocumento'
 import { comEmpresaVinculada, empresasLivres, opcoesDaLinha } from '@/lib/reclamadas'
 import { uid } from '@/lib/utils'
 
@@ -1431,6 +1432,24 @@ export default function PericiaEditor() {
       {passo === 5 && (
         <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
           <div className="space-y-4 no-print">
+            <Card>
+              <CardHeader title="Data e local da assinatura" subtitle="Fecho do documento" />
+              <div className="grid gap-3 p-5">
+                <Input
+                  label="Data da assinatura"
+                  type="date"
+                  value={p.tecnico.dataAssinatura ?? dadosAssinatura(p).data}
+                  onChange={(e) => setT({ dataAssinatura: e.target.value })}
+                />
+                <Input
+                  label="Cidade da assinatura"
+                  value={p.tecnico.cidadeAssinatura ?? dadosAssinatura(p).cidade}
+                  onChange={(e) => setT({ cidadeAssinatura: e.target.value })}
+                  placeholder="Santo André"
+                  hint="Por padrão, usa a cidade e a data da vistoria. Ambos podem ser alterados."
+                />
+              </div>
+            </Card>
             <Card>
               <CardHeader title="Título do documento" subtitle="Módulo G" icon={<FileText size={18} />} />
               <div className="space-y-3 p-5">

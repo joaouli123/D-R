@@ -323,4 +323,71 @@ describe('DocumentoPreview', () => {
     expect(html).toContain('12. Encerramento')
     expect(html).not.toContain('14. Encerramento')
   })
+
+  it('usa a data e a cidade escolhidas para a assinatura', () => {
+    const configurada = {
+      ...pericia,
+      tecnico: {
+        ...pericia.tecnico,
+        dataAssinatura: '2026-08-20',
+        cidadeAssinatura: 'Santo André',
+      },
+    } satisfies Pericia
+
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={configurada} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    expect(html).toContain('Santo André, 20 de agosto de 2026.')
+  })
+
+  it('usa data e cidade da vistoria como padrão da assinatura', () => {
+    const comEnderecoCompleto = {
+      ...pericia,
+      localVistoria: 'Rua das Flores — Centro — Cajamar/SP',
+    } satisfies Pericia
+
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={comEnderecoCompleto} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    expect(html).toContain('Cajamar, 14 de agosto de 2026.')
+  })
+
+  it('não imprime marcadores internos quando campos, agentes ou EPIs estão vazios', () => {
+    const vazia = {
+      ...pericia,
+      modalidade: 'insalubridade',
+      tecnico: {
+        ...pericia.tecnico,
+        apresentacao: '',
+        objetivoPericia: '',
+        descricaoEmpresa: '',
+        descricaoAmbiente: '',
+        descricaoPostoTrabalho: '',
+        maquinasFerramentas: '',
+        produtosUtilizados: '',
+        atividadesFuncoes: '',
+        agentes: [],
+        normasReferencias: '',
+        equipamentosAnalisados: '',
+        informacoesLevantadas: '',
+        notaTecnicaEpis: '',
+        protecoesColetivas: '',
+        analiseTecnica: '',
+        conclusao: '',
+        conclusaoInsalubridade: '',
+        encerramento: '',
+        observacoesAdicionais: '',
+      },
+    } satisfies Pericia
+
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={vazia} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    expect(html).not.toContain('[Seção não preenchida]')
+    expect(html).not.toContain('[Nenhum agente cadastrado]')
+    expect(html).not.toContain('[Nenhum EPI associado aos agentes]')
+  })
 })

@@ -3,6 +3,7 @@ import { extenso, formatDate, maskCNPJ } from '@/lib/utils'
 import { dadosPapel } from '@/lib/participantes'
 import { montarApresentacaoAgente } from '@/lib/apresentacaoAgente'
 import { intervaloDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
+import { dadosAssinatura } from '@/lib/assinaturaDocumento'
 import { Logo } from '@/components/Logo'
 
 // ============================================================
@@ -12,9 +13,7 @@ import { Logo } from '@/components/Logo'
 // ============================================================
 
 function Paragrafos({ texto }: { texto?: string | null }) {
-  if (!texto?.trim()) {
-    return <p className="italic text-ink-400">[Seção não preenchida]</p>
-  }
+  if (!texto?.trim()) return null
   return (
     <>
       {texto.split(/\n{2,}/).map((paragrafo, indice) => (
@@ -25,7 +24,7 @@ function Paragrafos({ texto }: { texto?: string | null }) {
 }
 
 function ConteudoEstruturado({ texto }: { texto?: string | null }) {
-  if (!texto?.trim()) return <p className="italic text-ink-400">[Seção não preenchida]</p>
+  if (!texto?.trim()) return null
 
   return (
     <>
@@ -126,6 +125,7 @@ export function DocumentoPreview({
     t.conclusaoPericulosidade?.trim() ||
     (pericia.modalidade === 'periculosidade' ? t.conclusao : '')
   const encerramento = t.encerramento?.trim() || t.observacoesAdicionais
+  const fecho = dadosAssinatura(pericia)
 
   const rotuloNatureza = (tipo: (typeof t.agentes)[number]['tipo']) => ({
     fisico: 'Agente Físico',
@@ -157,9 +157,7 @@ export function DocumentoPreview({
           )
         })}
       </div>
-    ) : (
-      <p className="italic text-ink-400">[Nenhum agente cadastrado]</p>
-    )
+    ) : null
 
   const protecoes = t.agentes.flatMap((agente) => {
     const apresentacao = montarApresentacaoAgente(agente)
@@ -350,7 +348,7 @@ export function DocumentoPreview({
             </div>
           ))}
         </section>
-      )) : <p className="italic text-ink-400">[Nenhum EPI associado aos agentes]</p>}
+      )) : null}
       {fotosDasSecoes(['epi'])}
 
       <h2>9. Das Proteções Coletivas</h2>
@@ -369,7 +367,7 @@ export function DocumentoPreview({
         Sendo o que se apresenta para o momento, o signatário coloca-se à disposição deste MM. Juízo
         para os esclarecimentos que se fizerem necessários.
       </p>
-      <p className="mt-8 no-indent text-center">{pericia.comarca}, {extenso(new Date().toISOString().slice(0, 10))}.</p>
+      <p className="mt-8 no-indent text-center">{fecho.cidade}, {extenso(fecho.data)}.</p>
       <div className="mt-14 text-center">
         <div className="mx-auto w-72 border-t border-ink-800 pt-1.5">
           <p className="no-indent font-bold">{perito?.nome ?? '—'}</p>

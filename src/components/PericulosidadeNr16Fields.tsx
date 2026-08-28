@@ -1,5 +1,10 @@
-import { Input, Select, Textarea } from '@/components/ui'
-import { ANEXOS_NR16, anexoNr16PorId, aplicarAnexoNr16 } from '@/content/anexosNr16'
+import { Button, Input, Select, Textarea } from '@/components/ui'
+import {
+  ANEXOS_NR16,
+  PADRAO_NR16_SEM_ENQUADRAMENTO,
+  anexoNr16PorId,
+  aplicarAnexoNr16,
+} from '@/content/anexosNr16'
 import type { AgenteAvaliado, ExposicaoPericulosidade, ResultadoPericulosidade } from '@/types'
 
 interface PericulosidadeNr16FieldsProps {
@@ -11,11 +16,18 @@ const EXPOSICOES: { value: ExposicaoPericulosidade; label: string }[] = [
   { value: 'permanente', label: 'Permanente' },
   { value: 'intermitente', label: 'Intermitente' },
   { value: 'eventual', label: 'Eventual ou por tempo extremamente reduzido' },
+  {
+    value: 'nao_constatada',
+    label: 'Não constatada exposição a condição de risco que atenda aos critérios normativos de caracterização',
+  },
 ]
 
 const RESULTADOS: { value: ResultadoPericulosidade; label: string }[] = [
   { value: 'caracterizada', label: 'Periculosidade caracterizada' },
-  { value: 'nao_caracterizada', label: 'Periculosidade não caracterizada' },
+  {
+    value: 'nao_caracterizada',
+    label: 'Não caracterizada periculosidade, por ausência de enquadramento nos critérios técnicos e normativos aplicáveis',
+  },
   { value: 'prejudicada', label: 'Avaliação prejudicada por insuficiência de elementos' },
 ]
 
@@ -84,6 +96,15 @@ export function PericulosidadeNr16Fields({ avaliacao, onChange }: Periculosidade
           <option value="">— selecione —</option>
           {RESULTADOS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
         </Select>
+      </div>
+      <div className="mt-3 flex justify-end">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => onChange({ ...avaliacao, ...PADRAO_NR16_SEM_ENQUADRAMENTO })}
+        >
+          Aplicar texto padrão sem enquadramento
+        </Button>
       </div>
       <p className="mt-2 text-xs text-ink-500">
         Critério qualitativo. A conclusão deve considerar a atividade, a área de risco e a frequência de exposição verificadas no caso concreto.

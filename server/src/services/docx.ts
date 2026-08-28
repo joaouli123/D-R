@@ -28,8 +28,8 @@ import {
   ORIGEM_PONTO,
   PAPEL,
   type TecnicoJson,
-  VAZIO,
   data,
+  dadosAssinaturaDocumento,
   emParagrafos,
   extenso,
   intervaloDoPeriodo,
@@ -151,14 +151,7 @@ const h4 = (t: string) =>
 
 const blocos = (t?: string | null): Paragraph[] => {
   const partes = emParagrafos(t)
-  if (!partes.length) {
-    return [
-      new Paragraph({
-        spacing: { after: 120 },
-        children: [texto(VAZIO, { italico: true })],
-      }),
-    ]
-  }
+  if (!partes.length) return []
   return partes.map(p)
 }
 
@@ -177,15 +170,14 @@ const blocosEstruturados = (t?: string | null): Paragraph[] => {
 
 const blocosComProximo = (t?: string | null): Paragraph[] => {
   const partes = emParagrafos(t)
-  const conteudo = partes.length ? partes : [VAZIO]
-  return conteudo.map(
+  return partes.map(
     (parte) =>
       new Paragraph({
         alignment: AlignmentType.JUSTIFIED,
         indent: { firstLine: RECUO_PRIMEIRA_LINHA },
         keepNext: true,
         spacing: { after: 120, line: 340 },
-        children: [texto(parte, { italico: !partes.length })],
+        children: [texto(parte)],
       }),
   )
 }
@@ -314,7 +306,11 @@ async function figuraDocx(
   }
 }
 
-function assinatura(perito: Usuario | null, comarca?: string | null): Paragraph[] {
+function assinatura(
+  perito: Usuario | null,
+  cidade?: string | null,
+  dataAssinatura: string = hoje(),
+): Paragraph[] {
   const titulos = (perito?.titulo ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean)
   const registros = (perito?.registroProfissional ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean)
   return [
@@ -322,7 +318,7 @@ function assinatura(perito: Usuario | null, comarca?: string | null): Paragraph[
       alignment: AlignmentType.CENTER,
       keepNext: true,
       spacing: { before: 600, after: 720 },
-      children: [texto(`${comarca || 'São Paulo/SP'}, ${extenso(hoje())}.`)],
+      children: [texto(`${cidade || 'São Paulo/SP'}, ${extenso(dataAssinatura)}.`)],
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
@@ -438,6 +434,7 @@ async function docParecer(
   titulo: string,
 ): Promise<(Paragraph | Table)[]> {
   const t = pericia.tecnico as unknown as TecnicoJson
+  const fecho = dadosAssinaturaDocumento({ ...pericia, tecnico: t })
   const porId = new Map(empresas.map((e) => [e.id, e]))
   const principal = porId.get(pericia.reclamadas.find((r) => r.principal)?.empresaId ?? '')
   const solidarias = pericia.reclamadas
@@ -604,10 +601,7 @@ async function docParecer(
   } as Record<string, string>)[tipo ?? ''] ?? 'Agente'
 
   const adicionarAgentes = (lista: typeof agentes, prefixo?: string) => {
-    if (!lista.length) {
-      filhos.push(new Paragraph({ children: [texto('[Nenhum agente cadastrado]', { italico: true })] }))
-      return
-    }
+    if (!lista.length) return
     for (const [indice, agente] of lista.entries()) {
       const apresentacao = montarApresentacaoAgente(agente)
       filhos.push(
@@ -667,11 +661,9 @@ async function docParecer(
 
   filhos.push(h2(num.secao('DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)')))
   filhos.push(...blocos(t.notaTecnicaEpis))
-  let temProtecao = false
   for (const agente of agentes) {
     const apresentacao = montarApresentacaoAgente(agente)
     if (!apresentacao.protecoes.length) continue
-    temProtecao = true
     filhos.push(h3(apresentacao.titulo))
     for (const protecao of apresentacao.protecoes) {
       filhos.push(
@@ -680,7 +672,6 @@ async function docParecer(
       )
     }
   }
-  if (!temProtecao) filhos.push(new Paragraph({ children: [texto('[Nenhum EPI associado aos agentes]', { italico: true })] }))
   filhos.push(...(await fotosDasSecoes(['epi'])))
 
   filhos.push(
@@ -700,7 +691,7 @@ async function docParecer(
       false,
       true,
     ),
-    ...assinatura(perito, pericia.comarca),
+    ...assinatura(perito, fecho.cidade, fecho.data),
   )
 
   return filhos

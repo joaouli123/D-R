@@ -38,11 +38,15 @@ const EXPOSICAO_PERICULOSIDADE = {
   permanente: 'Permanente',
   intermitente: 'Intermitente',
   eventual: 'Eventual ou por tempo extremamente reduzido',
+  nao_constatada: 'Não constatada exposição a condição de risco que atenda aos critérios normativos de caracterização.',
 } as const
 
 const RESULTADO_PERICULOSIDADE = {
   caracterizada: { valor: 'Periculosidade caracterizada', destaque: 'negativo' as const },
-  nao_caracterizada: { valor: 'Periculosidade não caracterizada', destaque: 'positivo' as const },
+  nao_caracterizada: {
+    valor: 'Não caracterizada periculosidade, por ausência de enquadramento nos critérios técnicos e normativos aplicáveis.',
+    destaque: 'positivo' as const,
+  },
   prejudicada: { valor: 'Avaliação prejudicada por insuficiência de elementos', destaque: 'aviso' as const },
 } as const
 
