@@ -18,6 +18,7 @@ import {
   extenso,
   intervaloDoPeriodo,
   mascaraCnpj,
+  mascaraCpf,
   montarApresentacaoAgente,
   numeradorDeSecoes,
   periodoAvaliacaoDocumento,
@@ -273,7 +274,7 @@ export async function htmlDoParecer(
   const identificacao = `
   <table class="ficha-processual"><tbody>
     ${linha('Processo nº', esc(pericia.numeroProcesso))}
-    ${linha('Reclamante', `${esc(pericia.reclamante)}${pericia.funcaoReclamante ? ` — ${esc(pericia.funcaoReclamante)}` : ''}`)}
+    ${linha('Reclamante', `${esc(pericia.reclamante)}${pericia.cpfReclamante ? ` — CPF ${esc(mascaraCpf(pericia.cpfReclamante))}` : ''}`)}
     ${linha('Reclamada', principal ? `${esc(principal.razaoSocial)} — CNPJ ${esc(mascaraCnpj(principal.cnpj))}` : '—')}
     ${solidarias.map((e) => linha('Reclamada', `${esc(e.razaoSocial)} — CNPJ ${esc(mascaraCnpj(e.cnpj))}`)).join('')}
   </tbody></table>`
@@ -285,7 +286,7 @@ export async function htmlDoParecer(
 
   const dadosContratuais = `
   <table><tbody>
-    ${linha('Função / Cargo', esc(pericia.funcaoReclamante || '—'))}
+    ${linha('Função Inicial', esc(pericia.funcaoReclamante || '—'))}
     ${linha('Data de admissão', data(pericia.admissao))}
     ${linha('Data de desligamento', pericia.demissao ? data(pericia.demissao) : 'Contrato vigente')}
     ${pericia.dataAjuizamento ? linha('Ajuizamento da ação', data(pericia.dataAjuizamento)) : ''}

@@ -354,6 +354,24 @@ describe('DocumentoPreview', () => {
     expect(html).toContain('Cajamar, 14 de agosto de 2026.')
   })
 
+  it('identifica o reclamante pelo CPF e apresenta a função inicial separadamente', () => {
+    const identificada = {
+      ...pericia,
+      cpfReclamante: '12345678900',
+      funcaoReclamante: 'Operador de Produção',
+    } satisfies Pericia
+
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={identificada} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    expect(html).toMatch(
+      /<th>Reclamante<\/th><td>\s*Pessoa reclamante\s*— CPF 123\.456\.789-00\s*<\/td>/,
+    )
+    expect(html).not.toMatch(/<th>Reclamante<\/th><td>[^<]*Operador de Produção/)
+    expect(html).toMatch(/<th>Função Inicial<\/th><td>Operador de Produção<\/td>/)
+  })
+
   it('não imprime marcadores internos quando campos, agentes ou EPIs estão vazios', () => {
     const vazia = {
       ...pericia,

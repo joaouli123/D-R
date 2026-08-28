@@ -537,6 +537,23 @@ async function main() {
   await fs.writeFile(path.join(SAIDA, 'parecer-medicao-registros.docx'), docxRegistros)
 
   assert.doesNotMatch(htmlParecer, />Tramitação</, 'o PDF não deve repetir a modalidade no campo Tramitação')
+  assert.match(
+    htmlParecer,
+    /<th>Reclamante<\/th><td[^>]*>José Aparecido da Silva — CPF 123\.456\.789-00<\/td>/,
+    'o cabeçalho do parecer deve identificar o reclamante pelo CPF',
+  )
+  assert.doesNotMatch(
+    htmlParecer,
+    /<th>Reclamante<\/th><td[^>]*>[^<]*Operador de Máquinas/,
+    'a função não deve ocupar o lugar do CPF no cabeçalho',
+  )
+  assert.match(
+    htmlParecer,
+    /<th>Função Inicial<\/th><td[^>]*>Operador de Máquinas<\/td>/,
+    'a função contratual precisa ser rotulada como Função Inicial',
+  )
+  assert.match(parecerGerado?.xml ?? '', /José Aparecido da Silva — CPF 123\.456\.789-00/)
+  assert.match(parecerGerado?.xml ?? '', /Função Inicial/)
   assert.doesNotMatch(
     parecerGerado?.xml ?? '',
     />Tramitação</,

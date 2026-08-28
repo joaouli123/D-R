@@ -34,6 +34,7 @@ import {
   extenso,
   intervaloDoPeriodo,
   mascaraCnpj,
+  mascaraCpf,
   montarApresentacaoAgente,
   numeradorDeSecoes,
   periodoAvaliacaoDocumento,
@@ -483,7 +484,7 @@ async function docParecer(
       fichaLinha('Processo nº', pericia.numeroProcesso),
       fichaLinha(
         'Reclamante',
-        `${pericia.reclamante}${pericia.funcaoReclamante ? ` — ${pericia.funcaoReclamante}` : ''}`,
+        `${pericia.reclamante}${pericia.cpfReclamante ? ` — CPF ${mascaraCpf(pericia.cpfReclamante)}` : ''}`,
       ),
       fichaLinha(
         'Reclamada',
@@ -497,7 +498,7 @@ async function docParecer(
     h2(num.secao('OBJETO DA PERÍCIA E DADOS CONTRATUAIS')),
     ...blocos(t.objetivoPericia),
     tabela([
-      fichaLinha('Função / Cargo', pericia.funcaoReclamante || '—'),
+      fichaLinha('Função Inicial', pericia.funcaoReclamante || '—'),
       fichaLinha('Data de admissão', data(pericia.admissao)),
       fichaLinha('Data de desligamento', pericia.demissao ? data(pericia.demissao) : 'Contrato vigente'),
       ...(pericia.dataAjuizamento ? [fichaLinha('Ajuizamento da ação', data(pericia.dataAjuizamento))] : []),

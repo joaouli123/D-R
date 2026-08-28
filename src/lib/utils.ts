@@ -41,6 +41,12 @@ export function maskCNPJ(v: string) {
     .replace(/(\d{4})(\d)/, '$1-$2')
 }
 
+export function maskCPF(v: string) {
+  const d = v.replace(/\D/g, '')
+  if (d.length !== 11) return v.trim() || '—'
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`
+}
+
 export function maskProcesso(v: string) {
   return v
     .replace(/\D/g, '')

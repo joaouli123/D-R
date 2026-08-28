@@ -78,4 +78,29 @@ describe('PericiaEditor — período avaliado', () => {
     expect(screen.getByText('10/06/2021 até o fim do contrato')).toBeDefined()
     expect(screen.queryByText(/Cinco anos anteriores ao ajuizamento da ação/i)).toBeNull()
   })
+
+  it('identifica a função contratual como função inicial', () => {
+    vi.mocked(useApp).mockReturnValue({
+      usuario: { id: 'usuario-1', nome: 'Perito responsável' },
+      empresas: [],
+      pericias: [pericia],
+      documentos: [],
+      textos: [],
+      quesitos: [],
+      salvarPericia: vi.fn(),
+      salvarDocumento: vi.fn(),
+    } as unknown as ReturnType<typeof useApp>)
+
+    render(
+      <MemoryRouter initialEntries={['/pericias/pericia-periodo']}>
+        <ToastProvider>
+          <Routes>
+            <Route path="/pericias/:id" element={<PericiaEditor />} />
+          </Routes>
+        </ToastProvider>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByLabelText('Função Inicial')).toBeDefined()
+  })
 })

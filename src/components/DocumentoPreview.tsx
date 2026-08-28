@@ -1,5 +1,5 @@
 import type { Empresa, Pericia, SecaoFoto, Usuario } from '@/types'
-import { extenso, formatDate, maskCNPJ } from '@/lib/utils'
+import { extenso, formatDate, maskCNPJ, maskCPF } from '@/lib/utils'
 import { dadosPapel } from '@/lib/participantes'
 import { montarApresentacaoAgente } from '@/lib/apresentacaoAgente'
 import { intervaloDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
@@ -202,7 +202,7 @@ export function DocumentoPreview({
             <th>Reclamante</th>
             <td>
               {pericia.reclamante}
-              {pericia.funcaoReclamante ? ` — ${pericia.funcaoReclamante}` : ''}
+              {pericia.cpfReclamante ? ` — CPF ${maskCPF(pericia.cpfReclamante)}` : ''}
             </td>
           </tr>
           <tr>
@@ -232,7 +232,7 @@ export function DocumentoPreview({
       <Paragrafos texto={t.objetivoPericia} />
       <table>
         <tbody>
-          <tr><th>Função / Cargo</th><td>{pericia.funcaoReclamante || '—'}</td></tr>
+          <tr><th>Função Inicial</th><td>{pericia.funcaoReclamante || '—'}</td></tr>
           <tr><th>Data de admissão</th><td>{formatDate(pericia.admissao)}</td></tr>
           <tr><th>Data de desligamento</th><td>{pericia.demissao ? formatDate(pericia.demissao) : 'Contrato vigente'}</td></tr>
           {pericia.dataAjuizamento && (

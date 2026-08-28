@@ -583,7 +583,7 @@ export default function PericiaEditor() {
                 onChange={(e) => set({ cpfReclamante: e.target.value })}
               />
               <Input
-                label="Função"
+                label="Função Inicial"
                 value={p.funcaoReclamante}
                 onChange={(e) => set({ funcaoReclamante: e.target.value })}
               />
