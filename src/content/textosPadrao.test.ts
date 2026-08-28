@@ -93,11 +93,13 @@ describe('textosPadraoDaPericia', () => {
     const so15 = textosPadraoDaPericia(pericia('insalubridade'), PERITO)
     expect(so15.objetivoPericia).toContain('NR-15')
     expect(so15.objetivoPericia).not.toContain('NR-16')
+    expect(so15.objetivoPericia).not.toContain('direito ao adicional')
     expect(so15.normasReferencias).not.toContain('NR-16')
 
     const so16 = textosPadraoDaPericia(pericia('periculosidade'), PERITO)
     expect(so16.objetivoPericia).toContain('NR-16')
     expect(so16.objetivoPericia).not.toContain('NR-15')
+    expect(so16.objetivoPericia).not.toContain('direito ao adicional')
     expect(so16.normasReferencias).not.toContain('NR-15')
 
     const ambas = textosPadraoDaPericia(pericia('ambas'), PERITO)
@@ -112,12 +114,13 @@ describe('textosPadraoDaPericia', () => {
     expect(textosPadraoDaPericia(pericia('periculosidade'), PERITO).equipamentosAnalisados).not.toContain('15.4.1')
   })
 
-  it('a metodologia descreve o NRRsf e o critério do conjunto de protetores', () => {
+  it('a metodologia avalia cada EPI comprovado sem escolher automaticamente a maior atenuação', () => {
     const { equipamentosAnalisados } = textosPadraoDaPericia(pericia(), PERITO)
 
     expect(equipamentosAnalisados).toContain('NRRsf')
-    expect(equipamentosAnalisados).toContain('CAEPI')
-    expect(equipamentosAnalisados).toContain('o de maior atenuação')
+    expect(equipamentosAnalisados).toContain('base oficial de Certificados de Aprovação (CA)')
+    expect(equipamentosAnalisados).toContain('efetivamente comprovados como fornecidos e utilizados')
+    expect(equipamentosAnalisados).not.toContain('o de maior atenuação')
   })
 
   it('incorpora os complementos técnicos aprovados na planilha de 26/08', () => {
@@ -125,12 +128,19 @@ describe('textosPadraoDaPericia', () => {
 
     expect(textos.normasReferencias).toContain('Frequência: quantidade de ocorrências')
     expect(textos.normasReferencias).toContain('Habitualidade: integração da atividade à rotina laboral')
-    expect(textos.normasReferencias).toContain('Líquidos Inflamáveis (Gera Direito à Periculosidade)')
-    expect(textos.normasReferencias).toContain('Diesel Automotivo Comum (S10/S500)')
-    expect(textos.criterioAvaliacaoPericulosidade).toContain('avaliação qualitativa')
+    expect(textos.normasReferencias).toContain('Anexo 5 da NR-15')
+    expect(textos.normasReferencias).toContain('não caracteriza, isoladamente, a periculosidade')
+    expect(textos.normasReferencias).toContain('diesel S10 ou S500')
+    expect(textos.normasReferencias).not.toContain('Gera Direito à Periculosidade')
+    expect(textos.criterioAvaliacaoPericulosidade).toContain('atividades e operações efetivamente desenvolvidas')
+    expect(textos.criterioAvaliacaoPericulosidade).not.toContain('mediante avaliação qualitativa')
     expect(textos.notaTecnicaEpis).toContain('Primazia da Realidade')
-    expect(textos.notaTecnicaEpis).toContain('art. 369 do CPC')
+    expect(textos.notaTecnicaEpis).toContain('não substituem automaticamente a ficha de entrega')
+    expect(textos.notaTecnicaEpis).toContain('quando tiver efetivamente ocorrido')
     expect(textos.protecoesColetivas).toContain('Sistemas de Ventilação e Exaustão')
+    expect(textos.encerramento).not.toContain('No melhor conhecimento e crédito')
+    expect(textos.encerramento).toContain('Código de Ética Profissional do Sistema Confea/Crea')
+    expect(textos.encerramento).not.toContain('Código de Ética Profissional do Conselho Federal')
   })
 })
 
@@ -181,6 +191,36 @@ describe('patchDeTextosPadrao', () => {
     const patch = patchDeTextosPadrao(tecnico, padroes, {})
 
     expect(patch.apresentacao).toBe(padroes.apresentacao)
+  })
+
+  it('migra os textos automáticos anteriores à revisão técnica sem apagar texto personalizado', () => {
+    const tecnico = {
+      ...pericia('ambas').tecnico,
+      objetivoPericia:
+        'Apurar o direito ao adicional de insalubridade, nos termos da NR-15, e, se devido, seu respectivo grau: mínimo, médio ou máximo.\n\nApurar o direito ao adicional de periculosidade, nos termos da NR-16, e o respectivo percentual aplicável.',
+      normasReferencias:
+        'Texto automático.\n\nLíquidos Inflamáveis (Gera Direito à Periculosidade): são os líquidos com ponto de fulgor menor ou igual a 60 ºC.',
+      equipamentosAnalisados:
+        'Texto automático. Para a proteção auditiva, a conclusão considerará o de maior atenuação.',
+      criterioAvaliacaoPericulosidade:
+        'A caracterização da periculosidade é realizada mediante avaliação qualitativa, considerando as atividades efetivamente desenvolvidas.',
+      notaTecnicaEpis:
+        'Do ponto de vista técnico, a identificação dos próprios EPIs do Reclamante, por ele reconhecidos na presença de todos, constitui elemento objetivo.',
+      encerramento:
+        '3 - No melhor conhecimento e crédito, as vistorias, análises e conclusões expressas no presente trabalho são baseadas em dados verdadeiros.',
+      protecoesColetivas: 'Texto personalizado pelo perito.',
+    }
+    const novosPadroes = textosPadraoDaPericia(pericia('ambas'), PERITO, RECLAMADA)
+
+    const patch = patchDeTextosPadrao(tecnico, novosPadroes, {})
+
+    expect(patch.objetivoPericia).toBe(novosPadroes.objetivoPericia)
+    expect(patch.normasReferencias).toBe(novosPadroes.normasReferencias)
+    expect(patch.equipamentosAnalisados).toBe(novosPadroes.equipamentosAnalisados)
+    expect(patch.criterioAvaliacaoPericulosidade).toBe(novosPadroes.criterioAvaliacaoPericulosidade)
+    expect(patch.notaTecnicaEpis).toBe(novosPadroes.notaTecnicaEpis)
+    expect(patch.encerramento).toBe(novosPadroes.encerramento)
+    expect(patch).not.toHaveProperty('protecoesColetivas')
   })
 
   it('não repete o patch quando já está tudo em dia', () => {
