@@ -27,3 +27,38 @@ const LEGADOS: Partial<Record<Participante['papel'], { label: string; atuacao: s
 export function dadosPapel(papel: Participante['papel']) {
   return PAPEIS.find((item) => item.value === papel) ?? LEGADOS[papel] ?? { label: papel, atuacao: '—' }
 }
+
+const PAPEIS_RECLAMANTE = new Set<Participante['papel']>([
+  'reclamante',
+  'engenheiro_assistente_reclamante',
+  'tecnico_assistente_reclamante',
+  'assistente_reclamante',
+  'advogado_reclamante',
+])
+
+const PAPEIS_RECLAMADA = new Set<Participante['papel']>([
+  'engenheiro_assistente_reclamada',
+  'tecnico_assistente_reclamada',
+  'assistente_reclamada',
+  'advogado_reclamada',
+  'preposto',
+  'engenheiro_sst_empresa',
+  'tecnico_sst_empresa',
+  'gestor_lideranca',
+])
+
+export type GrupoParticipante = 'reclamante' | 'outros' | string
+
+/**
+ * Localiza a parte representada sem perder participantes antigos, que
+ * foram salvos antes de existir vínculo explícito com a empresa.
+ */
+export function grupoDoParticipante(
+  participante: Participante,
+  empresaPrincipalId?: string,
+): GrupoParticipante {
+  if (participante.empresaId) return participante.empresaId
+  if (PAPEIS_RECLAMANTE.has(participante.papel)) return 'reclamante'
+  if (PAPEIS_RECLAMADA.has(participante.papel) && empresaPrincipalId) return empresaPrincipalId
+  return 'outros'
+}

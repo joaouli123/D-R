@@ -61,6 +61,8 @@ export type StatusPericia = 'rascunho' | 'em_andamento' | 'concluida' | 'entregu
 export interface Participante {
   id: UUID
   nome: string
+  /** Empresa reclamada que este participante representa, quando aplicável. */
+  empresaId?: UUID
   papel:
     | 'perito_judicial'
     | 'reclamante'
@@ -110,6 +112,8 @@ export interface Pericia {
   participantes: Participante[]
   dataVistoria?: string
   horaVistoria?: string
+  /** Horário em que a diligência pericial foi encerrada. */
+  horaFimVistoria?: string
   cepVistoria?: string
   localVistoria?: string
   numeroVistoria?: string

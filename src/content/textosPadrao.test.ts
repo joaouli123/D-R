@@ -114,13 +114,14 @@ describe('textosPadraoDaPericia', () => {
     expect(textosPadraoDaPericia(pericia('periculosidade'), PERITO).equipamentosAnalisados).not.toContain('15.4.1')
   })
 
-  it('a metodologia avalia cada EPI comprovado sem escolher automaticamente a maior atenuação', () => {
+  it('usa a metodologia de EPI aprovada sem criar presunção por falta documental', () => {
     const { equipamentosAnalisados } = textosPadraoDaPericia(pericia(), PERITO)
 
     expect(equipamentosAnalisados).toContain('NRRsf')
-    expect(equipamentosAnalisados).toContain('base oficial de Certificados de Aprovação (CA)')
-    expect(equipamentosAnalisados).toContain('efetivamente comprovados como fornecidos e utilizados')
-    expect(equipamentosAnalisados).not.toContain('o de maior atenuação')
+    expect(equipamentosAnalisados).toContain('características de proteção e correspondência com o agente de risco')
+    expect(equipamentosAnalisados).toContain('sem que, isoladamente, seja estabelecida presunção')
+    expect(equipamentosAnalisados).toContain('item 15.4.1 da NR-15 e do artigo 191 da CLT')
+    expect(equipamentosAnalisados).not.toContain('A validade e a adequação serão conferidas na base oficial')
   })
 
   it('incorpora os complementos técnicos aprovados na planilha de 26/08', () => {
@@ -135,8 +136,9 @@ describe('textosPadraoDaPericia', () => {
     expect(textos.criterioAvaliacaoPericulosidade).toContain('atividades e operações efetivamente desenvolvidas')
     expect(textos.criterioAvaliacaoPericulosidade).not.toContain('mediante avaliação qualitativa')
     expect(textos.notaTecnicaEpis).toContain('Primazia da Realidade')
-    expect(textos.notaTecnicaEpis).toContain('não substituem automaticamente a ficha de entrega')
-    expect(textos.notaTecnicaEpis).toContain('quando tiver efetivamente ocorrido')
+    expect(textos.notaTecnicaEpis).toContain('nos termos do art. 369 do CPC')
+    expect(textos.notaTecnicaEpis).toContain('identificação e o reconhecimento, pelo próprio Reclamante')
+    expect(textos.notaTecnicaEpis).not.toContain('não substituem automaticamente a ficha de entrega')
     expect(textos.protecoesColetivas).toContain('Sistemas de Ventilação e Exaustão')
     expect(textos.encerramento).not.toContain('No melhor conhecimento e crédito')
     expect(textos.encerramento).toContain('Código de Ética Profissional do Sistema Confea/Crea')
@@ -221,6 +223,21 @@ describe('patchDeTextosPadrao', () => {
     expect(patch.notaTecnicaEpis).toBe(novosPadroes.notaTecnicaEpis)
     expect(patch.encerramento).toBe(novosPadroes.encerramento)
     expect(patch).not.toHaveProperty('protecoesColetivas')
+  })
+
+  it('migra a metodologia e a nota técnica que estavam em produção antes do feedback noturno', () => {
+    const tecnico = {
+      ...pericia().tecnico,
+      equipamentosAnalisados:
+        '5.2.3. Equipamentos de Proteção Individual – EPI\n\nOs registros de fornecimento de EPI serão analisados em conjunto com os demais elementos disponíveis, considerando-se o equipamento fornecido, respectivo CA, adequação ao agente, período de utilização, treinamentos e demais evidências pertinentes.',
+      notaTecnicaEpis:
+        'Nota Técnica sobre a Primazia da Realidade\n\nQuanto aos EPIs, os registros de entrega, o Certificado de Aprovação, a adequação ao agente, os treinamentos, a periodicidade de substituição, o uso efetivo e as demais evidências disponíveis devem ser analisados conjuntamente. PGR, laudos ocupacionais, entrevistas ou outros documentos não substituem automaticamente a ficha de entrega.',
+    }
+
+    const patch = patchDeTextosPadrao(tecnico, padroes, {})
+
+    expect(patch.equipamentosAnalisados).toBe(padroes.equipamentosAnalisados)
+    expect(patch.notaTecnicaEpis).toBe(padroes.notaTecnicaEpis)
   })
 
   it('não repete o patch quando já está tudo em dia', () => {

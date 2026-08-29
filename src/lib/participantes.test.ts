@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dadosPapel, PAPEIS } from './participantes'
+import { dadosPapel, grupoDoParticipante, PAPEIS } from './participantes'
 
 describe('qualificação e atuação dos participantes', () => {
   it('oferece os 15 papéis aprovados', () => {
@@ -20,5 +20,35 @@ describe('qualificação e atuação dos participantes', () => {
   it('mantém os papéis legados legíveis', () => {
     expect(dadosPapel('assistente_reclamante').label).toBe('Assistente Técnico do Reclamante')
     expect(dadosPapel('acompanhante').atuacao).toBe('Prestação de informações complementares')
+  })
+
+  it('mantém cada representante ligado à empresa reclamada correspondente', () => {
+    expect(
+      grupoDoParticipante(
+        { id: 'p-1', nome: 'Preposto da segunda empresa', papel: 'preposto', empresaId: 'empresa-2' },
+        'empresa-1',
+      ),
+    ).toBe('empresa-2')
+  })
+
+  it('organiza participante legado sem vínculo pela parte que seu papel representa', () => {
+    expect(
+      grupoDoParticipante(
+        { id: 'p-1', nome: 'Advogado do reclamante', papel: 'advogado_reclamante' },
+        'empresa-1',
+      ),
+    ).toBe('reclamante')
+    expect(
+      grupoDoParticipante(
+        { id: 'p-2', nome: 'Preposto legado', papel: 'preposto' },
+        'empresa-1',
+      ),
+    ).toBe('empresa-1')
+    expect(
+      grupoDoParticipante(
+        { id: 'p-3', nome: 'Perito judicial', papel: 'perito_judicial' },
+        'empresa-1',
+      ),
+    ).toBe('outros')
   })
 })

@@ -21,7 +21,9 @@ import {
   mascaraCpf,
   montarApresentacaoAgente,
   numeradorDeSecoes,
+  objetivoAutomaticoDocumento,
   periodoAvaliacaoDocumento,
+  horarioDaVistoriaDocumento,
   hoje,
   ATUACAO,
 } from './documento-comum.js'
@@ -176,8 +178,8 @@ const CSS = `
     margin: 0 auto;
   }
   figcaption { font-size: 9pt; font-style: italic; color: ${css(MARCA.tinta600)}; margin-top: 4px; }
-  .local-data { text-align: center; text-indent: 0; margin-top: 20px; }
-  .assinatura { margin-top: 24px; margin-bottom: 12px; text-align: center; page-break-inside: avoid; }
+  .local-data { text-align: center; text-indent: 0; margin-top: 14px; }
+  .assinatura { margin-top: 14px; margin-bottom: 12px; text-align: center; page-break-inside: avoid; }
   .assinatura .traco { width: 280px; margin: 0 auto; border-top: 1px solid ${css(MARCA.tinta800)}; padding-top: 6px; }
   .assinatura p { text-indent: 0; margin: 0; }
   .assinatura .nome { font-weight: 700; }
@@ -240,15 +242,7 @@ function enderecamento(vara?: string | null): string {
 function enderecamentoDoParecer(
   vara?: string | null,
   comarca?: string | null,
-  personalizado?: string | null,
 ): string {
-  const linhas = emParagrafos(personalizado)
-  if (linhas.length) {
-    return linhas
-      .map((texto) => `<p class="sem-recuo enderecamento-judicial">${esc(texto).replace(/\n/g, '<br>')}</p>`)
-      .join('')
-  }
-
   const destino = [vara, comarca].filter(Boolean).join(' — ')
   return `<p class="sem-recuo enderecamento-judicial">EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA ${esc(destino.toUpperCase())}</p>`
 }
@@ -299,15 +293,15 @@ export async function htmlDoParecer(
         <tbody>${pericia.participantes
           .map(
             (p) =>
-              `<tr><td>${esc(p.nome)}</td><td>${esc(PAPEL[p.papel] ?? p.papel)}</td><td>${esc(ATUACAO[p.papel] ?? '—')}</td></tr>`,
+              `<tr><td>${esc(p.nome)}</td><td>${esc(PAPEL[p.papel] ?? p.papel)}${p.empresaId && porId.get(p.empresaId) ? ` — ${esc(porId.get(p.empresaId)?.razaoSocial)}` : ''}</td><td>${esc(ATUACAO[p.papel] ?? '—')}</td></tr>`,
           )
           .join('')}</tbody>
       </table>`
     : ''
 
-  const textoVistoria = `<p>A vistoria técnica foi realizada em ${extenso(pericia.dataVistoria)}${
-    pericia.horaVistoria ? `, às ${esc(pericia.horaVistoria)}` : ''
-  }, no endereço ${esc(pericia.localVistoria || '—')}${pericia.numeroVistoria ? `, nº ${esc(pericia.numeroVistoria)}` : ''}${pericia.setorVistoriado ? `, no setor/local ${esc(pericia.setorVistoriado)}` : ''}, com a presença dos participantes abaixo relacionados.</p>`
+  const textoVistoria = `<p>A vistoria técnica foi realizada em ${extenso(pericia.dataVistoria)}${esc(
+    horarioDaVistoriaDocumento(pericia),
+  )}, no endereço ${esc(pericia.localVistoria || '—')}${pericia.numeroVistoria ? `, nº ${esc(pericia.numeroVistoria)}` : ''}${pericia.setorVistoriado ? `, no setor/local ${esc(pericia.setorVistoriado)}` : ''}, com a presença dos participantes abaixo relacionados.</p>`
 
   const tabelaPeriodos = t.periodos?.length
     ? `<table>
@@ -429,13 +423,13 @@ export async function htmlDoParecer(
   }
 
   const partes: string[] = [
-    enderecamentoDoParecer(pericia.vara, pericia.comarca, t.enderecamento),
+    enderecamentoDoParecer(pericia.vara, pericia.comarca),
     identificacao,
     `<h1>${esc(titulo)}</h1>`,
     '<h3 class="titulo-qualificacao">APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA</h3>',
     blocoConteudo(paragrafos(t.apresentacao)),
     `<h2>${num.secao('OBJETO DA PERÍCIA E DADOS CONTRATUAIS')}</h2>`,
-    blocoConteudo(paragrafos(t.objetivoPericia) + dadosContratuais),
+    blocoConteudo(paragrafos(objetivoAutomaticoDocumento(pericia.modalidade)) + dadosContratuais),
     `<h2>${num.secao('DA DILIGÊNCIA TÉCNICA PERICIAL')}</h2>`,
     blocoConteudo(textoVistoria + tabelaParticipantes),
     `<h2>${num.secao('DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA')}</h2>`,
@@ -451,7 +445,7 @@ export async function htmlDoParecer(
     blocoConteudo(paragrafosEstruturados(t.equipamentosAnalisados)),
     `<h2>${num.secao('DESCRIÇÃO DO POSTO DE TRABALHO, MÁQUINAS, FERRAMENTAS E PRODUTOS')}</h2>`,
     blocoConteudo(
-      `<h3>${num.sub('Características do Posto de Trabalho')}</h3>` +
+      `<h3>${num.sub('Descrição do Posto de Trabalho')}</h3>` +
         paragrafos(t.descricaoPostoTrabalho || t.descricaoAmbiente) +
         fotosAtividades +
         `<h3>${num.sub('Máquinas, Ferramentas e Equipamentos Utilizados')}</h3>` +

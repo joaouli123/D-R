@@ -143,6 +143,26 @@ export function extenso(iso?: string | null): string {
 
 export const hoje = (): string => new Date().toISOString().slice(0, 10)
 
+export function objetivoAutomaticoDocumento(modalidade: string): string {
+  const insalubridade = 'Analisar tecnicamente a eventual caracterização da insalubridade, conforme os critérios da NR-15 e seus Anexos, indicando, quando caracterizada, o agente, o enquadramento e o respectivo grau aplicável.'
+  const periculosidade = 'Analisar tecnicamente a eventual caracterização da periculosidade, conforme as atividades e operações previstas na NR-16 e seus Anexos, indicando, quando caracterizada, o enquadramento e o percentual normativo aplicável.'
+  if (modalidade === 'insalubridade') return insalubridade
+  if (modalidade === 'periculosidade') return periculosidade
+  return `${insalubridade}\n\n${periculosidade}`
+}
+
+export function horarioDaVistoriaDocumento(pericia: {
+  horaVistoria?: string | null
+  horaFimVistoria?: string | null
+}): string {
+  const inicio = pericia.horaVistoria?.trim()
+  const fim = pericia.horaFimVistoria?.trim()
+  if (inicio && fim) return `, das ${inicio} às ${fim}`
+  if (inicio) return `, com início às ${inicio}`
+  if (fim) return `, com término às ${fim}`
+  return ''
+}
+
 const CIDADE_COM_UF = /^(.+?)\s*\/\s*[A-Z]{2}$/i
 
 export function cidadeDaVistoriaDocumento(localVistoria?: string | null): string {

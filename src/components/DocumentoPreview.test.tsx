@@ -341,6 +341,64 @@ describe('DocumentoPreview', () => {
     expect(html).toContain('Santo André, 20 de agosto de 2026.')
   })
 
+  it('gera endereçamento e objetivo automaticamente e mostra início e término da vistoria', () => {
+    const automatica = {
+      ...pericia,
+      horaVistoria: '09:00',
+      horaFimVistoria: '10:30',
+      tecnico: {
+        ...pericia.tecnico,
+        enderecamento: 'ENDEREÇAMENTO ANTIGO QUE NÃO DEVE SAIR',
+        objetivoPericia: 'OBJETIVO ANTIGO QUE NÃO DEVE SAIR',
+      },
+    } satisfies Pericia
+
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={automatica} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    expect(html).toContain('EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA VARA DO TRABALHO — SÃO PAULO/SP')
+    expect(html).toContain('Analisar tecnicamente a eventual caracterização da insalubridade')
+    expect(html).toContain('Analisar tecnicamente a eventual caracterização da periculosidade')
+    expect(html).toContain('das 09:00 às 10:30')
+    expect(html).not.toContain('ENDEREÇAMENTO ANTIGO QUE NÃO DEVE SAIR')
+    expect(html).not.toContain('OBJETIVO ANTIGO QUE NÃO DEVE SAIR')
+  })
+
+  it('identifica no documento a empresa representada por cada participante', () => {
+    const empresa = {
+      id: 'empresa-2',
+      razaoSocial: 'Segunda Reclamada Ltda.',
+      cnpj: '12.345.678/0001-90',
+      endereco: '',
+      cidade: 'São Paulo',
+      uf: 'SP',
+      criadoEm: '2026-08-01',
+    }
+    const comRepresentante = {
+      ...pericia,
+      reclamadas: [{ id: 'reclamada-2', empresaId: empresa.id, principal: true }],
+      participantes: [
+        { id: 'participante-1', nome: 'Maria da Silva', papel: 'preposto', empresaId: empresa.id },
+      ],
+    } satisfies Pericia
+
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={comRepresentante} empresas={[empresa]} titulo="Parecer de teste" />,
+    )
+
+    expect(html).toContain('Preposto — Segunda Reclamada Ltda.')
+  })
+
+  it('nomeia o subitem 6.1 como descrição do posto de trabalho', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={pericia} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    expect(html).toContain('6.1. Descrição do Posto de Trabalho')
+    expect(html).not.toContain('6.1. Características do Posto de Trabalho')
+  })
+
   it('usa data e cidade da vistoria como padrão da assinatura', () => {
     const comEnderecoCompleto = {
       ...pericia,

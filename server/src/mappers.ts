@@ -81,6 +81,7 @@ export function periciaParaApi(p: PericiaCompleta) {
     demissao: p.demissao ?? '',
     dataVistoria: p.dataVistoria ?? '',
     horaVistoria: p.horaVistoria ?? '',
+    horaFimVistoria: p.horaFimVistoria ?? '',
     cepVistoria: p.cepVistoria ?? '',
     localVistoria: p.localVistoria ?? '',
     numeroVistoria: p.numeroVistoria ?? '',
@@ -98,6 +99,7 @@ export function periciaParaApi(p: PericiaCompleta) {
     participantes: p.participantes.map((pt) => ({
       id: pt.id,
       nome: pt.nome,
+      empresaId: pt.empresaId ?? undefined,
       papel: pt.papel,
       registro: pt.registro ?? undefined,
       contato: pt.contato ?? undefined,

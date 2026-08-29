@@ -132,7 +132,13 @@ export default function Pericias() {
                       </span>
                       <span className="flex items-center gap-1.5">
                         <CalendarDays size={13} /> Vistoria: {formatDate(p.dataVistoria)}
-                        {p.horaVistoria ? ` às ${p.horaVistoria}` : ''}
+                        {p.horaVistoria && p.horaFimVistoria
+                          ? ` das ${p.horaVistoria} às ${p.horaFimVistoria}`
+                          : p.horaVistoria
+                            ? ` com início às ${p.horaVistoria}`
+                            : p.horaFimVistoria
+                              ? ` com término às ${p.horaFimVistoria}`
+                              : ''}
                       </span>
                       {p.localVistoria && (
                         <span className="flex items-center gap-1.5">

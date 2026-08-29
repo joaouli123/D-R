@@ -4,6 +4,8 @@ import { dadosPapel } from '@/lib/participantes'
 import { montarApresentacaoAgente } from '@/lib/apresentacaoAgente'
 import { intervaloDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
 import { dadosAssinatura } from '@/lib/assinaturaDocumento'
+import { objetivoPadraoDaPericia } from '@/content/textosPadrao'
+import { horarioDaVistoria } from '@/lib/vistoria'
 import { Logo } from '@/components/Logo'
 
 // ============================================================
@@ -55,6 +57,7 @@ export function DocumentoPreview({
   const t = pericia.tecnico
   const principal = pericia.reclamadas.find((reclamada) => reclamada.principal)
   const empresaPrincipal = empresas.find((empresa) => empresa.id === principal?.empresaId)
+  const empresasPorId = new Map(empresas.map((empresa) => [empresa.id, empresa]))
   const outras = pericia.reclamadas
     .filter((reclamada) => !reclamada.principal)
     .map((reclamada) => empresas.find((empresa) => empresa.id === reclamada.empresaId))
@@ -176,14 +179,11 @@ export function DocumentoPreview({
         )}
       </header>
       <section className="mb-8">
-        {t.enderecamento?.trim() ? (
-          <Paragrafos texto={t.enderecamento} />
-        ) : (
-          <p className="no-indent font-bold uppercase">
-            EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA{' '}
-            {[pericia.vara, pericia.comarca].filter(Boolean).join(' — ')}
-          </p>
-        )}
+        <p className="no-indent font-bold uppercase">
+          {`EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA ${[pericia.vara, pericia.comarca]
+            .filter(Boolean)
+            .join(' — ')}`.toUpperCase()}
+        </p>
       </section>
 
       <table className="ficha-processual">
@@ -229,7 +229,7 @@ export function DocumentoPreview({
       <Paragrafos texto={t.apresentacao} />
 
       <h2>1. Objeto da Perícia e Dados Contratuais</h2>
-      <Paragrafos texto={t.objetivoPericia} />
+      <Paragrafos texto={objetivoPadraoDaPericia(pericia)} />
       <table>
         <tbody>
           <tr><th>Função Inicial</th><td>{pericia.funcaoReclamante || '—'}</td></tr>
@@ -250,7 +250,7 @@ export function DocumentoPreview({
       <h2>2. Da Diligência Técnica Pericial</h2>
       <p>
         A vistoria técnica foi realizada em {extenso(pericia.dataVistoria)}
-        {pericia.horaVistoria ? `, às ${pericia.horaVistoria}` : ''}, no endereço{' '}
+        {horarioDaVistoria(pericia)}, no endereço{' '}
         {pericia.localVistoria || '—'}
         {pericia.numeroVistoria ? `, nº ${pericia.numeroVistoria}` : ''}
         {pericia.setorVistoriado ? `, no setor/local ${pericia.setorVistoriado}` : ''}, com a presença dos participantes abaixo relacionados.
@@ -262,7 +262,12 @@ export function DocumentoPreview({
             {pericia.participantes.map((participante) => (
               <tr key={participante.id}>
                 <td>{participante.nome}</td>
-                <td>{dadosPapel(participante.papel).label}</td>
+                <td>
+                  {dadosPapel(participante.papel).label}
+                  {participante.empresaId && empresasPorId.get(participante.empresaId)
+                    ? ` — ${empresasPorId.get(participante.empresaId)?.razaoSocial}`
+                    : ''}
+                </td>
                 <td>{dadosPapel(participante.papel).atuacao}</td>
               </tr>
             ))}
@@ -283,7 +288,7 @@ export function DocumentoPreview({
       <ConteudoEstruturado texto={t.equipamentosAnalisados} />
 
       <h2>6. Descrição do Posto de Trabalho, Máquinas, Ferramentas e Produtos</h2>
-      <h3>6.1. Características do Posto de Trabalho</h3>
+      <h3>6.1. Descrição do Posto de Trabalho</h3>
       <Paragrafos texto={t.descricaoPostoTrabalho || t.descricaoAmbiente} />
       {fotosDasSecoes(['atividades'])}
       <h3>6.2. Máquinas, Ferramentas e Equipamentos Utilizados</h3>
@@ -367,8 +372,8 @@ export function DocumentoPreview({
         Sendo o que se apresenta para o momento, o signatário coloca-se à disposição deste MM. Juízo
         para os esclarecimentos que se fizerem necessários.
       </p>
-      <p className="mt-8 no-indent text-center">{fecho.cidade}, {extenso(fecho.data)}.</p>
-      <div className="mt-14 text-center">
+      <p className="mt-6 no-indent text-center">{fecho.cidade}, {extenso(fecho.data)}.</p>
+      <div className="mt-8 text-center">
         <div className="mx-auto w-72 border-t border-ink-800 pt-1.5">
           <p className="no-indent font-bold">{perito?.nome ?? '—'}</p>
           {(perito?.titulo ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean).map((linha) => (

@@ -54,6 +54,7 @@ async function main() {
     demissao: '2025-01-01',
     dataVistoria: '2026-08-18',
     horaVistoria: '09:00',
+    horaFimVistoria: '10:30',
     localVistoria: 'Local de teste',
     modalidade: 'ambas',
     status: 'em_andamento',
@@ -62,7 +63,8 @@ async function main() {
     atualizadoEm: new Date(),
     tecnico: {
       apresentacao: 'Apresentação do documento.',
-      objetivoPericia: 'Objetivo da perícia.',
+      enderecamento: 'ENDEREÇAMENTO MANUAL LEGADO',
+      objetivoPericia: 'OBJETIVO MANUAL LEGADO',
       descricaoEmpresa: 'Descrição da empresa.',
       descricaoAmbiente: 'Descrição do ambiente.',
       descricaoPostoTrabalho: 'Descrição do posto de trabalho.',
@@ -83,7 +85,17 @@ async function main() {
       encerramento: 'Encerramento do parecer.',
     },
     reclamadas: [{ id: 'rec-layout', periciaId: 'per-layout', empresaId: 'emp-layout', principal: true }],
-    participantes: [],
+    participantes: [
+      {
+        id: 'participante-layout',
+        periciaId: 'per-layout',
+        empresaId: 'emp-layout',
+        nome: 'Representante da Empresa',
+        papel: 'preposto',
+        registro: null,
+        contato: null,
+      },
+    ],
     fotos: [
       {
         id: 'foto-1',
@@ -231,6 +243,13 @@ async function main() {
     `estrutura enxuta do DOCX fora da ordem aprovada: ${estruturaEnxuta.join(', ')}`,
   )
   assert.doesNotMatch(xml, /RELATÓRIO FOTOGRÁFICO/)
+  assert.doesNotMatch(xml, /ENDEREÇAMENTO MANUAL LEGADO|OBJETIVO MANUAL LEGADO/)
+  assert.match(xml, /Analisar tecnicamente a eventual caracterização da insalubridade/)
+  assert.match(xml, /das 09:00 às 10:30/)
+  assert.match(xml, /Preposto — Empresa de Teste Ltda\./)
+  assert.match(xml, /6\.1\. Descrição do Posto de Trabalho/)
+  assert.match(html, /das 09:00 às 10:30/)
+  assert.match(html, /Preposto — Empresa de Teste Ltda\./)
 
   const fotoAmbiente = xml.indexOf('Figura 1 — Vista geral do ambiente de trabalho')
   const secao3 = xml.indexOf('3. DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA')

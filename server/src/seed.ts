@@ -10,12 +10,15 @@ const prisma = new PrismaClient()
 //
 //   · administrador inicial (ADMIN_EMAIL / ADMIN_SENHA)
 //   · 39 quesitos do banco global (item 17)
-//   · biblioteca de textos inicial do administrador (Módulo F)
+//   · limpeza segura dos antigos textos demonstrativos da biblioteca
 //
 // Empresas e perícias fictícias só entram com SEED_DEMO=true.
 // ============================================================
 
-const TEXTOS_INICIAIS = [
+/** Modelos distribuídos nas primeiras versões; só são removidos se
+ * título e conteúdo continuarem intactos. Uma edição do cliente os
+ * transforma em conteúdo autoral e os preserva. */
+const TEXTOS_DEMONSTRATIVOS_LEGADOS = [
   {
     titulo: 'Apresentação padrão — Perito Judicial',
     secao: 'apresentacao' as const,
@@ -145,16 +148,23 @@ async function main() {
     console.log(`· quesitos globais já presentes (${jaTem}) — nada a fazer`)
   }
 
-  // ---------- Biblioteca inicial ----------
-  const textosDoAdmin = await prisma.textoBiblioteca.count({ where: { usuarioId: admin.id } })
-  if (textosDoAdmin === 0) {
-    await prisma.textoBiblioteca.createMany({
-      data: TEXTOS_INICIAIS.map((t) => ({ ...t, usuarioId: admin.id })),
-    })
-    console.log(`✓ ${TEXTOS_INICIAIS.length} textos na biblioteca do administrador`)
-  } else {
-    console.log(`· biblioteca do administrador já tem ${textosDoAdmin} textos — nada a fazer`)
-  }
+  // ---------- Biblioteca pessoal ----------
+  // A estrutura aprovada usa os textos técnicos automáticos da matriz.
+  // A biblioteca fica reservada ao que o cliente criar e reaproveitar.
+  const removidos = await prisma.textoBiblioteca.deleteMany({
+    where: {
+      usuarioId: admin.id,
+      OR: TEXTOS_DEMONSTRATIVOS_LEGADOS.map((texto) => ({
+        titulo: texto.titulo,
+        conteudo: texto.conteudo,
+      })),
+    },
+  })
+  console.log(
+    removidos.count
+      ? `✓ ${removidos.count} texto(s) demonstrativo(s) removido(s) da biblioteca`
+      : '· biblioteca pessoal preservada — nenhum modelo demonstrativo intacto',
+  )
 
   // ---------- Demonstração (opcional) ----------
   if (process.env.SEED_DEMO === 'true') {
@@ -201,6 +211,7 @@ async function seedDemo(responsavelId: string) {
       demissao: '2024-11-08',
       dataVistoria: '2026-07-15',
       horaVistoria: '09:30',
+      horaFimVistoria: '10:30',
       localVistoria: 'Rodovia Anhanguera, km 32 — Cajamar/SP',
       modalidade: 'insalubridade',
       status: 'em_andamento',
@@ -237,7 +248,7 @@ async function seedDemo(responsavelId: string) {
       participantes: {
         create: [
           { nome: 'Dr. Fábio Toledo', papel: 'advogado_reclamante', registro: 'OAB/SP 210.334' },
-          { nome: 'Eng. Roberto Manzi', papel: 'assistente_reclamada', registro: 'CREA-SP 0601223344' },
+          { nome: 'Eng. Roberto Manzi', papel: 'assistente_reclamada', empresaId: ferrante.id, registro: 'CREA-SP 0601223344' },
         ],
       },
     },

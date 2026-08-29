@@ -108,6 +108,8 @@ export const tecnicoSchema = z.object({
   conclusaoPericulosidade: texto,
   respostasQuesitos: texto,
   encerramento: texto,
+  dataAssinatura: texto.optional(),
+  cidadeAssinatura: texto.optional(),
   observacoesAdicionais: texto,
 })
 
@@ -124,6 +126,7 @@ const corpo = z.object({
   demissao: texto.optional(),
   dataVistoria: texto.optional(),
   horaVistoria: texto.optional(),
+  horaFimVistoria: texto.optional(),
   cepVistoria: texto.optional(),
   localVistoria: texto.optional(),
   numeroVistoria: texto.optional(),
@@ -146,6 +149,7 @@ const corpo = z.object({
       z.object({
         id: z.string().optional(),
         nome: texto,
+        empresaId: z.string().optional(),
         papel: z.enum([
           'perito_judicial',
           'reclamante',
@@ -233,6 +237,7 @@ periciasRouter.post(
       0,
       reclamadasValidas.findIndex((r) => r.principal),
     )
+    const empresasReclamadas = new Set(reclamadasValidas.map((r) => r.empresaId))
 
     const escalares = {
       numeroProcesso: d.numeroProcesso,
@@ -246,6 +251,7 @@ periciasRouter.post(
       demissao: nulo(d.demissao),
       dataVistoria: nulo(d.dataVistoria),
       horaVistoria: nulo(d.horaVistoria),
+      horaFimVistoria: nulo(d.horaFimVistoria),
       cepVistoria: nulo(d.cepVistoria),
       localVistoria: nulo(d.localVistoria),
       numeroVistoria: nulo(d.numeroVistoria),
@@ -265,6 +271,7 @@ periciasRouter.post(
       participantes: {
         create: d.participantes.map((p) => ({
           nome: p.nome,
+          empresaId: p.empresaId && empresasReclamadas.has(p.empresaId) ? p.empresaId : null,
           papel: p.papel,
           registro: nulo(p.registro),
           contato: nulo(p.contato),

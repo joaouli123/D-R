@@ -64,7 +64,7 @@ import {
 } from '@/content/textosPadrao'
 import { patchDoProcesso } from '@/lib/consultas'
 import { aplicarAnexo, usaAtenuacaoRuido } from '@/lib/nr15'
-import { dadosPapel, PAPEIS } from '@/lib/participantes'
+import { dadosPapel, grupoDoParticipante, PAPEIS } from '@/lib/participantes'
 import { intervaloDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
 import { dadosAssinatura } from '@/lib/assinaturaDocumento'
 import { comEmpresaVinculada, empresasLivres, opcoesDaLinha } from '@/lib/reclamadas'
@@ -121,6 +121,7 @@ function novaPericia(responsavelId: string): Pericia {
     participantes: [],
     dataVistoria: '',
     horaVistoria: '',
+    horaFimVistoria: '',
     cepVistoria: '',
     localVistoria: '',
     numeroVistoria: '',
@@ -333,6 +334,9 @@ export default function PericiaEditor() {
         ? avaliacao.tipo === 'periculosidade'
         : avaliacao.tipo !== 'periculosidade',
   )
+  const numeroNr16Editor = p.modalidade === 'ambas' ? '7.3' : '7.2'
+  const numeroDivergenciasEditor = p.modalidade === 'ambas' ? '7.4' : '7.3'
+  const numeroConsideracoesEditor = p.modalidade === 'ambas' ? '7.5' : '7.4'
 
   // Reabrir uma perícia já documentada continua o mesmo documento.
   useEffect(() => {
@@ -447,7 +451,16 @@ export default function PericiaEditor() {
       if (!salva) return
 
       const novas = await api.fotos.enviar(salva.id, secaoFotoAtual, files)
-      setP((v) => ({ ...v, fotos: [...v.fotos, ...novas] }))
+      // O upload persiste o arquivo, mas o POST da perícia é quem mantém
+      // a lista de fotos. Sincronizar agora impede que o próximo salvar
+      // interprete a imagem recém-enviada como removida.
+      const comFotos = {
+        ...salva,
+        fotos: [...salva.fotos, ...novas],
+      }
+      setP(comFotos)
+      const sincronizada = await salvarPericia(comFotos)
+      setP(sincronizada)
       toast(`${novas.length} foto(s) adicionada(s) em "${rotulo}".`)
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Falha ao enviar as fotos.', 'error')
@@ -663,13 +676,19 @@ export default function PericiaEditor() {
                     label={`Reclamada ${i + 1}`}
                     className="min-w-[240px] flex-1"
                     value={r.empresaId}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const novaEmpresaId = e.target.value
                       set({
                         reclamadas: p.reclamadas.map((x) =>
-                          x.id === r.id ? { ...x, empresaId: e.target.value } : x,
+                          x.id === r.id ? { ...x, empresaId: novaEmpresaId } : x,
+                        ),
+                        participantes: p.participantes.map((participante) =>
+                          participante.empresaId === r.empresaId
+                            ? { ...participante, empresaId: novaEmpresaId || undefined }
+                            : participante,
                         ),
                       })
-                    }
+                    }}
                   >
                     <option value="">— selecione —</option>
                     {opcoesDaLinha(empresas, p.reclamadas, r).map((e) => (
@@ -694,7 +713,16 @@ export default function PericiaEditor() {
                     size="sm"
                     className="mb-1 text-red-600 hover:bg-red-50"
                     icon={<Trash2 size={14} />}
-                    onClick={() => set({ reclamadas: p.reclamadas.filter((x) => x.id !== r.id) })}
+                    onClick={() =>
+                      set({
+                        reclamadas: p.reclamadas.filter((x) => x.id !== r.id),
+                        participantes: p.participantes.map((participante) =>
+                          participante.empresaId === r.empresaId
+                            ? { ...participante, empresaId: undefined }
+                            : participante,
+                        ),
+                      })
+                    }
                     aria-label="Remover reclamada"
                   />
                 </div>
@@ -715,87 +743,136 @@ export default function PericiaEditor() {
             />
           )}
 
-          {/* Participantes */}
+          {/* Participantes — cada parte tem seu próprio botão e grupo. */}
           <Card>
             <CardHeader
               title="Participantes da perícia"
-              subtitle="Perito judicial, assistentes técnicos, advogados e demais presentes."
+              subtitle="Organizados pela parte ou empresa que representam."
               icon={<Users size={18} />}
-              action={
-                <Button
-                  size="sm"
-                  variant="outline"
-                  icon={<Plus size={14} />}
-                  onClick={() =>
-                    set({
-                      participantes: [
-                        ...p.participantes,
-                        { id: uid('par'), nome: '', papel: 'reclamante' },
-                      ],
-                    })
-                  }
-                >
-                  Adicionar
-                </Button>
-              }
             />
-            <div className="space-y-3 p-5">
-              {p.participantes.map((pt) => (
-                <div key={pt.id} className="grid gap-3 rounded-lg border border-ink-200 p-3 sm:grid-cols-[1fr_1fr_1.25fr_auto]">
-                  <Input
-                    label="Nome"
-                    value={pt.nome}
-                    onChange={(e) =>
-                      set({
-                        participantes: p.participantes.map((x) =>
-                          x.id === pt.id ? { ...x, nome: e.target.value } : x,
-                        ),
-                      })
+            <div className="space-y-5 p-5">
+              {[
+                {
+                  chave: 'reclamante',
+                  titulo: 'Participantes do Reclamante',
+                  papel: 'reclamante' as Participante['papel'],
+                  empresaId: undefined,
+                },
+                ...p.reclamadas
+                  .slice()
+                  .sort((a, b) => Number(b.principal) - Number(a.principal))
+                  .map((reclamada) => {
+                    const empresa = empresas.find((item) => item.id === reclamada.empresaId)
+                    return {
+                      chave: reclamada.empresaId,
+                      titulo: empresa?.razaoSocial ?? 'Empresa reclamada',
+                      papel: 'preposto' as Participante['papel'],
+                      empresaId: reclamada.empresaId,
                     }
-                  />
-                  <Select
-                    label="Qualificação"
-                    value={pt.papel}
-                    onChange={(e) =>
-                      set({
-                        participantes: p.participantes.map((x) =>
-                          x.id === pt.id ? { ...x, papel: e.target.value as Participante['papel'] } : x,
-                        ),
-                      })
-                    }
-                  >
-                    {PAPEIS.map((pp) => (
-                      <option key={pp.value} value={pp.value}>
-                        {pp.label}
-                      </option>
-                    ))}
-                  </Select>
-                  <div>
-                    <span className="mb-1.5 block text-sm font-medium text-ink-700">Atuação no ato</span>
-                    <div className="flex min-h-10 items-center rounded-md border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-700">
-                      {dadosPapel(pt.papel).atuacao}
+                  }),
+                {
+                  chave: 'outros',
+                  titulo: 'Demais participantes',
+                  papel: 'perito_judicial' as Participante['papel'],
+                  empresaId: undefined,
+                },
+              ].map((grupo) => {
+                const principalId = p.reclamadas.find((item) => item.principal)?.empresaId
+                const participantes = p.participantes.filter(
+                  (participante) => grupoDoParticipante(participante, principalId) === grupo.chave,
+                )
+                return (
+                  <section key={grupo.chave} className="rounded-lg border border-ink-200 bg-ink-50/60 p-4">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h4 className="font-semibold text-ink-900">{grupo.titulo}</h4>
+                        {grupo.empresaId && (
+                          <p className="text-xs text-ink-500">
+                            {p.reclamadas.find((item) => item.empresaId === grupo.empresaId)?.principal
+                              ? 'Reclamada principal'
+                              : 'Reclamada secundária'}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        icon={<Plus size={14} />}
+                        aria-label={`Adicionar participante em ${grupo.titulo}`}
+                        onClick={() =>
+                          set({
+                            participantes: [
+                              ...p.participantes,
+                              {
+                                id: uid('par'),
+                                nome: '',
+                                papel: grupo.papel,
+                                empresaId: grupo.empresaId,
+                              },
+                            ],
+                          })
+                        }
+                      >
+                        Adicionar
+                      </Button>
                     </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    className="mb-1 self-end text-red-600 hover:bg-red-50"
-                    icon={<Trash2 size={15} />}
-                    onClick={() =>
-                      set({ participantes: p.participantes.filter((x) => x.id !== pt.id) })
-                    }
-                    aria-label="Remover participante"
-                  />
-                </div>
-              ))}
-              {p.participantes.length === 0 && (
-                <p className="text-sm text-ink-500">Nenhum participante cadastrado.</p>
-              )}
+                    <div className="space-y-3">
+                      {participantes.map((pt) => (
+                        <div key={pt.id} className="grid gap-3 rounded-lg border border-ink-200 bg-white p-3 sm:grid-cols-[1fr_1fr_1.25fr_auto]">
+                          <Input
+                            label="Nome"
+                            value={pt.nome}
+                            onChange={(e) =>
+                              set({
+                                participantes: p.participantes.map((x) =>
+                                  x.id === pt.id ? { ...x, nome: e.target.value } : x,
+                                ),
+                              })
+                            }
+                          />
+                          <Select
+                            label="Qualificação"
+                            value={pt.papel}
+                            onChange={(e) =>
+                              set({
+                                participantes: p.participantes.map((x) =>
+                                  x.id === pt.id ? { ...x, papel: e.target.value as Participante['papel'] } : x,
+                                ),
+                              })
+                            }
+                          >
+                            {PAPEIS.map((pp) => (
+                              <option key={pp.value} value={pp.value}>{pp.label}</option>
+                            ))}
+                          </Select>
+                          <div>
+                            <span className="mb-1.5 block text-sm font-medium text-ink-700">Atuação no ato</span>
+                            <div className="flex min-h-10 items-center rounded-md border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-700">
+                              {dadosPapel(pt.papel).atuacao}
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            className="mb-1 self-end text-red-600 hover:bg-red-50"
+                            icon={<Trash2 size={15} />}
+                            onClick={() => set({ participantes: p.participantes.filter((x) => x.id !== pt.id) })}
+                            aria-label="Remover participante"
+                          />
+                        </div>
+                      ))}
+                      {!participantes.length && (
+                        <p className="text-sm text-ink-500">Nenhum participante neste grupo.</p>
+                      )}
+                    </div>
+                  </section>
+                )
+              })}
             </div>
           </Card>
 
           <Card>
             <CardHeader title="Vistoria" icon={<Camera size={18} />} />
-            <div className="grid gap-4 p-5 sm:grid-cols-4">
+            <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-5">
               <Input
                 label="Data da vistoria"
                 type="date"
@@ -803,10 +880,16 @@ export default function PericiaEditor() {
                 onChange={(e) => set({ dataVistoria: e.target.value })}
               />
               <Input
-                label="Horário"
+                label="Horário de início da perícia"
                 type="time"
                 value={p.horaVistoria}
                 onChange={(e) => set({ horaVistoria: e.target.value })}
+              />
+              <Input
+                label="Horário de término da perícia"
+                type="time"
+                value={p.horaFimVistoria ?? ''}
+                onChange={(e) => set({ horaFimVistoria: e.target.value })}
               />
               <Input
                 label="CEP da vistoria"
@@ -862,15 +945,13 @@ export default function PericiaEditor() {
         <div className="space-y-4">
           {(
             [
-              { campo: 'apresentacao', secao: 'apresentacao', label: 'Apresentação do documento', rows: 5 },
-              { campo: 'enderecamento', secao: 'generico', label: 'Endereçamento', rows: 3 },
-              { campo: 'objetivoPericia', secao: 'objetivo', label: 'Objetivo da perícia', rows: 4 },
-              { campo: 'descricaoEmpresa', secao: 'empresa', label: 'Descrição da empresa', rows: 5 },
-              { campo: 'descricaoAmbiente', secao: 'ambiente', label: 'Descrição do ambiente de trabalho', rows: 6 },
-              { campo: 'descricaoPostoTrabalho', secao: 'ambiente', label: 'Descrição do posto de trabalho', rows: 6 },
-              { campo: 'maquinasFerramentas', secao: 'atividades', label: 'Máquinas, equipamentos e ferramentas', rows: 5 },
-              { campo: 'produtosUtilizados', secao: 'atividades', label: 'Produtos utilizados', rows: 5 },
-              { campo: 'atividadesFuncoes', secao: 'atividades', label: 'Atividades e funções exercidas', rows: 6 },
+              { campo: 'apresentacao', secao: 'apresentacao', label: 'APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA', rows: 5 },
+              { campo: 'descricaoEmpresa', secao: 'empresa', label: '3. Descrição das Instalações da Reclamada', rows: 5 },
+              { campo: 'descricaoAmbiente', secao: 'ambiente', label: '3.1. Instalações Físicas', rows: 6 },
+              { campo: 'descricaoPostoTrabalho', secao: 'ambiente', label: '6.1. Descrição do Posto de Trabalho', rows: 6 },
+              { campo: 'maquinasFerramentas', secao: 'atividades', label: '6.2. Máquinas, Ferramentas e Equipamentos Utilizados', rows: 5 },
+              { campo: 'produtosUtilizados', secao: 'atividades', label: '6.4. Produtos Utilizados Habitualmente nas Atividades', rows: 5 },
+              { campo: 'atividadesFuncoes', secao: 'atividades', label: '7.1. Atividades Efetivamente Exercidas', rows: 6 },
             ] as const
           ).map((f) => {
             const campoPadrao = campoPadraoDe(f.campo)
@@ -1356,30 +1437,30 @@ export default function PericiaEditor() {
         <div className="space-y-4">
           {(
             [
-              { campo: 'normasReferencias', secao: 'generico', label: 'Normas e referências utilizadas', rows: 4 },
-              { campo: 'equipamentosAnalisados', secao: 'generico', label: 'Metodologia, equipamentos e procedimentos analisados', rows: 4 },
-              { campo: 'informacoesLevantadas', secao: 'generico', label: 'Histórico laboral e informações levantadas na vistoria', rows: 5 },
-              { campo: 'divergenciasFaticas', secao: 'generico', label: 'Resumo geral das divergências fáticas (opcional)', rows: 4 },
-              { campo: 'alegacoesReclamante', secao: 'generico', label: 'Alegações do Reclamante', rows: 5 },
-              { campo: 'informacoesReclamada', secao: 'generico', label: 'Informações prestadas pela Reclamada', rows: 5 },
-              { campo: 'consideracoesDivergencias', secao: 'analise', label: 'Considerações sobre as divergências fáticas', rows: 6 },
-              { campo: 'criterioAvaliacaoPericulosidade', secao: 'analise', label: 'Critério de avaliação — NR-16', rows: 4 },
-              { campo: 'notaTecnicaEpis', secao: 'analise', label: 'Nota técnica dos EPIs', rows: 7 },
-              { campo: 'protecoesColetivas', secao: 'analise', label: 'Proteções coletivas', rows: 5 },
+              { campo: 'normasReferencias', secao: 'generico', label: '4. Critérios Técnicos para Avaliação Pericial', rows: 4 },
+              { campo: 'equipamentosAnalisados', secao: 'generico', label: '5. Metodologia de Avaliação', rows: 4 },
+              { campo: 'informacoesLevantadas', secao: 'generico', label: '6.3. Constatações da Vistoria Pericial', rows: 5 },
+              { campo: 'divergenciasFaticas', secao: 'generico', label: `${numeroDivergenciasEditor}. Divergências Fáticas — resumo geral (opcional)`, rows: 4 },
+              { campo: 'alegacoesReclamante', secao: 'generico', label: `${numeroDivergenciasEditor}.1. Alegações do Reclamante`, rows: 5 },
+              { campo: 'informacoesReclamada', secao: 'generico', label: `${numeroDivergenciasEditor}.2. Informações prestadas pela Reclamada`, rows: 5 },
+              { campo: 'consideracoesDivergencias', secao: 'analise', label: `${numeroConsideracoesEditor}. Considerações sobre as Divergências Fáticas`, rows: 6 },
+              { campo: 'criterioAvaliacaoPericulosidade', secao: 'analise', label: `${numeroNr16Editor}.1. NR-16 — Critério de Avaliação`, rows: 4 },
+              { campo: 'notaTecnicaEpis', secao: 'analise', label: '8. Dos Equipamentos de Proteção Individual (NR-06)', rows: 7 },
+              { campo: 'protecoesColetivas', secao: 'analise', label: '9. Das Proteções Coletivas', rows: 5 },
               {
                 campo: 'analiseTecnica',
                 secao: 'analise',
                 label: p.modalidade === 'insalubridade'
-                  ? 'Análise técnica dos agentes'
+                  ? '10. Análise Técnica dos Agentes'
                   : p.modalidade === 'periculosidade'
-                    ? 'Análise técnica das atividades e riscos'
-                    : 'Análise técnica dos agentes, atividades e riscos',
+                    ? '10. Análise Técnica das Atividades e Riscos'
+                    : '10. Análise Técnica dos Agentes, Atividades e Riscos',
                 rows: 8,
               },
-              { campo: 'conclusaoInsalubridade', secao: 'conclusao', label: 'Conclusão — NR-15 (Insalubridade)', rows: 6 },
-              { campo: 'conclusaoPericulosidade', secao: 'conclusao', label: 'Conclusão — NR-16 (Periculosidade)', rows: 6 },
-              { campo: 'respostasQuesitos', secao: 'conclusao', label: 'Respostas aos quesitos', rows: 8 },
-              { campo: 'encerramento', secao: 'conclusao', label: 'Encerramento', rows: 5 },
+              { campo: 'conclusaoInsalubridade', secao: 'conclusao', label: '11. NR-15 — Conclusão e Fundamentação', rows: 6 },
+              { campo: 'conclusaoPericulosidade', secao: 'conclusao', label: p.modalidade === 'ambas' ? '12. NR-16 — Conclusão e Fundamentação' : '11. NR-16 — Conclusão e Fundamentação', rows: 6 },
+              { campo: 'respostasQuesitos', secao: 'conclusao', label: p.modalidade === 'ambas' ? '13. Respostas aos Quesitos Técnicos' : '12. Respostas aos Quesitos Técnicos', rows: 8 },
+              { campo: 'encerramento', secao: 'conclusao', label: p.modalidade === 'ambas' ? '14. Encerramento' : '13. Encerramento', rows: 5 },
             ] as const
           ).filter((f) =>
             (f.campo !== 'conclusaoInsalubridade' || p.modalidade !== 'periculosidade') &&

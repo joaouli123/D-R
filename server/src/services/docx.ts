@@ -37,7 +37,9 @@ import {
   mascaraCpf,
   montarApresentacaoAgente,
   numeradorDeSecoes,
+  objetivoAutomaticoDocumento,
   periodoAvaliacaoDocumento,
+  horarioDaVistoriaDocumento,
   hoje,
   ATUACAO,
 } from './documento-comum.js'
@@ -318,7 +320,7 @@ function assinatura(
     new Paragraph({
       alignment: AlignmentType.CENTER,
       keepNext: true,
-      spacing: { before: 600, after: 720 },
+      spacing: { before: 360, after: 360 },
       children: [texto(`${cidade || 'São Paulo/SP'}, ${extenso(dataAssinatura)}.`)],
     }),
     new Paragraph({
@@ -350,13 +352,9 @@ const enderecamento = (vara?: string | null): Paragraph[] => [
 const enderecamentoDoParecer = (
   vara?: string | null,
   comarca?: string | null,
-  personalizado?: string | null,
 ): Paragraph[] => {
-  const informados = emParagrafos(personalizado)
   const destino = [vara, comarca].filter(Boolean).join(' — ').toUpperCase()
-  const linhas = informados.length
-    ? informados
-    : [`EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA ${destino}`]
+  const linhas = [`EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA ${destino}`]
 
   return linhas.map(
     (linha, indice) =>
@@ -479,7 +477,7 @@ async function docParecer(
   const periodo = periodoAvaliacaoDocumento(pericia)
 
   const filhos: (Paragraph | Table)[] = [
-    ...enderecamentoDoParecer(pericia.vara, pericia.comarca, t.enderecamento),
+    ...enderecamentoDoParecer(pericia.vara, pericia.comarca),
     tabela([
       fichaLinha('Processo nº', pericia.numeroProcesso),
       fichaLinha(
@@ -496,7 +494,7 @@ async function docParecer(
     h3('APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA'),
     ...blocos(t.apresentacao),
     h2(num.secao('OBJETO DA PERÍCIA E DADOS CONTRATUAIS')),
-    ...blocos(t.objetivoPericia),
+    ...blocos(objetivoAutomaticoDocumento(pericia.modalidade)),
     tabela([
       fichaLinha('Função Inicial', pericia.funcaoReclamante || '—'),
       fichaLinha('Data de admissão', data(pericia.admissao)),
@@ -506,9 +504,7 @@ async function docParecer(
     ]),
     h2(num.secao('DA DILIGÊNCIA TÉCNICA PERICIAL')),
     p(
-      `A vistoria técnica foi realizada em ${extenso(pericia.dataVistoria)}${
-        pericia.horaVistoria ? `, às ${pericia.horaVistoria}` : ''
-      }, no endereço ${pericia.localVistoria || '—'}${pericia.numeroVistoria ? `, nº ${pericia.numeroVistoria}` : ''}${pericia.setorVistoriado ? `, no setor/local ${pericia.setorVistoriado}` : ''}, com a presença dos participantes abaixo relacionados.`,
+      `A vistoria técnica foi realizada em ${extenso(pericia.dataVistoria)}${horarioDaVistoriaDocumento(pericia)}, no endereço ${pericia.localVistoria || '—'}${pericia.numeroVistoria ? `, nº ${pericia.numeroVistoria}` : ''}${pericia.setorVistoriado ? `, no setor/local ${pericia.setorVistoriado}` : ''}, com a presença dos participantes abaixo relacionados.`,
     ),
   ]
 
@@ -528,7 +524,10 @@ async function docParecer(
             new TableRow({
               children: [
                 celula(pt.nome, { larguraDxa: 2685 }),
-                celula(PAPEL[pt.papel] ?? pt.papel, { larguraDxa: 2864 }),
+                celula(
+                  `${PAPEL[pt.papel] ?? pt.papel}${pt.empresaId && porId.get(pt.empresaId) ? ` — ${porId.get(pt.empresaId)?.razaoSocial}` : ''}`,
+                  { larguraDxa: 2864 },
+                ),
                 celula(ATUACAO[pt.papel] ?? '—', { larguraDxa: 3401 }),
               ],
             }),
@@ -550,7 +549,7 @@ async function docParecer(
     h2(num.secao('METODOLOGIA DE AVALIAÇÃO')),
     ...blocosEstruturados(t.equipamentosAnalisados),
     h2(num.secao('DESCRIÇÃO DO POSTO DE TRABALHO, MÁQUINAS, FERRAMENTAS E PRODUTOS')),
-    h3(num.sub('Características do Posto de Trabalho')),
+    h3(num.sub('Descrição do Posto de Trabalho')),
     ...blocos(t.descricaoPostoTrabalho || t.descricaoAmbiente),
   )
   filhos.push(...(await fotosDasSecoes(['atividades'])))

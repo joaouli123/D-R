@@ -79,7 +79,8 @@ model Empresa {
   criadoEm        DateTime @default(now())
   atualizadoEm    DateTime @updatedAt
 
-  reclamadas Reclamada[]
+  reclamadas    Reclamada[]
+  participantes Participante[]
 
   @@map("empresas")
 }
@@ -115,6 +116,7 @@ model Pericia {
   demissao String?
   dataVistoria     String?
   horaVistoria     String?
+  horaFimVistoria  String?
   cepVistoria      String?
   localVistoria    String?
   numeroVistoria   String?
@@ -180,14 +182,17 @@ enum PapelParticipante {
 model Participante {
   id        String            @id @default(uuid())
   periciaId String
+  empresaId String?
   nome      String            @default("")
   papel     PapelParticipante
   registro  String?
   contato   String?
 
   pericia Pericia @relation(fields: [periciaId], references: [id], onDelete: Cascade)
+  empresa Empresa? @relation(fields: [empresaId], references: [id], onDelete: SetNull)
 
   @@index([periciaId])
+  @@index([empresaId])
   @@map("participantes")
 }
 

@@ -53,7 +53,7 @@ function objetoPorModalidade(modalidade: ModalidadePericia): string {
   return `${insalubridade}\n\n${periculosidade}`
 }
 
-function objetivoPericia(pericia: Pericia): string {
+export function objetivoPadraoDaPericia(pericia: Pick<Pericia, 'modalidade'>): string {
   return objetoPorModalidade(pericia.modalidade)
 }
 
@@ -93,9 +93,8 @@ function notaTecnicaEpis(): string {
   return paragrafos(
     'Nota Técnica sobre a Primazia da Realidade',
     'A análise técnica observará a primazia da realidade, considerando as condições efetivamente existentes e as atividades realmente desempenhadas, em conjunto com os elementos documentais e demais evidências disponíveis.',
-    'Quanto aos EPIs, os registros de entrega, o Certificado de Aprovação, a adequação ao agente, os treinamentos, a periodicidade de substituição, o uso efetivo e as demais evidências disponíveis devem ser analisados conjuntamente. PGR, laudos ocupacionais, entrevistas ou outros documentos não substituem automaticamente a ficha de entrega nem comprovam, isoladamente, o fornecimento e a utilização do equipamento.',
-    'A ausência ou inconsistência de um registro formal também não encerra, isoladamente, a análise. Cada elemento deve ser valorado conforme seu conteúdo, período de abrangência, coerência e confiabilidade.',
-    'A identificação de EPI pelo Reclamante durante a diligência somente será considerada quando tiver efetivamente ocorrido, estiver devidamente registrada e for analisada em conjunto com as demais evidências do caso.',
+    'Quanto aos EPIs, eventual ausência ou inconsistência nos registros formais de entrega não deve, isoladamente, conduzir à conclusão de inexistência de fornecimento, disponibilização ou utilização dos equipamentos, devendo ser considerado o conjunto probatório, inclusive os demais meios de prova admitidos em direito, nos termos do art. 369 do CPC.',
+    'Nesse contexto, a identificação e o reconhecimento, pelo próprio Reclamante, dos EPIs apresentados na presença dos demais envolvidos constituem elementos objetivos e relevantes para a análise do fornecimento e da disponibilização desses equipamentos, devendo ser considerados em conjunto com os demais elementos probatórios relativos ao período contratual.',
   )
 }
 
@@ -121,8 +120,12 @@ function metodologia(pericia: Pericia): string {
     pericia.modalidade !== 'periculosidade' && '5.2.2. Critérios de Avaliação de Ruído – NHO-01 (Q=3) e NR-15 (Q=5)',
     pericia.modalidade !== 'periculosidade' && 'Nas informações de ruído constantes do PPP ou de outros documentos técnicos, deverá ser identificada a metodologia utilizada para obtenção dos resultados. A NHO-01 da FUNDACENTRO utiliza fator de duplicação Q = 3 dB, enquanto o Anexo nº 1 da NR-15 adota Q = 5 dB. Por se tratarem de critérios distintos, os resultados obtidos por uma metodologia não deverão ser automaticamente convertidos ou interpretados como se tivessem sido obtidos segundo a outra.',
     '5.2.3. Equipamentos de Proteção Individual – EPI',
-    'Os registros de fornecimento de EPI serão analisados em conjunto com os demais elementos disponíveis, considerando-se o equipamento fornecido, respectivo CA, adequação ao agente, período de utilização, treinamentos e demais evidências pertinentes. A validade e a adequação serão conferidas na base oficial de Certificados de Aprovação (CA) do Ministério do Trabalho e Emprego. Para a proteção auditiva, será considerado o NRRsf constante do CA do equipamento efetivamente comprovado. Havendo mais de um EPI associado ao mesmo agente, cada equipamento será demonstrado e avaliado individualmente, e a conclusão considerará os EPIs efetivamente comprovados como fornecidos e utilizados no período analisado, sem seleção automática daquele que apresente a maior atenuação.',
-    pericia.modalidade !== 'periculosidade' && 'A eliminação ou neutralização da insalubridade será analisada conforme o item 15.4.1 da NR-15 e o artigo 191 da CLT, considerando-se as medidas de ordem geral e a utilização de equipamento de proteção individual.',
+    'A análise dos Equipamentos de Proteção Individual – EPI será realizada a partir do conjunto dos elementos técnicos e documentais disponíveis nos autos, considerando-se os equipamentos relacionados às atividades e aos agentes de risco identificados, bem como suas características e finalidade de proteção.',
+    'Serão considerados, quando disponíveis, os registros e demais elementos relacionados aos equipamentos utilizados, incluindo sua identificação, respectivo Certificado de Aprovação – CA, características de proteção e correspondência com o agente de risco e com o período analisado.',
+    'Para os protetores auditivos, quando identificado o respectivo CA nos elementos disponíveis, serão consideradas suas características de atenuação, inclusive o NRRsf correspondente, quando aplicável, em conjunto com as demais informações técnicas pertinentes à avaliação da proteção proporcionada.',
+    'A análise não será realizada de forma isolada a partir de um único documento, devendo ser considerados, conjuntamente, os elementos técnicos, documentais e circunstanciais relacionados às condições de trabalho, às atividades desenvolvidas, aos agentes identificados e aos equipamentos de proteção associados.',
+    'A eventual ausência ou insuficiência de determinada informação documental será apreciada em conjunto com os demais elementos disponíveis, sem que, isoladamente, seja estabelecida presunção quanto à inexistência do equipamento, à sua não utilização ou à ineficácia da proteção.',
+    pericia.modalidade !== 'periculosidade' && 'A eliminação ou neutralização da insalubridade será analisada nos termos do item 15.4.1 da NR-15 e do artigo 191 da CLT, considerando-se as medidas de ordem geral e, quando aplicável, a utilização de Equipamento de Proteção Individual adequado ao agente e capaz de reduzir ou neutralizar a exposição, observadas as características técnicas do equipamento e as condições verificadas no período objeto da análise.',
     pericia.modalidade !== 'insalubridade' && '5.3. METODOLOGIA – NR-16',
     pericia.modalidade !== 'insalubridade' && 'A avaliação de periculosidade compreenderá, conforme aplicável: inspeção técnica in loco; análise das atividades efetivamente desenvolvidas; análise do processo e fluxo operacional; identificação das fontes e condições de risco; verificação das áreas de risco; análise do ingresso ou permanência do trabalhador; avaliação da frequência e forma de exposição; análise da documentação técnica; registro fotográfico, quando permitido; e enquadramento nos critérios específicos da NR-16.',
     pericia.modalidade !== 'insalubridade' && '5.3.1. Áreas de Risco',
@@ -152,7 +155,7 @@ export function textosPadraoDaPericia(
 ): Record<CampoComTextoPadrao, string> {
   return {
     apresentacao: apresentacao(pericia, perito, reclamada),
-    objetivoPericia: objetivoPericia(pericia),
+    objetivoPericia: objetivoPadraoDaPericia(pericia),
     normasReferencias: normasReferencias(pericia),
     equipamentosAnalisados: metodologia(pericia),
     criterioAvaliacaoPericulosidade: criterioAvaliacaoPericulosidade(),
@@ -193,8 +196,10 @@ export function patchDeTextosPadrao(
       (campo === 'normasReferencias' && atual.includes('Líquidos Inflamáveis (Gera Direito à Periculosidade)')) ||
       (campo === 'equipamentosAnalisados' && atual.startsWith('Os trabalhos periciais foram conduzidos em três etapas')) ||
       (campo === 'equipamentosAnalisados' && atual.includes('conclusão considerará o de maior atenuação')) ||
+      (campo === 'equipamentosAnalisados' && atual.includes('Os registros de fornecimento de EPI serão analisados em conjunto')) ||
       (campo === 'criterioAvaliacaoPericulosidade' && atual.includes('realizada mediante avaliação qualitativa')) ||
       (campo === 'notaTecnicaEpis' && atual.includes('identificação dos próprios EPIs do Reclamante')) ||
+      (campo === 'notaTecnicaEpis' && atual.includes('não substituem automaticamente a ficha de entrega')) ||
       (campo === 'encerramento' && atual.startsWith('Os trabalhos periciais foram desenvolvidos com imparcialidade')) ||
       (campo === 'encerramento' && atual.includes('No melhor conhecimento e crédito'))
     const doPerito = atual.trim() !== '' && atual !== anterior && !padraoLegado
