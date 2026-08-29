@@ -123,7 +123,12 @@ const CSS = `
   p.sem-recuo { text-indent: 0; }
   p.vazio { font-style: italic; color: ${css(MARCA.tinta400)}; text-indent: 0; }
   .nota { font-size: 8.5pt; color: ${css(MARCA.tinta500)}; }
-  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10pt; page-break-inside: avoid; }
+  /* Uma tabela pode atravessar páginas; cada linha continua inteira e o
+     cabeçalho reaparece na continuação. Manter a tabela toda indivisível
+     fazia o Chromium empurrar quadros longos e deixar títulos órfãos. */
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10pt; page-break-inside: auto; break-inside: auto; }
+  tr { page-break-inside: avoid; break-inside: avoid-page; }
+  thead { display: table-header-group; }
   th, td { border: 1px solid var(--documento-borda); padding: 6px 9px; vertical-align: top; text-align: left; text-indent: 0; }
   th { background: var(--documento-tabela); color: var(--documento-titulo); font-weight: 700; }
   td { background: var(--documento-fundo); }
@@ -132,18 +137,16 @@ const CSS = `
      técnica padrão. A classe segue existindo só para agrupar o conteúdo. */
   .bloco-conteudo { margin: 0 0 8px; }
   .agente-bloco { page-break-inside: auto; break-inside: auto; margin: 0 0 16px; }
-  /* inline-block torna título + ficha uma unidade indivisível no Chromium.
-     Só page-break-inside não bastava quando restava quase espaço suficiente
-     no rodapé: o cabeçalho da tabela ficava na página anterior. */
+  /* O título fica unido ao começo da ficha pelo break-after do h3. A ficha
+     em si precisa poder continuar em outra página, sobretudo nos anexos
+     com muitas propriedades. */
   .agente-resumo {
-    display: inline-block;
+    display: block;
     width: 100%;
-    page-break-inside: avoid;
-    break-inside: avoid-page;
   }
   .agente-bloco h3 { margin: 12px 0 6px; padding: 0 0 4px; color: var(--documento-titulo); border-bottom: 1px solid var(--documento-borda); page-break-after: avoid; break-after: avoid; }
   .parecer-manual .agente-bloco h3.agente-titulo { color: var(--documento-titulo); }
-  .agente-bloco table { margin: 0; page-break-inside: avoid; break-inside: avoid-page; }
+  .agente-bloco table { margin: 0; page-break-inside: auto; break-inside: auto; }
   .agente-bloco tr { page-break-inside: avoid; break-inside: avoid-page; }
   .agente-bloco thead { display: table-header-group; }
   .agente-bloco th { width: 32%; }

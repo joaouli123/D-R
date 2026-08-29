@@ -732,7 +732,24 @@ async function main() {
   assert.match(
     secaoAgentes,
     /<div class="agente-resumo"><h3 class="agente-titulo">[\s\S]*?<table>/,
-    'o título e a tabela principal do agente precisam formar um bloco indivisível',
+    'o título precisa preceder imediatamente a tabela principal do agente',
+  )
+  const blocosAgentes = [...secaoAgentes.matchAll(
+    /<section class="agente-bloco">([\s\S]*?)<\/section>/gi,
+  )].map((resultado) => resultado[1])
+  const blocoRuido = blocosAgentes.find((bloco) => /Ruído/i.test(bloco))
+  const blocoAcetaldeido = blocosAgentes.find((bloco) => /Acetaldeído/i.test(bloco))
+  assert.ok(blocoRuido, 'a avaliação de ruído precisa ter um bloco próprio')
+  assert.ok(blocoAcetaldeido, 'a avaliação do Anexo 11 precisa ter um bloco próprio')
+  assert.doesNotMatch(
+    blocoRuido,
+    /75-07-0|12,5 ppm|78 ppm/,
+    'dados do Anexo 11 não podem ser misturados à avaliação de ruído',
+  )
+  assert.doesNotMatch(
+    blocoAcetaldeido,
+    /90 dB\(A\)|85 dB\(A\)/,
+    'dados de ruído não podem ser misturados à avaliação do Anexo 11',
   )
   assert.doesNotMatch(secaoAgentes, /class="tabela-agentes"/)
   assert.match(secaoAgentes, /<th>Propriedade<\/th><th>Informação<\/th>/)
@@ -750,6 +767,26 @@ async function main() {
   assert.match(htmlParecer, /h2 \{[^}]*font-size: 14pt/s)
   assert.match(htmlParecer, /body \{[\s\S]*font-size: 11pt/)
   assert.match(htmlParecer, /table \{[\s\S]*font-size: 10pt/)
+  assert.match(
+    htmlParecer,
+    /table \{[^}]*page-break-inside:\s*auto[^}]*break-inside:\s*auto/s,
+    'tabelas longas precisam continuar na página seguinte sem deixar o título órfão',
+  )
+  assert.match(
+    htmlParecer,
+    /tr \{[^}]*page-break-inside:\s*avoid[^}]*break-inside:\s*avoid-page/s,
+    'cada linha da tabela deve permanecer inteira durante a paginação',
+  )
+  assert.match(
+    htmlParecer,
+    /thead \{[^}]*display:\s*table-header-group/s,
+    'o cabeçalho da tabela deve se repetir após a quebra de página',
+  )
+  assert.doesNotMatch(
+    htmlParecer,
+    /\.agente-resumo \{[^}]*display:\s*inline-block/s,
+    'a ficha completa do agente não pode ser um bloco indivisível que cria grandes vazios',
+  )
   assert.match(
     htmlParecer,
     /\.fotos \{[^}]*display:\s*block/s,
