@@ -17,12 +17,15 @@ const incluirTudo = {
 
 const texto = z.string().default('')
 const textoObrigatorio = z.string().trim().min(1)
+export const dataIsoSchema = z
+  .string()
+  .regex(/^(?:|\d{4}-\d{2}-\d{2})$/, 'Use uma data com ano de quatro dígitos.')
 
 const periodoSchema = z.object({
   id: z.string(),
   funcao: texto,
-  inicio: texto,
-  fim: texto.optional(),
+  inicio: dataIsoSchema.default(''),
+  fim: dataIsoSchema.optional(),
   setor: texto.optional(),
   descricaoAtividades: texto.optional(),
 })
@@ -108,7 +111,7 @@ export const tecnicoSchema = z.object({
   conclusaoPericulosidade: texto,
   respostasQuesitos: texto,
   encerramento: texto,
-  dataAssinatura: texto.optional(),
+  dataAssinatura: dataIsoSchema.optional(),
   cidadeAssinatura: texto.optional(),
   observacoesAdicionais: texto,
 })
@@ -121,10 +124,10 @@ const corpo = z.object({
   reclamante: texto,
   cpfReclamante: texto.optional(),
   funcaoReclamante: texto.optional(),
-  dataAjuizamento: texto.optional(),
-  admissao: texto.optional(),
-  demissao: texto.optional(),
-  dataVistoria: texto.optional(),
+  dataAjuizamento: dataIsoSchema.optional(),
+  admissao: dataIsoSchema.optional(),
+  demissao: dataIsoSchema.optional(),
+  dataVistoria: dataIsoSchema.optional(),
   horaVistoria: texto.optional(),
   horaFimVistoria: texto.optional(),
   cepVistoria: texto.optional(),

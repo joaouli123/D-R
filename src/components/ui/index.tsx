@@ -136,6 +136,17 @@ export function Input({
   const errorId = React.useId()
   const autoId = React.useId()
   const campoId = props.id ?? autoId
+  const limitarAno = props.type === 'date'
+  const aoAlterar: React.ChangeEventHandler<HTMLInputElement> | undefined = limitarAno
+    ? (evento) => {
+        const ano = evento.currentTarget.value.split('-', 1)[0]
+        if (ano.length > 4) {
+          evento.currentTarget.value = typeof props.value === 'string' ? props.value : ''
+          return
+        }
+        props.onChange?.(evento)
+      }
+    : props.onChange
   return (
     <FieldWrap
       label={label}
@@ -148,6 +159,8 @@ export function Input({
       <input
         {...props}
         id={campoId}
+        onChange={aoAlterar}
+        max={limitarAno ? (props.max ?? '9999-12-31') : props.max}
         className={cn(inputBase, 'h-10', error && 'border-red-500', className)}
         aria-required={required || props['aria-required']}
         aria-invalid={error ? true : props['aria-invalid']}

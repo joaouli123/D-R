@@ -18,6 +18,11 @@ const dockerfile = readFileSync(new URL('../Dockerfile', import.meta.url), 'utf8
 
 const moduloPericias = await import('../src/routes/pericias.js')
 const { agenteSchema } = moduloPericias
+const dataIsoSchema = (
+  moduloPericias as typeof moduloPericias & {
+    dataIsoSchema?: { safeParse: (valor: unknown) => { success: boolean } }
+  }
+).dataIsoSchema
 const tecnicoSchema = (
   moduloPericias as typeof moduloPericias & {
     tecnicoSchema?: { safeParse: (valor: unknown) => { success: boolean; data?: Record<string, unknown> } }
@@ -165,6 +170,9 @@ const epiComCamposObrigatoriosVazios = agenteSchema.safeParse(agenteComEpiComCam
 const epiMinimo = agenteSchema.safeParse(agenteComEpiMinimo)
 const epiManual = agenteSchema.safeParse(agenteComEpiManual)
 const novaEstrutura = tecnicoSchema?.safeParse(tecnicoNaNovaEstrutura)
+const dataComAnoLongo = dataIsoSchema?.safeParse('202626-08-29')
+const dataComAnoValido = dataIsoSchema?.safeParse('2026-08-29')
+const dataVazia = dataIsoSchema?.safeParse('')
 
 const resultados = [
   {
@@ -237,6 +245,13 @@ const resultados = [
       novaEstrutura.data?.notaTecnicaEpis === 'Primazia da realidade e conjunto probatório' &&
       novaEstrutura.data?.conclusaoPericulosidade === 'Não caracterizada' &&
       novaEstrutura.data?.encerramento === 'Parecer composto por folhas rubricadas.',
+  },
+  {
+    nome: 'datas aceitam ano com quatro dígitos e rejeitam ano mais longo',
+    ok:
+      dataComAnoLongo?.success === false &&
+      dataComAnoValido?.success === true &&
+      dataVazia?.success === true,
   },
   {
     nome: 'migração do número é idempotente e recupera somente a falha conhecida',
