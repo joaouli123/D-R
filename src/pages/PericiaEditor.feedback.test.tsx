@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -112,13 +112,53 @@ function prepararEditor() {
 }
 
 describe('PericiaEditor — feedback noturno de 28/08', () => {
-  it('separa participantes por parte e por empresa e oferece início e término da vistoria', () => {
+  it('oferece quatro grupos de participantes com qualificações próprias', () => {
     prepararEditor()
 
-    expect(screen.getByText('Participantes do Reclamante')).toBeDefined()
-    expect(screen.getByRole('heading', { name: 'Reclamada Principal Ltda.' })).toBeDefined()
-    expect(screen.getByRole('heading', { name: 'Reclamada Secundária Ltda.' })).toBeDefined()
-    expect(screen.getByDisplayValue('Preposto Secundário')).toBeDefined()
+    const reclamante = screen.getByRole('region', { name: 'Parte Reclamante' })
+    const principal = screen.getByRole('region', { name: 'Parte Reclamada Principal' })
+    const envolvidas = screen.getByRole('region', { name: 'Parte Reclamada Envolvida no Processo' })
+    const demais = screen.getByRole('region', { name: 'Perícia / Juízo — Demais Participantes' })
+
+    fireEvent.click(within(reclamante).getByRole('button', { name: 'Adicionar participante em Parte Reclamante' }))
+    fireEvent.click(within(principal).getByRole('button', { name: 'Adicionar participante em Parte Reclamada Principal' }))
+    fireEvent.click(within(demais).getByRole('button', { name: 'Adicionar participante em Perícia / Juízo — Demais Participantes' }))
+
+    const rotulos = (regiao: HTMLElement) => Array.from(
+      within(regiao).getByLabelText<HTMLSelectElement>('Qualificação').options,
+    ).map((opcao) => opcao.textContent)
+
+    expect(rotulos(reclamante)).toEqual(['Reclamante', 'Advogado (a)', 'Assistente Técnico (a)'])
+    expect(rotulos(principal)).toEqual([
+      'Advogado (a)',
+      'Eng. Segurança do Trabalho',
+      'Eng. Segurança do Trabalho - Assistente Técnico',
+      'Téc. Segurança do Trabalho - Assistente Técnico',
+      'Preposto',
+      'Gestor(a) Imediato(a) / Liderança',
+    ])
+    expect(rotulos(envolvidas)).toEqual([
+      'Advogado (a)',
+      'Eng. Segurança do Trabalho',
+      'Eng. Segurança do Trabalho - Assistente Técnico',
+      'Téc. Segurança do Trabalho - Assistente Técnico',
+      'Preposto',
+      'Gestor(a) Imediato(a) / Liderança',
+    ])
+    expect(rotulos(demais)).toEqual([
+      'Perito Judicial',
+      'Auxiliar do Perito',
+      'Paradigma',
+      'Entrevistado',
+      'Participante Autorizado',
+    ])
+    expect((within(envolvidas).getByLabelText('Empresa representada') as HTMLSelectElement).value)
+      .toBe('empresa-secundaria')
+  })
+
+  it('oferece início e término da vistoria', () => {
+    prepararEditor()
+
     expect(screen.getByLabelText('Horário de início da perícia')).toBeDefined()
     expect(screen.getByLabelText('Horário de término da perícia')).toBeDefined()
   })

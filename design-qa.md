@@ -46,3 +46,38 @@ The complete agent card is the relevant full view and focused region because the
 ## Final result
 
 final result: passed
+
+---
+
+# Design QA — participantes da perícia
+
+Resultado: **APROVADO**
+
+Referência: página 2 de `feedback 29.08.26.docx`.
+
+Implementação validada em `/pericias/per-1`, no ambiente local com dados de demonstração.
+
+## Comparação visual
+
+- Os quatro grupos solicitados aparecem em cartões separados:
+  - Parte Reclamante
+  - Parte Reclamada Principal
+  - Parte Reclamada Envolvida no Processo
+  - Perícia / Juízo — Demais Participantes
+- Cada grupo possui seu próprio botão **Adicionar**.
+- Os títulos, campos e ações seguem o design system existente do sistema.
+- A empresa representada aparece no grupo da reclamada principal e é selecionável para reclamadas envolvidas.
+- Não foram observados cortes, sobreposições, desalinhamentos ou espaçamentos quebrados no painel.
+
+## Comparação funcional
+
+- Cada botão cria um participante dentro do grupo correto.
+- Cada grupo exibe somente as qualificações previstas no material do cliente.
+- Cadastros antigos continuam visíveis com identificação de compatibilidade.
+- O grupo de reclamadas envolvidas fica indisponível enquanto não houver uma empresa secundária para vincular.
+
+Evidências locais:
+
+- Referência renderizada: `C:/Users/Lenovo/AppData/Local/Temp/dr-feedback-2908-render/page-2.png`
+- Implementação: `C:/Users/Lenovo/AppData/Local/Temp/dr-participantes-2908-viewport.png`
+- Continuação do painel: `C:/Users/Lenovo/AppData/Local/Temp/dr-participantes-2908-viewport-2.png`

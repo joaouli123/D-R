@@ -64,7 +64,13 @@ import {
 } from '@/content/textosPadrao'
 import { patchDoProcesso } from '@/lib/consultas'
 import { aplicarAnexo, usaAtenuacaoRuido } from '@/lib/nr15'
-import { dadosPapel, grupoDoParticipante, PAPEIS } from '@/lib/participantes'
+import {
+  dadosPapel,
+  grupoDoParticipante,
+  papeisDoGrupo,
+  PAPEIS_POR_GRUPO,
+  type GrupoParticipante,
+} from '@/lib/participantes'
 import { intervaloDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
 import { dadosAssinatura } from '@/lib/assinaturaDocumento'
 import { comEmpresaVinculada, empresasLivres, opcoesDaLinha } from '@/lib/reclamadas'
@@ -337,6 +343,45 @@ export default function PericiaEditor() {
   const numeroNr16Editor = p.modalidade === 'ambas' ? '7.3' : '7.2'
   const numeroDivergenciasEditor = p.modalidade === 'ambas' ? '7.4' : '7.3'
   const numeroConsideracoesEditor = p.modalidade === 'ambas' ? '7.5' : '7.4'
+  const vinculoPrincipal = p.reclamadas.find((item) => item.principal)
+  const vinculosEnvolvidos = p.reclamadas.filter((item) => !item.principal && item.empresaId)
+  const nomeDaEmpresa = (empresaId?: string) =>
+    empresas.find((empresa) => empresa.id === empresaId)?.razaoSocial
+  const gruposParticipantes: {
+    chave: GrupoParticipante
+    titulo: string
+    descricao: string
+    empresaId?: string
+    desabilitado?: boolean
+  }[] = [
+    {
+      chave: 'reclamante',
+      titulo: 'Parte Reclamante',
+      descricao: 'Reclamante, advogado(a) e assistente técnico(a).',
+    },
+    {
+      chave: 'reclamada_principal',
+      titulo: 'Parte Reclamada Principal',
+      descricao: nomeDaEmpresa(vinculoPrincipal?.empresaId) ?? 'Defina uma reclamada principal para adicionar participantes.',
+      empresaId: vinculoPrincipal?.empresaId,
+      desabilitado: !vinculoPrincipal?.empresaId,
+    },
+    {
+      chave: 'reclamadas_envolvidas',
+      titulo: 'Parte Reclamada Envolvida no Processo',
+      descricao: vinculosEnvolvidos
+        .map((item) => nomeDaEmpresa(item.empresaId))
+        .filter(Boolean)
+        .join(' • ') || 'Adicione outra empresa reclamada para vincular seus representantes.',
+      empresaId: vinculosEnvolvidos[0]?.empresaId,
+      desabilitado: vinculosEnvolvidos.length === 0,
+    },
+    {
+      chave: 'outros',
+      titulo: 'Perícia / Juízo — Demais Participantes',
+      descricao: 'Perito, auxiliar, paradigma, entrevistado e participante autorizado.',
+    },
+  ]
 
   // Reabrir uma perícia já documentada continua o mesmo documento.
   useEffect(() => {
@@ -751,53 +796,28 @@ export default function PericiaEditor() {
               icon={<Users size={18} />}
             />
             <div className="space-y-5 p-5">
-              {[
-                {
-                  chave: 'reclamante',
-                  titulo: 'Participantes do Reclamante',
-                  papel: 'reclamante' as Participante['papel'],
-                  empresaId: undefined,
-                },
-                ...p.reclamadas
-                  .slice()
-                  .sort((a, b) => Number(b.principal) - Number(a.principal))
-                  .map((reclamada) => {
-                    const empresa = empresas.find((item) => item.id === reclamada.empresaId)
-                    return {
-                      chave: reclamada.empresaId,
-                      titulo: empresa?.razaoSocial ?? 'Empresa reclamada',
-                      papel: 'preposto' as Participante['papel'],
-                      empresaId: reclamada.empresaId,
-                    }
-                  }),
-                {
-                  chave: 'outros',
-                  titulo: 'Demais participantes',
-                  papel: 'perito_judicial' as Participante['papel'],
-                  empresaId: undefined,
-                },
-              ].map((grupo) => {
-                const principalId = p.reclamadas.find((item) => item.principal)?.empresaId
+              {gruposParticipantes.map((grupo) => {
+                const principalId = vinculoPrincipal?.empresaId
                 const participantes = p.participantes.filter(
                   (participante) => grupoDoParticipante(participante, principalId) === grupo.chave,
                 )
+                const tituloId = `grupo-participantes-${grupo.chave}`
                 return (
-                  <section key={grupo.chave} className="rounded-lg border border-ink-200 bg-ink-50/60 p-4">
+                  <section
+                    key={grupo.chave}
+                    aria-labelledby={tituloId}
+                    className="rounded-lg border border-ink-200 bg-ink-50/60 p-4"
+                  >
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <h4 className="font-semibold text-ink-900">{grupo.titulo}</h4>
-                        {grupo.empresaId && (
-                          <p className="text-xs text-ink-500">
-                            {p.reclamadas.find((item) => item.empresaId === grupo.empresaId)?.principal
-                              ? 'Reclamada principal'
-                              : 'Reclamada secundária'}
-                          </p>
-                        )}
+                        <h4 id={tituloId} className="font-semibold text-ink-900">{grupo.titulo}</h4>
+                        <p className="text-xs text-ink-500">{grupo.descricao}</p>
                       </div>
                       <Button
                         size="sm"
                         variant="outline"
                         icon={<Plus size={14} />}
+                        disabled={grupo.desabilitado}
                         aria-label={`Adicionar participante em ${grupo.titulo}`}
                         onClick={() =>
                           set({
@@ -806,7 +826,7 @@ export default function PericiaEditor() {
                               {
                                 id: uid('par'),
                                 nome: '',
-                                papel: grupo.papel,
+                                papel: PAPEIS_POR_GRUPO[grupo.chave][0]!.value,
                                 empresaId: grupo.empresaId,
                               },
                             ],
@@ -818,7 +838,31 @@ export default function PericiaEditor() {
                     </div>
                     <div className="space-y-3">
                       {participantes.map((pt) => (
-                        <div key={pt.id} className="grid gap-3 rounded-lg border border-ink-200 bg-white p-3 sm:grid-cols-[1fr_1fr_1.25fr_auto]">
+                        <div
+                          key={pt.id}
+                          className={`grid gap-3 rounded-lg border border-ink-200 bg-white p-3 ${grupo.chave === 'reclamadas_envolvidas'
+                            ? 'md:grid-cols-2 xl:grid-cols-[0.9fr_1fr_1fr_1.25fr_auto]'
+                            : 'sm:grid-cols-[1fr_1fr_1.25fr_auto]'}`}
+                        >
+                          {grupo.chave === 'reclamadas_envolvidas' && (
+                            <Select
+                              label="Empresa representada"
+                              value={pt.empresaId ?? grupo.empresaId ?? ''}
+                              onChange={(e) =>
+                                set({
+                                  participantes: p.participantes.map((x) =>
+                                    x.id === pt.id ? { ...x, empresaId: e.target.value || undefined } : x,
+                                  ),
+                                })
+                              }
+                            >
+                              {vinculosEnvolvidos.map((reclamada, indice) => (
+                                <option key={reclamada.id} value={reclamada.empresaId}>
+                                  {indice + 2}ª Reclamada — {nomeDaEmpresa(reclamada.empresaId) ?? 'Empresa não identificada'}
+                                </option>
+                              ))}
+                            </Select>
+                          )}
                           <Input
                             label="Nome"
                             value={pt.nome}
@@ -841,7 +885,7 @@ export default function PericiaEditor() {
                               })
                             }
                           >
-                            {PAPEIS.map((pp) => (
+                            {papeisDoGrupo(grupo.chave, pt.papel).map((pp) => (
                               <option key={pp.value} value={pp.value}>{pp.label}</option>
                             ))}
                           </Select>
@@ -1082,8 +1126,10 @@ export default function PericiaEditor() {
                   </div>
                   <Textarea
                     className="mt-3"
-                    rows={2}
+                    rows={4}
                     label="Atividades do período"
+                    hint="Informe uma atividade por linha; o documento monta a lista automaticamente."
+                    placeholder={'Ex.:\nOperou a máquina impressora.\nAnalisou os clichês antes da impressão.'}
                     value={pr.descricaoAtividades ?? ''}
                     onChange={(e) =>
                       setT({

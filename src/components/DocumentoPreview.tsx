@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import type { Empresa, Pericia, SecaoFoto, Usuario } from '@/types'
 import { extenso, formatDate, maskCNPJ, maskCPF } from '@/lib/utils'
 import { dadosPapel } from '@/lib/participantes'
@@ -6,6 +7,7 @@ import { intervaloDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvalia
 import { dadosAssinatura } from '@/lib/assinaturaDocumento'
 import { objetivoPadraoDaPericia } from '@/content/textosPadrao'
 import { horarioDaVistoria } from '@/lib/vistoria'
+import { atividadesDoPeriodo } from '@/lib/periodos'
 import { Logo } from '@/components/Logo'
 
 // ============================================================
@@ -303,14 +305,27 @@ export function DocumentoPreview({
       <h2>7. Histórico Laboral, Períodos e Atividades Habituais Exercidas</h2>
       {t.periodos.length > 0 && (
         <table>
-          <thead><tr><th className="w-[28%]">Função</th><th className="w-[18%]">Setor</th><th className="w-[24%]">Período</th><th>Atividades</th></tr></thead>
           <tbody>
             {t.periodos.map((periodo) => (
-              <tr key={periodo.id}>
-                <td>{periodo.funcao}</td><td>{periodo.setor || '—'}</td>
-                <td>{formatDate(periodo.inicio)} a {periodo.fim ? formatDate(periodo.fim) : 'atual'}</td>
-                <td>{periodo.descricaoAtividades || '—'}</td>
-              </tr>
+              <Fragment key={periodo.id}>
+                <tr>
+                  <th className="w-[34%]">Função: {periodo.funcao}</th>
+                  <th className="w-[28%]">Setor: {periodo.setor || '—'}</th>
+                  <th>Período: {formatDate(periodo.inicio)} a {periodo.fim ? formatDate(periodo.fim) : 'atual'}</th>
+                </tr>
+                <tr>
+                  <td colSpan={3}>
+                    <strong>Atividades</strong>
+                    {atividadesDoPeriodo(periodo.descricaoAtividades).length ? (
+                      <ul className="ml-6 mt-1 list-disc">
+                        {atividadesDoPeriodo(periodo.descricaoAtividades).map((atividade) => (
+                          <li key={atividade}>{atividade}</li>
+                        ))}
+                      </ul>
+                    ) : <div>—</div>}
+                  </td>
+                </tr>
+              </Fragment>
             ))}
           </tbody>
         </table>

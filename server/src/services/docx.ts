@@ -28,6 +28,7 @@ import {
   ORIGEM_PONTO,
   PAPEL,
   type TecnicoJson,
+  atividadesDoPeriodo,
   data,
   dadosAssinaturaDocumento,
   emParagrafos,
@@ -188,13 +189,22 @@ const blocosComProximo = (t?: string | null): Paragraph[] => {
 const borda = { style: BorderStyle.SINGLE, size: 4, color: MARCA.documentoBorda }
 const BORDAS = { top: borda, bottom: borda, left: borda, right: borda }
 
-function celula(conteudo: string, opcoes: { cabecalho?: boolean; larguraDxa?: number } = {}) {
+function celula(
+  conteudo: string,
+  opcoes: {
+    cabecalho?: boolean
+    larguraDxa?: number
+    columnSpan?: number
+    paragrafos?: Paragraph[]
+  } = {},
+) {
   return new TableCell({
     borders: BORDAS,
     shading: { fill: opcoes.cabecalho ? MARCA.documentoTabela : MARCA.documentoFundo },
     width: opcoes.larguraDxa ? { size: opcoes.larguraDxa, type: WidthType.DXA } : undefined,
+    columnSpan: opcoes.columnSpan,
     margins: { top: 60, bottom: 60, left: 120, right: 120 },
-    children: [
+    children: opcoes.paragrafos ?? [
       new Paragraph({
         spacing: { after: 0 },
         children: [texto(conteudo, { negrito: opcoes.cabecalho, tamanho: 20 })],
@@ -565,29 +575,52 @@ async function docParecer(
   filhos.push(h2(num.secao('HISTÓRICO LABORAL, PERÍODOS E ATIVIDADES HABITUAIS EXERCIDAS')))
 
   if (t.periodos?.length) {
+    const largurasPeriodos = [3043, 2506, 3401] as const
     filhos.push(
-      tabela([
-        new TableRow({
-          tableHeader: true,
-          children: [
-            celula('Função', { cabecalho: true, larguraDxa: 2506 }),
-            celula('Setor', { cabecalho: true, larguraDxa: 1611 }),
-            celula('Período', { cabecalho: true, larguraDxa: 2148 }),
-            celula('Atividades', { cabecalho: true, larguraDxa: 2685 }),
-          ],
-        }),
-        ...t.periodos.map(
-          (pr) =>
+      tabela(
+        t.periodos.flatMap((pr) => {
+          const atividades = atividadesDoPeriodo(pr.descricaoAtividades)
+          const paragrafosAtividades = [
+            new Paragraph({
+              keepNext: atividades.length > 0,
+              spacing: { after: atividades.length ? 40 : 0 },
+              children: [texto('Atividades', { negrito: true, tamanho: 20 })],
+            }),
+            ...(atividades.length
+              ? atividades.map((atividade) => new Paragraph({
+                  bullet: { level: 0 },
+                  spacing: { after: 20, line: 260 },
+                  children: [texto(atividade, { tamanho: 20 })],
+                }))
+              : [new Paragraph({ spacing: { after: 0 }, children: [texto('—', { tamanho: 20 })] })]),
+          ]
+
+          return [
             new TableRow({
+              cantSplit: true,
               children: [
-                celula(pr.funcao, { larguraDxa: 2506 }),
-                celula(pr.setor || '—', { larguraDxa: 1611 }),
-                celula(`${data(pr.inicio)} a ${pr.fim ? data(pr.fim) : 'atual'}`, { larguraDxa: 2148 }),
-                celula(pr.descricaoAtividades || '—', { larguraDxa: 2685 }),
+                celula(`Função: ${pr.funcao}`, { cabecalho: true, larguraDxa: largurasPeriodos[0] }),
+                celula(`Setor: ${pr.setor || '—'}`, { cabecalho: true, larguraDxa: largurasPeriodos[1] }),
+                celula(`Período: ${data(pr.inicio)} a ${pr.fim ? data(pr.fim) : 'atual'}`, {
+                  cabecalho: true,
+                  larguraDxa: largurasPeriodos[2],
+                }),
               ],
             }),
-        ),
-      ], [2506, 1611, 2148, 2685]),
+            new TableRow({
+              cantSplit: true,
+              children: [
+                celula('', {
+                  larguraDxa: LARGURA_TABELA_DXA,
+                  columnSpan: 3,
+                  paragrafos: paragrafosAtividades,
+                }),
+              ],
+            }),
+          ]
+        }),
+        largurasPeriodos,
+      ),
     )
   }
 

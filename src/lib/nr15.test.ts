@@ -252,25 +252,37 @@ describe('aplicarAnexo', () => {
     })
   })
 
-  it('preserva medicao, EPI e observacao ao trocar para o Anexo 7', () => {
-    expect(aplicarAnexo({
+  it('não leva medição nem EPI de um anexo para outro', () => {
+    const atualizado = aplicarAnexo({
       id: 'a1',
-      nome: 'Legado',
-      tipo: 'quimico',
-      criterio: 'quantitativo',
-      medido: '12 ppm',
-      epiEficaz: false,
-      observacao: 'Jornada completa',
-    }, 'ANEXO_07')).toMatchObject({
-      medido: '12 ppm',
-      epiEficaz: false,
-      observacao: 'Jornada completa',
+      nome: 'Ruído contínuo ou intermitente',
       tipo: 'fisico',
-      criterio: 'qualitativo',
+      criterio: 'quantitativo',
+      anexoNr15: 'ANEXO_01',
+      medido: '88 dB(A)',
+      valorMedido: '88',
+      medicaoEmpresa: '84',
+      origemMedicao: 'perito',
+      fonteRuido: 'maquinas',
+      epis: [{ categoria: 'Protetor auditivo', modelo: 'CA 11882', caUnico: '11882', nivelProtecaoDb: 17 }],
+      epiEficaz: false,
+      observacao: 'Jornada completa',
+    }, 'ANEXO_11')
+
+    expect(atualizado).toMatchObject({
+      anexoNr15: 'ANEXO_11',
+      observacao: 'Jornada completa',
     })
+    expect(atualizado).not.toHaveProperty('medido')
+    expect(atualizado).not.toHaveProperty('valorMedido')
+    expect(atualizado).not.toHaveProperty('medicaoEmpresa')
+    expect(atualizado).not.toHaveProperty('origemMedicao')
+    expect(atualizado).not.toHaveProperty('fonteRuido')
+    expect(atualizado).not.toHaveProperty('epis')
+    expect(atualizado).not.toHaveProperty('epiEficaz')
   })
 
-  it('remove apenas referencias normativas incompatíveis com o novo anexo', () => {
+  it('remove referências, medição e conclusão incompatíveis com o novo anexo', () => {
     const agente = aplicarAnexo({
       id: 'a1',
       nome: 'Ácido Nítrico',
@@ -290,10 +302,10 @@ describe('aplicarAnexo', () => {
     expect(agente).not.toHaveProperty('atividadeEnquadrada')
     expect(agente).not.toHaveProperty('unidadeLimite')
     expect(agente).not.toHaveProperty('unidadeMedicao')
+    expect(agente).not.toHaveProperty('medido')
+    expect(agente).not.toHaveProperty('epiEficaz')
     expect(agente).toMatchObject({
       anexoNr15: 'ANEXO_14',
-      medido: '12 ppm',
-      epiEficaz: false,
       observacao: 'Jornada completa',
     })
   })

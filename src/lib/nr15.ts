@@ -56,13 +56,33 @@ export function aplicarAnexo(agente: AgenteAvaliado, anexoId: string): AgenteAva
   const anexo = anexoNr15PorId(anexoId)
   const regra = obterRegraAnexo(anexoId)
   const mudouAnexo = agente.anexoNr15 !== anexoId
+  const trocouAnexoPreenchido = Boolean(agente.anexoNr15) && mudouAnexo
   const { referenciaNormativaId, atividadeEnquadrada, unidadeLimite, unidadeMedicao, ...agenteSemReferencia } = agente
   const baseComReferencia = mudouAnexo ? agenteSemReferencia : agente
-  const { cas, ...baseSemCas } = baseComReferencia
+  const baseSemAvaliacao = { ...baseComReferencia }
+
+  // Medições e EPIs pertencem ao anexo que estava sendo avaliado. Ao trocar
+  // um Anexo 1 por 11, por exemplo, conservar o NRRsf e o valor em dB(A)
+  // mistura protetor auditivo com respirador e leva dados incorretos ao laudo.
+  if (trocouAnexoPreenchido) {
+    delete baseSemAvaliacao.medido
+    delete baseSemAvaliacao.valorMedido
+    delete baseSemAvaliacao.medicaoEmpresa
+    delete baseSemAvaliacao.medicaoEmpresaAte
+    delete baseSemAvaliacao.tipoMedicaoEmpresa
+    delete baseSemAvaliacao.fonteMedicaoEmpresa
+    delete baseSemAvaliacao.origemMedicao
+    delete baseSemAvaliacao.fonteRuido
+    delete baseSemAvaliacao.epis
+    delete baseSemAvaliacao.epiEficaz
+  }
+
+  const baseDaAvaliacao = trocouAnexoPreenchido ? baseSemAvaliacao : baseComReferencia
+  const { cas, ...baseSemCas } = baseDaAvaliacao
   // Ao trocar de anexo, um CAS do agente anterior nunca pode sobreviver. Os
   // anexos de agente fixo recebem seu identificador abaixo; nos qualitativos,
   // o campo reabre vazio para preenchimento consciente pelo perito.
-  const base = regra?.exibeCas === false || mudouAnexo ? baseSemCas : baseComReferencia
+  const base = regra?.exibeCas === false || mudouAnexo ? baseSemCas : baseDaAvaliacao
 
   // O campo "Agente" fica em somente leitura quando o anexo impõe o nome
   // (agenteFixo) ou quando há referência escolhida — nesses dois casos o que

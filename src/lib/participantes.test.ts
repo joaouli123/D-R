@@ -19,16 +19,24 @@ describe('qualificação e atuação dos participantes', () => {
 
   it('mantém os papéis legados legíveis', () => {
     expect(dadosPapel('assistente_reclamante').label).toBe('Assistente Técnico do Reclamante')
-    expect(dadosPapel('acompanhante').atuacao).toBe('Prestação de informações complementares')
+    expect(dadosPapel('acompanhante').label).toBe('Participante Autorizado')
+    expect(dadosPapel('acompanhante').atuacao).toBe('Pessoa autorizada pelo juiz para acompanhar na diligência.')
   })
 
-  it('mantém cada representante ligado à empresa reclamada correspondente', () => {
+  it('agrupa representantes das reclamadas pela atuação processual', () => {
     expect(
       grupoDoParticipante(
         { id: 'p-1', nome: 'Preposto da segunda empresa', papel: 'preposto', empresaId: 'empresa-2' },
         'empresa-1',
       ),
-    ).toBe('empresa-2')
+    ).toBe('reclamadas_envolvidas')
+
+    expect(
+      grupoDoParticipante(
+        { id: 'p-2', nome: 'Preposto da principal', papel: 'preposto', empresaId: 'empresa-1' },
+        'empresa-1',
+      ),
+    ).toBe('reclamada_principal')
   })
 
   it('organiza participante legado sem vínculo pela parte que seu papel representa', () => {
@@ -43,7 +51,7 @@ describe('qualificação e atuação dos participantes', () => {
         { id: 'p-2', nome: 'Preposto legado', papel: 'preposto' },
         'empresa-1',
       ),
-    ).toBe('empresa-1')
+    ).toBe('reclamada_principal')
     expect(
       grupoDoParticipante(
         { id: 'p-3', nome: 'Perito judicial', papel: 'perito_judicial' },

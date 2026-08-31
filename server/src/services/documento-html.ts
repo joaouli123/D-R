@@ -14,6 +14,7 @@ import {
   css,
   data,
   dadosAssinaturaDocumento,
+  atividadesDoPeriodo,
   emParagrafos,
   extenso,
   intervaloDoPeriodo,
@@ -132,6 +133,10 @@ const CSS = `
   th, td { border: 1px solid var(--documento-borda); padding: 6px 9px; vertical-align: top; text-align: left; text-indent: 0; }
   th { background: var(--documento-tabela); color: var(--documento-titulo); font-weight: 700; }
   td { background: var(--documento-fundo); }
+  .historico-periodos .periodo-cabecalho th { vertical-align: middle; }
+  .historico-periodos .periodo-atividades td { padding-top: 7px; padding-bottom: 8px; }
+  .atividades-periodo { margin: 4px 0 0 22px; padding: 0; }
+  .atividades-periodo li { margin: 1px 0; }
   .box { font-size: 11pt; }
   /* Sem caixa: o texto corre em parágrafos justificados, como uma peça
      técnica padrão. A classe segue existindo só para agrupar o conteúdo. */
@@ -307,15 +312,21 @@ export async function htmlDoParecer(
   )}, no endereço ${esc(pericia.localVistoria || '—')}${pericia.numeroVistoria ? `, nº ${esc(pericia.numeroVistoria)}` : ''}${pericia.setorVistoriado ? `, no setor/local ${esc(pericia.setorVistoriado)}` : ''}, com a presença dos participantes abaixo relacionados.</p>`
 
   const tabelaPeriodos = t.periodos?.length
-    ? `<table>
-        <thead><tr><th style="width:28%">Função</th><th style="width:18%">Setor</th><th style="width:24%">Período</th><th>Atividades</th></tr></thead>
+    ? `<table class="historico-periodos">
         <tbody>${t.periodos
-          .map(
-            (p) =>
-              `<tr><td>${esc(p.funcao)}</td><td>${esc(p.setor || '—')}</td><td>${data(p.inicio)} a ${
-                p.fim ? data(p.fim) : 'atual'
-              }</td><td>${esc(p.descricaoAtividades || '—')}</td></tr>`,
-          )
+          .map((p) => {
+            const atividades = atividadesDoPeriodo(p.descricaoAtividades)
+            return `<tr class="periodo-cabecalho">
+              <th style="width:34%">Função: ${esc(p.funcao)}</th>
+              <th style="width:28%">Setor: ${esc(p.setor || '—')}</th>
+              <th style="width:38%">Período: ${data(p.inicio)} a ${p.fim ? data(p.fim) : 'atual'}</th>
+            </tr>
+            <tr class="periodo-atividades"><td colspan="3"><strong>Atividades</strong>${
+              atividades.length
+                ? `<ul class="atividades-periodo">${atividades.map((atividade) => `<li>${esc(atividade)}</li>`).join('')}</ul>`
+                : '<div>—</div>'
+            }</td></tr>`
+          })
           .join('')}</tbody>
       </table>`
     : ''

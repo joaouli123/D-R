@@ -21,7 +21,7 @@ export const PAPEIS: { value: Participante['papel']; label: string; atuacao: str
 const LEGADOS: Partial<Record<Participante['papel'], { label: string; atuacao: string }>> = {
   assistente_reclamante: { label: 'Assistente Técnico do Reclamante', atuacao: 'Acompanhamento Técnico – Reclamante' },
   assistente_reclamada: { label: 'Assistente Técnico da Reclamada', atuacao: 'Acompanhamento Técnico – Reclamada' },
-  acompanhante: { label: 'Acompanhante', atuacao: 'Prestação de informações complementares' },
+  acompanhante: { label: 'Participante Autorizado', atuacao: 'Pessoa autorizada pelo juiz para acompanhar na diligência.' },
 }
 
 export function dadosPapel(papel: Participante['papel']) {
@@ -47,7 +47,62 @@ const PAPEIS_RECLAMADA = new Set<Participante['papel']>([
   'gestor_lideranca',
 ])
 
-export type GrupoParticipante = 'reclamante' | 'outros' | string
+export type GrupoParticipante =
+  | 'reclamante'
+  | 'reclamada_principal'
+  | 'reclamadas_envolvidas'
+  | 'outros'
+
+export interface OpcaoPapelParticipante {
+  value: Participante['papel']
+  label: string
+}
+
+/**
+ * Opções aprovadas para cada botão "Adicionar". O vínculo com o grupo fica
+ * explícito aqui para que um advogado da Reclamante não possa virar, por
+ * engano, preposto da Reclamada sem trocar de grupo.
+ */
+export const PAPEIS_POR_GRUPO: Record<GrupoParticipante, readonly OpcaoPapelParticipante[]> = {
+  reclamante: [
+    { value: 'reclamante', label: 'Reclamante' },
+    { value: 'advogado_reclamante', label: 'Advogado (a)' },
+    { value: 'assistente_reclamante', label: 'Assistente Técnico (a)' },
+  ],
+  reclamada_principal: [
+    { value: 'advogado_reclamada', label: 'Advogado (a)' },
+    { value: 'engenheiro_sst_empresa', label: 'Eng. Segurança do Trabalho' },
+    { value: 'engenheiro_assistente_reclamada', label: 'Eng. Segurança do Trabalho - Assistente Técnico' },
+    { value: 'tecnico_assistente_reclamada', label: 'Téc. Segurança do Trabalho - Assistente Técnico' },
+    { value: 'preposto', label: 'Preposto' },
+    { value: 'gestor_lideranca', label: 'Gestor(a) Imediato(a) / Liderança' },
+  ],
+  reclamadas_envolvidas: [
+    { value: 'advogado_reclamada', label: 'Advogado (a)' },
+    { value: 'engenheiro_sst_empresa', label: 'Eng. Segurança do Trabalho' },
+    { value: 'engenheiro_assistente_reclamada', label: 'Eng. Segurança do Trabalho - Assistente Técnico' },
+    { value: 'tecnico_assistente_reclamada', label: 'Téc. Segurança do Trabalho - Assistente Técnico' },
+    { value: 'preposto', label: 'Preposto' },
+    { value: 'gestor_lideranca', label: 'Gestor(a) Imediato(a) / Liderança' },
+  ],
+  outros: [
+    { value: 'perito_judicial', label: 'Perito Judicial' },
+    { value: 'auxiliar_perito', label: 'Auxiliar do Perito' },
+    { value: 'paradigma', label: 'Paradigma' },
+    { value: 'entrevistado', label: 'Entrevistado' },
+    { value: 'acompanhante', label: 'Participante Autorizado' },
+  ],
+}
+
+/** Mantém um papel legado visível até o usuário escolher uma opção atual. */
+export function papeisDoGrupo(
+  grupo: GrupoParticipante,
+  papelAtual?: Participante['papel'],
+): readonly OpcaoPapelParticipante[] {
+  const aprovados = PAPEIS_POR_GRUPO[grupo]
+  if (!papelAtual || aprovados.some((item) => item.value === papelAtual)) return aprovados
+  return [...aprovados, { value: papelAtual, label: `${dadosPapel(papelAtual).label} (cadastro anterior)` }]
+}
 
 /**
  * Localiza a parte representada sem perder participantes antigos, que
@@ -57,8 +112,12 @@ export function grupoDoParticipante(
   participante: Participante,
   empresaPrincipalId?: string,
 ): GrupoParticipante {
-  if (participante.empresaId) return participante.empresaId
   if (PAPEIS_RECLAMANTE.has(participante.papel)) return 'reclamante'
-  if (PAPEIS_RECLAMADA.has(participante.papel) && empresaPrincipalId) return empresaPrincipalId
+  if (participante.empresaId) {
+    return participante.empresaId === empresaPrincipalId
+      ? 'reclamada_principal'
+      : 'reclamadas_envolvidas'
+  }
+  if (PAPEIS_RECLAMADA.has(participante.papel) && empresaPrincipalId) return 'reclamada_principal'
   return 'outros'
 }

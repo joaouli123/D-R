@@ -71,6 +71,24 @@ async function main() {
       maquinasFerramentas: 'Máquinas e ferramentas utilizadas.',
       produtosUtilizados: 'Produtos utilizados nas atividades.',
       atividadesFuncoes: 'Atividades exercidas.',
+      periodos: [
+        {
+          id: 'periodo-1',
+          funcao: 'Operador de Máquina Júnior',
+          setor: 'UT Gomadeira — Papel',
+          inicio: '2021-06-10',
+          fim: '2023-09-30',
+          descricaoAtividades: 'Trabalhou na linha contínua gomadeira.\nPreparou a cola em tanques.\nAbasteceu o equipamento.',
+        },
+        {
+          id: 'periodo-2',
+          funcao: 'Impressor Flexográfico',
+          setor: 'UT Papel — Operação',
+          inicio: '2023-10-01',
+          fim: '2026-03-17',
+          descricaoAtividades: 'Operou a máquina impressora.\nAnalisou os clichês antes da impressão.',
+        },
+      ],
       agentes: [],
       normasReferencias: 'NR-15.',
       equipamentosAnalisados: 'Equipamentos analisados.',
@@ -250,6 +268,14 @@ async function main() {
   assert.match(xml, /6\.1\. Descrição do Posto de Trabalho/)
   assert.match(html, /das 09:00 às 10:30/)
   assert.match(html, /Preposto — Empresa de Teste Ltda\./)
+  assert.match(html, /Função: Operador de Máquina Júnior/)
+  assert.match(html, /<ul class="atividades-periodo">\s*<li>Trabalhou na linha contínua gomadeira\.<\/li>/)
+  assert.doesNotMatch(html, /<th[^>]*>Atividades<\/th>/)
+  assert.match(xml, /Função: Operador de Máquina Júnior/)
+  assert.ok(
+    (xml.match(/<w:numPr>/g) ?? []).length >= 5,
+    'cada atividade dos períodos deve ser apresentada como item de lista no DOCX',
+  )
 
   const fotoAmbiente = xml.indexOf('Figura 1 — Vista geral do ambiente de trabalho')
   const secao3 = xml.indexOf('3. DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA')

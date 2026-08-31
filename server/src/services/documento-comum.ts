@@ -56,7 +56,7 @@ export const PAPEL: Record<string, string> = {
   auxiliar_perito: 'Auxiliar do Perito',
   paradigma: 'Paradigma',
   entrevistado: 'Entrevistado',
-  acompanhante: 'Acompanhante',
+  acompanhante: 'Participante Autorizado',
 }
 
 export const ATUACAO: Record<string, string> = {
@@ -77,7 +77,7 @@ export const ATUACAO: Record<string, string> = {
   auxiliar_perito: 'Auxílio e suporte ao Perito',
   paradigma: 'Demonstração das atividades exercidas',
   entrevistado: 'Prestação de informações complementares',
-  acompanhante: 'Prestação de informações complementares',
+  acompanhante: 'Pessoa autorizada pelo juiz para acompanhar na diligência.',
 }
 
 export const CRITERIO: Record<string, string> = {
@@ -474,6 +474,15 @@ export function medicaoAdotadaDocumento(agente: AgenteDocumento): MedicaoAdotada
 function comUnidadeMedicao(valor: string, unidade?: string): string {
   const formatado = valor.replace('.', ',')
   return unidade ? `${formatado} ${unidade}` : formatado
+}
+
+/** Linhas digitadas no histórico laboral viram itens reais de atividade. */
+export function atividadesDoPeriodo(texto?: string | null): string[] {
+  if (!texto?.trim()) return []
+  return texto
+    .split(/\r?\n/)
+    .map((linha) => linha.trim().replace(/^(?:[-*•]|\d+[.)])\s*/, ''))
+    .filter(Boolean)
 }
 
 function tipoMedicaoEmpresaDe(agente: AgenteDocumento): TipoMedicaoEmpresaDocumento {
