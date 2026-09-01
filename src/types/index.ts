@@ -288,6 +288,8 @@ export type SecaoTexto =
 export interface TextoBiblioteca {
   id: UUID
   titulo: string
+  /** Item/subitem do parecer em que este trecho deve ser inserido. */
+  referencia?: string
   secao: SecaoTexto
   tiposDocumento: TipoDocumento[]
   tags: string[]

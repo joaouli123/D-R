@@ -58,6 +58,42 @@ describe('biblioteca por documentos', () => {
     ).toEqual(['duplo'])
   })
 
+  it('localiza e ordena textos pelo item exato do parecer', () => {
+    const porReferencia = [
+      { ...texto('dez', ['parecer']), referencia: '10.2.1' },
+      { ...texto('sete', ['parecer']), referencia: '7.2.1' },
+      { ...texto('sem-item', ['parecer']) },
+      { ...texto('outro', ['parecer']), referencia: '7.2.2' },
+    ] as TextoBiblioteca[]
+
+    expect(
+      filtrarTextosBiblioteca(porReferencia, {
+        biblioteca: 'parecer',
+        referencia: '7.2.1',
+      }).map((item) => item.id),
+    ).toEqual(['sete'])
+
+    expect(
+      filtrarTextosBiblioteca(porReferencia, { biblioteca: 'parecer' }).map(
+        (item) => item.referencia ?? 'sem-item',
+      ),
+    ).toEqual(['7.2.1', '7.2.2', '10.2.1', 'sem-item'])
+  })
+
+  it('encontra a referência digitada na busca', () => {
+    const referenciado = {
+      ...texto('criterio', ['parecer']),
+      referencia: '5.2.3',
+    } as TextoBiblioteca
+
+    expect(
+      filtrarTextosBiblioteca([referenciado], {
+        biblioteca: 'parecer',
+        busca: '5.2.3',
+      }).map((item) => item.id),
+    ).toEqual(['criterio'])
+  })
+
   it('busca também pelas tags', () => {
     const comEpi = [...textos, texto('epi', ['quesitos'])]
     expect(
@@ -96,5 +132,21 @@ describe('biblioteca por documentos', () => {
     expect(textoDisponivelNoContexto(textos[1], 'parecer', 'analise')).toBe(true)
     expect(textoDisponivelNoContexto(textos[2], 'parecer', 'analise')).toBe(false)
     expect(textoDisponivelNoContexto(textos[1], 'laudo', 'analise')).toBe(false)
+  })
+
+  it('mantém no drawer o item exato e os textos sem referência', () => {
+    const geral = texto('geral-item', [])
+    const mesmoItem = {
+      ...texto('mesmo-item', ['parecer']),
+      referencia: '10.1.2',
+    } as TextoBiblioteca
+    const outroItem = {
+      ...texto('outro-item', ['parecer']),
+      referencia: '10.2.1',
+    } as TextoBiblioteca
+
+    expect(textoDisponivelNoContexto(geral, 'parecer', 'analise', '10.1.2')).toBe(true)
+    expect(textoDisponivelNoContexto(mesmoItem, 'parecer', 'analise', '10.1.2')).toBe(true)
+    expect(textoDisponivelNoContexto(outroItem, 'parecer', 'analise', '10.1.2')).toBe(false)
   })
 })

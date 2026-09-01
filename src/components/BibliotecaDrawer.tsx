@@ -15,12 +15,14 @@ export function BibliotecaDrawer({
   onClose,
   secao,
   tipoDocumento,
+  referencia,
   onInserir,
 }: {
   open: boolean
   onClose: () => void
   secao?: SecaoTexto
   tipoDocumento?: TipoDocumento
+  referencia?: string
   onInserir: (conteudo: string) => void
 }) {
   const { textos, salvarTexto } = useApp()
@@ -32,11 +34,11 @@ export function BibliotecaDrawer({
     const q = busca.toLowerCase().trim()
     return textos
       .filter((t) =>
-        apenasContexto ? textoDisponivelNoContexto(t, tipoDocumento, secao) : true,
+        apenasContexto ? textoDisponivelNoContexto(t, tipoDocumento, secao, referencia) : true,
       )
-      .filter((t) => !q || [t.titulo, t.conteudo, ...t.tags].join(' ').toLowerCase().includes(q))
+      .filter((t) => !q || [t.referencia, t.titulo, t.conteudo, ...t.tags].filter(Boolean).join(' ').toLowerCase().includes(q))
       .sort((a, b) => Number(b.favorito) - Number(a.favorito) || b.usos - a.usos)
-  }, [textos, busca, apenasContexto, tipoDocumento, secao])
+  }, [textos, busca, apenasContexto, tipoDocumento, secao, referencia])
 
   const rotuloContexto = tipoDocumento
     ? secao
@@ -100,6 +102,13 @@ export function BibliotecaDrawer({
         )}
       </div>
 
+      {referencia && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-navy-200 bg-navy-50 px-3 py-2 text-xs text-navy-800">
+          <span className="font-semibold">Destino no documento</span>
+          <Badge tone="navy">Item {referencia}</Badge>
+        </div>
+      )}
+
       {lista.length === 0 ? (
         <div className="py-10 text-center text-sm text-ink-500">
           <BookOpen size={22} className="mx-auto mb-2 text-ink-300" />
@@ -130,6 +139,7 @@ export function BibliotecaDrawer({
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="text-[13.5px] font-semibold text-ink-900">{t.titulo}</span>
+                        {t.referencia && <Badge tone="navy">Item {t.referencia}</Badge>}
                         {t.favorito && <Star size={12} className="fill-amber-400 text-amber-400" />}
                         <Badge tone="gray">{t.usos} usos</Badge>
                       </div>

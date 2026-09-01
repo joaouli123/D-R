@@ -16,6 +16,7 @@ import { BibliotecaCategorias } from '@/components/BibliotecaCategorias'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { useApp } from '@/store/AppStore'
 import type { SecaoTexto, TextoBiblioteca } from '@/types'
+import { REFERENCIAS_PARECER } from '@/content/referenciasParecer'
 import {
   alternarTipoDocumento,
   BIBLIOTECAS_DOCUMENTO,
@@ -50,6 +51,7 @@ const SECOES: { value: SecaoTexto; label: string }[] = [
 const vazio = (): TextoBiblioteca => ({
   id: uid('txt'),
   titulo: '',
+  referencia: undefined,
   secao: 'generico',
   tiposDocumento: [],
   tags: [],
@@ -64,14 +66,15 @@ export default function Biblioteca() {
   const toast = useToast()
   const [busca, setBusca] = useState('')
   const [secao, setSecao] = useState<'todas' | SecaoTexto>('todas')
+  const [referencia, setReferencia] = useState('todas')
   const [biblioteca, setBiblioteca] = useState<BibliotecaAtiva>('todas')
   const [editando, setEditando] = useState<TextoBiblioteca | null>(null)
   const [tagsInput, setTagsInput] = useState('')
   const [salvando, setSalvando] = useState(false)
 
   const lista = useMemo(() => {
-    return filtrarTextosBiblioteca(textos, { biblioteca, secao, busca })
-  }, [textos, biblioteca, busca, secao])
+    return filtrarTextosBiblioteca(textos, { biblioteca, secao, referencia, busca })
+  }, [textos, biblioteca, busca, secao, referencia])
 
   const contagens = useMemo(() => contarTextosBiblioteca(textos), [textos])
 
@@ -142,7 +145,7 @@ export default function Biblioteca() {
           contagens={contagens}
           onChange={setBiblioteca}
         />
-        <div className="grid gap-3 border-t border-ink-200 p-3 sm:grid-cols-[1fr_200px]">
+        <div className="grid gap-3 border-t border-ink-200 p-3 md:grid-cols-[1fr_200px_320px]">
           <div className="relative">
             <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
             <input
@@ -160,6 +163,14 @@ export default function Biblioteca() {
               </option>
             ))}
           </Select>
+          <Select value={referencia} onChange={(e) => setReferencia(e.target.value)}>
+            <option value="todas">Todos os itens e subitens</option>
+            {REFERENCIAS_PARECER.map((item) => (
+              <option key={item.numero} value={item.numero}>
+                {item.numero} — {item.titulo}
+              </option>
+            ))}
+          </Select>
         </div>
       </Card>
 
@@ -169,7 +180,7 @@ export default function Biblioteca() {
             icon={<BookOpen size={22} />}
             title="Nenhum texto encontrado"
             description={
-              busca || secao !== 'todas'
+              busca || secao !== 'todas' || referencia !== 'todas'
                 ? 'Ajuste a busca ou os filtros para localizar outros textos.'
                 : 'Cadastre o primeiro texto desta biblioteca documental.'
             }
@@ -192,6 +203,7 @@ export default function Biblioteca() {
                   </button>
                 </div>
                 <div className="mb-2 flex flex-wrap gap-1.5">
+                  {t.referencia && <Badge tone="navy">Item {t.referencia}</Badge>}
                   {(t.tiposDocumento ?? []).length ? (
                     t.tiposDocumento.map((tipo) => (
                       <Badge key={tipo} tone="navy">
@@ -311,6 +323,29 @@ export default function Biblioteca() {
                 ))}
               </Select>
             </div>
+            <Select
+              label="Item ou subitem de destino no Parecer"
+              value={editando.referencia ?? ''}
+              onChange={(e) => {
+                const novaReferencia = e.target.value || undefined
+                const item = REFERENCIAS_PARECER.find(
+                  (referenciaParecer) => referenciaParecer.numero === novaReferencia,
+                )
+                setEditando({
+                  ...editando,
+                  referencia: novaReferencia,
+                  secao: item?.secao ?? editando.secao,
+                })
+              }}
+              hint="O mesmo número será mostrado na inserção e nas telas de preenchimento."
+            >
+              <option value="">Sem item específico</option>
+              {REFERENCIAS_PARECER.map((item) => (
+                <option key={item.numero} value={item.numero}>
+                  {item.numero} — {item.titulo}
+                </option>
+              ))}
+            </Select>
             <Input
               label="Tags"
               value={tagsInput}

@@ -241,6 +241,7 @@ model TextoBiblioteca {
   id             String          @id @default(uuid())
   usuarioId      String
   titulo         String
+  referencia     String?
   secao          SecaoTexto      @default(generico)
   tiposDocumento TipoDocumento[] @default([])
   tags           String[]        @default([])
@@ -253,6 +254,7 @@ model TextoBiblioteca {
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@index([usuarioId])
+  @@index([usuarioId, referencia])
   @@map("textos_biblioteca")
 }
 

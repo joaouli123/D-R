@@ -26,8 +26,9 @@ const texto = (
 
 const textos = [
   texto('geral', 'Texto geral', []),
-  texto('parecer', 'Texto de parecer', ['parecer']),
-  texto('laudo', 'Texto de laudo', ['laudo']),
+  { ...texto('parecer', 'Texto de parecer', ['parecer']), referencia: '10.1.2' },
+  { ...texto('outro-item', 'Texto de outro item', ['parecer']), referencia: '10.2.1' },
+  { ...texto('laudo', 'Texto de laudo', ['laudo']), referencia: '10.1.2' },
 ]
 
 beforeEach(() => {
@@ -51,15 +52,19 @@ describe('BibliotecaDrawer por documento', () => {
         onClose={vi.fn()}
         secao="analise"
         tipoDocumento="parecer"
+        referencia="10.1.2"
         onInserir={vi.fn()}
       />,
     )
 
     expect(screen.queryByText('Texto geral')).not.toBeNull()
     expect(screen.queryByText('Texto de parecer')).not.toBeNull()
+    expect(screen.queryAllByText('Item 10.1.2')).toHaveLength(2)
+    expect(screen.queryByText('Texto de outro item')).toBeNull()
     expect(screen.queryByText('Texto de laudo')).toBeNull()
 
     await user.click(screen.getByLabelText('Somente para este documento e seção'))
+    expect(screen.queryByText('Texto de outro item')).not.toBeNull()
     expect(screen.queryByText('Texto de laudo')).not.toBeNull()
   })
 })

@@ -121,6 +121,7 @@ export function textoParaApi(t: TextoBiblioteca) {
   return {
     id: t.id,
     titulo: t.titulo,
+    referencia: t.referencia ?? undefined,
     secao: t.secao,
     tiposDocumento: t.tiposDocumento,
     tags: t.tags,

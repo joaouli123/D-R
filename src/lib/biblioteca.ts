@@ -1,5 +1,7 @@
 import type { SecaoTexto, TextoBiblioteca, TipoDocumento } from '@/types'
 
+const compararReferencia = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' })
+
 export type BibliotecaAtiva = 'todas' | 'geral' | TipoDocumento
 
 export const BIBLIOTECAS_DOCUMENTO: ReadonlyArray<{
@@ -26,6 +28,7 @@ export function filtrarTextosBiblioteca(
   filtros: {
     biblioteca: BibliotecaAtiva
     secao?: 'todas' | SecaoTexto
+    referencia?: 'todas' | string
     busca?: string
   },
 ): TextoBiblioteca[] {
@@ -44,10 +47,29 @@ export function filtrarTextosBiblioteca(
     )
     .filter(
       (texto) =>
-        !busca ||
-        [texto.titulo, texto.conteudo, ...texto.tags].join(' ').toLowerCase().includes(busca),
+        !filtros.referencia ||
+        filtros.referencia === 'todas' ||
+        texto.referencia === filtros.referencia,
     )
-    .sort((a, b) => Number(b.favorito) - Number(a.favorito) || b.usos - a.usos)
+    .filter(
+      (texto) =>
+        !busca ||
+        [texto.referencia, texto.titulo, texto.conteudo, ...texto.tags]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(busca),
+    )
+    .sort((a, b) => {
+      const porFavorito = Number(b.favorito) - Number(a.favorito)
+      if (porFavorito) return porFavorito
+      if (a.referencia && b.referencia) {
+        const porReferencia = compararReferencia.compare(a.referencia, b.referencia)
+        if (porReferencia) return porReferencia
+      } else if (a.referencia) return -1
+      else if (b.referencia) return 1
+      return b.usos - a.usos
+    })
 }
 
 export function contarTextosBiblioteca(
@@ -87,9 +109,11 @@ export function textoDisponivelNoContexto(
   texto: TextoBiblioteca,
   tipo?: TipoDocumento,
   secao?: SecaoTexto,
+  referencia?: string,
 ): boolean {
   const tipos = tiposDe(texto)
   const tipoCompativel = !tipo || !tipos.length || tipos.includes(tipo)
   const secaoCompativel = !secao || texto.secao === secao || texto.secao === 'generico'
-  return tipoCompativel && secaoCompativel
+  const referenciaCompativel = !referencia || !texto.referencia || texto.referencia === referencia
+  return tipoCompativel && secaoCompativel && referenciaCompativel
 }

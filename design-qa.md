@@ -81,3 +81,40 @@ Evidências locais:
 - Referência renderizada: `C:/Users/Lenovo/AppData/Local/Temp/dr-feedback-2908-render/page-2.png`
 - Implementação: `C:/Users/Lenovo/AppData/Local/Temp/dr-participantes-2908-viewport.png`
 - Continuação do painel: `C:/Users/Lenovo/AppData/Local/Temp/dr-participantes-2908-viewport-2.png`
+
+---
+
+# Design QA — referências de itens e subitens
+
+Resultado: **APROVADO**
+
+Referência: estrutura numerada do Parecer Técnico de Jhonathan Victor, com validação visual representativa dos itens **7**, **7.1** e seus desdobramentos na página 14 do documento.
+
+## Implementação validada
+
+- A tela de preenchimento preserva o número do item ou subitem nos títulos e nos botões de acesso à Biblioteca.
+- O painel contextual da Biblioteca informa explicitamente o destino no documento, por exemplo **Item 3.1**.
+- A Biblioteca permite cadastrar, editar, pesquisar, filtrar e ordenar textos pelo número de referência.
+- A seleção de um texto usa correspondência exata do item, evitando sugerir conteúdo de um subitem vizinho.
+- Textos antigos sem referência continuam disponíveis para preservar compatibilidade.
+
+## Comparação visual
+
+- Referência renderizada: `C:/Users/Lenovo/AppData/Local/Temp/jhonathan-qa-3108/page-14.png`
+- Biblioteca em desktop: `C:/Users/Lenovo/AppData/Local/Temp/dr-referencias-biblioteca-desktop.png`
+- Biblioteca em viewport estreito: `C:/Users/Lenovo/AppData/Local/Temp/dr-referencias-biblioteca-760.png`
+- Modal responsivo: `C:/Users/Lenovo/AppData/Local/Temp/dr-referencias-modal-760.png`
+- Painel contextual do item 3.1: `C:/Users/Lenovo/AppData/Local/Temp/dr-referencias-drawer-3-1.png`
+- Comparação lado a lado: `C:/Users/Lenovo/AppData/Local/Temp/dr-referencias-comparacao.png`
+
+## Verificações
+
+- Desktop validado em 1440 × 1000 px.
+- Layout estreito validado em 760 × 900 px.
+- Sem cortes, sobreposições, rolagem horizontal ou perda de hierarquia.
+- Filtros, modal de edição e painel contextual permanecem alinhados ao design system existente.
+- A estrutura numérica segue o documento-fonte sem substituir a organização aprovada.
+
+## Final result
+
+final result: passed

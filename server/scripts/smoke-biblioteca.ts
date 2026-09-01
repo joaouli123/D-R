@@ -34,6 +34,23 @@ const payloadLegado = textoBibliotecaCorpoSchema.parse({
   conteudo: 'Conteúdo técnico',
 })
 assert.deepEqual(payloadLegado.tiposDocumento, [])
+assert.equal(payloadLegado.referencia, '')
+
+const payloadReferenciado = textoBibliotecaCorpoSchema.parse({
+  titulo: 'Agentes químicos',
+  conteudo: 'Conteúdo técnico',
+  tiposDocumento: ['parecer'],
+  referencia: '10.1.2',
+})
+assert.equal(payloadReferenciado.referencia, '10.1.2')
+assert.equal(
+  textoBibliotecaCorpoSchema.safeParse({
+    titulo: 'Referência inválida',
+    conteudo: 'Conteúdo técnico',
+    referencia: 'item dez',
+  }).success,
+  false,
+)
 assert.equal(
   textoBibliotecaCorpoSchema.safeParse({
     titulo: 'Inválido',
@@ -47,6 +64,7 @@ const persistido: TextoBiblioteca = {
   id: 'texto-1',
   usuarioId: 'usuario-1',
   titulo: 'Parecer e laudo',
+  referencia: '10.1.2',
   secao: 'analise',
   tiposDocumento: ['parecer', 'laudo'],
   tags: [],
@@ -57,5 +75,6 @@ const persistido: TextoBiblioteca = {
   atualizadoEm: new Date('2026-08-17T00:00:00Z'),
 }
 assert.deepEqual(textoParaApi(persistido).tiposDocumento, ['parecer', 'laudo'])
+assert.equal(textoParaApi(persistido).referencia, '10.1.2')
 
-console.log('8 verificações · 0 falhas')
+console.log('12 verificações · 0 falhas')

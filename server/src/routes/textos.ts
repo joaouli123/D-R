@@ -17,6 +17,12 @@ textosRouter.use(exigirSessao)
 export const textoBibliotecaCorpoSchema = z.object({
   id: z.string().optional(),
   titulo: z.string().trim().min(1, 'Informe o título.'),
+  referencia: z
+    .string()
+    .trim()
+    .max(20)
+    .refine((valor) => !valor || /^\d+(?:\.\d+)*$/.test(valor), 'Informe uma referência válida.')
+    .default(''),
   secao: z
     .enum([
       'apresentacao',
@@ -64,6 +70,7 @@ textosRouter.post(
 
     const dados = {
       titulo: d.titulo,
+      referencia: d.referencia || null,
       secao: d.secao,
       tiposDocumento: d.tiposDocumento,
       tags: d.tags.filter(Boolean),

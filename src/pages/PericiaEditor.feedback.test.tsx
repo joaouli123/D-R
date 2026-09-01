@@ -172,6 +172,8 @@ describe('PericiaEditor — feedback noturno de 28/08', () => {
     expect(screen.getByText('3.1. Instalações Físicas')).toBeDefined()
     expect(screen.getByText('6.1. Descrição do Posto de Trabalho')).toBeDefined()
     expect(screen.getByText('7.1. Atividades Efetivamente Exercidas')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Abrir biblioteca do item 3.1' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Abrir biblioteca do item 6.4' })).toBeDefined()
     expect(screen.queryByText('Endereçamento')).toBeNull()
     expect(screen.queryByText('Objetivo da perícia')).toBeNull()
   })

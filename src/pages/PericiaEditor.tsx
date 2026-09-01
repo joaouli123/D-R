@@ -219,6 +219,7 @@ export default function PericiaEditor() {
   const [bibliotecaPara, setBibliotecaPara] = useState<{
     campo: keyof Pericia['tecnico']
     secao: SecaoTexto
+    referencia?: string
   } | null>(null)
   const [emailAberto, setEmailAberto] = useState(false)
   const [enviando, setEnviando] = useState(false)
@@ -583,7 +584,7 @@ export default function PericiaEditor() {
       {passo === 0 && (
         <div className="space-y-4">
           <Card>
-            <CardHeader title="Dados do processo" icon={<FileText size={18} />} />
+            <CardHeader title="Dados do processo" subtitle="Referência no documento: item 1" icon={<FileText size={18} />} />
             <div className="grid gap-4 p-5 sm:grid-cols-2">
               <BuscaProcesso
                 className="sm:col-span-2"
@@ -792,7 +793,7 @@ export default function PericiaEditor() {
           <Card>
             <CardHeader
               title="Participantes da perícia"
-              subtitle="Organizados pela parte ou empresa que representam."
+              subtitle="Item 2 — organizados pela parte ou empresa que representam."
               icon={<Users size={18} />}
             />
             <div className="space-y-5 p-5">
@@ -915,7 +916,7 @@ export default function PericiaEditor() {
           </Card>
 
           <Card>
-            <CardHeader title="Vistoria" icon={<Camera size={18} />} />
+            <CardHeader title="Vistoria" subtitle="Referência no documento: item 2" icon={<Camera size={18} />} />
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-5">
               <Input
                 label="Data da vistoria"
@@ -989,13 +990,13 @@ export default function PericiaEditor() {
         <div className="space-y-4">
           {(
             [
-              { campo: 'apresentacao', secao: 'apresentacao', label: 'APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA', rows: 5 },
-              { campo: 'descricaoEmpresa', secao: 'empresa', label: '3. Descrição das Instalações da Reclamada', rows: 5 },
-              { campo: 'descricaoAmbiente', secao: 'ambiente', label: '3.1. Instalações Físicas', rows: 6 },
-              { campo: 'descricaoPostoTrabalho', secao: 'ambiente', label: '6.1. Descrição do Posto de Trabalho', rows: 6 },
-              { campo: 'maquinasFerramentas', secao: 'atividades', label: '6.2. Máquinas, Ferramentas e Equipamentos Utilizados', rows: 5 },
-              { campo: 'produtosUtilizados', secao: 'atividades', label: '6.4. Produtos Utilizados Habitualmente nas Atividades', rows: 5 },
-              { campo: 'atividadesFuncoes', secao: 'atividades', label: '7.1. Atividades Efetivamente Exercidas', rows: 6 },
+              { campo: 'apresentacao', secao: 'apresentacao', referencia: undefined, label: 'APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA', rows: 5 },
+              { campo: 'descricaoEmpresa', secao: 'empresa', referencia: '3', label: '3. Descrição das Instalações da Reclamada', rows: 5 },
+              { campo: 'descricaoAmbiente', secao: 'ambiente', referencia: '3.1', label: '3.1. Instalações Físicas', rows: 6 },
+              { campo: 'descricaoPostoTrabalho', secao: 'ambiente', referencia: '6.1', label: '6.1. Descrição do Posto de Trabalho', rows: 6 },
+              { campo: 'maquinasFerramentas', secao: 'atividades', referencia: '6.2', label: '6.2. Máquinas, Ferramentas e Equipamentos Utilizados', rows: 5 },
+              { campo: 'produtosUtilizados', secao: 'atividades', referencia: '6.4', label: '6.4. Produtos Utilizados Habitualmente nas Atividades', rows: 5 },
+              { campo: 'atividadesFuncoes', secao: 'atividades', referencia: '7.1', label: '7.1. Atividades Efetivamente Exercidas', rows: 6 },
             ] as const
           ).map((f) => {
             const campoPadrao = campoPadraoDe(f.campo)
@@ -1021,7 +1022,8 @@ export default function PericiaEditor() {
                       size="sm"
                       variant="outline"
                       icon={<BookOpen size={14} />}
-                      onClick={() => setBibliotecaPara({ campo: f.campo, secao: f.secao })}
+                      aria-label={f.referencia ? `Abrir biblioteca do item ${f.referencia}` : 'Abrir biblioteca da apresentação'}
+                      onClick={() => setBibliotecaPara({ campo: f.campo, secao: f.secao, referencia: f.referencia })}
                     >
                       Biblioteca
                     </Button>
@@ -1043,7 +1045,7 @@ export default function PericiaEditor() {
           {/* Períodos por função */}
           <Card>
             <CardHeader
-              title="Períodos trabalhados por função"
+              title="7.1. Períodos trabalhados por função"
               subtitle="Detalha a evolução das funções ao longo do contrato."
               icon={<Users size={18} />}
               action={
@@ -1154,7 +1156,11 @@ export default function PericiaEditor() {
         <div className="space-y-4">
           <Card>
             <CardHeader
-              title="Avaliações de insalubridade e periculosidade"
+              title={p.modalidade === 'ambas'
+                ? 'Avaliações NR-15 (item 7.2) e NR-16 (item 7.3)'
+                : p.modalidade === 'insalubridade'
+                  ? '7.2. Avaliação da Exposição Ocupacional — NR-15'
+                  : `${numeroNr16Editor}. Avaliação das Atividades e Operações Perigosas — NR-16`}
               subtitle="A modalidade escolhida no processo define as matrizes NR-15 e NR-16 exibidas nesta etapa."
               icon={<FileText size={18} />}
               action={
@@ -1199,6 +1205,7 @@ export default function PericiaEditor() {
                         <ol aria-label="Fluxo técnico da periculosidade" className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                           <li className="text-amber-700">Risco</li><li aria-hidden="true">→</li><li>Enquadramento</li><li aria-hidden="true">→</li><li>Conclusão</li>
                         </ol>
+                        <Badge tone="navy">Item {numeroNr16Editor}.2</Badge>
                         <Button
                           variant="ghost"
                           className="text-red-600 hover:bg-red-50"
@@ -1221,11 +1228,19 @@ export default function PericiaEditor() {
                 const agenteFixo = Boolean(regraAnexo?.agenteFixo)
                 const grauFixo = regraAnexo?.grausPermitidos.length === 1
                 const exibeCas = regraAnexo?.exibeCas ?? true
+                const referenciaAvaliacao = a.tipo === 'biologico'
+                  ? '7.2.3'
+                  : a.tipo === 'quimico'
+                    ? '7.2.2'
+                    : '7.2.1'
                 return (
                 <div key={a.id} className="rounded-lg border border-ink-200 border-l-4 border-l-navy-700 p-3">
-                  <ol aria-label="Fluxo técnico do agente" className="mb-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
-                    <li className="text-navy-700">Agente</li><li aria-hidden="true">→</li><li>Medição</li><li aria-hidden="true">→</li><li>Proteção</li>
-                  </ol>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <ol aria-label="Fluxo técnico do agente" className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+                      <li className="text-navy-700">Agente</li><li aria-hidden="true">→</li><li>Medição</li><li aria-hidden="true">→</li><li>Proteção</li>
+                    </ol>
+                    <Badge tone="navy">Item {referenciaAvaliacao}</Badge>
+                  </div>
                   <div className={`grid gap-3 ${exibeCas
                     ? 'md:grid-cols-[minmax(220px,1.4fr)_minmax(120px,0.65fr)_minmax(230px,1fr)_minmax(130px,0.65fr)_auto]'
                     : 'md:grid-cols-[minmax(240px,1.5fr)_minmax(240px,1fr)_minmax(150px,0.7fr)_auto]'}`}>
@@ -1392,7 +1407,7 @@ export default function PericiaEditor() {
         <div className="space-y-4">
           <Card>
             <CardHeader
-              title="Relatório fotográfico"
+              title="5.1.3. Registro fotográfico e evidências"
               subtitle="As fotos são organizadas dentro das seções correspondentes do documento."
               icon={<Camera size={18} />}
               action={
@@ -1483,19 +1498,20 @@ export default function PericiaEditor() {
         <div className="space-y-4">
           {(
             [
-              { campo: 'normasReferencias', secao: 'generico', label: '4. Critérios Técnicos para Avaliação Pericial', rows: 4 },
-              { campo: 'equipamentosAnalisados', secao: 'generico', label: '5. Metodologia de Avaliação', rows: 4 },
-              { campo: 'informacoesLevantadas', secao: 'generico', label: '6.3. Constatações da Vistoria Pericial', rows: 5 },
-              { campo: 'divergenciasFaticas', secao: 'generico', label: `${numeroDivergenciasEditor}. Divergências Fáticas — resumo geral (opcional)`, rows: 4 },
-              { campo: 'alegacoesReclamante', secao: 'generico', label: `${numeroDivergenciasEditor}.1. Alegações do Reclamante`, rows: 5 },
-              { campo: 'informacoesReclamada', secao: 'generico', label: `${numeroDivergenciasEditor}.2. Informações prestadas pela Reclamada`, rows: 5 },
-              { campo: 'consideracoesDivergencias', secao: 'analise', label: `${numeroConsideracoesEditor}. Considerações sobre as Divergências Fáticas`, rows: 6 },
-              { campo: 'criterioAvaliacaoPericulosidade', secao: 'analise', label: `${numeroNr16Editor}.1. NR-16 — Critério de Avaliação`, rows: 4 },
-              { campo: 'notaTecnicaEpis', secao: 'analise', label: '8. Dos Equipamentos de Proteção Individual (NR-06)', rows: 7 },
-              { campo: 'protecoesColetivas', secao: 'analise', label: '9. Das Proteções Coletivas', rows: 5 },
+              { campo: 'normasReferencias', secao: 'generico', referencia: '4', label: '4. Critérios Técnicos para Avaliação Pericial', rows: 4 },
+              { campo: 'equipamentosAnalisados', secao: 'generico', referencia: '5', label: '5. Metodologia de Avaliação', rows: 4 },
+              { campo: 'informacoesLevantadas', secao: 'generico', referencia: '6.3', label: '6.3. Constatações da Vistoria Pericial', rows: 5 },
+              { campo: 'divergenciasFaticas', secao: 'generico', referencia: numeroDivergenciasEditor, label: `${numeroDivergenciasEditor}. Divergências Fáticas — resumo geral (opcional)`, rows: 4 },
+              { campo: 'alegacoesReclamante', secao: 'generico', referencia: `${numeroDivergenciasEditor}.1`, label: `${numeroDivergenciasEditor}.1. Alegações do Reclamante`, rows: 5 },
+              { campo: 'informacoesReclamada', secao: 'generico', referencia: `${numeroDivergenciasEditor}.2`, label: `${numeroDivergenciasEditor}.2. Informações prestadas pela Reclamada`, rows: 5 },
+              { campo: 'consideracoesDivergencias', secao: 'analise', referencia: numeroConsideracoesEditor, label: `${numeroConsideracoesEditor}. Considerações sobre as Divergências Fáticas`, rows: 6 },
+              { campo: 'criterioAvaliacaoPericulosidade', secao: 'analise', referencia: `${numeroNr16Editor}.1`, label: `${numeroNr16Editor}.1. NR-16 — Critério de Avaliação`, rows: 4 },
+              { campo: 'notaTecnicaEpis', secao: 'analise', referencia: '8', label: '8. Dos Equipamentos de Proteção Individual (NR-06)', rows: 7 },
+              { campo: 'protecoesColetivas', secao: 'analise', referencia: '9', label: '9. Das Proteções Coletivas', rows: 5 },
               {
                 campo: 'analiseTecnica',
                 secao: 'analise',
+                referencia: '10',
                 label: p.modalidade === 'insalubridade'
                   ? '10. Análise Técnica dos Agentes'
                   : p.modalidade === 'periculosidade'
@@ -1503,10 +1519,10 @@ export default function PericiaEditor() {
                     : '10. Análise Técnica dos Agentes, Atividades e Riscos',
                 rows: 8,
               },
-              { campo: 'conclusaoInsalubridade', secao: 'conclusao', label: '11. NR-15 — Conclusão e Fundamentação', rows: 6 },
-              { campo: 'conclusaoPericulosidade', secao: 'conclusao', label: p.modalidade === 'ambas' ? '12. NR-16 — Conclusão e Fundamentação' : '11. NR-16 — Conclusão e Fundamentação', rows: 6 },
-              { campo: 'respostasQuesitos', secao: 'conclusao', label: p.modalidade === 'ambas' ? '13. Respostas aos Quesitos Técnicos' : '12. Respostas aos Quesitos Técnicos', rows: 8 },
-              { campo: 'encerramento', secao: 'conclusao', label: p.modalidade === 'ambas' ? '14. Encerramento' : '13. Encerramento', rows: 5 },
+              { campo: 'conclusaoInsalubridade', secao: 'conclusao', referencia: '11', label: '11. NR-15 — Conclusão e Fundamentação', rows: 6 },
+              { campo: 'conclusaoPericulosidade', secao: 'conclusao', referencia: p.modalidade === 'ambas' ? '12' : '11', label: p.modalidade === 'ambas' ? '12. NR-16 — Conclusão e Fundamentação' : '11. NR-16 — Conclusão e Fundamentação', rows: 6 },
+              { campo: 'respostasQuesitos', secao: 'conclusao', referencia: p.modalidade === 'ambas' ? '13' : '12', label: p.modalidade === 'ambas' ? '13. Respostas aos Quesitos Técnicos' : '12. Respostas aos Quesitos Técnicos', rows: 8 },
+              { campo: 'encerramento', secao: 'conclusao', referencia: p.modalidade === 'ambas' ? '14' : '13', label: p.modalidade === 'ambas' ? '14. Encerramento' : '13. Encerramento', rows: 5 },
             ] as const
           ).filter((f) =>
             (f.campo !== 'conclusaoInsalubridade' || p.modalidade !== 'periculosidade') &&
@@ -1535,7 +1551,8 @@ export default function PericiaEditor() {
                       size="sm"
                       variant="outline"
                       icon={<BookOpen size={14} />}
-                      onClick={() => setBibliotecaPara({ campo: f.campo, secao: f.secao })}
+                      aria-label={`Abrir biblioteca do item ${f.referencia}`}
+                      onClick={() => setBibliotecaPara({ campo: f.campo, secao: f.secao, referencia: f.referencia })}
                     >
                       Biblioteca
                     </Button>
@@ -1734,6 +1751,7 @@ export default function PericiaEditor() {
         onClose={() => setBibliotecaPara(null)}
         secao={bibliotecaPara?.secao}
         tipoDocumento={tipoDoc}
+        referencia={bibliotecaPara?.referencia}
         onInserir={(conteudo) => {
           if (!bibliotecaPara) return
           const atual = (p.tecnico[bibliotecaPara.campo] as string) ?? ''
