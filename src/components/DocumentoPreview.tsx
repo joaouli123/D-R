@@ -77,8 +77,12 @@ export function DocumentoPreview({
 
     return (
       <div className="fotos space-y-4">
-        {fotos.map((foto) => (
-          <figure key={foto.id} className="break-inside-avoid text-center">
+        {fotos.map((foto) => {
+          const legenda = foto.legenda?.trim() || 'Sem legenda'
+          const legendaComFonte = /\bfonte\s*:/i.test(legenda)
+            ? legenda
+            : `${legenda} - Fonte: Ato pericial.`
+          return <figure key={foto.id} className="break-inside-avoid text-center">
             <div className="flex items-center justify-center overflow-hidden border border-ink-300 bg-white p-2">
               {foto.url ? (
                 <img
@@ -91,10 +95,10 @@ export function DocumentoPreview({
               )}
             </div>
             <figcaption className="mt-1 text-[9pt] italic text-ink-600">
-              Figura {numeroDaFoto.get(foto.id)} — {foto.legenda || 'sem legenda'}
+              Fotografia {numeroDaFoto.get(foto.id)} – {legendaComFonte}
             </figcaption>
           </figure>
-        ))}
+        })}
       </div>
     )
   }
@@ -121,6 +125,9 @@ export function DocumentoPreview({
   const numeroConclusaoNr16 = temPericulosidade ? ++indiceSecaoFinal : null
   const numeroQuesitos = t.respostasQuesitos?.trim() ? ++indiceSecaoFinal : null
   const numeroEncerramento = ++indiceSecaoFinal
+  let indiceGrupoAnalise = 0
+  const numeroAnaliseNr15 = temInsalubridade ? `10.${++indiceGrupoAnalise}` : null
+  const numeroAnaliseNr16 = temPericulosidade ? `10.${++indiceGrupoAnalise}` : null
   const conclusaoNr15 =
     t.conclusaoInsalubridade?.trim() ||
     (pericia.modalidade === 'insalubridade' || !t.conclusaoPericulosidade?.trim()
@@ -164,10 +171,66 @@ export function DocumentoPreview({
       </div>
     ) : null
 
+  const quadrosDeAnalise = (
+    agentes: typeof t.agentes,
+    prefixo: string | null,
+    tituloGrupo: string,
+  ) => prefixo && agentes.length ? (
+    <section>
+      <h3>{prefixo}. {tituloGrupo}</h3>
+      <div className="space-y-4">
+        {agentes.map((agente, indice) => {
+          const apresentacao = montarApresentacaoAgente(agente)
+          const protecoesAssociadas = (agente.epis ?? []).map((epi, indiceEpi) => {
+            const cas = [
+              epi.caUnico?.trim() ? `CA ${epi.caUnico.trim()}` : '',
+              epi.caPecaFacial?.trim() ? `CA peça facial ${epi.caPecaFacial.trim()}` : '',
+              epi.caFiltroCartucho?.trim() ? `CA cartucho/filtro ${epi.caFiltroCartucho.trim()}` : '',
+            ].filter(Boolean).join(' / ')
+            return `Proteção ${indiceEpi + 1}: ${epi.modelo}${cas ? ` — ${cas}` : ''}`
+          })
+
+          return (
+            <section key={`analise-${agente.id}`} className="agente-bloco">
+              <h4>{prefixo}.{indice + 1}. {apresentacao.titulo}</h4>
+              <table className="agente-propriedades">
+                <thead><tr><th>Propriedade</th><th>Informação</th></tr></thead>
+                <tbody>
+                  {apresentacao.linhas.map((linha) => (
+                    <tr key={linha.rotulo}><th>{linha.rotulo}</th><td>{linha.valor}</td></tr>
+                  ))}
+                  {protecoesAssociadas.length > 0 && (
+                    <tr>
+                      <th>Proteções associadas</th>
+                      <td>{protecoesAssociadas.map((linha) => <div key={linha}>{linha}</div>)}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </section>
+          )
+        })}
+      </div>
+    </section>
+  ) : null
+
   const protecoes = t.agentes.flatMap((agente) => {
     const apresentacao = montarApresentacaoAgente(agente)
     return apresentacao.protecoes.length ? [{ agente, apresentacao }] : []
   })
+  let numeroProtecao = 1
+  const protecoesNumeradas = protecoes.map(({ agente, apresentacao }) => ({
+    agente,
+    apresentacao: {
+      ...apresentacao,
+      protecoes: apresentacao.protecoes.map((protecao) => ({
+        ...protecao,
+        titulo: /^Proteção \d+$/.test(protecao.titulo)
+          ? `Proteção ${numeroProtecao++}`
+          : protecao.titulo,
+      })),
+    },
+  }))
 
   return (
     <article className="doc-sheet mx-auto w-full max-w-[820px] bg-white px-10 py-12 shadow-card print-area sm:px-14">
@@ -356,7 +419,7 @@ export function DocumentoPreview({
 
       <h2>8. Dos Equipamentos de Proteção Individual (NR-06)</h2>
       <Paragrafos texto={t.notaTecnicaEpis} />
-      {protecoes.length ? protecoes.map(({ agente, apresentacao }) => (
+      {protecoesNumeradas.length ? protecoesNumeradas.map(({ agente, apresentacao }) => (
         <section key={agente.id} className="agente-bloco">
           <h3>{apresentacao.titulo}</h3>
           {apresentacao.protecoes.map((protecao) => (
@@ -376,6 +439,8 @@ export function DocumentoPreview({
 
       <h2>10. {pericia.modalidade === 'insalubridade' ? 'Análise Técnica dos Agentes Identificados' : pericia.modalidade === 'periculosidade' ? 'Análise Técnica das Atividades e Riscos Identificados' : 'Análise Técnica dos Agentes, Atividades e Riscos Identificados'}</h2>
       <Paragrafos texto={t.analiseTecnica} />
+      {quadrosDeAnalise(agentesNr15, numeroAnaliseNr15, 'NR-15 — Avaliação da Exposição Ocupacional')}
+      {quadrosDeAnalise(agentesNr16, numeroAnaliseNr16, 'NR-16 — Avaliação das Atividades e Operações Perigosas')}
 
       {numeroConclusaoNr15 && <><h2>{numeroConclusaoNr15}. NR-15 — Conclusão e Fundamentação</h2><Paragrafos texto={conclusaoNr15} /></>}
       {numeroConclusaoNr16 && <><h2>{numeroConclusaoNr16}. NR-16 — Conclusão e Fundamentação</h2><Paragrafos texto={conclusaoNr16} /></>}
@@ -383,10 +448,6 @@ export function DocumentoPreview({
 
       <h2>{numeroEncerramento}. Encerramento</h2>
       <Paragrafos texto={encerramento} />
-      <p className="mt-6 no-indent">
-        Sendo o que se apresenta para o momento, o signatário coloca-se à disposição deste MM. Juízo
-        para os esclarecimentos que se fizerem necessários.
-      </p>
       <p className="mt-6 no-indent text-center">{fecho.cidade}, {extenso(fecho.data)}.</p>
       <div className="mt-8 text-center">
         <div className="mx-auto w-72 border-t border-ink-800 pt-1.5">

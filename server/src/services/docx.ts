@@ -196,6 +196,7 @@ function celula(
     larguraDxa?: number
     columnSpan?: number
     paragrafos?: Paragraph[]
+    manterComProxima?: boolean
   } = {},
 ) {
   return new TableCell({
@@ -206,6 +207,7 @@ function celula(
     margins: { top: 60, bottom: 60, left: 120, right: 120 },
     children: opcoes.paragrafos ?? [
       new Paragraph({
+        keepNext: opcoes.manterComProxima,
         spacing: { after: 0 },
         children: [texto(conteudo, { negrito: opcoes.cabecalho, tamanho: 20 })],
       }),
@@ -223,11 +225,12 @@ const tabela = (linhas: TableRow[], larguras: readonly number[] = COLUNAS_FICHA)
   })
 
 /** Tabela rótulo/valor, como as fichas de identificação do parecer. */
-const fichaLinha = (rotulo: string, valor: string) =>
+const fichaLinha = (rotulo: string, valor: string, manterComProxima = false) =>
   new TableRow({
+    cantSplit: true,
     children: [
-      celula(rotulo, { cabecalho: true, larguraDxa: COLUNAS_FICHA[0] }),
-      celula(valor, { larguraDxa: COLUNAS_FICHA[1] }),
+      celula(rotulo, { cabecalho: true, larguraDxa: COLUNAS_FICHA[0], manterComProxima }),
+      celula(valor, { larguraDxa: COLUNAS_FICHA[1], manterComProxima }),
     ],
   })
 
@@ -236,8 +239,11 @@ async function figuraDocx(
   legenda: string | null,
   numero: number,
 ): Promise<(Paragraph | Table)[]> {
-  const titulo = `Figura ${numero}`
+  const titulo = `Fotografia ${numero}`
   const descricao = legenda?.trim() || 'Sem legenda'
+  const descricaoComFonte = /\bfonte\s*:/i.test(descricao)
+    ? descricao
+    : `${descricao} - Fonte: Ato pericial.`
 
   try {
     // Carrega o armazenamento apenas quando há uma foto para embutir.
@@ -293,7 +299,7 @@ async function figuraDocx(
                     keepLines: true,
                     spacing: { after: 0, line: 260 },
                     children: [
-                      texto(`${titulo} — ${descricao}`, {
+                      texto(`${titulo} – ${descricaoComFonte}`, {
                         italico: true,
                         tamanho: 18,
                         cor: MARCA.tinta600,
@@ -313,7 +319,7 @@ async function figuraDocx(
         alignment: AlignmentType.CENTER,
         keepLines: true,
         spacing: { before: 120, after: 180 },
-        children: [texto(`${titulo} — imagem indisponível. ${descricao}`, { italico: true, tamanho: 18 })],
+        children: [texto(`${titulo} – imagem indisponível. ${descricaoComFonte}`, { italico: true, tamanho: 18 })],
       }),
     ]
   }
@@ -694,14 +700,18 @@ async function docParecer(
 
   filhos.push(h2(num.secao('DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)')))
   filhos.push(...blocos(t.notaTecnicaEpis))
+  let numeroProtecao = 1
   for (const agente of agentes) {
     const apresentacao = montarApresentacaoAgente(agente)
     if (!apresentacao.protecoes.length) continue
     filhos.push(h3(apresentacao.titulo))
     for (const protecao of apresentacao.protecoes) {
+      const tituloProtecao = /^Proteção \d+$/.test(protecao.titulo)
+        ? `Proteção ${numeroProtecao++}`
+        : protecao.titulo
       filhos.push(
-        new Paragraph({ spacing: { before: 140, after: 60 }, children: [texto(protecao.titulo, { negrito: true, tamanho: 20 })] }),
-        tabela(protecao.linhas.map((item) => fichaLinha(item.rotulo, item.valor))),
+        new Paragraph({ keepNext: true, spacing: { before: 140, after: 60 }, children: [texto(tituloProtecao, { negrito: true, tamanho: 20 })] }),
+        tabela(protecao.linhas.map((item, indice, linhas) => fichaLinha(item.rotulo, item.valor, indice < linhas.length - 1))),
       )
     }
   }
@@ -710,22 +720,53 @@ async function docParecer(
   filhos.push(
     h2(num.secao('DAS PROTEÇÕES COLETIVAS')),
     ...blocos(t.protecoesColetivas),
-    h2(num.secao(tituloAnalise)),
-    ...blocos(t.analiseTecnica),
   )
+
+  const cabecalhoAnalise = num.secao(tituloAnalise)
+  const numeroAnalise = cabecalhoAnalise.split('. ')[0]
+  filhos.push(h2(cabecalhoAnalise), ...blocos(t.analiseTecnica))
+
+  let grupoAnalise = 0
+  const adicionarQuadrosDeAnalise = (lista: typeof agentes, tituloGrupo: string) => {
+    if (!lista.length) return
+    grupoAnalise += 1
+    filhos.push(h3(`${numeroAnalise}.${grupoAnalise}. ${tituloGrupo}`))
+    lista.forEach((agente, indice) => {
+      const apresentacao = montarApresentacaoAgente(agente)
+      const protecoes = (agente.epis ?? []).map((epi, indiceEpi) => {
+        const cas = [
+          epi.caUnico?.trim() ? `CA ${epi.caUnico.trim()}` : '',
+          epi.caPecaFacial?.trim() ? `CA peça facial ${epi.caPecaFacial.trim()}` : '',
+          epi.caFiltroCartucho?.trim() ? `CA cartucho/filtro ${epi.caFiltroCartucho.trim()}` : '',
+        ].filter(Boolean).join(' / ')
+        return `Proteção ${indiceEpi + 1}: ${epi.modelo}${cas ? ` — ${cas}` : ''}`
+      }).join('\n')
+      filhos.push(
+        h4(`${numeroAnalise}.${grupoAnalise}.${indice + 1}. ${apresentacao.titulo}`),
+        tabela([
+          new TableRow({
+            tableHeader: true,
+            cantSplit: true,
+            children: [
+              celula('Propriedade', { cabecalho: true, larguraDxa: COLUNAS_FICHA[0] }),
+              celula('Informação', { cabecalho: true, larguraDxa: COLUNAS_FICHA[1] }),
+            ],
+          }),
+          ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor)),
+          ...(protecoes ? [fichaLinha('Proteções associadas', protecoes)] : []),
+        ]),
+      )
+    })
+  }
+
+  if (temInsalubridade) adicionarQuadrosDeAnalise(agentesNr15, 'NR-15 — Avaliação da Exposição Ocupacional')
+  if (temPericulosidade) adicionarQuadrosDeAnalise(agentesNr16, 'NR-16 — Avaliação das Atividades e Operações Perigosas')
   if (temInsalubridade) filhos.push(h2(num.secao('NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr15))
   if (temPericulosidade) filhos.push(h2(num.secao('NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr16))
   if (t.respostasQuesitos?.trim()) filhos.push(h2(num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')), ...blocos(t.respostasQuesitos))
   filhos.push(h2(num.secao('ENCERRAMENTO')), ...blocosComProximo(encerramento))
 
-  filhos.push(
-    pSemRecuo(
-      'Sendo o que se apresenta para o momento, o signatário coloca-se à disposição deste MM. Juízo para os esclarecimentos que se fizerem necessários.',
-      false,
-      true,
-    ),
-    ...assinatura(perito, fecho.cidade, fecho.data),
-  )
+  filhos.push(...assinatura(perito, fecho.cidade, fecho.data))
 
   return filhos
 }

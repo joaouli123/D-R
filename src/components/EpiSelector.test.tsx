@@ -293,6 +293,32 @@ describe('EpiSelector', () => {
     }))
   })
 
+  it('mantém dois EPIs adicionados ao mesmo agente no mesmo lote de eventos', async () => {
+    const alterado = vi.fn()
+    vi.mocked(api.epis.listar).mockResolvedValue([EPI_3M, EPI_7502])
+
+    function Harness() {
+      const [agente, setAgente] = useState(AGENTE_BASE)
+      return <EpiSelector agente={agente} onChange={(valor) => { setAgente(valor); alterado(valor) }} />
+    }
+
+    render(<Harness />)
+    const primeiro = await screen.findByRole('button', { name: /Adicionar 3M 6200/ })
+    const segundo = screen.getByRole('button', { name: /Adicionar 3M 7502/ })
+
+    act(() => {
+      primeiro.click()
+      segundo.click()
+    })
+
+    expect(alterado).toHaveBeenLastCalledWith(expect.objectContaining({
+      epis: [
+        expect.objectContaining({ catalogoId: EPI_3M.id }),
+        expect.objectContaining({ catalogoId: EPI_7502.id }),
+      ],
+    }))
+  })
+
   it('prioriza a categoria reconhecida, mantém Multigases e não recomenda categorias incompatíveis', async () => {
     vi.mocked(api.epis.listar).mockResolvedValue([EPI_GASES_ACIDOS, EPI_MULTIGASES, EPI_3M])
 

@@ -144,8 +144,8 @@ export function extenso(iso?: string | null): string {
 export const hoje = (): string => new Date().toISOString().slice(0, 10)
 
 export function objetivoAutomaticoDocumento(modalidade: string): string {
-  const insalubridade = 'Analisar tecnicamente a eventual caracterização da insalubridade, conforme os critérios da NR-15 e seus Anexos, indicando, quando caracterizada, o agente, o enquadramento e o respectivo grau aplicável.'
-  const periculosidade = 'Analisar tecnicamente a eventual caracterização da periculosidade, conforme as atividades e operações previstas na NR-16 e seus Anexos, indicando, quando caracterizada, o enquadramento e o percentual normativo aplicável.'
+  const insalubridade = 'Avaliar, sob o ponto de vista técnico, a caracterização ou não de insalubridade, nos termos da NR-15, e, quando caracterizada, indicar o respectivo grau: mínimo, médio ou máximo.'
+  const periculosidade = 'Avaliar, sob o ponto de vista técnico, a caracterização ou não de periculosidade, nos termos da NR-16, e, quando caracterizada, indicar o respectivo percentual.'
   if (modalidade === 'insalubridade') return insalubridade
   if (modalidade === 'periculosidade') return periculosidade
   return `${insalubridade}\n\n${periculosidade}`
@@ -621,13 +621,10 @@ function protecaoDocumento(
   epi: EpiDocumento,
   indice: number,
 ): ApresentacaoAgenteDocumento['protecoes'][number] {
-  const manualAtual = Boolean(epi.validadeCa?.trim())
   const linhas: LinhaApresentacaoAgente[] = [
-    { rotulo: manualAtual ? 'Equipamento' : 'Categoria', valor: epi.categoria },
-    { rotulo: manualAtual ? 'Descrição' : 'Modelo', valor: epi.modelo },
-    manualAtual
-      ? { rotulo: 'Validade do CA', valor: epi.validadeCa!.trim() }
-      : epi.marca?.trim() ? { rotulo: 'Marca', valor: epi.marca.trim() } : undefined,
+    { rotulo: 'Equipamento', valor: epi.categoria },
+    { rotulo: 'Descrição', valor: epi.modelo },
+    { rotulo: 'Validade do CA', valor: epi.validadeCa?.trim() || 'Não informada' },
     ...[
       epi.caUnico?.trim() ? { rotulo: 'CA', valor: epi.caUnico.trim() } : undefined,
       epi.caPecaFacial?.trim() ? { rotulo: 'CA da peça facial', valor: epi.caPecaFacial.trim() } : undefined,

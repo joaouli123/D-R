@@ -80,9 +80,10 @@ describe('montarApresentacaoAgente', () => {
     expect(apresentacao.protecoes).toHaveLength(2)
     expect(apresentacao.protecoes[0]?.titulo).toContain('1')
     expect(apresentacao.protecoes[1]?.titulo).toContain('2')
-    expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'Modelo', valor: 'Respirador PFF2' })
+    expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'Descrição', valor: 'Respirador PFF2' })
+    expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'Validade do CA', valor: 'Não informada' })
     expect(apresentacao.protecoes[0]?.linhas).toContainEqual({ rotulo: 'CA', valor: '5657' })
-    expect(apresentacao.protecoes[1]?.linhas).toContainEqual({ rotulo: 'Modelo', valor: 'Luva nitrílica' })
+    expect(apresentacao.protecoes[1]?.linhas).toContainEqual({ rotulo: 'Descrição', valor: 'Luva nitrílica' })
     expect(apresentacao.protecoes[1]?.linhas).toContainEqual({ rotulo: 'CA', valor: '28956' })
   })
 

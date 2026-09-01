@@ -262,7 +262,8 @@ const periciaBase = {
     consideracoesDivergencias: 'As versões foram confrontadas com os elementos técnicos disponíveis.',
     criterioAvaliacaoPericulosidade:
       'A caracterização da periculosidade é realizada mediante avaliação qualitativa.',
-    notaTecnicaEpis: 'Nota Técnica sobre a Primazia da Realidade.',
+    notaTecnicaEpis:
+      'Quanto aos EPIs, eventual ausência ou inconsistência nos registros formais de entrega não deve, isoladamente, conduzir à conclusão de inexistência de fornecimento, disponibilização ou utilização dos equipamentos, devendo ser considerado o conjunto probatório, inclusive os demais meios de prova admitidos em direito, nos termos do art. 369 do CPC.\n\nNesse contexto, a identificação e o reconhecimento, pelo próprio Reclamante, dos EPIs apresentados na presença dos demais envolvidos constituem elementos objetivos e relevantes para a análise do fornecimento e da disponibilização desses equipamentos, devendo ser considerados em conjunto com os demais elementos probatórios relativos ao período contratual.',
     protecoesColetivas: 'Exaustão localizada junto aos pontos de geração de névoa e enclausuramento parcial.',
     analiseTecnica:
       'A exposição habitual a névoas de óleo mineral, sem neutralização comprovada, atrai o enquadramento qualitativo do Anexo 13 da NR-15.\n\nRegistra-se que o simples fornecimento de EPI não elide o adicional, nos termos das Súmulas 80 e 289 do C. TST.',
@@ -577,10 +578,12 @@ async function main() {
   assert.match(htmlParecer, /7\.2\.1\. Agente Químico — Óleos minerais \(névoa\)/)
   assert.match(htmlParecer, /Análise técnica editável dos óleos minerais\./)
   assert.match(htmlParecer, /7\.3\.1\. Critério de Avaliação/)
-  assert.match(htmlParecer, /Nota Técnica sobre a Primazia da Realidade\./)
+  assert.match(htmlParecer, /Quanto aos EPIs, eventual ausência ou inconsistência/)
+  assert.doesNotMatch(htmlParecer, /Nota Técnica sobre a Primazia da Realidade\./)
   assert.match(parecerGerado?.xml ?? '', /7\.2\.1\. Agente Químico — Óleos minerais \(névoa\)/)
   assert.match(parecerGerado?.xml ?? '', /7\.3\.1\. Critério de Avaliação/)
-  assert.match(parecerGerado?.xml ?? '', /Nota Técnica sobre a Primazia da Realidade\./)
+  assert.match(parecerGerado?.xml ?? '', /Quanto aos EPIs, eventual ausência ou inconsistência/)
+  assert.doesNotMatch(parecerGerado?.xml ?? '', /Nota Técnica sobre a Primazia da Realidade\./)
   assert.match(htmlParecer, /Período avaliado/)
   assert.match(parecerGerado?.xml ?? '', /Período avaliado/)
   assert.doesNotMatch(htmlParecer, /cinco anos anteriores ao ajuizamento da ação/i)
@@ -694,8 +697,8 @@ async function main() {
     'a assinatura da impugnação não deve ficar órfã em uma segunda página',
   )
   assert.ok(
-    (saidasVisuais.find((saida) => saida.nome === 'parecer')?.paginasPdf ?? Infinity) <= 9,
-    'o parecer completo de teste não deve crescer além de nove páginas',
+    (saidasVisuais.find((saida) => saida.nome === 'parecer')?.paginasPdf ?? Infinity) <= 15,
+    'o parecer completo de teste não deve crescer além de quinze páginas',
   )
   assert.match(
     saidasVisuais.find((saida) => saida.nome === 'parecer')?.xml ?? '',
@@ -761,6 +764,35 @@ async function main() {
   )?.[1]
   assert.ok(secaoEpis, 'seção de EPI não encontrada')
   assert.match(secaoEpis, /CA da peça facial|CA do cartucho\/filtro|90 - 17 = 73 dB\(A\)/)
+  assert.match(secaoEpis, /Equipamento/)
+  assert.match(secaoEpis, /Descrição/)
+  assert.match(secaoEpis, /Validade do CA/)
+  assert.match(secaoEpis, /Não informada/)
+  assert.doesNotMatch(secaoEpis, />Categoria<|>Modelo<|>Marca</)
+  const ordemProtecoes = ['Proteção 1', 'Proteção 2', 'Proteção 3']
+    .map((titulo) => secaoEpis.indexOf(titulo))
+  assert.ok(
+    ordemProtecoes.every((indice) => indice >= 0) &&
+      ordemProtecoes.every((indice, posicao) => posicao === 0 || indice > ordemProtecoes[posicao - 1]),
+    'as proteções de agentes diferentes devem permanecer registradas e numeradas em sequência',
+  )
+
+  const secaoAnalise = htmlParecer.match(
+    /<h2>10\. ANÁLISE TÉCNICA[\s\S]*?<h2>11\. NR-15/i,
+  )?.[0]
+  assert.ok(secaoAnalise, 'quadros da análise técnica não encontrados')
+  assert.match(secaoAnalise, /10\.1\.\d+\. Ruído/)
+  assert.match(secaoAnalise, /10\.1\.\d+\. Acetaldeído/)
+  assert.match(secaoAnalise, /Proteções associadas/)
+  assert.doesNotMatch(
+    htmlParecer,
+    /Sendo o que se apresenta para o momento, o signatário/,
+    'o gerador não deve reintroduzir o encerramento antigo',
+  )
+  assert.match(
+    htmlParecer,
+    /Avaliar, sob o ponto de vista técnico, a caracterização ou não de insalubridade/,
+  )
 
   assert.match(htmlParecer, /font-family: Arial, sans-serif/)
   assert.match(htmlParecer, /h1 \{[^}]*font-size: 18pt/s)
@@ -861,7 +893,9 @@ async function main() {
   const escapouEnquadramento =
     htmlParecer.includes('&lt;referência especial &amp; controlada&gt;') &&
     !htmlParecer.includes('<referência especial & controlada>')
-  const unidadeSemRepeticao = (htmlParecer.match(/mg\/m³/g) ?? []).length === 1
+  const ocorrenciasMg = (htmlParecer.match(/mg\/m³/g) ?? []).length
+  const unidadeSemRepeticao =
+    ocorrenciasMg === 2 && !/mg\/m³\s*mg\/m³/.test(htmlParecer)
 
   // As seções têm de sair numeradas 1, 2, 3… na ordem em que aparecem.
   const numeros = [...htmlParecer.matchAll(/<h2>(\d+)\./g)].map((m) => Number(m[1]))

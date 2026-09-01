@@ -9,10 +9,9 @@ import type { Empresa, ModalidadePericia, Pericia, Usuario } from '@/types'
  * encerramento) é a mesma coisa em todos os laudos, e o perito não deve
  * ter de redigir de novo a cada processo.
  *
- * Estes textos entram sozinhos na perícia e se mantêm atualizados
- * enquanto o perito não os editar. No instante em que ele mexe em um
- * deles, aquele campo passa a ser dele e nunca mais é reescrito
- * (ver `patchDeTextosPadrao`).
+ * Estes textos reproduzem a matriz revisada no Parecer Jhonathan Victor.
+ * Peritos e assistentes recebem sempre a versão oficial; somente o
+ * administrador pode deliberadamente personalizá-la.
  */
 export const CAMPOS_COM_TEXTO_PADRAO = [
   'apresentacao',
@@ -45,8 +44,8 @@ function apresentacao(_pericia: Pericia, perito?: Usuario | null, _reclamada?: E
 }
 
 function objetoPorModalidade(modalidade: ModalidadePericia): string {
-  const insalubridade = 'Analisar tecnicamente a eventual caracterização da insalubridade, conforme os critérios da NR-15 e seus Anexos, indicando, quando caracterizada, o agente, o enquadramento e o respectivo grau aplicável.'
-  const periculosidade = 'Analisar tecnicamente a eventual caracterização da periculosidade, conforme as atividades e operações previstas na NR-16 e seus Anexos, indicando, quando caracterizada, o enquadramento e o percentual normativo aplicável.'
+  const insalubridade = 'Avaliar, sob o ponto de vista técnico, a caracterização ou não de insalubridade, nos termos da NR-15, e, quando caracterizada, indicar o respectivo grau: mínimo, médio ou máximo.'
+  const periculosidade = 'Avaliar, sob o ponto de vista técnico, a caracterização ou não de periculosidade, nos termos da NR-16, e, quando caracterizada, indicar o respectivo percentual.'
 
   if (modalidade === 'insalubridade') return insalubridade
   if (modalidade === 'periculosidade') return periculosidade
@@ -80,7 +79,7 @@ function normasReferencias(pericia: Pericia): string {
     pericia.modalidade !== 'insalubridade' && 'A caracterização da periculosidade deverá observar os critérios estabelecidos na NR-16 e respectivos Anexos, mediante análise da atividade ou operação efetivamente desenvolvida e do correspondente enquadramento normativo. Serão considerados, conforme aplicável: atividade efetivamente desempenhada; natureza da condição de risco; área de risco; ingresso ou permanência na área de risco; frequência e forma de exposição; condições reais de trabalho; e enquadramento específico no respectivo Anexo da NR-16.',
     pericia.modalidade !== 'insalubridade' && 'A mera proximidade, possibilidade de contato ou existência de fonte de risco no estabelecimento não constitui, isoladamente, comprovação de condição perigosa.',
     pericia.modalidade !== 'insalubridade' && '4.2.1. Anexos da NR-16',
-    pericia.modalidade !== 'insalubridade' && 'Para a análise serão considerados os respectivos Anexos da NR-16 aplicáveis ao objeto da perícia, incluindo:\n• Anexo I – Explosivos;\n• Anexo II – Inflamáveis;\n• Anexo III – Segurança pessoal ou patrimonial;\n• Anexo IV – Energia elétrica;\n• Anexo V – Motocicleta;\n• Anexo VI – Agentes das autoridades de trânsito;\n• Anexo VII – Radiações ionizantes ou substâncias radioativas.',
+    pericia.modalidade !== 'insalubridade' && 'Para a análise serão considerados os respectivos Anexos da NR-16 aplicáveis ao objeto da perícia, incluindo:\n• Anexo 1 – Explosivos;\n• Anexo 2 – Inflamáveis;\n• Anexo 3 – Segurança pessoal ou patrimonial;\n• Anexo 4 – Energia elétrica;\n• Anexo 5 – Motocicleta;\n• Anexo 6 – Agentes das autoridades de trânsito e\n• Anexo (*) – Radiações ionizantes ou substâncias radioativas.',
     pericia.modalidade !== 'insalubridade' && 'Nota Técnica sobre Inflamáveis e Combustíveis.\nO ponto de fulgor é um elemento de classificação da substância, mas não caracteriza, isoladamente, a periculosidade. A análise deve verificar a atividade ou operação efetivamente desempenhada, a forma de manuseio, armazenamento ou transporte, as quantidades e embalagens, o ingresso ou permanência em área de risco e o correspondente enquadramento no Anexo 2 da NR-16.\nO item 16.7 da NR-16 define como líquido combustível aquele que possui ponto de fulgor maior que 60 ºC e inferior ou igual a 93 ºC. Essa definição também não autoriza conclusão automática de caracterização ou descaracterização, que depende das condições concretas e das hipóteses normativas aplicáveis.\nNo caso de óleo diesel S10 ou S500, devem ser examinadas a Ficha com Dados de Segurança do produto efetivamente utilizado e as condições verificadas na diligência. O nome comercial ou o ponto de fulgor, isoladamente, não determinam a conclusão técnica.',
   )
 }
@@ -91,8 +90,6 @@ function criterioAvaliacaoPericulosidade(): string {
 
 function notaTecnicaEpis(): string {
   return paragrafos(
-    'Nota Técnica sobre a Primazia da Realidade',
-    'A análise técnica observará a primazia da realidade, considerando as condições efetivamente existentes e as atividades realmente desempenhadas, em conjunto com os elementos documentais e demais evidências disponíveis.',
     'Quanto aos EPIs, eventual ausência ou inconsistência nos registros formais de entrega não deve, isoladamente, conduzir à conclusão de inexistência de fornecimento, disponibilização ou utilização dos equipamentos, devendo ser considerado o conjunto probatório, inclusive os demais meios de prova admitidos em direito, nos termos do art. 369 do CPC.',
     'Nesse contexto, a identificação e o reconhecimento, pelo próprio Reclamante, dos EPIs apresentados na presença dos demais envolvidos constituem elementos objetivos e relevantes para a análise do fornecimento e da disponibilização desses equipamentos, devendo ser considerados em conjunto com os demais elementos probatórios relativos ao período contratual.',
   )
@@ -114,7 +111,7 @@ function metodologia(pericia: Pericia): string {
     pericia.modalidade !== 'periculosidade' && '5.1.3. Registro Fotográfico e Evidências',
     pericia.modalidade !== 'periculosidade' && 'Quando permitido, serão realizados registros fotográficos dos postos de trabalho, máquinas, equipamentos, fontes geradoras, instalações e demais condições relevantes. As imagens terão caráter complementar e serão analisadas conjuntamente com os demais elementos técnicos e documentais.',
     '5.2. ANÁLISE DOCUMENTAL E PPP',
-    'Serão considerados, conforme disponíveis: PPP; PGR; LTCAT; laudos ambientais; fichas de entrega de EPI; documentos relativos ao processo produtivo; e demais documentos técnicos pertinentes. A documentação será analisada em conjunto com as condições reais de trabalho, considerando-se sua coerência, período de abrangência, metodologia utilizada e compatibilidade com as atividades efetivamente desempenhadas.',
+    'Serão considerados, conforme disponíveis: PPP; PGR; laudos ambientais; fichas de entrega de EPI; documentos relativos ao processo produtivo; e demais documentos técnicos pertinentes. A documentação será analisada em conjunto com as condições reais de trabalho, considerando-se sua coerência, período de abrangência, metodologia utilizada e compatibilidade com as atividades efetivamente desempenhadas.',
     '5.2.1. PPP – Perfil Profissiográfico Previdenciário',
     'O PPP constitui elemento documental relevante, porém não deverá ser analisado isoladamente para fins de caracterização de insalubridade ou periculosidade. Suas informações deverão ser confrontadas com os demais documentos técnicos, com a metodologia utilizada para obtenção dos dados e, quando possível, com as condições efetivamente verificadas.',
     pericia.modalidade !== 'periculosidade' && '5.2.2. Critérios de Avaliação de Ruído – NHO-01 (Q=3) e NR-15 (Q=5)',
@@ -139,11 +136,9 @@ function metodologia(pericia: Pericia): string {
 
 function encerramento(): string {
   return paragrafos(
-    '1 - Foi realizada inspeção in loco no ambiente objeto do presente trabalho, com análise das condições relacionadas à insalubridade e/ou periculosidade conforme a modalidade selecionada e a fundamentação técnica apresentada.',
-    '2 - As conclusões apresentadas decorrem exclusivamente dos elementos técnicos, documentais e fáticos analisados, observados os critérios estabelecidos na legislação e nas Normas Regulamentadoras aplicáveis.',
-    '3 - As vistorias, análises e conclusões expressas no presente trabalho fundamentam-se nos dados, documentos, diligências, pesquisas e levantamentos técnicos efetivamente considerados.',
-    '4 - Quando colhidos durante a diligência, os relatos das partes foram registrados e considerados em conjunto com os demais elementos técnicos e documentais.',
-    '5 - A presente vistoria e o respectivo parecer foram elaborados com observância ao Código de Ética Profissional do Sistema Confea/Crea, à legislação trabalhista, às Normas Regulamentadoras e às normas técnicas aplicáveis.',
+    'As considerações e conclusões apresentadas neste parecer são fundamentadas nos elementos técnicos, documentais e fáticos pertinentes ao objeto da perícia, considerados à luz da legislação aplicável, das Normas Regulamentadoras e das normas técnicas pertinentes.',
+    'O presente parecer técnico foi elaborado por este Assistente Técnico com fundamento nos elementos disponíveis para análise e em observância ao Código de Ética Profissional do Sistema Confea/Crea, à legislação trabalhista, às Normas Regulamentadoras e às normas técnicas aplicáveis.',
+    'Diante do exposto, o signatário coloca-se à disposição dos envolvidos para os esclarecimentos técnicos que se fizerem necessários.',
   )
 }
 
@@ -191,16 +186,20 @@ export function patchDeTextosPadrao(
         )) ||
       (campo === 'objetivoPericia' && atual.includes('Apurar o direito ao adicional de insalubridade')) ||
       (campo === 'objetivoPericia' && atual.includes('Apurar o direito ao adicional de periculosidade')) ||
+      (campo === 'objetivoPericia' && atual.includes('Analisar tecnicamente a eventual caracterização')) ||
       (campo === 'normasReferencias' && atual.startsWith('A avaliação pericial observou os seguintes diplomas')) ||
       (campo === 'normasReferencias' && atual.includes('agente avaliado: frequência, duração, periodicidade, habitualidade e permanência')) ||
       (campo === 'normasReferencias' && atual.includes('Líquidos Inflamáveis (Gera Direito à Periculosidade)')) ||
+      (campo === 'normasReferencias' && atual.includes('Anexo I – Explosivos')) ||
       (campo === 'equipamentosAnalisados' && atual.startsWith('Os trabalhos periciais foram conduzidos em três etapas')) ||
       (campo === 'equipamentosAnalisados' && atual.includes('conclusão considerará o de maior atenuação')) ||
       (campo === 'equipamentosAnalisados' && atual.includes('Os registros de fornecimento de EPI serão analisados em conjunto')) ||
+      (campo === 'equipamentosAnalisados' && atual.includes('PPP; PGR; LTCAT;')) ||
       (campo === 'criterioAvaliacaoPericulosidade' && atual.includes('realizada mediante avaliação qualitativa')) ||
       (campo === 'notaTecnicaEpis' && atual.includes('identificação dos próprios EPIs do Reclamante')) ||
       (campo === 'notaTecnicaEpis' && atual.includes('não substituem automaticamente a ficha de entrega')) ||
       (campo === 'encerramento' && atual.startsWith('Os trabalhos periciais foram desenvolvidos com imparcialidade')) ||
+      (campo === 'encerramento' && atual.startsWith('1 - Foi realizada inspeção in loco')) ||
       (campo === 'encerramento' && atual.includes('No melhor conhecimento e crédito'))
     const doPerito = atual.trim() !== '' && atual !== anterior && !padraoLegado
     if (!doPerito && atual !== padroes[campo]) patch[campo] = padroes[campo]

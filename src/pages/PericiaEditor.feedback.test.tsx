@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -16,6 +16,25 @@ vi.mock('@/components/layout/AppLayout', () => ({
 }))
 vi.mock('@/components/BuscaProcesso', () => ({
   BuscaProcesso: () => <div>Busca de processo</div>,
+}))
+vi.mock('@/components/EpiSelector', () => ({
+  EpiSelector: ({ agente, onChange }: { agente: Pericia['tecnico']['agentes'][number]; onChange: (valor: Pericia['tecnico']['agentes'][number]) => void }) => (
+    <div>
+      <span>{agente.nome}: {(agente.epis ?? []).length} EPI</span>
+      <button
+        type="button"
+        onClick={() => onChange({
+          ...agente,
+          epis: [
+            ...(agente.epis ?? []),
+            { categoria: `EPI ${agente.nome}`, modelo: `Modelo ${agente.nome}`, marca: 'Teste' },
+          ],
+        })}
+      >
+        Adicionar EPI a {agente.nome}
+      </button>
+    </div>
+  ),
 }))
 
 afterEach(() => {
@@ -85,12 +104,13 @@ const pericia: Pericia = {
   fotos: [],
 }
 
-function prepararEditor() {
+function prepararEditor(opcoes: { perfil?: 'admin' | 'perito' | 'assistente'; valor?: Pericia } = {}) {
+  const valor = opcoes.valor ?? pericia
   const salvarPericia = vi.fn(async (valor: Pericia) => valor)
   vi.mocked(useApp).mockReturnValue({
-    usuario: { id: 'usuario-1', nome: 'Perito responsável' },
+    usuario: { id: 'usuario-1', nome: 'Perito responsável', perfil: opcoes.perfil ?? 'perito' },
     empresas,
-    pericias: [pericia],
+    pericias: [valor],
     documentos: [],
     textos: [],
     quesitos: [],
@@ -176,6 +196,52 @@ describe('PericiaEditor — feedback noturno de 28/08', () => {
     expect(screen.getByRole('button', { name: 'Abrir biblioteca do item 6.4' })).toBeDefined()
     expect(screen.queryByText('Endereçamento')).toBeNull()
     expect(screen.queryByText('Objetivo da perícia')).toBeNull()
+  })
+
+  it('protege os textos próprios da matriz para usuários não administradores', () => {
+    prepararEditor({ perfil: 'perito' })
+    fireEvent.click(screen.getByRole('button', { name: /Preenchimento/ }))
+
+    const apresentacao = screen.getByText('APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA').closest('.card')?.querySelector('textarea')
+    expect(apresentacao).not.toBeNull()
+    expect(apresentacao?.readOnly).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Abrir biblioteca da apresentação' })).toBeNull()
+    expect(screen.getByText(/Texto oficial da matriz/)).toBeDefined()
+  })
+
+  it('permite que o administrador edite o texto próprio da matriz', () => {
+    prepararEditor({ perfil: 'admin' })
+    fireEvent.click(screen.getByRole('button', { name: /Preenchimento/ }))
+
+    const apresentacao = screen.getByText('APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA').closest('.card')?.querySelector('textarea')
+    expect(apresentacao).not.toBeNull()
+    expect(apresentacao?.readOnly).toBe(false)
+    expect(screen.getByRole('button', { name: 'Abrir biblioteca da apresentação' })).toBeDefined()
+  })
+
+  it('mantém os EPIs de agentes diferentes quando atualizações são recebidas no mesmo lote', () => {
+    const comAgentes = {
+      ...pericia,
+      tecnico: {
+        ...pericia.tecnico,
+        agentes: [
+          { id: 'agente-ruido', nome: 'Ruído', tipo: 'fisico', criterio: 'quantitativo', epis: [] },
+          { id: 'agente-quimico', nome: 'Amônia', tipo: 'quimico', criterio: 'quantitativo', epis: [] },
+        ],
+      },
+    } as Pericia
+    prepararEditor({ valor: comAgentes })
+    fireEvent.click(screen.getByRole('button', { name: /Avaliações e EPIs/ }))
+
+    const ruido = screen.getByRole('button', { name: 'Adicionar EPI a Ruído' })
+    const amonia = screen.getByRole('button', { name: 'Adicionar EPI a Amônia' })
+    act(() => {
+      ruido.click()
+      amonia.click()
+    })
+
+    expect(screen.getByText('Ruído: 1 EPI')).toBeDefined()
+    expect(screen.getByText('Amônia: 1 EPI')).toBeDefined()
   })
 
   it('sincroniza a fotografia enviada com a perícia antes de sair da etapa', async () => {

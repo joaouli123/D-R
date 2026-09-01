@@ -269,7 +269,11 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
   function propagarNrrsf(numeroDoCa: string, nrrsfDb: number | null) {
     const agora = agenteAtual.current
     const atualizados = comNrrsfAtualizado(agora.epis ?? [], numeroDoCa, nrrsfDb)
-    if (atualizados) onChange({ ...agora, epis: atualizados })
+    if (atualizados) {
+      const proximo = { ...agora, epis: atualizados }
+      agenteAtual.current = proximo
+      onChange(proximo)
+    }
   }
 
   function limparConsultaCa() {
@@ -368,8 +372,12 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
   }
 
   function adicionar(epi: EpiSelecionado) {
-    if (limiteAtingido) return
-    onChange({ ...agente, epis: [...selecionados, epi] })
+    const agora = agenteAtual.current
+    const atuais = agora.epis ?? []
+    if (atuais.length >= 10) return
+    const proximo = { ...agora, epis: [...atuais, epi] }
+    agenteAtual.current = proximo
+    onChange(proximo)
   }
 
   function adicionarDoCaepi() {
@@ -722,7 +730,12 @@ export function EpiSelector({ agente, onChange, dataReferencia }: EpiSelectorPro
                 className={`self-start text-red-700 hover:bg-red-50 sm:self-center ${FOCO_VISIVEL}`}
                 icon={<Trash2 size={14} />}
                 aria-label={`Remover ${epi.modelo}`}
-                onClick={() => onChange({ ...agente, epis: selecionados.filter((_, item) => item !== indice) })}
+                onClick={() => {
+                  const agora = agenteAtual.current
+                  const proximo = { ...agora, epis: (agora.epis ?? []).filter((_, item) => item !== indice) }
+                  agenteAtual.current = proximo
+                  onChange(proximo)
+                }}
               >
                 Remover
               </Button>

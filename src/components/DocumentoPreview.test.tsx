@@ -358,11 +358,21 @@ describe('DocumentoPreview', () => {
     )
 
     expect(html).toContain('EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA VARA DO TRABALHO — SÃO PAULO/SP')
-    expect(html).toContain('Analisar tecnicamente a eventual caracterização da insalubridade')
-    expect(html).toContain('Analisar tecnicamente a eventual caracterização da periculosidade')
+    expect(html).toContain('Avaliar, sob o ponto de vista técnico, a caracterização ou não de insalubridade')
+    expect(html).toContain('Avaliar, sob o ponto de vista técnico, a caracterização ou não de periculosidade')
     expect(html).toContain('das 09:00 às 10:30')
     expect(html).not.toContain('ENDEREÇAMENTO ANTIGO QUE NÃO DEVE SAIR')
     expect(html).not.toContain('OBJETIVO ANTIGO QUE NÃO DEVE SAIR')
+    expect(html).toContain('Equipamento')
+    expect(html).toContain('Descrição')
+    expect(html).toContain('Validade do CA')
+    expect(html).not.toMatch(/>Categoria<|>Modelo<|>Marca</)
+    expect(html).toContain('Fotografia 1 – EPI reconhecido na diligência - Fonte: Ato pericial.')
+    expect(html).toContain('10.1.1. Acetaldeído')
+    expect(html).toContain('Proteções associadas')
+    expect(html.indexOf('Proteção 1')).toBeLessThan(html.indexOf('Proteção 2'))
+    expect(html.indexOf('Proteção 2')).toBeLessThan(html.indexOf('Proteção 3'))
+    expect(html).not.toContain('Sendo o que se apresenta para o momento')
   })
 
   it('identifica no documento a empresa representada por cada participante', () => {

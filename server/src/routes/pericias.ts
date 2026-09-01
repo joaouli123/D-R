@@ -5,6 +5,7 @@ import { naoEncontrado, parametro, rota } from '../erros.js'
 import { periciaParaApi } from '../mappers.js'
 import { prisma } from '../prisma.js'
 import { apagarUpload } from '../services/armazenamento.js'
+import { decidirSincronizacaoDeFotos } from '../services/fotos-pericia.js'
 
 export const periciasRouter = Router()
 periciasRouter.use(exigirSessao)
@@ -178,8 +179,8 @@ const corpo = z.object({
       }),
     )
     .default([]),
-  /// As fotos são criadas em POST /pericias/:id/fotos. Aqui só
-  /// chegam as edições de legenda/ordem e as remoções.
+  /// As fotos são criadas em POST /pericias/:id/fotos e removidas pela
+  /// rota DELETE própria. Aqui chegam apenas edições de legenda/ordem.
   fotos: z
     .array(z.object({ id: z.string(), legenda: texto, ordem: z.number().int().default(0) }))
     .default([]),
@@ -300,16 +301,12 @@ periciasRouter.post(
       await tx.reclamada.deleteMany({ where: { periciaId: existente.id } })
       await tx.participante.deleteMany({ where: { periciaId: existente.id } })
 
-      // Fotos ausentes na lista enviada foram removidas na tela.
-      const idsMantidos = d.fotos.map((f) => f.id)
-      const removidas = await tx.foto.findMany({
-        where: { periciaId: existente.id, id: { notIn: idsMantidos.length ? idsMantidos : [''] } },
+      const fotosPersistidas = await tx.foto.findMany({
+        where: { periciaId: existente.id },
+        select: { id: true },
       })
-      if (removidas.length) {
-        await tx.foto.deleteMany({ where: { id: { in: removidas.map((f) => f.id) } } })
-      }
-
-      for (const f of d.fotos) {
+      const sincronizacao = decidirSincronizacaoDeFotos(fotosPersistidas, d.fotos)
+      for (const f of sincronizacao.atualizar) {
         await tx.foto.updateMany({
           where: { id: f.id, periciaId: existente.id },
           data: { legenda: f.legenda, ordem: f.ordem },
@@ -325,9 +322,6 @@ periciasRouter.post(
         },
         include: incluirTudo,
       })
-
-      // Os arquivos só saem do disco depois do commit lógico.
-      await Promise.all(removidas.map((f) => apagarUpload(f.arquivo)))
 
       return atualizada
     })

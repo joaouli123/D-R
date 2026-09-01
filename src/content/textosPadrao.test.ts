@@ -135,7 +135,7 @@ describe('textosPadraoDaPericia', () => {
     expect(textos.normasReferencias).not.toContain('Gera Direito à Periculosidade')
     expect(textos.criterioAvaliacaoPericulosidade).toContain('atividades e operações efetivamente desenvolvidas')
     expect(textos.criterioAvaliacaoPericulosidade).not.toContain('mediante avaliação qualitativa')
-    expect(textos.notaTecnicaEpis).toContain('Primazia da Realidade')
+    expect(textos.notaTecnicaEpis).not.toContain('Primazia da Realidade')
     expect(textos.notaTecnicaEpis).toContain('nos termos do art. 369 do CPC')
     expect(textos.notaTecnicaEpis).toContain('identificação e o reconhecimento, pelo próprio Reclamante')
     expect(textos.notaTecnicaEpis).not.toContain('não substituem automaticamente a ficha de entrega')
@@ -244,5 +244,37 @@ describe('patchDeTextosPadrao', () => {
     const tecnico = { ...pericia().tecnico, ...padroes }
 
     expect(patchDeTextosPadrao(tecnico, padroes, padroes)).toEqual({})
+  })
+})
+
+describe('fidelidade à matriz canônica do Parecer Jhonathan Victor', () => {
+  it('mantém os objetivos revisados exatamente como aprovados', () => {
+    const textos = textosPadraoDaPericia(pericia('ambas'), PERITO)
+
+    expect(textos.objetivoPericia).toBe(
+      'Avaliar, sob o ponto de vista técnico, a caracterização ou não de insalubridade, nos termos da NR-15, e, quando caracterizada, indicar o respectivo grau: mínimo, médio ou máximo.\n\nAvaliar, sob o ponto de vista técnico, a caracterização ou não de periculosidade, nos termos da NR-16, e, quando caracterizada, indicar o respectivo percentual.',
+    )
+  })
+
+  it('não reintroduz trechos removidos na revisão do cliente', () => {
+    const textos = textosPadraoDaPericia(pericia('ambas'), PERITO)
+
+    expect(textos.notaTecnicaEpis).toMatch(/^Quanto aos EPIs,/)
+    expect(textos.notaTecnicaEpis).not.toContain('Nota Técnica sobre a Primazia da Realidade')
+    expect(textos.equipamentosAnalisados).toContain('PPP; PGR; laudos ambientais;')
+    expect(textos.equipamentosAnalisados).not.toContain('LTCAT')
+    expect(textos.normasReferencias).toContain('Anexo 1 – Explosivos;')
+    expect(textos.normasReferencias).toContain('Anexo (*) – Radiações ionizantes ou substâncias radioativas.')
+    expect(textos.normasReferencias).not.toContain('Anexo VII')
+  })
+
+  it('usa o encerramento de três parágrafos do parecer aprovado', () => {
+    const textos = textosPadraoDaPericia(pericia('ambas'), PERITO)
+
+    expect(textos.encerramento.split('\n\n')).toEqual([
+      'As considerações e conclusões apresentadas neste parecer são fundamentadas nos elementos técnicos, documentais e fáticos pertinentes ao objeto da perícia, considerados à luz da legislação aplicável, das Normas Regulamentadoras e das normas técnicas pertinentes.',
+      'O presente parecer técnico foi elaborado por este Assistente Técnico com fundamento nos elementos disponíveis para análise e em observância ao Código de Ética Profissional do Sistema Confea/Crea, à legislação trabalhista, às Normas Regulamentadoras e às normas técnicas aplicáveis.',
+      'Diante do exposto, o signatário coloca-se à disposição dos envolvidos para os esclarecimentos técnicos que se fizerem necessários.',
+    ])
   })
 })

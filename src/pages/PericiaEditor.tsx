@@ -299,6 +299,27 @@ export default function PericiaEditor() {
   const setT = (patch: Partial<Pericia['tecnico']>) =>
     setP((v) => ({ ...v, tecnico: { ...v.tecnico, ...patch } }))
 
+  /** Atualizações simultâneas do CAEPI não podem recolocar o estado antigo de outro agente. */
+  const transformarAgentes = (
+    transformar: (agentes: AgenteAvaliado[]) => AgenteAvaliado[],
+  ) => setP((v) => ({
+    ...v,
+    tecnico: { ...v.tecnico, agentes: transformar(v.tecnico.agentes) },
+  }))
+
+  const adicionarAgente = (agente: AgenteAvaliado) =>
+    transformarAgentes((agentes) => [...agentes, agente])
+
+  const atualizarAgente = (
+    idAgente: string,
+    transformar: (agente: AgenteAvaliado) => AgenteAvaliado,
+  ) => transformarAgentes((agentes) =>
+    agentes.map((agente) => agente.id === idAgente ? transformar(agente) : agente),
+  )
+
+  const removerAgente = (idAgente: string) =>
+    transformarAgentes((agentes) => agentes.filter((agente) => agente.id !== idAgente))
+
   const empresaPrincipal = useMemo(
     () => empresas.find((e) => e.id === p.reclamadas.find((r) => r.principal)?.empresaId),
     [empresas, p.reclamadas],
@@ -310,16 +331,23 @@ export default function PericiaEditor() {
    * Textos padrão: o perito não redige de novo, a cada processo, aquilo
    * que é igual em todo laudo. Enquanto ele não editar o campo, o texto
    * acompanha os dados da perícia — trocar a modalidade para
-   * "periculosidade" reescreve o objeto e as normas na hora. Ao primeiro
-   * caractere digitado, o campo vira dele e o mecanismo larga o osso.
+   * "periculosidade" reescreve o objeto e as normas na hora. A matriz é
+   * fixa para usuários comuns; o administrador pode personalizá-la.
    */
+  const ehAdministrador = usuario?.perfil === 'admin'
   const padroesAplicados = useRef<Partial<Record<CampoComTextoPadrao, string>>>({})
   useEffect(() => {
     const padroes = textosPadraoDaPericia(p, usuario, empresaPrincipal)
-    const patch = patchDeTextosPadrao(p.tecnico, padroes, padroesAplicados.current)
+    const patch = ehAdministrador
+      ? patchDeTextosPadrao(p.tecnico, padroes, padroesAplicados.current)
+      : Object.fromEntries(
+          CAMPOS_COM_TEXTO_PADRAO
+            .filter((campo) => p.tecnico[campo] !== padroes[campo])
+            .map((campo) => [campo, padroes[campo]]),
+        ) as Partial<Record<CampoComTextoPadrao, string>>
     padroesAplicados.current = padroes
     if (Object.keys(patch).length) setT(patch)
-  }, [p, usuario, empresaPrincipal])
+  }, [p, usuario, empresaPrincipal, ehAdministrador])
 
   /** O campo, quando ele é um dos que têm texto padrão; senão, null. */
   const campoPadraoDe = (campo: string): CampoComTextoPadrao | null =>
@@ -1004,11 +1032,15 @@ export default function PericiaEditor() {
             <Card key={f.campo}>
               <CardHeader
                 title={f.label}
-                subtitle={campoPadrao ? 'Já preenchido com o texto padrão — edite apenas se este processo pedir.' : undefined}
+                subtitle={campoPadrao
+                  ? ehAdministrador
+                    ? 'Texto oficial da matriz — edição administrativa habilitada.'
+                    : 'Texto oficial da matriz — protegido contra alterações durante o preenchimento.'
+                  : undefined}
                 icon={<FileText size={18} />}
                 action={
                   <div className="flex flex-wrap gap-2">
-                    {campoPadrao && (
+                    {campoPadrao && ehAdministrador && (
                       <Button
                         size="sm"
                         variant="ghost"
@@ -1018,7 +1050,7 @@ export default function PericiaEditor() {
                         Texto padrão
                       </Button>
                     )}
-                    <Button
+                    {(!campoPadrao || ehAdministrador) && <Button
                       size="sm"
                       variant="outline"
                       icon={<BookOpen size={14} />}
@@ -1026,7 +1058,7 @@ export default function PericiaEditor() {
                       onClick={() => setBibliotecaPara({ campo: f.campo, secao: f.secao, referencia: f.referencia })}
                     >
                       Biblioteca
-                    </Button>
+                    </Button>}
                   </div>
                 }
               />
@@ -1034,6 +1066,7 @@ export default function PericiaEditor() {
                 <Textarea
                   rows={f.rows}
                   value={(p.tecnico[f.campo] as string | undefined) ?? ''}
+                  readOnly={Boolean(campoPadrao && !ehAdministrador)}
                   onChange={(e) => setT({ [f.campo]: e.target.value } as never)}
                   placeholder="Digite ou insira um texto da sua biblioteca pessoal…"
                 />
@@ -1170,11 +1203,9 @@ export default function PericiaEditor() {
                       size="sm"
                       variant="outline"
                       icon={<Plus size={14} />}
-                      onClick={() => setT({
-                        agentes: [...p.tecnico.agentes, {
-                          id: uid('agn'), nome: '', tipo: 'quimico', criterio: 'qualitativo', grau: 'medio',
-                        } as AgenteAvaliado],
-                      })}
+                      onClick={() => adicionarAgente({
+                        id: uid('agn'), nome: '', tipo: 'quimico', criterio: 'qualitativo', grau: 'medio',
+                      } as AgenteAvaliado)}
                     >
                       Novo agente NR-15
                     </Button>
@@ -1184,11 +1215,9 @@ export default function PericiaEditor() {
                       size="sm"
                       variant="outline"
                       icon={<Plus size={14} />}
-                      onClick={() => setT({
-                        agentes: [...p.tecnico.agentes, {
-                          id: uid('ris'), nome: '', tipo: 'periculosidade', criterio: 'qualitativo',
-                        } as AgenteAvaliado],
-                      })}
+                      onClick={() => adicionarAgente({
+                        id: uid('ris'), nome: '', tipo: 'periculosidade', criterio: 'qualitativo',
+                      } as AgenteAvaliado)}
                     >
                       Nova avaliação NR-16
                     </Button>
@@ -1210,15 +1239,13 @@ export default function PericiaEditor() {
                           variant="ghost"
                           className="text-red-600 hover:bg-red-50"
                           icon={<Trash2 size={15} />}
-                          onClick={() => setT({ agentes: p.tecnico.agentes.filter((x) => x.id !== a.id) })}
+                          onClick={() => removerAgente(a.id)}
                           aria-label="Remover avaliação NR-16"
                         />
                       </div>
                       <PericulosidadeNr16Fields
                         avaliacao={a}
-                        onChange={(avaliacaoAtualizada) => setT({
-                          agentes: p.tecnico.agentes.map((x) => x.id === a.id ? avaliacaoAtualizada : x),
-                        })}
+                        onChange={(avaliacaoAtualizada) => atualizarAgente(a.id, () => avaliacaoAtualizada)}
                       />
                     </div>
                   )
@@ -1248,34 +1275,18 @@ export default function PericiaEditor() {
                       label="Agente"
                       value={regraAnexo?.agenteFixo ?? a.nome}
                       readOnly={referenciaNormativaSelecionada || agenteFixo}
-                      onChange={(e) =>
-                        setT({
-                          agentes: p.tecnico.agentes.map((x) =>
-                            x.id === a.id ? { ...x, nome: e.target.value } : x,
-                          ),
-                        })
-                      }
+                      onChange={(e) => atualizarAgente(a.id, (atual) => ({ ...atual, nome: e.target.value }))}
                     />
                     {exibeCas && <Input
                       label="CAS"
                       value={a.cas ?? ''}
                       disabled={referenciaNormativaSelecionada || Boolean(regraAnexo?.casFixo)}
-                      onChange={(e) =>
-                        setT({
-                          agentes: p.tecnico.agentes.map((x) =>
-                            x.id === a.id ? { ...x, cas: e.target.value } : x,
-                          ),
-                        })
-                      }
+                      onChange={(e) => atualizarAgente(a.id, (atual) => ({ ...atual, cas: e.target.value }))}
                     />}
                     <Select
                       label="Anexo NR-15"
                       value={a.anexoNr15 ?? ''}
-                      onChange={(e) => setT({
-                        agentes: p.tecnico.agentes.map((x) =>
-                          x.id === a.id ? aplicarAnexo(x, e.target.value) : x,
-                        ),
-                      })}
+                      onChange={(e) => atualizarAgente(a.id, (atual) => aplicarAnexo(atual, e.target.value))}
                     >
                       <option value="">—</option>
                       {ANEXOS_NR15.map((an) => (
@@ -1288,13 +1299,10 @@ export default function PericiaEditor() {
                       label="Grau"
                       value={a.grau ?? ''}
                       disabled={referenciaNormativaSelecionada || grauFixo}
-                      onChange={(e) =>
-                        setT({
-                          agentes: p.tecnico.agentes.map((x) =>
-                            x.id === a.id ? { ...x, grau: e.target.value as AgenteAvaliado['grau'] } : x,
-                          ),
-                        })
-                      }
+                      onChange={(e) => atualizarAgente(a.id, (atual) => ({
+                        ...atual,
+                        grau: e.target.value as AgenteAvaliado['grau'],
+                      }))}
                     >
                       <option value="">— selecione —</option>
                       {(regraAnexo?.grausPermitidos ?? ['minimo', 'medio', 'maximo', 'nao_caracterizado']).map((grau) => (
@@ -1305,26 +1313,23 @@ export default function PericiaEditor() {
                       variant="ghost"
                       className="mb-1 self-end text-red-600 hover:bg-red-50"
                       icon={<Trash2 size={15} />}
-                      onClick={() => setT({ agentes: p.tecnico.agentes.filter((x) => x.id !== a.id) })}
+                      onClick={() => removerAgente(a.id)}
                       aria-label="Remover agente"
                     />
                   </div>
                   <AgenteNr15Fields
                     agente={a}
-                    onChange={(agenteAtualizado) => setT({
-                      agentes: p.tecnico.agentes.map((x) => x.id === a.id ? agenteAtualizado : x),
-                    })}
+                    onChange={(agenteAtualizado) => atualizarAgente(a.id, () => agenteAtualizado)}
                   />
                   <div className="mt-3">
                     <Textarea
                       label="Texto técnico deste agente no documento (opcional)"
                       rows={4}
                       value={a.observacao ?? ''}
-                      onChange={(e) => setT({
-                        agentes: p.tecnico.agentes.map((x) =>
-                          x.id === a.id ? { ...x, observacao: e.target.value } : x,
-                        ),
-                      })}
+                      onChange={(e) => atualizarAgente(a.id, (atual) => ({
+                        ...atual,
+                        observacao: e.target.value,
+                      }))}
                       placeholder="Registre a avaliação, as medidas de proteção e as evidências específicas deste agente."
                     />
                   </div>
@@ -1333,13 +1338,10 @@ export default function PericiaEditor() {
                       label="Natureza"
                       value={a.tipo}
                       disabled={referenciaNormativaSelecionada || Boolean(regraAnexo?.tipoFixo)}
-                      onChange={(e) =>
-                        setT({
-                          agentes: p.tecnico.agentes.map((x) =>
-                            x.id === a.id ? { ...x, tipo: e.target.value as AgenteAvaliado['tipo'] } : x,
-                          ),
-                        })
-                      }
+                      onChange={(e) => atualizarAgente(a.id, (atual) => ({
+                        ...atual,
+                        tipo: e.target.value as AgenteAvaliado['tipo'],
+                      }))}
                     >
                       <option value="quimico">Químico</option>
                       <option value="fisico">Físico</option>
@@ -1349,15 +1351,10 @@ export default function PericiaEditor() {
                       label="Critério"
                       value={a.criterio}
                       disabled={referenciaNormativaSelecionada || Boolean(regraAnexo?.criterioFixo)}
-                      onChange={(e) =>
-                        setT({
-                          agentes: p.tecnico.agentes.map((x) =>
-                            x.id === a.id
-                              ? { ...x, criterio: e.target.value as AgenteAvaliado['criterio'] }
-                              : x,
-                          ),
-                        })
-                      }
+                      onChange={(e) => atualizarAgente(a.id, (atual) => ({
+                        ...atual,
+                        criterio: e.target.value as AgenteAvaliado['criterio'],
+                      }))}
                     >
                       <option value="qualitativo">Qualitativo</option>
                       <option value="quantitativo">Quantitativo</option>
@@ -1367,7 +1364,7 @@ export default function PericiaEditor() {
                   <EpiSelector
                     agente={a}
                     dataReferencia={p.dataVistoria}
-                    onChange={(agenteAtualizado) => setT({ agentes: p.tecnico.agentes.map((x) => x.id === a.id ? agenteAtualizado : x) })}
+                    onChange={(agenteAtualizado) => atualizarAgente(a.id, () => agenteAtualizado)}
                   />
                   {/* No ruído a conclusão sai do cálculo, não de um
                       checkbox — vale para o Anexo 1 e para o 2. */}
@@ -1378,7 +1375,7 @@ export default function PericiaEditor() {
                         label="EPI comprovadamente eficaz para este agente"
                         description="Adicionar equipamento não altera automaticamente esta conclusão técnica."
                         checked={a.epiEficaz ?? false}
-                        onChange={(e) => setT({ agentes: p.tecnico.agentes.map((x) => x.id === a.id ? { ...x, epiEficaz: e.target.checked } : x) })}
+                        onChange={(e) => atualizarAgente(a.id, (atual) => ({ ...atual, epiEficaz: e.target.checked }))}
                       />
                       {/* O enquadramento destes anexos é por atividade, e há
                           quem sustente que aí o EPI não conta. A lei permite
@@ -1533,11 +1530,15 @@ export default function PericiaEditor() {
             <Card key={f.campo}>
               <CardHeader
                 title={f.label}
-                subtitle={campoPadrao ? 'Já preenchido com o texto padrão — edite apenas se este processo pedir.' : undefined}
+                subtitle={campoPadrao
+                  ? ehAdministrador
+                    ? 'Texto oficial da matriz — edição administrativa habilitada.'
+                    : 'Texto oficial da matriz — protegido contra alterações durante o preenchimento.'
+                  : undefined}
                 icon={<FileText size={18} />}
                 action={
                   <div className="flex flex-wrap gap-2">
-                    {campoPadrao && (
+                    {campoPadrao && ehAdministrador && (
                       <Button
                         size="sm"
                         variant="ghost"
@@ -1547,7 +1548,7 @@ export default function PericiaEditor() {
                         Texto padrão
                       </Button>
                     )}
-                    <Button
+                    {(!campoPadrao || ehAdministrador) && <Button
                       size="sm"
                       variant="outline"
                       icon={<BookOpen size={14} />}
@@ -1555,7 +1556,7 @@ export default function PericiaEditor() {
                       onClick={() => setBibliotecaPara({ campo: f.campo, secao: f.secao, referencia: f.referencia })}
                     >
                       Biblioteca
-                    </Button>
+                    </Button>}
                   </div>
                 }
               />
@@ -1563,6 +1564,7 @@ export default function PericiaEditor() {
                 <Textarea
                   rows={f.rows}
                   value={(p.tecnico[f.campo] as string | undefined) ?? ''}
+                  readOnly={Boolean(campoPadrao && !ehAdministrador)}
                   onChange={(e) => setT({ [f.campo]: e.target.value } as never)}
                 />
               </div>
@@ -1754,6 +1756,7 @@ export default function PericiaEditor() {
         referencia={bibliotecaPara?.referencia}
         onInserir={(conteudo) => {
           if (!bibliotecaPara) return
+          if (!ehAdministrador && campoPadraoDe(bibliotecaPara.campo)) return
           const atual = (p.tecnico[bibliotecaPara.campo] as string) ?? ''
           setT({ [bibliotecaPara.campo]: atual ? `${atual}\n\n${conteudo}` : conteudo } as never)
           toast('Texto inserido na seção.')

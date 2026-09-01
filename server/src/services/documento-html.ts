@@ -364,14 +364,18 @@ export async function htmlDoParecer(
       }).join('')
     : ''
 
+  let numeroProtecao = 1
   const blocoProtecoes = agentes.flatMap((agente) => {
     const apresentacao = montarApresentacaoAgente(agente)
     if (!apresentacao.protecoes.length) return []
     return [
       `<section class="agente-bloco"><h3 class="agente-titulo">${esc(apresentacao.titulo)}</h3>${apresentacao.protecoes
-        .map((protecao) =>
-          `<div class="protecao-bloco"><h4>${esc(protecao.titulo)}</h4>${tabelaLinhasAgente(protecao.linhas)}</div>`,
-        )
+        .map((protecao) => {
+          const tituloProtecao = /^Proteção \d+$/.test(protecao.titulo)
+            ? `Proteção ${numeroProtecao++}`
+            : protecao.titulo
+          return `<div class="protecao-bloco"><h4>${esc(tituloProtecao)}</h4>${tabelaLinhasAgente(protecao.linhas)}</div>`
+        })
         .join('')}</section>`,
     ]
   }).join('')
@@ -389,7 +393,11 @@ export async function htmlDoParecer(
           const img = uri
             ? `<img src="${uri}" alt="${esc(f.legenda)}">`
             : `<div style="height:180px;border:1px solid ${css(MARCA.tinta300)};display:flex;align-items:center;justify-content:center;font-size:9pt;color:${css(MARCA.tinta400)}">imagem indisponível</div>`
-          return `<figure>${img}<figcaption>Figura ${numeroAtual} — ${esc(f.legenda || 'sem legenda')}</figcaption></figure>`
+          const legenda = f.legenda?.trim() || 'Sem legenda'
+          const legendaComFonte = /\bfonte\s*:/i.test(legenda)
+            ? legenda
+            : `${legenda} - Fonte: Ato pericial.`
+          return `<figure>${img}<figcaption>Fotografia ${numeroAtual} – ${esc(legendaComFonte)}</figcaption></figure>`
       }),
     )
     return `<div class="fotos">${figuras.join('')}</div>`
@@ -410,6 +418,34 @@ export async function htmlDoParecer(
   // Numeração contada, não escrita à mão: as seções finais são
   // condicionais e o documento não pode pular de "11." para "13.".
   const num = numeradorDeSecoes()
+  const quadrosAnalise = (() => {
+    let grupo = 0
+    const montarGrupo = (lista: typeof agentes, tituloGrupo: string) => {
+      if (!lista.length) return ''
+      grupo += 1
+      const quadros = lista.map((agente, indice) => {
+        const apresentacao = montarApresentacaoAgente(agente)
+        const protecoes = (agente.epis ?? []).map((epi, indiceEpi) => {
+          const cas = [
+            epi.caUnico?.trim() ? `CA ${epi.caUnico.trim()}` : '',
+            epi.caPecaFacial?.trim() ? `CA peça facial ${epi.caPecaFacial.trim()}` : '',
+            epi.caFiltroCartucho?.trim() ? `CA cartucho/filtro ${epi.caFiltroCartucho.trim()}` : '',
+          ].filter(Boolean).join(' / ')
+          return `Proteção ${indiceEpi + 1}: ${epi.modelo}${cas ? ` — ${cas}` : ''}`
+        }).join('\n')
+        const linhas = protecoes
+          ? [...apresentacao.linhas, { rotulo: 'Proteções associadas', valor: protecoes }]
+          : apresentacao.linhas
+        return `<h4>10.${grupo}.${indice + 1}. ${esc(apresentacao.titulo)}</h4>${tabelaLinhasAgente(linhas, true)}`
+      }).join('')
+      return `<h3>10.${grupo}. ${esc(tituloGrupo)}</h3>${quadros}`
+    }
+
+    return (
+      (temInsalubridade ? montarGrupo(agentesNr15, 'NR-15 — Avaliação da Exposição Ocupacional') : '') +
+      (temPericulosidade ? montarGrupo(agentesNr16, 'NR-16 — Avaliação das Atividades e Operações Perigosas') : '')
+    )
+  })()
   const blocoDivergencias = () => {
     const temDivergencias = Boolean(
       t.divergenciasFaticas?.trim() ||
@@ -498,7 +534,7 @@ export async function htmlDoParecer(
     `<h2>${num.secao('DAS PROTEÇÕES COLETIVAS')}</h2>`,
     blocoConteudo(paragrafos(t.protecoesColetivas)),
     `<h2>${num.secao(tituloAnalise)}</h2>`,
-    blocoConteudo(paragrafos(t.analiseTecnica)),
+    blocoConteudo(paragrafos(t.analiseTecnica) + quadrosAnalise),
   ]
 
   if (temInsalubridade) partes.push(`<h2>${num.secao('NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')}</h2>`, blocoConteudo(paragrafos(conclusaoNr15)))
@@ -508,7 +544,6 @@ export async function htmlDoParecer(
   partes.push(
     `<h2>${num.secao('ENCERRAMENTO')}</h2>`,
     blocoConteudo(paragrafos(encerramento)),
-    '<p class="sem-recuo" style="margin-top:24px">Sendo o que se apresenta para o momento, o signatário coloca-se à disposição deste MM. Juízo para os esclarecimentos que se fizerem necessários.</p>',
     assinatura(perito, fecho.cidade, fecho.data),
   )
 
