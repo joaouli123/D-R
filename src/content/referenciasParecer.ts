@@ -60,7 +60,7 @@ export const REFERENCIAS_PARECER: readonly ReferenciaParecer[] = [
   { numero: '9', titulo: 'Das Proteções Coletivas', secao: 'analise' },
   { numero: '10', titulo: 'Análise Técnica dos Agentes, Atividades e Riscos Identificados', secao: 'analise' },
   { numero: '10.1', titulo: 'NR-15 — Avaliação da Exposição Ocupacional', secao: 'analise' },
-  { numero: '10.1.1', titulo: 'Agente Físico — Ruído', secao: 'analise' },
+  { numero: '10.1.1', titulo: 'Agentes Físicos', secao: 'analise' },
   { numero: '10.1.2', titulo: 'Agentes Químicos', secao: 'analise' },
   { numero: '10.1.3', titulo: 'Agentes Biológicos', secao: 'analise' },
   { numero: '10.2', titulo: 'NR-16 — Avaliação das Atividades e Operações Perigosas', secao: 'analise' },
@@ -70,4 +70,3 @@ export const REFERENCIAS_PARECER: readonly ReferenciaParecer[] = [
   { numero: '12', titulo: 'NR-16 — Conclusão e Fundamentação', secao: 'conclusao' },
   { numero: '13', titulo: 'Encerramento', secao: 'conclusao' },
 ]
-
