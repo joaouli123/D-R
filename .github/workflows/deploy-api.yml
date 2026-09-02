@@ -1,10 +1,9 @@
 # ============================================================
-# Sobe a API para produção a cada push na main.
+# Sobe a API e o frontend para produção a cada push na main.
 #
-# O frontend já é redeployado sozinho pelo webhook do Coolify; a
-# aplicação da API, não — mesmo com auto-deploy ligado no painel, os
-# push events nunca chegaram nela. O resultado era o pior estado
-# possível: front novo falando com API velha, sem ninguém perceber.
+# Os webhooks automáticos do Coolify já deixaram tanto a API quanto o
+# frontend para trás. Por isso os dois deploys são disparados e
+# acompanhados explicitamente neste workflow.
 #
 # Aqui o disparo é explícito e o job só passa quando o deploy termina
 # de verdade, então uma falha aparece como X no commit em vez de
@@ -15,7 +14,7 @@
 # deixando a produção defasada de novo.
 # ============================================================
 
-name: Deploy da API
+name: Deploy de produção
 
 on:
   push:
@@ -117,4 +116,79 @@ jobs:
           done
 
           echo "A API não voltou a responder 200 em /api/saude."
+          exit 1
+
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Disparar o deploy do frontend no Coolify
+        id: disparar
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          APP_UUID: sphdvh6tw67r2mr4bi0afg2n
+        run: |
+          set -euo pipefail
+          resposta=$(curl -sS --fail-with-body -X POST \
+            --connect-timeout 20 --retry 8 --retry-delay 20 --retry-all-errors \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "$COOLIFY_URL/api/v1/deploy?uuid=$APP_UUID")
+
+          uuid=$(printf '%s' "$resposta" | jq -r '.deployments[0].deployment_uuid // empty')
+          if [ -z "$uuid" ]; then
+            echo "O Coolify não devolveu um deployment do frontend. Resposta:"
+            printf '%s\n' "$resposta"
+            exit 1
+          fi
+
+          echo "uuid=$uuid" >> "$GITHUB_OUTPUT"
+          echo "Deployment do frontend $uuid enfileirado para ${GITHUB_SHA:0:7}."
+
+      - name: Aguardar o deploy do frontend terminar
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          UUID: ${{ steps.disparar.outputs.uuid }}
+        run: |
+          set -uo pipefail
+          for _ in $(seq 1 120); do
+            estado=$(curl -sS --connect-timeout 15 --retry 3 --retry-delay 5 --retry-all-errors \
+              -H "Authorization: Bearer $COOLIFY_TOKEN" \
+              "$COOLIFY_URL/api/v1/deployments/$UUID" 2>/dev/null | jq -r '.status // "desconhecido"' 2>/dev/null || echo "desconhecido")
+
+            case "$estado" in
+              finished)
+                echo "Deploy do frontend concluído."
+                exit 0
+                ;;
+              failed|cancelled-by-user)
+                echo "Deploy do frontend terminou como \"$estado\". Veja os logs no painel do Coolify."
+                exit 1
+                ;;
+              *)
+                echo "  $estado…"
+                sleep 10
+                ;;
+            esac
+          done
+
+          echo "O deploy do frontend não terminou dentro do tempo previsto."
+          exit 1
+
+      - name: Conferir se o frontend voltou no ar
+        run: |
+          set -euo pipefail
+          for tentativa in $(seq 1 12); do
+            codigo=$(curl -s -o /dev/null -w '%{http_code}' https://drpericiatrabalhista.com.br/ || echo 000)
+            if [ "$codigo" = "200" ]; then
+              echo "Frontend respondendo (tentativa $tentativa)."
+              exit 0
+            fi
+            echo "  frontend devolveu $codigo…"
+            sleep 10
+          done
+
+          echo "O frontend não voltou a responder 200."
           exit 1
