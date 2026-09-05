@@ -121,9 +121,14 @@ export default function Inicio() {
         title={`Bem-vindo, ${usuario?.nome.split(' ')[0]}`}
         description="Elaboração de documentos técnicos com agilidade e precisão."
         action={
-          <Button icon={<Plus size={16} />} onClick={() => navigate('/pericias/nova')}>
-            Nova perícia
-          </Button>
+          <>
+            <Button icon={<Plus size={16} />} onClick={() => navigate('/pericias/nova?tipo=parecer')}>
+              Novo Parecer Técnico
+            </Button>
+            <Button variant="secondary" icon={<Plus size={16} />} onClick={() => navigate('/pericias/nova?tipo=laudo')}>
+              Novo Laudo Técnico
+            </Button>
+          </>
         }
       />
 

@@ -212,6 +212,9 @@ export default function PericiaEditor() {
   const { usuario, empresas, pericias, salvarPericia, salvarDocumento, documentos } = useApp()
 
   const tipoDoc = (params.get('tipo') as 'parecer' | 'laudo') ?? 'parecer'
+  // O cabeçalho chama de "novo" o documento que vai sair, não a perícia: é
+  // pelo nome do documento que o perito escolheu o caminho no menu.
+  const nomeDocumento = tipoDoc === 'laudo' ? 'Laudo Técnico' : 'Parecer Técnico'
   const original = id ? pericias.find((p) => p.id === id) : undefined
 
   const [p, setP] = useState<Pericia>(() => original ?? novaPericia(usuario?.id ?? 'usr-1'))
@@ -602,8 +605,8 @@ export default function PericiaEditor() {
   return (
     <>
       <PageHeader
-        breadcrumb={id ? 'Editar perícia' : 'Nova perícia'}
-        title={p.numeroProcesso || 'Nova perícia'}
+        breadcrumb={id ? 'Editar perícia' : `Novo ${nomeDocumento}`}
+        title={p.numeroProcesso || `Novo ${nomeDocumento}`}
         description={p.reclamante ? `${p.reclamante} · ${p.vara}` : 'Preencha os dados do processo para começar.'}
         action={
           <>

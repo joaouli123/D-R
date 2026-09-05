@@ -56,9 +56,14 @@ export default function Pericias() {
         title="Perícias"
         description="Cadastro de processo, participantes, vistoria, preenchimento técnico e fotografias."
         action={
-          <Button icon={<Plus size={16} />} onClick={() => navigate('/pericias/nova')}>
-            Nova perícia
-          </Button>
+          <>
+            <Button icon={<Plus size={16} />} onClick={() => navigate('/pericias/nova?tipo=parecer')}>
+              Novo Parecer Técnico
+            </Button>
+            <Button variant="secondary" icon={<Plus size={16} />} onClick={() => navigate('/pericias/nova?tipo=laudo')}>
+              Novo Laudo Técnico
+            </Button>
+          </>
         }
       />
 
@@ -89,11 +94,16 @@ export default function Pericias() {
           <EmptyState
             icon={<Scale size={22} />}
             title="Nenhuma perícia encontrada"
-            description="Cadastre uma nova perícia para iniciar o preenchimento técnico."
+            description="Comece um parecer ou um laudo técnico para iniciar o preenchimento."
             action={
-              <Button icon={<Plus size={16} />} onClick={() => navigate('/pericias/nova')}>
-                Nova perícia
-              </Button>
+              <>
+                <Button icon={<Plus size={16} />} onClick={() => navigate('/pericias/nova?tipo=parecer')}>
+                  Novo Parecer Técnico
+                </Button>
+                <Button variant="secondary" icon={<Plus size={16} />} onClick={() => navigate('/pericias/nova?tipo=laudo')}>
+                  Novo Laudo Técnico
+                </Button>
+              </>
             }
           />
         </Card>

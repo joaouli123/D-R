@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
+import type { ReactNode } from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useSearchParams } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import Inicio from './Inicio'
@@ -12,7 +13,12 @@ import type { Pericia } from '@/types'
 vi.mock('@/store/AppStore', () => ({ useApp: vi.fn() }))
 // Só o cabeçalho interessa aqui — o resto do layout arrasta a aplicação inteira.
 vi.mock('@/components/layout/AppLayout', () => ({
-  PageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
+  PageHeader: ({ title, action }: { title: string; action?: ReactNode }) => (
+    <>
+      <h1>{title}</h1>
+      {action}
+    </>
+  ),
 }))
 
 const removerPericia = vi.fn()
@@ -27,7 +33,7 @@ const pericia = (id: string, reclamante: string, status: Pericia['status'] = 'ra
     atualizadoEm: '2026-08-22T12:00:00.000Z',
   }) as unknown as Pericia
 
-function montar(pericias: Pericia[]) {
+function mockarLoja(pericias: Pericia[]) {
   vi.mocked(useApp).mockReturnValue({
     usuario: { nome: 'Henrique Dinoel' },
     pericias,
@@ -35,6 +41,10 @@ function montar(pericias: Pericia[]) {
     empresas: [],
     removerPericia,
   } as unknown as ReturnType<typeof useApp>)
+}
+
+function montar(pericias: Pericia[]) {
+  mockarLoja(pericias)
 
   render(
     <MemoryRouter>
@@ -90,5 +100,53 @@ describe('Início — descartar o que ficou em aberto', () => {
   it('sem perícia em aberto, o cartão de retomada não aparece', () => {
     montar([])
     expect(screen.queryByText('Continuar de onde parou')).toBeNull()
+  })
+})
+
+// Fica no lugar do editor só para dizer com que tipo ele foi aberto.
+function SondaDoEditor() {
+  const [params] = useSearchParams()
+  return <p>Editor aberto para: {params.get('tipo')}</p>
+}
+
+describe('Início — atalhos do cabeçalho', () => {
+  function montarComRotas() {
+    mockarLoja([])
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <ToastProvider>
+          <Routes>
+            <Route path="/" element={<Inicio />} />
+            <Route path="/pericias/nova" element={<SondaDoEditor />} />
+          </Routes>
+        </ToastProvider>
+      </MemoryRouter>,
+    )
+  }
+
+  it('nomeia o documento que vai sair, não a perícia', () => {
+    montarComRotas()
+
+    expect(screen.queryByRole('button', { name: /Nova perícia/i })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Novo Parecer Técnico' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Novo Laudo Técnico' })).toBeDefined()
+  })
+
+  it('"Novo Laudo Técnico" abre o editor já como laudo', async () => {
+    const user = userEvent.setup()
+    montarComRotas()
+
+    await user.click(screen.getByRole('button', { name: 'Novo Laudo Técnico' }))
+
+    expect(screen.getByText('Editor aberto para: laudo')).toBeDefined()
+  })
+
+  it('"Novo Parecer Técnico" abre o editor como parecer', async () => {
+    const user = userEvent.setup()
+    montarComRotas()
+
+    await user.click(screen.getByRole('button', { name: 'Novo Parecer Técnico' }))
+
+    expect(screen.getByText('Editor aberto para: parecer')).toBeDefined()
   })
 })
