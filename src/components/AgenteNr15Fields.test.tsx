@@ -217,8 +217,8 @@ describe('fonte do ruído', () => {
 })
 
 // A CETESB, do primeiro desenho, publica 96 produtos e cobre 40 dos 146
-// agentes do Anexo 11 — e não filtra por URL. As bases de agora abrem a
-// ficha da substância direto do CAS que vai sair no parecer.
+// agentes do Anexo 11 — e não filtra por URL. As bases de agora recebem o CAS
+// que vai sair no parecer já na busca, sem o perito redigitar.
 describe('consulta do número CAS', () => {
   const QUIMICO: AgenteAvaliado = {
     id: 'q-1',
@@ -230,16 +230,16 @@ describe('consulta do número CAS', () => {
     unidadeMedicao: 'mg/m³',
   }
 
-  it('abre a ficha da substância nas duas bases a partir do CAS gravado', () => {
+  it('leva o CAS gravado para a busca das duas bases', () => {
     render(<AgenteNr15Fields agente={QUIMICO} onChange={() => undefined} />)
 
     expect(screen.getByRole('link', { name: /CAS Common Chemistry/ }).getAttribute('href'))
-      .toBe('https://commonchemistry.cas.org/detail?cas_rn=7439-96-5')
+      .toBe('https://commonchemistry.cas.org/results?q=7439-96-5')
     expect(screen.getByRole('link', { name: /PubChem/ }).getAttribute('href'))
       .toBe('https://pubchem.ncbi.nlm.nih.gov/#query=7439-96-5')
   })
 
-  it('cai na busca das bases quando o agente ainda não tem CAS', () => {
+  it('abre a base sem termo quando o agente ainda não tem CAS', () => {
     render(<AgenteNr15Fields agente={{ ...QUIMICO, cas: undefined }} onChange={() => undefined} />)
 
     expect(screen.getByRole('link', { name: /CAS Common Chemistry/ }).getAttribute('href'))

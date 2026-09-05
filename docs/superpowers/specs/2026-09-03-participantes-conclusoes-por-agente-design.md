@@ -8,24 +8,43 @@ Adequar o cadastro de participantes e a apresentação das avaliações ocupacio
 
 ### Origem oficial dos agentes químicos e números CAS
 
-- A lista fixa de números CAS mantida no frontend deixará de ser a fonte de consulta do sistema.
-- Os dados normativos — agente, anexo, limite, unidade, grau e observações legais — continuarão vinculados à publicação vigente da NR-15 pelo Ministério do Trabalho e Emprego.
-- A identificação química e os números CAS serão consultados na API pública governamental PubChem PUG REST, mantida pelo National Institutes of Health dos Estados Unidos, sem geração ou complementação por IA.
-- O resultado será importado e armazenado em uma tabela própria do backend, com:
-  - nome preferencial;
-  - número CAS;
-  - sinônimos;
-  - identificador PubChem;
-  - fonte;
-  - data da consulta e da última atualização;
-  - vínculo com o agente e o anexo da NR-15, quando aplicável.
-- O sistema fará busca cruzada por nome, sinônimo ou CAS primeiro no espelho local. Quando não houver resultado, o backend consultará a fonte pública, validará a resposta e armazenará o resultado para as próximas buscas.
-- A integração respeitará o limite público de até cinco requisições por segundo e terá tentativas controladas para indisponibilidade temporária.
-- Um resultado externo somente será aceito automaticamente quando identificar um único composto e um CAS válido. Ambiguidades serão apresentadas como opções ao usuário; não haverá escolha silenciosa.
-- A tela mostrará a origem e a data de atualização do registro selecionado.
-- Se a fonte estiver indisponível e não houver registro local, o sistema não inventará nem reutilizará um CAS aproximado; permitirá tentar novamente e manterá o campo sem preenchimento automático.
-- Agentes coletivos, misturas e categorias dos Anexos 12 e 13 que não possuam um CAS único não receberão um número forçado. Nesses casos, o usuário poderá pesquisar e associar a substância específica efetivamente identificada na FDS/FISPQ.
-- A base CAS Common Chemistry não será integrada sem licença comercial, pois seus termos públicos são não comerciais. A arquitetura permitirá trocar o provedor por uma API licenciada da CAS no futuro sem mudar o fluxo da tela.
+> Revisto em 05/09/2026. O desenho original previa importar os números CAS da
+> API pública do PubChem. A auditoria feita antes de implementar mostrou que a
+> importação resolveria um problema que a base não tem, e criaria outro — o
+> texto abaixo descreve o que foi implementado.
+
+- A lista de agentes, anexos, limites, unidades e graus continua vinculada à
+  publicação vigente da NR-15 pelo Ministério do Trabalho e Emprego. Ela foi
+  conferida contra o PDF oficial dos Anexos 11, 12 e 13.
+- Os números CAS continuam mantidos no frontend, gravados na avaliação e
+  impressos no parecer. Eles foram auditados em 04–05/09/2026: 150 números, os
+  150 com dígito de controle válido e formato correto, 143 confirmados por nome
+  e fórmula molecular no PubChem e 4 conferidos à mão (misturas e genéricos que
+  o PubChem não indexa) — **nenhuma divergência**.
+- Não haverá preenchimento automático de CAS a partir de fonte externa. A
+  auditoria não achou erro para corrigir, e o próprio PubChem devolve composto
+  errado em casos reais de sinônimo ambíguo (o CAS 19624-22-7, pentaborano,
+  retorna EPN); um autopreenchimento silencioso trocaria um número correto por
+  um errado sem o perito perceber.
+- Em vez da importação, cada agente químico da tela oferece a consulta a um
+  clique, levando o CAS já gravado para a busca de duas bases públicas e sem
+  cadastro: **CAS Common Chemistry**, publicado pela própria CAS — que atribui o
+  número —, e **PubChem**, do NIH, como cobertura complementar. É o mesmo padrão
+  do link para o portal do CAEPI usado na conferência do CA do EPI.
+- O link usa a busca da base, e não a ficha direta. O Common Chemistry cobre um
+  recorte de substâncias e sua rota de ficha (`/detail?cas_rn=`) abre em branco
+  para um CAS ausente; a busca responde que não encontrou, e o link do PubChem
+  fica ao lado.
+- Sem CAS gravado, o link abre a base sem termo. O nome do agente não é enviado
+  na URL: as duas bases respondem em inglês.
+- Agentes coletivos, misturas e categorias dos Anexos 12 e 13 que não possuam um
+  CAS único não recebem número forçado. O perito pesquisa e associa a substância
+  específica identificada na FDS/FISPQ.
+- A base CAS Common Chemistry não é integrada por API: a API exige `X-API-KEY` e
+  a licença pública é CC BY-NC. Só o site é livre — daí o link, e não a
+  importação. A CETESB foi avaliada e descartada: sua listagem pública tem 96
+  produtos e cobre 40 dos 146 agentes do Anexo 11, além de não aceitar termo de
+  busca na URL.
 
 ### Ausência da parte reclamante
 
@@ -80,10 +99,10 @@ Adequar o cadastro de participantes e a apresentação das avaliações ocupacio
 
 Para agentes químicos, a seleção seguirá este fluxo:
 
-1. O usuário pesquisa pelo nome, sinônimo ou número CAS.
-2. O backend consulta o espelho local e, se necessário, a fonte pública oficial.
-3. Ao selecionar uma correspondência inequívoca, nome e CAS são preenchidos em conjunto.
-4. Limites, unidades e grau continuam vindo exclusivamente da matriz normativa do anexo aplicável, sem serem substituídos por dados toxicológicos externos.
+1. O usuário pesquisa pelo nome, sinônimo ou número CAS na lista do anexo.
+2. Ao selecionar o agente, nome e CAS são preenchidos em conjunto a partir da lista normativa.
+3. Limites, unidades e grau continuam vindo exclusivamente da matriz normativa do anexo aplicável, sem serem substituídos por dados toxicológicos externos.
+4. Ao lado do campo CAS, o link de consulta leva o número às bases públicas para conferência antes da emissão.
 
 O campo de conclusão será visível e identificado como obrigatório para a emissão. O sistema impedirá a geração de Word/PDF quando houver uma avaliação NR-15 sem conclusão, informando qual agente precisa ser completado.
 
@@ -117,9 +136,8 @@ As avaliações continuarão numeradas individualmente e não poderão substitui
 - Ausência do valor será interpretada como `true`, preservando o comportamento dos registros antigos.
 - O texto individual continuará no campo persistido atualmente para a observação técnica, evitando perda de conteúdo e migração desnecessária.
 - Os novos papéis de participantes serão aceitos pela validação da API e persistidos na estrutura atual de participantes.
-- Uma nova tabela armazenará o espelho dos identificadores químicos e sua procedência.
-- Os pareceres existentes manterão os nomes e CAS já salvos; a nova fonte será aplicada às novas seleções e às consultas feitas pelo usuário.
-- A tabela fixa atual poderá ser usada apenas em teste de migração e comparação, mas não será apresentada como fonte oficial nem prevalecerá sobre a consulta importada.
+- Não há tabela de espelho de identificadores químicos: sem importação externa, não há o que espelhar.
+- Os pareceres existentes mantêm os nomes e CAS já salvos, sem migração.
 
 ## Tratamento de erros
 
@@ -127,8 +145,7 @@ As avaliações continuarão numeradas individualmente e não poderão substitui
 - Uma empresa com razão social vazia não produzirá pontuação ou separador órfão na qualificação.
 - A ausência da parte reclamante não exigirá preenchimento artificial do campo Nome.
 - A troca entre agente identificado e não identificado não apagará medições, EPIs ou outros dados já informados.
-- Falhas do PubChem não impedirão a edição de avaliações já salvas e não apagarão resultados previamente importados.
-- A validação de CAS verificará formato e dígito de controle antes da persistência.
+- A indisponibilidade das bases externas não afeta o preenchimento nem a emissão: elas são apenas destino de link, abertas em nova aba pelo navegador do perito.
 
 ## Testes e aceite
 
@@ -143,11 +160,11 @@ Serão cobertos por testes automatizados:
 - compatibilidade de registros antigos sem o novo booleano;
 - bloqueio de emissão quando faltar conclusão individual;
 - independência entre dois ou mais agentes e suas conclusões;
-- busca bidirecional por nome e CAS no espelho local;
-- importação e cache de resposta inequívoca da fonte pública;
-- recusa de CAS inválido ou ambíguo;
-- preservação dos limites normativos do MTE após selecionar um identificador químico;
-- funcionamento em contingência quando a fonte externa estiver indisponível.
+- busca por nome e CAS na lista normativa do anexo;
+- montagem do link de consulta com o CAS gravado, nas duas bases;
+- link sem termo quando o agente ainda não tem CAS;
+- ausência do link em agente físico;
+- preservação dos limites normativos do MTE após selecionar um agente químico.
 
 Antes do deploy serão executados a suíte completa, o build do frontend, o build da API e os testes documentais existentes. Após o push, serão conferidos o workflow, a saúde da API e o bundle público do frontend.
 

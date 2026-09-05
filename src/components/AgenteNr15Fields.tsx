@@ -38,33 +38,38 @@ const CONFIGURACOES = {
 const BASES_CAS = [
   {
     nome: 'CAS Common Chemistry',
-    fichaDoCas: (cas: string) => `https://commonchemistry.cas.org/detail?cas_rn=${cas}`,
+    porCas: (cas: string) => `https://commonchemistry.cas.org/results?q=${encodeURIComponent(cas)}`,
     busca: 'https://commonchemistry.cas.org/',
   },
   {
     nome: 'PubChem',
-    fichaDoCas: (cas: string) => `https://pubchem.ncbi.nlm.nih.gov/#query=${cas}`,
+    porCas: (cas: string) => `https://pubchem.ncbi.nlm.nih.gov/#query=${encodeURIComponent(cas)}`,
     busca: 'https://pubchem.ncbi.nlm.nih.gov/',
   },
 ] as const
 
 const FORMATO_CAS = /^\d{2,7}-\d{2}-\d$/
 
-// Com o CAS preenchido o link abre direto a ficha da substância, para o perito
-// conferir o que vai sair no parecer; sem ele, abre a busca. O nome do agente
-// não vai na URL de propósito: as duas bases respondem em inglês e
+// Com o CAS preenchido o link já leva o número para a busca da base, para o
+// perito conferir o que vai sair no parecer; sem ele, abre a base vazia. O nome
+// do agente não vai na URL de propósito: as duas bases respondem em inglês e
 // “Álcool n-butílico” não encontraria nada.
+//
+// A busca, e não a ficha direta (`/detail?cas_rn=` no Common Chemistry): a base
+// cobre um recorte de substâncias, e a ficha de um CAS que ela não tem abre em
+// branco, sem dizer o que houve. A busca responde “We couldn't find any
+// results” e sobra o link do PubChem ao lado — que aceita o mesmo número.
 function LinkConsultaCas({ cas, className = '' }: { cas?: string; className?: string }) {
   const numero = (cas ?? '').trim()
-  const temFicha = FORMATO_CAS.test(numero)
+  const temCas = FORMATO_CAS.test(numero)
 
   return (
     <span className={`inline-flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[11px] ${className}`}>
-      <span className="font-semibold text-ink-500">{temFicha ? 'Conferir CAS em:' : 'Consultar CAS em:'}</span>
+      <span className="font-semibold text-ink-500">{temCas ? 'Conferir CAS em:' : 'Consultar CAS em:'}</span>
       {BASES_CAS.map((base) => (
         <a
           key={base.nome}
-          href={temFicha ? base.fichaDoCas(numero) : base.busca}
+          href={temCas ? base.porCas(numero) : base.busca}
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1 rounded font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
