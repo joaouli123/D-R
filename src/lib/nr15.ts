@@ -34,13 +34,18 @@ const REFERENCIAS_NR15: readonly ReferenciaNormativa[] = [
   ...ATIVIDADES_ANEXO_14,
 ]
 
+/** Substância ou atividade dos Anexos 11, 13 e 14 pelo id gravado no agente. */
+export function referenciaNr15PorId(id: string | undefined): ReferenciaNormativa | undefined {
+  if (!id) return undefined
+  return REFERENCIAS_NR15.find((referencia) => referencia.id === id)
+}
+
 export function categoriaProtecaoDoAgente(
   agente: Pick<AgenteAvaliado, 'referenciaNormativaId' | 'anexoNr15'>,
 ): string | undefined {
   const categoriaDoAnexo = obterRegraAnexo(agente.anexoNr15)?.categoriaProtecao
   if (categoriaDoAnexo) return categoriaDoAnexo
-  if (!agente.referenciaNormativaId) return undefined
-  return REFERENCIAS_NR15.find((referencia) => referencia.id === agente.referenciaNormativaId)?.categoriaProtecao
+  return referenciaNr15PorId(agente.referenciaNormativaId)?.categoriaProtecao
 }
 
 /**

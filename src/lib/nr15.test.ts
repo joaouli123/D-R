@@ -7,7 +7,8 @@ import { AgenteNr15Fields } from '@/components/AgenteNr15Fields'
 import { BuscaNormativa } from '@/components/BuscaNormativa'
 import type { ReferenciaNormativa } from '@/content/nr15/tipos'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
-import { aplicarAnexo, aplicarReferencia, buscarReferencias, buscarReferenciasNr15, categoriaProtecaoDoAgente, normalizarBuscaNr15 } from './nr15'
+import { casValido } from './cas'
+import { aplicarAnexo, aplicarReferencia, buscarReferencias, buscarReferenciasNr15, categoriaProtecaoDoAgente, normalizarBuscaNr15, referenciaNr15PorId } from './nr15'
 
 function referenciaPorId(
   referencias: readonly ReferenciaNormativa[],
@@ -20,14 +21,6 @@ function referenciaPorId(
 
 describe('bases normativas oficiais da NR-15', () => {
   it('mantém CAS válido e pesquisável em todos os 146 agentes do Anexo 11', () => {
-    const casValido = (cas: string) => {
-      const partes = cas.match(/^(\d{2,7})-(\d{2})-(\d)$/)
-      if (!partes) return false
-      const corpo = `${partes[1]}${partes[2]}`.split('').reverse().map(Number)
-      const digito = corpo.reduce((soma, numero, indice) => soma + numero * (indice + 1), 0) % 10
-      return digito === Number(partes[3])
-    }
-
     expect(SUBSTANCIAS_ANEXO_11).toHaveLength(146)
     expect(SUBSTANCIAS_ANEXO_11.every(item => item.cas && casValido(item.cas))).toBe(true)
     expect(buscarReferenciasNr15('121-44-8')[0]).toMatchObject({
@@ -551,5 +544,20 @@ describe('AgenteNr15Fields', () => {
 
     expect(html).toContain('A referência normativa salva não está na base atual.')
     expect(html).not.toContain('role="combobox"')
+  })
+})
+
+describe('referenciaNr15PorId', () => {
+  it('encontra substância, atividade química e agente biológico pelo id gravado', () => {
+    expect(referenciaNr15PorId('ANEXO_11_ACETALDEIDO')).toMatchObject({ anexoId: 'ANEXO_11', cas: '75-07-0' })
+    expect(referenciaNr15PorId('ANEXO_13_ARSENICO_MAX_01')).toMatchObject({ anexoId: 'ANEXO_13' })
+    expect(referenciaNr15PorId('ANEXO_13_ARSENICO_MAX_01')?.cas).toBeUndefined()
+    expect(referenciaNr15PorId('ANEXO_14_MAX_PACIENTES_EM_ISOLAMENTO')).toMatchObject({ anexoId: 'ANEXO_14' })
+  })
+
+  it('devolve nada para id ausente ou legado que saiu da lista', () => {
+    expect(referenciaNr15PorId(undefined)).toBeUndefined()
+    expect(referenciaNr15PorId('')).toBeUndefined()
+    expect(referenciaNr15PorId('SUBSTANCIA_QUE_NAO_EXISTE')).toBeUndefined()
   })
 })

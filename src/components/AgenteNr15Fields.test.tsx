@@ -253,4 +253,89 @@ describe('consulta do número CAS', () => {
 
     expect(screen.queryByRole('link', { name: /CAS Common Chemistry/ })).toBeNull()
   })
+
+  it('usa o CAS da substância do Anexo 11 quando o registro antigo gravou o campo vazio', () => {
+    render(<AgenteNr15Fields
+      agente={{ ...QUIMICO, anexoNr15: 'ANEXO_11', referenciaNormativaId: 'ANEXO_11_ACETALDEIDO', cas: '', unidadeMedicao: 'ppm' }}
+      onChange={() => undefined}
+    />)
+
+    expect(screen.getByRole('link', { name: /CAS Common Chemistry/ }).getAttribute('href'))
+      .toBe('https://commonchemistry.cas.org/results?q=75-07-0')
+  })
+
+  it('prefere o CAS gravado no agente ao da referência — é o que sai no parecer', () => {
+    render(<AgenteNr15Fields
+      agente={{ ...QUIMICO, anexoNr15: 'ANEXO_11', referenciaNormativaId: 'ANEXO_11_ACETALDEIDO', cas: '7439-96-5', unidadeMedicao: 'ppm' }}
+      onChange={() => undefined}
+    />)
+
+    expect(screen.getByRole('link', { name: /PubChem/ }).getAttribute('href'))
+      .toBe('https://pubchem.ncbi.nlm.nih.gov/#query=7439-96-5')
+  })
+
+  it('oferece a consulta na atividade do Anexo 13, que não traz CAS na lista', () => {
+    const atividade: AgenteAvaliado = {
+      id: 'q-13',
+      nome: 'Arsênico',
+      tipo: 'quimico',
+      criterio: 'qualitativo',
+      anexoNr15: 'ANEXO_13',
+      referenciaNormativaId: 'ANEXO_13_ARSENICO_MAX_01',
+      grau: 'maximo',
+    }
+    render(<AgenteNr15Fields agente={atividade} onChange={() => undefined} />)
+
+    expect(screen.getByText('Consultar CAS em:')).toBeDefined()
+    expect(screen.getByRole('link', { name: /CAS Common Chemistry/ }).getAttribute('href'))
+      .toBe('https://commonchemistry.cas.org/')
+
+    cleanup()
+    render(<AgenteNr15Fields agente={{ ...atividade, cas: '7784-42-1' }} onChange={() => undefined} />)
+
+    expect(screen.getByText('Conferir CAS em:')).toBeDefined()
+    expect(screen.getByRole('link', { name: /CAS Common Chemistry/ }).getAttribute('href'))
+      .toBe('https://commonchemistry.cas.org/results?q=7784-42-1')
+  })
+
+  it('não oferece consulta de CAS em agente biológico do Anexo 14', () => {
+    render(<AgenteNr15Fields
+      agente={{
+        id: 'b-14',
+        nome: 'Pacientes em isolamento',
+        tipo: 'biologico',
+        criterio: 'qualitativo',
+        anexoNr15: 'ANEXO_14',
+        referenciaNormativaId: 'ANEXO_14_MAX_PACIENTES_EM_ISOLAMENTO',
+        grau: 'maximo',
+      }}
+      onChange={() => undefined}
+    />)
+
+    expect(screen.queryByText(/CAS em:/)).toBeNull()
+    expect(screen.queryByRole('link', { name: /PubChem/ })).toBeNull()
+  })
+
+  it('ignora espaços em volta do CAS e trata número malformado como ausente', () => {
+    render(<AgenteNr15Fields agente={{ ...QUIMICO, cas: ' 7439-96-5 ' }} onChange={() => undefined} />)
+    expect(screen.getByRole('link', { name: /CAS Common Chemistry/ }).getAttribute('href'))
+      .toBe('https://commonchemistry.cas.org/results?q=7439-96-5')
+
+    cleanup()
+    render(<AgenteNr15Fields agente={{ ...QUIMICO, cas: '7439965' }} onChange={() => undefined} />)
+    expect(screen.getByText('Consultar CAS em:')).toBeDefined()
+    expect(screen.getByRole('link', { name: /CAS Common Chemistry/ }).getAttribute('href'))
+      .toBe('https://commonchemistry.cas.org/')
+  })
+
+  it('abre as bases em nova aba sem vazar o referer', () => {
+    render(<AgenteNr15Fields agente={QUIMICO} onChange={() => undefined} />)
+
+    const links = screen.getAllByRole('link', { name: /CAS Common Chemistry|PubChem/ })
+    expect(links).toHaveLength(2)
+    for (const link of links) {
+      expect(link.getAttribute('target')).toBe('_blank')
+      expect(link.getAttribute('rel')).toBe('noreferrer')
+    }
+  })
 })

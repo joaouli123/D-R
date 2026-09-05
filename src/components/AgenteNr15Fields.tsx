@@ -12,6 +12,7 @@ import {
   normalizarNumeroMedido,
   unidadesDisponiveis,
 } from '@/lib/medicoes'
+import { formatoCas } from '@/lib/cas'
 import { aplicarReferencia } from '@/lib/nr15'
 import { protecaoDoConjunto } from '@/lib/protecaoAuditiva'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
@@ -48,8 +49,6 @@ const BASES_CAS = [
   },
 ] as const
 
-const FORMATO_CAS = /^\d{2,7}-\d{2}-\d$/
-
 // Com o CAS preenchido o link já leva o número para a busca da base, para o
 // perito conferir o que vai sair no parecer; sem ele, abre a base vazia. O nome
 // do agente não vai na URL de propósito: as duas bases respondem em inglês e
@@ -61,7 +60,7 @@ const FORMATO_CAS = /^\d{2,7}-\d{2}-\d$/
 // results” e sobra o link do PubChem ao lado — que aceita o mesmo número.
 function LinkConsultaCas({ cas, className = '' }: { cas?: string; className?: string }) {
   const numero = (cas ?? '').trim()
-  const temCas = FORMATO_CAS.test(numero)
+  const temCas = formatoCas(numero)
 
   return (
     <span className={`inline-flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[11px] ${className}`}>
@@ -372,7 +371,9 @@ export function AgenteNr15Fields({ agente, onChange }: AgenteNr15FieldsProps) {
         {referencia
           ? <p className="text-xs text-ink-600">Referência selecionada: {referencia.label}{referencia.cas ? ` — CAS ${referencia.cas}` : ''}</p>
           : <span aria-hidden="true" />}
-        {exibeCas && <LinkConsultaCas cas={agente.cas ?? referencia?.cas} />}
+        {/* `||`, não `??`: registro antigo pode ter gravado '' no agente, e o
+            CAS a conferir é o da substância escolhida. */}
+        {exibeCas && <LinkConsultaCas cas={agente.cas || referencia?.cas} />}
       </div>
       {referenciaLegadaAusente && <AvisoReferenciaLegada className="mt-2" />}
 

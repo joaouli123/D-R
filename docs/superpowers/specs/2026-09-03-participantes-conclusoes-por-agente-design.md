@@ -146,6 +146,7 @@ As avaliações continuarão numeradas individualmente e não poderão substitui
 - A ausência da parte reclamante não exigirá preenchimento artificial do campo Nome.
 - A troca entre agente identificado e não identificado não apagará medições, EPIs ou outros dados já informados.
 - A indisponibilidade das bases externas não afeta o preenchimento nem a emissão: elas são apenas destino de link, abertas em nova aba pelo navegador do perito.
+- Revisão de 05/09/2026: o campo CAS só fica travado quando o número vem de quem o impõe — substância do Anexo 11 (a lista traz o CAS) ou agente fixo do Anexo 12. Nas atividades do Anexo 13, que enquadram a operação e não uma substância, o campo fica livre para o perito registrar o CAS do composto específico. O número digitado à mão passa por conferência de formato e de dígito verificador (`src/lib/cas.ts`); o aviso aparece no campo, não bloqueia o registro e some enquanto o número ainda está pela metade.
 
 ## Testes e aceite
 
@@ -164,7 +165,10 @@ Serão cobertos por testes automatizados:
 - montagem do link de consulta com o CAS gravado, nas duas bases;
 - link sem termo quando o agente ainda não tem CAS;
 - ausência do link em agente físico;
-- preservação dos limites normativos do MTE após selecionar um agente químico.
+- preservação dos limites normativos do MTE após selecionar um agente químico;
+- validação do CAS digitado (formato, dígito verificador, número pela metade e campo vazio);
+- campo CAS livre no Anexo 13 e travado no Anexo 11 e no Anexo 12, dentro do editor;
+- link de consulta com o CAS da substância quando o registro antigo gravou o campo vazio.
 
 Antes do deploy serão executados a suíte completa, o build do frontend, o build da API e os testes documentais existentes. Após o push, serão conferidos o workflow, a saúde da API e o bundle público do frontend.
 

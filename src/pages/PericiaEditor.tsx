@@ -62,8 +62,9 @@ import {
   textosPadraoDaPericia,
   type CampoComTextoPadrao,
 } from '@/content/textosPadrao'
+import { erroCas } from '@/lib/cas'
 import { patchDoProcesso } from '@/lib/consultas'
-import { aplicarAnexo, usaAtenuacaoRuido } from '@/lib/nr15'
+import { aplicarAnexo, referenciaNr15PorId, usaAtenuacaoRuido } from '@/lib/nr15'
 import {
   dadosPapel,
   grupoDoParticipante,
@@ -1282,6 +1283,11 @@ export default function PericiaEditor() {
                 const agenteFixo = Boolean(regraAnexo?.agenteFixo)
                 const grauFixo = regraAnexo?.grausPermitidos.length === 1
                 const exibeCas = regraAnexo?.exibeCas ?? true
+                // O CAS só fica travado quando vem de quem o impõe: a substância
+                // do Anexo 11 (a lista traz o número) ou o agente fixo do Anexo
+                // 12. As atividades do Anexo 13 não trazem CAS — ali o perito
+                // registra o do composto específico, quando houver.
+                const casImposto = Boolean(referenciaNr15PorId(a.referenciaNormativaId)?.cas) || Boolean(regraAnexo?.casFixo)
                 const referenciaAvaliacao = a.tipo === 'biologico'
                   ? '7.2.3'
                   : a.tipo === 'quimico'
@@ -1307,7 +1313,8 @@ export default function PericiaEditor() {
                     {exibeCas && <Input
                       label="CAS"
                       value={a.cas ?? ''}
-                      disabled={referenciaNormativaSelecionada || Boolean(regraAnexo?.casFixo)}
+                      disabled={casImposto}
+                      error={casImposto ? undefined : erroCas(a.cas)}
                       onChange={(e) => atualizarAgente(a.id, (atual) => ({ ...atual, cas: e.target.value }))}
                     />}
                     <Select
