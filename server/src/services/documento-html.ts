@@ -9,7 +9,6 @@ import {
   type ConteudoQuesitos,
   MARCA,
   ORIGEM_PONTO,
-  PAPEL,
   type TecnicoJson,
   css,
   data,
@@ -26,6 +25,8 @@ import {
   periodoAvaliacaoDocumento,
   horarioDaVistoriaDocumento,
   hoje,
+  qualificacaoParticipanteDocumento,
+  TEXTO_AUSENCIA_RECLAMANTE,
   ATUACAO,
 } from './documento-comum.js'
 
@@ -300,8 +301,12 @@ export async function htmlDoParecer(
         <thead><tr><th>Nome do Participante</th><th style="width:32%">Qualificação / Representação</th><th style="width:38%">Atuação no Ato</th></tr></thead>
         <tbody>${pericia.participantes
           .map(
-            (p) =>
-              `<tr><td>${esc(p.nome)}</td><td>${esc(PAPEL[p.papel] ?? p.papel)}${p.empresaId && porId.get(p.empresaId) ? ` — ${esc(porId.get(p.empresaId)?.razaoSocial)}` : ''}</td><td>${esc(ATUACAO[p.papel] ?? '—')}</td></tr>`,
+            (p) => p.papel === 'parte_reclamante_ausente'
+              ? `<tr><td colspan="3">${esc(TEXTO_AUSENCIA_RECLAMANTE)}</td></tr>`
+              : `<tr><td>${esc(p.nome)}</td><td>${esc(qualificacaoParticipanteDocumento(
+                  p.papel,
+                  p.empresaId ? porId.get(p.empresaId)?.razaoSocial : undefined,
+                ))}</td><td>${esc(ATUACAO[p.papel] ?? '—')}</td></tr>`,
           )
           .join('')}</tbody>
       </table>`
@@ -357,15 +362,17 @@ export async function htmlDoParecer(
   const tabelaAgentes = (lista: typeof agentes, prefixo?: string) => lista.length
     ? lista.map((agente, indice) => {
         const apresentacao = montarApresentacaoAgente(agente)
+        const identificado = agente.identificadoNaAtividade !== false
         const titulo = prefixo
           ? `${prefixo}.${indice + 1}. ${rotuloNatureza(agente.tipo)} — ${apresentacao.titulo}`
           : apresentacao.titulo
-        return `<section class="agente-bloco"><div class="agente-resumo"><h3 class="agente-titulo">${esc(titulo)}</h3>${tabelaLinhasAgente(apresentacao.linhas, true)}</div>${agente.observacao?.trim() ? paragrafos(agente.observacao) : ''}</section>`
+        const conclusao = agente.tipo === 'periculosidade' ? '' : `<h4>Conclusão</h4>${paragrafos(agente.observacao)}`
+        return `<section class="agente-bloco"><div class="agente-resumo"><h3 class="agente-titulo">${esc(titulo)}</h3>${identificado ? tabelaLinhasAgente(apresentacao.linhas, true) : ''}</div>${conclusao}</section>`
       }).join('')
     : ''
 
   let numeroProtecao = 1
-  const blocoProtecoes = agentes.flatMap((agente) => {
+  const blocoProtecoes = agentes.filter((agente) => agente.identificadoNaAtividade !== false).flatMap((agente) => {
     const apresentacao = montarApresentacaoAgente(agente)
     if (!apresentacao.protecoes.length) return []
     return [
@@ -425,6 +432,7 @@ export async function htmlDoParecer(
       grupo += 1
       const quadros = lista.map((agente, indice) => {
         const apresentacao = montarApresentacaoAgente(agente)
+        const identificado = agente.identificadoNaAtividade !== false
         const protecoes = (agente.epis ?? []).map((epi, indiceEpi) => {
           const cas = [
             epi.caUnico?.trim() ? `CA ${epi.caUnico.trim()}` : '',
@@ -436,7 +444,8 @@ export async function htmlDoParecer(
         const linhas = protecoes
           ? [...apresentacao.linhas, { rotulo: 'Proteções associadas', valor: protecoes }]
           : apresentacao.linhas
-        return `<h4>10.${grupo}.${indice + 1}. ${esc(apresentacao.titulo)}</h4>${tabelaLinhasAgente(linhas, true)}`
+        const conclusao = agente.tipo === 'periculosidade' ? '' : `<h4>Conclusão</h4>${paragrafos(agente.observacao)}`
+        return `<h4>10.${grupo}.${indice + 1}. ${esc(apresentacao.titulo)}</h4>${identificado ? tabelaLinhasAgente(linhas, true) : ''}${conclusao}`
       }).join('')
       return `<h3>10.${grupo}. ${esc(tituloGrupo)}</h3>${quadros}`
     }

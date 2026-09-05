@@ -26,7 +26,6 @@ import {
   type ConteudoQuesitos,
   MARCA,
   ORIGEM_PONTO,
-  PAPEL,
   type TecnicoJson,
   atividadesDoPeriodo,
   data,
@@ -41,6 +40,8 @@ import {
   objetivoAutomaticoDocumento,
   periodoAvaliacaoDocumento,
   horarioDaVistoriaDocumento,
+  qualificacaoParticipanteDocumento,
+  TEXTO_AUSENCIA_RECLAMANTE,
   hoje,
   ATUACAO,
 } from './documento-comum.js'
@@ -535,19 +536,18 @@ async function docParecer(
             celula('Atuação no Ato', { cabecalho: true, larguraDxa: 3401 }),
           ],
         }),
-        ...pericia.participantes.map(
-          (pt) =>
-            new TableRow({
+        ...pericia.participantes.map((pt) => pt.papel === 'parte_reclamante_ausente'
+          ? new TableRow({ children: [celula(TEXTO_AUSENCIA_RECLAMANTE, { columnSpan: 3 })] })
+          : new TableRow({
               children: [
                 celula(pt.nome, { larguraDxa: 2685 }),
-                celula(
-                  `${PAPEL[pt.papel] ?? pt.papel}${pt.empresaId && porId.get(pt.empresaId) ? ` — ${porId.get(pt.empresaId)?.razaoSocial}` : ''}`,
-                  { larguraDxa: 2864 },
-                ),
+                celula(qualificacaoParticipanteDocumento(
+                  pt.papel,
+                  pt.empresaId ? porId.get(pt.empresaId)?.razaoSocial : undefined,
+                ), { larguraDxa: 2864 }),
                 celula(ATUACAO[pt.papel] ?? '—', { larguraDxa: 3401 }),
               ],
-            }),
-        ),
+            })),
       ], [2685, 2864, 3401]),
     )
   }
@@ -643,11 +643,12 @@ async function docParecer(
     if (!lista.length) return
     for (const [indice, agente] of lista.entries()) {
       const apresentacao = montarApresentacaoAgente(agente)
+      const identificado = agente.identificadoNaAtividade !== false
       filhos.push(
         prefixo
           ? h4(`${prefixo}.${indice + 1}. ${rotuloNatureza(agente.tipo)} — ${apresentacao.titulo}`)
           : h3(apresentacao.titulo),
-        tabela([
+        ...(identificado ? [tabela([
           new TableRow({
             tableHeader: true,
             cantSplit: true,
@@ -657,9 +658,9 @@ async function docParecer(
             ],
           }),
           ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor)),
-        ]),
+        ])] : []),
+        ...(agente.tipo === 'periculosidade' ? [] : [h4('Conclusão'), ...blocos(agente.observacao)]),
       )
-      if (agente.observacao?.trim()) filhos.push(...blocos(agente.observacao))
     }
   }
 
@@ -701,7 +702,7 @@ async function docParecer(
   filhos.push(h2(num.secao('DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)')))
   filhos.push(...blocos(t.notaTecnicaEpis))
   let numeroProtecao = 1
-  for (const agente of agentes) {
+  for (const agente of agentes.filter((item) => item.identificadoNaAtividade !== false)) {
     const apresentacao = montarApresentacaoAgente(agente)
     if (!apresentacao.protecoes.length) continue
     filhos.push(h3(apresentacao.titulo))
@@ -733,6 +734,7 @@ async function docParecer(
     filhos.push(h3(`${numeroAnalise}.${grupoAnalise}. ${tituloGrupo}`))
     lista.forEach((agente, indice) => {
       const apresentacao = montarApresentacaoAgente(agente)
+      const identificado = agente.identificadoNaAtividade !== false
       const protecoes = (agente.epis ?? []).map((epi, indiceEpi) => {
         const cas = [
           epi.caUnico?.trim() ? `CA ${epi.caUnico.trim()}` : '',
@@ -743,7 +745,7 @@ async function docParecer(
       }).join('\n')
       filhos.push(
         h4(`${numeroAnalise}.${grupoAnalise}.${indice + 1}. ${apresentacao.titulo}`),
-        tabela([
+        ...(identificado ? [tabela([
           new TableRow({
             tableHeader: true,
             cantSplit: true,
@@ -754,7 +756,8 @@ async function docParecer(
           }),
           ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor)),
           ...(protecoes ? [fichaLinha('Proteções associadas', protecoes)] : []),
-        ]),
+        ])] : []),
+        ...(agente.tipo === 'periculosidade' ? [] : [h4('Conclusão'), ...blocos(agente.observacao)]),
       )
     })
   }

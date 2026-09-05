@@ -1,15 +1,19 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   BookOpen,
   Building2,
   ChevronDown,
   FileText,
+  FileSearch,
+  Files,
+  Fingerprint,
   HelpCircle,
   LayoutGrid,
   LogOut,
   Menu,
-  Scale,
+  ScrollText,
+  ShieldAlert,
   Settings,
   X,
 } from 'lucide-react'
@@ -20,9 +24,13 @@ import { cn } from '@/lib/utils'
 
 const NAV = [
   { to: '/', label: 'Início', icon: LayoutGrid, end: true },
-  { to: '/pericias', label: 'Perícias', icon: Scale },
-  { to: '/documentos', label: 'Documentos', icon: FileText },
-  { to: '/clientes', label: 'Clientes', icon: Building2 },
+  { to: '/clientes', label: 'Cadastrar Empresa', icon: Building2 },
+  { to: '/pericias/nova?tipo=parecer', label: 'Gerar Parecer Técnico Pericial', icon: FileText },
+  { to: '/pericias/nova?tipo=laudo', label: 'Gerar Laudo Técnico Pericial', icon: Files },
+  { to: '/quesitos', label: 'Elaborar Quesitos Técnicos', icon: HelpCircle },
+  { to: '/manifestacao/concordancia', label: 'Elaborar Manifestação sobre o Laudo', icon: ScrollText },
+  { to: '/manifestacao/impugnacao_laudo', label: 'Elaborar Impugnação ao Laudo', icon: ShieldAlert },
+  { to: '/esclarecimentos', label: 'Elaborar Esclarecimentos Técnicos', icon: FileSearch },
   { to: '/biblioteca', label: 'Biblioteca', icon: BookOpen },
 ]
 
@@ -31,9 +39,18 @@ const NAV_FOOTER = [
   { to: '/ajuda', label: 'Ajuda', icon: HelpCircle },
 ]
 
+const EM_DESENVOLVIMENTO = [
+  { label: 'Gerar PGR', icon: FileText },
+  { label: 'Gerar Laudo de Insalubridade', icon: FileText },
+  { label: 'Gerar Laudo de Periculosidade', icon: FileText },
+  { label: 'Gerar LTCAT', icon: FileText },
+  { label: 'Entrega de EPIs por biometria/facial', icon: Fingerprint },
+]
+
 export function AppLayout() {
   const { usuario, logout } = useApp()
   const navigate = useNavigate()
+  const location = useLocation()
   const [menuAberto, setMenuAberto] = useState(false)
   const [perfilAberto, setPerfilAberto] = useState(false)
 
@@ -44,20 +61,26 @@ export function AppLayout() {
     .join('')
     .toUpperCase()
 
-  const linkClass = ({ isActive }: { isActive: boolean }) =>
+  const linkClass = (destino: string) => ({ isActive }: { isActive: boolean }) => {
+    const [pathname, search = ''] = destino.split('?')
+    const ativo = search
+      ? location.pathname === pathname && location.search === `?${search}`
+      : isActive
+    return (
     cn(
-      'flex items-center gap-3 rounded-lg border-l-[3px] px-2.5 py-2 text-[13.5px] font-medium transition-colors',
-      isActive
+      'flex items-start gap-3 rounded-lg border-l-[3px] px-2.5 py-2 text-[13px] font-medium leading-4 transition-colors',
+      ativo
         ? 'border-brand-400 bg-brand-600/20 text-white font-semibold'
         : 'border-transparent text-white/65 hover:bg-white/10 hover:text-white',
-    )
+    ))
+  }
 
   return (
     <div className="flex min-h-screen bg-ink-50">
       {/* ---------- Sidebar ---------- */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex w-[236px] flex-col bg-navy-900 transition-transform lg:translate-x-0 no-print',
+          'fixed inset-y-0 left-0 z-40 flex w-[292px] flex-col bg-navy-900 transition-transform lg:translate-x-0 no-print',
           menuAberto ? 'translate-x-0' : '-translate-x-full',
         )}
       >
@@ -72,22 +95,44 @@ export function AppLayout() {
           </button>
         </div>
 
-        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
+        <nav aria-label="Navegação principal" className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
           {NAV.map(({ to, label, icon: Icon, end }) => (
-            <NavLink key={to} to={to} end={end} className={linkClass} onClick={() => setMenuAberto(false)}>
+            <NavLink key={to} to={to} end={end} className={linkClass(to)} onClick={() => setMenuAberto(false)}>
               <Icon size={17} strokeWidth={1.9} />
-              {label}
+              <span>{label}</span>
             </NavLink>
           ))}
 
           <div className="my-3 border-t border-white/10" />
 
           {NAV_FOOTER.map(({ to, label, icon: Icon }) => (
-            <NavLink key={to} to={to} className={linkClass} onClick={() => setMenuAberto(false)}>
+            <NavLink key={to} to={to} className={linkClass(to)} onClick={() => setMenuAberto(false)}>
               <Icon size={17} strokeWidth={1.9} />
-              {label}
+              <span>{label}</span>
             </NavLink>
           ))}
+
+          <section aria-label="Em desenvolvimento" className="mt-4 border-t border-white/10 pt-4">
+            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+              Em desenvolvimento
+            </p>
+            <div className="space-y-1">
+              {EM_DESENVOLVIMENTO.map(({ label, icon: Icon }) => (
+                <button
+                  key={label}
+                  type="button"
+                  disabled
+                  className="flex w-full cursor-not-allowed items-start gap-3 rounded-lg border-l-[3px] border-transparent px-2.5 py-2 text-left text-[12.5px] leading-4 text-white/35"
+                >
+                  <Icon size={16} className="mt-px shrink-0" strokeWidth={1.8} />
+                  <span className="min-w-0 flex-1">{label}</span>{' '}
+                  <span className="shrink-0 rounded-full border border-white/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/35">
+                    Em breve
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
         </nav>
 
         <div className="border-t border-white/10 px-4 py-3">
@@ -104,7 +149,7 @@ export function AppLayout() {
       )}
 
       {/* ---------- Conteúdo ---------- */}
-      <div className="flex min-w-0 flex-1 flex-col lg:pl-[236px]">
+      <div className="flex min-w-0 flex-1 flex-col lg:pl-[292px]">
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-ink-200 bg-white px-4 lg:px-6 no-print">
           <button
             className="rounded-lg p-2 text-ink-600 hover:bg-ink-100 lg:hidden"

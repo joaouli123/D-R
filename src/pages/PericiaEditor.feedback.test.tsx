@@ -148,7 +148,7 @@ describe('PericiaEditor — feedback noturno de 28/08', () => {
       within(regiao).getByLabelText<HTMLSelectElement>('Qualificação').options,
     ).map((opcao) => opcao.textContent)
 
-    expect(rotulos(reclamante)).toEqual(['Reclamante', 'Advogado (a)', 'Assistente Técnico (a)'])
+    expect(rotulos(reclamante)).toEqual(['Reclamante', 'Parte reclamante ausente', 'Advogado (a)', 'Assistente Técnico (a)'])
     expect(rotulos(principal)).toEqual([
       'Advogado (a)',
       'Eng. Segurança do Trabalho',
@@ -156,6 +156,8 @@ describe('PericiaEditor — feedback noturno de 28/08', () => {
       'Téc. Segurança do Trabalho - Assistente Técnico',
       'Preposto',
       'Gestor(a) Imediato(a) / Liderança',
+      'Representante Setorial',
+      'Recursos Humanos',
     ])
     expect(rotulos(envolvidas)).toEqual([
       'Advogado (a)',
@@ -164,6 +166,8 @@ describe('PericiaEditor — feedback noturno de 28/08', () => {
       'Téc. Segurança do Trabalho - Assistente Técnico',
       'Preposto',
       'Gestor(a) Imediato(a) / Liderança',
+      'Representante Setorial',
+      'Recursos Humanos',
     ])
     expect(rotulos(demais)).toEqual([
       'Perito Judicial',
@@ -181,6 +185,35 @@ describe('PericiaEditor — feedback noturno de 28/08', () => {
 
     expect(screen.getByLabelText('Horário de início da perícia')).toBeDefined()
     expect(screen.getByLabelText('Horário de término da perícia')).toBeDefined()
+  })
+
+  it('não exige nome quando a parte reclamante foi registrada como ausente', () => {
+    prepararEditor()
+    const reclamante = screen.getByRole('region', { name: 'Parte Reclamante' })
+    fireEvent.click(within(reclamante).getByRole('button', { name: 'Adicionar participante em Parte Reclamante' }))
+    fireEvent.change(within(reclamante).getByLabelText('Qualificação'), {
+      target: { value: 'parte_reclamante_ausente' },
+    })
+
+    expect(within(reclamante).queryByLabelText('Nome')).toBeNull()
+    expect(within(reclamante).getByText('A parte reclamante não compareceu para a apresentação de suas alegações.')).toBeDefined()
+  })
+
+  it('mantém presença e conclusão dentro de cada avaliação NR-15', async () => {
+    const comAgente = {
+      ...pericia,
+      tecnico: {
+        ...pericia.tecnico,
+        agentes: [
+          { id: 'agente-frio', nome: 'Frio', tipo: 'fisico', criterio: 'qualitativo', observacao: '' },
+        ],
+      },
+    } as Pericia
+    prepararEditor({ valor: comAgente })
+    fireEvent.click(screen.getByRole('button', { name: /Avaliações e EPIs/ }))
+
+    expect(await screen.findByRole('checkbox', { name: /Agente identificado na atividade/ })).toBeDefined()
+    expect(screen.getByRole('textbox', { name: 'Conclusão da avaliação' })).toBeDefined()
   })
 
   it('mostra no preenchimento a mesma numeração do documento e oculta campos automáticos', () => {

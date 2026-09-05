@@ -67,8 +67,10 @@ import { aplicarAnexo, usaAtenuacaoRuido } from '@/lib/nr15'
 import {
   dadosPapel,
   grupoDoParticipante,
+  participanteAusente,
   papeisDoGrupo,
   PAPEIS_POR_GRUPO,
+  TEXTO_AUSENCIA_RECLAMANTE,
   type GrupoParticipante,
 } from '@/lib/participantes'
 import { intervaloDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
@@ -217,7 +219,8 @@ export default function PericiaEditor() {
     tipoDoc === 'laudo' ? 'Laudo Técnico Pericial' : 'Parecer Técnico da Reclamada',
   )
   const [bibliotecaPara, setBibliotecaPara] = useState<{
-    campo: keyof Pericia['tecnico']
+    campo?: keyof Pericia['tecnico']
+    agenteId?: string
     secao: SecaoTexto
     referencia?: string
   } | null>(null)
@@ -445,6 +448,15 @@ export default function PericiaEditor() {
 
   /** Grava (ou atualiza) o documento no histórico e devolve o id. */
   async function finalizarDocumento(silencioso = false): Promise<string | null> {
+    const semConclusao = p.tecnico.agentes.filter(
+      (agente) => agente.tipo !== 'periculosidade' && !agente.observacao?.trim(),
+    )
+    if (semConclusao.length) {
+      const nomes = semConclusao.map((agente) => agente.nome.trim() || 'agente sem nome').join(', ')
+      setPasso(2)
+      toast(`Preencha a conclusão da avaliação: ${nomes}.`, 'error')
+      return null
+    }
     const salva = await salvarRascunho(true)
     if (!salva) return null
 
@@ -892,24 +904,37 @@ export default function PericiaEditor() {
                               ))}
                             </Select>
                           )}
-                          <Input
-                            label="Nome"
-                            value={pt.nome}
-                            onChange={(e) =>
-                              set({
-                                participantes: p.participantes.map((x) =>
-                                  x.id === pt.id ? { ...x, nome: e.target.value } : x,
-                                ),
-                              })
-                            }
-                          />
+                          {participanteAusente(pt) ? (
+                            <div className="sm:col-span-1">
+                              <span className="mb-1.5 block text-sm font-medium text-ink-700">Registro</span>
+                              <div className="flex min-h-10 items-center rounded-md border border-navy-200 bg-navy-50 px-3 py-2 text-sm text-navy-800">
+                                {TEXTO_AUSENCIA_RECLAMANTE}
+                              </div>
+                            </div>
+                          ) : (
+                            <Input
+                              label="Nome"
+                              value={pt.nome}
+                              onChange={(e) =>
+                                set({
+                                  participantes: p.participantes.map((x) =>
+                                    x.id === pt.id ? { ...x, nome: e.target.value } : x,
+                                  ),
+                                })
+                              }
+                            />
+                          )}
                           <Select
                             label="Qualificação"
                             value={pt.papel}
                             onChange={(e) =>
                               set({
                                 participantes: p.participantes.map((x) =>
-                                  x.id === pt.id ? { ...x, papel: e.target.value as Participante['papel'] } : x,
+                                  x.id === pt.id ? {
+                                    ...x,
+                                    papel: e.target.value as Participante['papel'],
+                                    nome: e.target.value === 'parte_reclamante_ausente' ? '' : x.nome,
+                                  } : x,
                                 ),
                               })
                             }
@@ -918,12 +943,14 @@ export default function PericiaEditor() {
                               <option key={pp.value} value={pp.value}>{pp.label}</option>
                             ))}
                           </Select>
-                          <div>
-                            <span className="mb-1.5 block text-sm font-medium text-ink-700">Atuação no ato</span>
-                            <div className="flex min-h-10 items-center rounded-md border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-700">
-                              {dadosPapel(pt.papel).atuacao}
+                          {!participanteAusente(pt) && (
+                            <div>
+                              <span className="mb-1.5 block text-sm font-medium text-ink-700">Atuação no ato</span>
+                              <div className="flex min-h-10 items-center rounded-md border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-700">
+                                {dadosPapel(pt.papel).atuacao}
+                              </div>
                             </div>
-                          </div>
+                          )}
                           <Button
                             variant="ghost"
                             className="mb-1 self-end text-red-600 hover:bg-red-50"
@@ -1321,17 +1348,39 @@ export default function PericiaEditor() {
                     agente={a}
                     onChange={(agenteAtualizado) => atualizarAgente(a.id, () => agenteAtualizado)}
                   />
+                  <div className="mt-3 rounded-lg border border-ink-200 bg-ink-50/60 p-3">
+                    <Checkbox
+                      label="Agente identificado na atividade"
+                      description="Desmarque quando o agente não estiver presente; o documento mostrará somente o título e a conclusão."
+                      checked={a.identificadoNaAtividade !== false}
+                      onChange={(e) => atualizarAgente(a.id, (atual) => ({
+                        ...atual,
+                        identificadoNaAtividade: e.target.checked,
+                      }))}
+                    />
+                  </div>
                   <div className="mt-3">
                     <Textarea
-                      label="Texto técnico deste agente no documento (opcional)"
+                      label="Conclusão da avaliação"
                       rows={4}
                       value={a.observacao ?? ''}
                       onChange={(e) => atualizarAgente(a.id, (atual) => ({
                         ...atual,
                         observacao: e.target.value,
                       }))}
-                      placeholder="Registre a avaliação, as medidas de proteção e as evidências específicas deste agente."
+                      placeholder="Registre a conclusão específica deste agente. Campo obrigatório para emitir o documento."
                     />
+                    <div className="mt-2 flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        icon={<BookOpen size={14} />}
+                        aria-label={`Abrir biblioteca da conclusão de ${a.nome || 'agente'}`}
+                        onClick={() => setBibliotecaPara({ agenteId: a.id, secao: 'conclusao', referencia: referenciaAvaliacao })}
+                      >
+                        Biblioteca
+                      </Button>
+                    </div>
                   </div>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <Select
@@ -1756,6 +1805,15 @@ export default function PericiaEditor() {
         referencia={bibliotecaPara?.referencia}
         onInserir={(conteudo) => {
           if (!bibliotecaPara) return
+          if (bibliotecaPara.agenteId) {
+            atualizarAgente(bibliotecaPara.agenteId, (agente) => ({
+              ...agente,
+              observacao: agente.observacao?.trim() ? `${agente.observacao}\n\n${conteudo}` : conteudo,
+            }))
+            toast('Texto inserido na conclusão do agente.')
+            return
+          }
+          if (!bibliotecaPara.campo) return
           if (!ehAdministrador && campoPadraoDe(bibliotecaPara.campo)) return
           const atual = (p.tecnico[bibliotecaPara.campo] as string) ?? ''
           setT({ [bibliotecaPara.campo]: atual ? `${atual}\n\n${conteudo}` : conteudo } as never)

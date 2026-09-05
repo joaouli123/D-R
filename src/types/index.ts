@@ -66,6 +66,7 @@ export interface Participante {
   papel:
     | 'perito_judicial'
     | 'reclamante'
+    | 'parte_reclamante_ausente'
     | 'engenheiro_assistente_reclamante'
     | 'tecnico_assistente_reclamante'
     | 'assistente_reclamante'
@@ -78,6 +79,8 @@ export interface Participante {
     | 'engenheiro_sst_empresa'
     | 'tecnico_sst_empresa'
     | 'gestor_lideranca'
+    | 'representante_setorial'
+    | 'recursos_humanos'
     | 'auxiliar_perito'
     | 'paradigma'
     | 'entrevistado'
@@ -173,6 +176,8 @@ export interface AgenteAvaliado {
   id: UUID
   nome: string
   tipo: 'quimico' | 'fisico' | 'biologico' | 'periculosidade'
+  /** Ausente nos registros antigos equivale a true. */
+  identificadoNaAtividade?: boolean
   cas?: string
   anexoNr15?: string // Anexo 1, 3, 11, 12, 13, 13-A, 14...
   /** Anexo próprio da NR-16. Não reutiliza o seletor da NR-15. */

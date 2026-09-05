@@ -127,6 +127,75 @@ const pericia = {
 } satisfies Pericia
 
 describe('DocumentoPreview', () => {
+  it('abrevia a empresa na representação e apresenta ausência da parte reclamante em linha única', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={{
+          ...pericia,
+          reclamadas: [{ id: 'rec-1', empresaId: 'emp-1', principal: true }],
+          participantes: [
+            { id: 'p-1', nome: '', papel: 'parte_reclamante_ausente' as never },
+            { id: 'p-2', nome: 'Maria', papel: 'recursos_humanos' as never, empresaId: 'emp-1' },
+          ],
+        }}
+        empresas={[{
+          id: 'emp-1', razaoSocial: 'Acme Serviços Industriais Ltda.', cnpj: '11.111.111/0001-11',
+          endereco: '', cidade: 'São Paulo', uf: 'SP', criadoEm: '2026-01-01',
+        }]}
+        titulo="Parecer de teste"
+      />,
+    )
+
+    expect(html).toContain('<td colSpan="3">A parte reclamante não compareceu para a apresentação de suas alegações.</td>')
+    expect(html).toContain('Recursos Humanos, Acme')
+    expect(html).not.toContain('Recursos Humanos — Acme Serviços Industriais Ltda.')
+  })
+
+  it('omite a tabela do agente não identificado e mantém sua conclusão individual', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={{
+          ...pericia,
+          modalidade: 'insalubridade',
+          tecnico: {
+            ...pericia.tecnico,
+            agentes: [{
+              id: 'bio-ausente', nome: 'Agentes biológicos', tipo: 'biologico',
+              criterio: 'qualitativo', identificadoNaAtividade: false, observacao: 'Não foi constatada exposição habitual a agentes biológicos.',
+            } as never],
+          },
+        }}
+        empresas={[]}
+        titulo="Parecer de teste"
+      />,
+    )
+
+    expect(html).toContain('Não foi constatada exposição habitual a agentes biológicos.')
+    expect(html).not.toContain('<th>Propriedade</th><th>Informação</th>')
+    expect(html).toMatch(/Agentes biológicos[\s\S]*?<h[34]>Conclusão<\/h[34]>/)
+  })
+
+  it('mostra a conclusão logo após a tabela de cada agente identificado', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={{
+          ...pericia,
+          modalidade: 'insalubridade',
+          tecnico: {
+            ...pericia.tecnico,
+            agentes: [{
+              id: 'fisico-presente', nome: 'Frio', tipo: 'fisico', criterio: 'qualitativo',
+              identificadoNaAtividade: true, observacao: 'Conclusão técnica exclusiva do agente frio.',
+            } as never],
+          },
+        }}
+        empresas={[]}
+        titulo="Parecer de teste"
+      />,
+    )
+
+    expect(html).toMatch(/<table class="agente-propriedades">[\s\S]*?<\/table><h[34]>Conclusão<\/h[34]>[\s\S]*?Conclusão técnica exclusiva do agente frio\./)
+  })
   it('renderiza snapshots estruturados de medição e EPI sem reescrever dados históricos', () => {
     const html = renderToStaticMarkup(
       <DocumentoPreview pericia={pericia} empresas={[]} titulo="Parecer de teste" />,
@@ -397,7 +466,7 @@ describe('DocumentoPreview', () => {
       <DocumentoPreview pericia={comRepresentante} empresas={[empresa]} titulo="Parecer de teste" />,
     )
 
-    expect(html).toContain('Preposto — Segunda Reclamada Ltda.')
+    expect(html).toContain('Preposto, Segunda')
   })
 
   it('nomeia o subitem 6.1 como descrição do posto de trabalho', () => {

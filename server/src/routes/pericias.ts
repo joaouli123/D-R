@@ -52,6 +52,7 @@ export const agenteSchema = z.object({
   id: z.string(),
   nome: texto,
   tipo: z.enum(['quimico', 'fisico', 'biologico', 'periculosidade']),
+  identificadoNaAtividade: z.boolean().optional(),
   cas: texto.optional(),
   anexoNr15: texto.optional(),
   anexoNr16: texto.optional(),
@@ -71,7 +72,7 @@ export const agenteSchema = z.object({
   origemMedicao: z.enum(['perito', 'empresa', 'nao_informado']).optional(),
   fonteRuido: z.enum(['maquinas', 'ruido_fundo', 'administrativa']).optional(),
   areaRisco: texto.optional(),
-  exposicaoPericulosidade: z.enum(['permanente', 'intermitente', 'eventual']).optional(),
+  exposicaoPericulosidade: z.enum(['permanente', 'intermitente', 'eventual', 'nao_constatada']).optional(),
   resultadoPericulosidade: z.enum(['caracterizada', 'nao_caracterizada', 'prejudicada']).optional(),
   unidadeMedicao: z.enum([
     'ppm', 'mg/m³', '% O₂ em volume', 'dB(A)', 'dB(C)', 'dB(Linear)',
@@ -157,6 +158,7 @@ const corpo = z.object({
         papel: z.enum([
           'perito_judicial',
           'reclamante',
+          'parte_reclamante_ausente',
           'engenheiro_assistente_reclamante',
           'tecnico_assistente_reclamante',
           'assistente_reclamante',
@@ -169,6 +171,8 @@ const corpo = z.object({
           'engenheiro_sst_empresa',
           'tecnico_sst_empresa',
           'gestor_lideranca',
+          'representante_setorial',
+          'recursos_humanos',
           'auxiliar_perito',
           'paradigma',
           'entrevistado',

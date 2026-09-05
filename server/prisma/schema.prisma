@@ -161,6 +161,7 @@ model Reclamada {
 enum PapelParticipante {
   perito_judicial
   reclamante
+  parte_reclamante_ausente
   engenheiro_assistente_reclamante
   tecnico_assistente_reclamante
   assistente_reclamante
@@ -173,6 +174,8 @@ enum PapelParticipante {
   engenheiro_sst_empresa
   tecnico_sst_empresa
   gestor_lideranca
+  representante_setorial
+  recursos_humanos
   auxiliar_perito
   paradigma
   entrevistado

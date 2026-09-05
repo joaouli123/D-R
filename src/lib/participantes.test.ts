@@ -1,15 +1,34 @@
 import { describe, expect, it } from 'vitest'
-import { dadosPapel, grupoDoParticipante, PAPEIS } from './participantes'
+import { dadosPapel, grupoDoParticipante, PAPEIS, PAPEIS_POR_GRUPO } from './participantes'
 
 describe('qualificação e atuação dos participantes', () => {
-  it('oferece os 15 papéis aprovados', () => {
-    expect(PAPEIS).toHaveLength(15)
+  it('oferece os 18 papéis aprovados', () => {
+    expect(PAPEIS).toHaveLength(18)
   })
 
   it('inclui representantes de SST e liderança da empresa', () => {
     expect(dadosPapel('engenheiro_sst_empresa').atuacao).toContain('Departamento de SST')
     expect(dadosPapel('tecnico_sst_empresa').atuacao).toContain('Departamento de SST')
     expect(dadosPapel('gestor_lideranca').atuacao).toContain('atividades habituais')
+  })
+
+  it('oferece ausência neutra na parte reclamante e representantes setoriais nas reclamadas', () => {
+    expect(PAPEIS_POR_GRUPO.reclamante).toContainEqual({
+      value: 'parte_reclamante_ausente',
+      label: 'Parte reclamante ausente',
+    })
+    for (const grupo of ['reclamada_principal', 'reclamadas_envolvidas'] as const) {
+      expect(PAPEIS_POR_GRUPO[grupo]).toEqual(expect.arrayContaining([
+        { value: 'representante_setorial', label: 'Representante Setorial' },
+        { value: 'recursos_humanos', label: 'Recursos Humanos' },
+      ]))
+    }
+    expect(dadosPapel('representante_setorial').atuacao).toBe(
+      'Acompanhamento e esclarecimentos pertinentes ao setor.',
+    )
+    expect(dadosPapel('recursos_humanos').atuacao).toBe(
+      'Acompanhamento e esclarecimentos pertinentes à área administrativa.',
+    )
   })
 
   it('diferencia a atuação dos assistentes da reclamante e da reclamada', () => {

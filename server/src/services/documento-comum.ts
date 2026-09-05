@@ -40,6 +40,7 @@ export const css = (cor: string): string => `#${cor}`
 
 export const PAPEL: Record<string, string> = {
   reclamante: 'Reclamante',
+  parte_reclamante_ausente: 'Parte reclamante ausente',
   engenheiro_assistente_reclamante: 'Eng. Segurança do Trabalho - Assistente Técnico',
   tecnico_assistente_reclamante: 'Téc. Segurança do Trabalho - Assistente Técnico',
   perito_judicial: 'Perito Judicial do Trabalho',
@@ -53,6 +54,8 @@ export const PAPEL: Record<string, string> = {
   engenheiro_sst_empresa: 'Eng. Segurança do Trabalho',
   tecnico_sst_empresa: 'Téc. Segurança do Trabalho',
   gestor_lideranca: 'Gestor Imediato / Liderança',
+  representante_setorial: 'Representante Setorial',
+  recursos_humanos: 'Recursos Humanos',
   auxiliar_perito: 'Auxiliar do Perito',
   paradigma: 'Paradigma',
   entrevistado: 'Entrevistado',
@@ -61,6 +64,7 @@ export const PAPEL: Record<string, string> = {
 
 export const ATUACAO: Record<string, string> = {
   reclamante: 'Apresentação das suas alegações.',
+  parte_reclamante_ausente: 'A parte reclamante não compareceu para a apresentação de suas alegações.',
   engenheiro_assistente_reclamante: 'Acompanhamento Técnico – Reclamante',
   tecnico_assistente_reclamante: 'Acompanhamento Técnico – Reclamante',
   assistente_reclamante: 'Acompanhamento Técnico – Reclamante',
@@ -73,6 +77,8 @@ export const ATUACAO: Record<string, string> = {
   engenheiro_sst_empresa: 'Representação do Departamento de SST da empresa',
   tecnico_sst_empresa: 'Representação do Departamento de SST da empresa',
   gestor_lideranca: 'Esclarecimentos sobre atividades habituais, eventuais e demais aspectos da rotina de trabalho',
+  representante_setorial: 'Acompanhamento e esclarecimentos pertinentes ao setor.',
+  recursos_humanos: 'Acompanhamento e esclarecimentos pertinentes à área administrativa.',
   perito_judicial: 'Condução da diligência pericial',
   auxiliar_perito: 'Auxílio e suporte ao Perito',
   paradigma: 'Demonstração das atividades exercidas',
@@ -362,6 +368,7 @@ export interface AgenteDocumento {
   id: string
   nome: string
   tipo?: string
+  identificadoNaAtividade?: boolean
   cas?: string
   anexoNr15?: string
   anexoNr16?: string
@@ -386,6 +393,34 @@ export interface AgenteDocumento {
   criterio: string
   grau?: string
   observacao?: string
+}
+
+/** Avaliações NR-15 sempre precisam levar sua conclusão individual ao documento. */
+export function agentesNr15SemConclusao(
+  tecnico?: { agentes?: AgenteDocumento[] } | null,
+  modalidade?: string | null,
+): string[] {
+  if (modalidade === 'periculosidade') return []
+
+  return (tecnico?.agentes ?? [])
+    .filter((agente) => agente.tipo !== 'periculosidade' && !agente.observacao?.trim())
+    .map((agente) => agente.nome?.trim() || 'Agente sem identificação')
+}
+
+export const TEXTO_AUSENCIA_RECLAMANTE =
+  'A parte reclamante não compareceu para a apresentação de suas alegações.'
+
+export function primeiroNomeEmpresa(razaoSocial?: string | null): string {
+  return razaoSocial?.trim().split(/\s+/)[0] ?? ''
+}
+
+export function qualificacaoParticipanteDocumento(
+  papel: string,
+  razaoSocial?: string | null,
+): string {
+  const qualificacao = PAPEL[papel] ?? papel
+  const empresa = primeiroNomeEmpresa(razaoSocial)
+  return empresa ? `${qualificacao}, ${empresa}` : qualificacao
 }
 
 export type OrigemMedicaoDocumento = 'perito' | 'empresa' | 'nao_informado'

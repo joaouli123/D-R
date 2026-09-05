@@ -8,6 +8,7 @@ import { prisma } from '../prisma.js'
 import { apagarUpload, lerUpload, uploadPdf } from '../services/armazenamento.js'
 import { montarHtml } from '../services/documento-html.js'
 import { gerarDocx } from '../services/docx.js'
+import { agentesNr15SemConclusao, type TecnicoJson } from '../services/documento-comum.js'
 import { enviarDocumento } from '../services/email.js'
 import { concatenarPdf, gerarPdf } from '../services/pdf.js'
 
@@ -69,6 +70,22 @@ async function carregarContexto(id: string) {
   const perito = await prisma.usuario.findUnique({ where: { id: documento.criadoPorId } })
 
   return { documento, pericia: pericia as PericiaCompleta | null, empresas, perito }
+}
+
+function exigirConclusoesNr15(
+  documento: { tipo: string },
+  pericia: PericiaCompleta | null,
+): void {
+  if (!pericia || (documento.tipo !== 'parecer' && documento.tipo !== 'laudo')) return
+  const pendentes = agentesNr15SemConclusao(
+    pericia.tecnico as unknown as Pick<TecnicoJson, 'agentes'>,
+    pericia.modalidade,
+  )
+  if (!pendentes.length) return
+  throw new ErroHttp(
+    422,
+    `Informe a conclusão individual antes de emitir o documento: ${pendentes.join(', ')}.`,
+  )
 }
 
 /** GET /documentos */
@@ -194,6 +211,7 @@ documentosRouter.post(
   '/:id/pdf',
   rota(async (req, res) => {
     const { documento, pericia, empresas, perito } = await carregarContexto(parametro(req, 'id'))
+    exigirConclusoesNr15(documento, pericia)
 
     const html = await montarHtml(documento, pericia, empresas, perito)
     let pdf = await gerarPdf(html)
@@ -225,6 +243,7 @@ documentosRouter.post(
   '/:id/docx',
   rota(async (req, res) => {
     const { documento, pericia, empresas, perito } = await carregarContexto(parametro(req, 'id'))
+    exigirConclusoesNr15(documento, pericia)
 
     const docx = await gerarDocx(documento, pericia, empresas, perito)
 
@@ -271,6 +290,7 @@ documentosRouter.post(
     const copia = listaDeEmails(d.copia, 'Cópia')
 
     const { documento, pericia, empresas, perito } = await carregarContexto(parametro(req, 'id'))
+    exigirConclusoesNr15(documento, pericia)
 
     // O PDF anexado é gerado na hora — o destinatário sempre recebe
     // a versão mais recente do documento.

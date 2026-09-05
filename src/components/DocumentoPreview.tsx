@@ -1,7 +1,12 @@
 import { Fragment } from 'react'
 import type { Empresa, Pericia, SecaoFoto, Usuario } from '@/types'
 import { extenso, formatDate, maskCNPJ, maskCPF } from '@/lib/utils'
-import { dadosPapel } from '@/lib/participantes'
+import {
+  dadosPapel,
+  participanteAusente,
+  qualificacaoParticipante,
+  TEXTO_AUSENCIA_RECLAMANTE,
+} from '@/lib/participantes'
 import { montarApresentacaoAgente } from '@/lib/apresentacaoAgente'
 import { intervaloDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
 import { dadosAssinatura } from '@/lib/assinaturaDocumento'
@@ -151,20 +156,21 @@ export function DocumentoPreview({
       <div className="space-y-4">
         {agentes.map((agente, indice) => {
           const apresentacao = montarApresentacaoAgente(agente)
+          const identificado = agente.identificadoNaAtividade !== false
           return (
             <section key={agente.id} className="agente-bloco">
               {prefixo
                 ? <h4>{prefixo}.{indice + 1}. {rotuloNatureza(agente.tipo)} — {apresentacao.titulo}</h4>
                 : <h3>{apresentacao.titulo}</h3>}
-              <table className="agente-propriedades">
+              {identificado && <table className="agente-propriedades">
                 <thead><tr><th>Propriedade</th><th>Informação</th></tr></thead>
                 <tbody>
                   {apresentacao.linhas.map((linha) => (
                     <tr key={linha.rotulo}><th>{linha.rotulo}</th><td>{linha.valor}</td></tr>
                   ))}
                 </tbody>
-              </table>
-              {agente.observacao?.trim() && <Paragrafos texto={agente.observacao} />}
+              </table>}
+              {agente.tipo !== 'periculosidade' && <><h4>Conclusão</h4><Paragrafos texto={agente.observacao} /></>}
             </section>
           )
         })}
@@ -181,6 +187,7 @@ export function DocumentoPreview({
       <div className="space-y-4">
         {agentes.map((agente, indice) => {
           const apresentacao = montarApresentacaoAgente(agente)
+          const identificado = agente.identificadoNaAtividade !== false
           const protecoesAssociadas = (agente.epis ?? []).map((epi, indiceEpi) => {
             const cas = [
               epi.caUnico?.trim() ? `CA ${epi.caUnico.trim()}` : '',
@@ -193,20 +200,21 @@ export function DocumentoPreview({
           return (
             <section key={`analise-${agente.id}`} className="agente-bloco">
               <h4>{prefixo}.{indice + 1}. {apresentacao.titulo}</h4>
-              <table className="agente-propriedades">
+              {identificado && <table className="agente-propriedades">
                 <thead><tr><th>Propriedade</th><th>Informação</th></tr></thead>
                 <tbody>
                   {apresentacao.linhas.map((linha) => (
                     <tr key={linha.rotulo}><th>{linha.rotulo}</th><td>{linha.valor}</td></tr>
                   ))}
-                  {protecoesAssociadas.length > 0 && (
+                  {identificado && protecoesAssociadas.length > 0 && (
                     <tr>
                       <th>Proteções associadas</th>
                       <td>{protecoesAssociadas.map((linha) => <div key={linha}>{linha}</div>)}</td>
                     </tr>
                   )}
                 </tbody>
-              </table>
+              </table>}
+              {agente.tipo !== 'periculosidade' && <><h4>Conclusão</h4><Paragrafos texto={agente.observacao} /></>}
             </section>
           )
         })}
@@ -214,7 +222,7 @@ export function DocumentoPreview({
     </section>
   ) : null
 
-  const protecoes = t.agentes.flatMap((agente) => {
+  const protecoes = t.agentes.filter((agente) => agente.identificadoNaAtividade !== false).flatMap((agente) => {
     const apresentacao = montarApresentacaoAgente(agente)
     return apresentacao.protecoes.length ? [{ agente, apresentacao }] : []
   })
@@ -326,14 +334,16 @@ export function DocumentoPreview({
           <tbody>
             {pericia.participantes.map((participante) => (
               <tr key={participante.id}>
-                <td>{participante.nome}</td>
-                <td>
-                  {dadosPapel(participante.papel).label}
-                  {participante.empresaId && empresasPorId.get(participante.empresaId)
-                    ? ` — ${empresasPorId.get(participante.empresaId)?.razaoSocial}`
-                    : ''}
-                </td>
-                <td>{dadosPapel(participante.papel).atuacao}</td>
+                {participanteAusente(participante) ? (
+                  <td colSpan={3}>{TEXTO_AUSENCIA_RECLAMANTE}</td>
+                ) : <>
+                  <td>{participante.nome}</td>
+                  <td>{qualificacaoParticipante(
+                    participante,
+                    participante.empresaId ? empresasPorId.get(participante.empresaId)?.razaoSocial : undefined,
+                  )}</td>
+                  <td>{dadosPapel(participante.papel).atuacao}</td>
+                </>}
               </tr>
             ))}
           </tbody>
