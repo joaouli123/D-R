@@ -137,14 +137,29 @@ export const ANEXOS_NR15: AnexoNr15Info[] = [
     limiteTolerancia: '2,0 fibras/cm³',
     limiteEditavel: false,
   },
+  // O Anexo 12 fixa dois limites distintos para o manganês, conforme a
+  // operação exponha a poeira (item 1) ou a fumos (item 2). Escolher o
+  // enquadramento errado muda o limite em cinco vezes, então os dois são
+  // referências separadas em vez de um campo que o perito digita.
   {
     id: 'ANEXO_12_MANGANES',
-    label: 'Anexo 12 — Poeiras Minerais: Manganês',
+    label: 'Anexo 12 — Poeiras Minerais: Manganês (poeiras)',
     tipo: 'quimico',
     grau: 'maximo',
     criterio: 'quantitativo',
     limiteTolerancia: '5,0 mg/m³',
     limiteEditavel: false,
+    dica: 'Extração, tratamento, moagem e transporte do minério, ou outras operações com exposição a poeiras de manganês ou de seus compostos.',
+  },
+  {
+    id: 'ANEXO_12_MANGANES_FUMOS',
+    label: 'Anexo 12 — Poeiras Minerais: Manganês (fumos)',
+    tipo: 'quimico',
+    grau: 'maximo',
+    criterio: 'quantitativo',
+    limiteTolerancia: '1,0 mg/m³',
+    limiteEditavel: false,
+    dica: 'Metalurgia de minerais de manganês, fabricação de compostos, de baterias e pilhas secas, de vidros especiais e cerâmicas, fabricação e uso de eletrodos de solda, produtos químicos, tintas e fertilizantes, ou outras operações com exposição a fumos.',
   },
   {
     id: 'ANEXO_12_SILICA',

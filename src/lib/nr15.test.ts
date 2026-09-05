@@ -348,7 +348,7 @@ describe('aplicarAnexo', () => {
     expect(aplicarAnexo({
       id: 'a1', nome: '', tipo: 'quimico', criterio: 'quantitativo',
     }, 'ANEXO_12_MANGANES')).toMatchObject({
-      nome: 'Manganês', cas: '7439-96-5', unidadeMedicao: 'mg/m³',
+      nome: 'Manganês (poeiras)', cas: '7439-96-5', unidadeMedicao: 'mg/m³',
     })
 
     const anexo13 = aplicarAnexo({
@@ -357,6 +357,19 @@ describe('aplicarAnexo', () => {
     }, 'ANEXO_13')
     expect(obterRegraAnexo('ANEXO_13')?.exibeCas).toBe(true)
     expect(anexo13).not.toHaveProperty('cas')
+  })
+
+  // O Anexo 12 fixa 5 mg/m³ para poeiras e 1 mg/m³ para fumos. Um único
+  // enquadramento de manganês obrigaria o perito a laudar metalurgia e
+  // eletrodo de solda com o limite cinco vezes maior do que o legal.
+  it('separa os dois limites de tolerância do manganês do Anexo 12', () => {
+    const poeiras = aplicarAnexo({ id: 'a1', nome: '', tipo: 'quimico', criterio: 'quantitativo' }, 'ANEXO_12_MANGANES')
+    const fumos = aplicarAnexo({ id: 'a2', nome: '', tipo: 'quimico', criterio: 'quantitativo' }, 'ANEXO_12_MANGANES_FUMOS')
+
+    expect(poeiras).toMatchObject({ nome: 'Manganês (poeiras)', limiteTolerancia: '5,0 mg/m³', grau: 'maximo' })
+    expect(fumos).toMatchObject({ nome: 'Manganês (fumos)', limiteTolerancia: '1,0 mg/m³', grau: 'maximo' })
+    expect(fumos.cas).toBe(poeiras.cas)
+    expect(obterRegraAnexo('ANEXO_12_MANGANES_FUMOS')?.exibeCas).toBe(true)
   })
 
   it('limpa o agente imposto também quando o perito tira o anexo', () => {

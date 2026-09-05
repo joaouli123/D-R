@@ -61,7 +61,14 @@ const REGRAS_ESPECIFICAS: Record<string, Partial<RegraAnexoNr15>> = {
     exibeCas: true,
   },
   ANEXO_12_MANGANES: {
-    agenteFixo: 'Manganês',
+    agenteFixo: 'Manganês (poeiras)',
+    casFixo: '7439-96-5',
+    unidades: ['mg/m³'],
+    unidadePadrao: 'mg/m³',
+    exibeCas: true,
+  },
+  ANEXO_12_MANGANES_FUMOS: {
+    agenteFixo: 'Manganês (fumos)',
     casFixo: '7439-96-5',
     unidades: ['mg/m³'],
     unidadePadrao: 'mg/m³',
