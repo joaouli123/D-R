@@ -215,3 +215,42 @@ describe('fonte do ruído', () => {
     expect(screen.queryByRole('combobox', { name: 'Fonte do ruído' })).toBeNull()
   })
 })
+
+// A CETESB, do primeiro desenho, publica 96 produtos e cobre 40 dos 146
+// agentes do Anexo 11 — e não filtra por URL. As bases de agora abrem a
+// ficha da substância direto do CAS que vai sair no parecer.
+describe('consulta do número CAS', () => {
+  const QUIMICO: AgenteAvaliado = {
+    id: 'q-1',
+    nome: 'Acetaldeído',
+    tipo: 'quimico',
+    criterio: 'quantitativo',
+    anexoNr15: 'ANEXO_12_MANGANES_FUMOS',
+    cas: '7439-96-5',
+    unidadeMedicao: 'mg/m³',
+  }
+
+  it('abre a ficha da substância nas duas bases a partir do CAS gravado', () => {
+    render(<AgenteNr15Fields agente={QUIMICO} onChange={() => undefined} />)
+
+    expect(screen.getByRole('link', { name: /CAS Common Chemistry/ }).getAttribute('href'))
+      .toBe('https://commonchemistry.cas.org/detail?cas_rn=7439-96-5')
+    expect(screen.getByRole('link', { name: /PubChem/ }).getAttribute('href'))
+      .toBe('https://pubchem.ncbi.nlm.nih.gov/#query=7439-96-5')
+  })
+
+  it('cai na busca das bases quando o agente ainda não tem CAS', () => {
+    render(<AgenteNr15Fields agente={{ ...QUIMICO, cas: undefined }} onChange={() => undefined} />)
+
+    expect(screen.getByRole('link', { name: /CAS Common Chemistry/ }).getAttribute('href'))
+      .toBe('https://commonchemistry.cas.org/')
+    expect(screen.getByRole('link', { name: /PubChem/ }).getAttribute('href'))
+      .toBe('https://pubchem.ncbi.nlm.nih.gov/')
+  })
+
+  it('não oferece consulta de CAS em agente físico', () => {
+    render(<AgenteNr15Fields agente={RUIDO} onChange={() => undefined} />)
+
+    expect(screen.queryByRole('link', { name: /CAS Common Chemistry/ })).toBeNull()
+  })
+})

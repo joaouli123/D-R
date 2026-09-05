@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ExternalLink } from 'lucide-react'
 
 import { anexoNr15PorId, ATIVIDADES_ANEXO_13, ATIVIDADES_ANEXO_14, SUBSTANCIAS_ANEXO_11 } from '@/content/anexosNr15'
 import type { ReferenciaNormativa, UnidadeMedicao } from '@/content/nr15/tipos'
@@ -23,6 +24,58 @@ const CONFIGURACOES = {
   ANEXO_13: { itens: ATIVIDADES_ANEXO_13, titulo: 'Grupo ou atividade do Anexo 13', placeholder: 'Busque por grupo ou atividade' },
   ANEXO_14: { itens: ATIVIDADES_ANEXO_14, titulo: 'Atividade do Anexo 14', placeholder: 'Busque por atividade biológica' },
 } as const
+
+// O Quadro 1 do Anexo 11 não publica número CAS, e nem toda perícia precisa
+// dele. Em vez de o sistema se responsabilizar por acertar o identificador
+// químico de cada agente, a consulta fica a um clique — mesmo caminho do
+// portal do CAEPI usado para o CA do EPI.
+//
+// A primeira versão apontava para a CETESB. A listagem pública de lá tem 96
+// produtos e cobre 40 dos 146 agentes do Anexo 11: é o manual de emergência
+// química do transporte, não um registro de substâncias. As duas bases abaixo
+// são gratuitas e sem cadastro — o CAS Common Chemistry é publicado pela
+// própria CAS, que atribui o número, e o PubChem (NIH) cobre o que faltar.
+const BASES_CAS = [
+  {
+    nome: 'CAS Common Chemistry',
+    fichaDoCas: (cas: string) => `https://commonchemistry.cas.org/detail?cas_rn=${cas}`,
+    busca: 'https://commonchemistry.cas.org/',
+  },
+  {
+    nome: 'PubChem',
+    fichaDoCas: (cas: string) => `https://pubchem.ncbi.nlm.nih.gov/#query=${cas}`,
+    busca: 'https://pubchem.ncbi.nlm.nih.gov/',
+  },
+] as const
+
+const FORMATO_CAS = /^\d{2,7}-\d{2}-\d$/
+
+// Com o CAS preenchido o link abre direto a ficha da substância, para o perito
+// conferir o que vai sair no parecer; sem ele, abre a busca. O nome do agente
+// não vai na URL de propósito: as duas bases respondem em inglês e
+// “Álcool n-butílico” não encontraria nada.
+function LinkConsultaCas({ cas, className = '' }: { cas?: string; className?: string }) {
+  const numero = (cas ?? '').trim()
+  const temFicha = FORMATO_CAS.test(numero)
+
+  return (
+    <span className={`inline-flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[11px] ${className}`}>
+      <span className="font-semibold text-ink-500">{temFicha ? 'Conferir CAS em:' : 'Consultar CAS em:'}</span>
+      {BASES_CAS.map((base) => (
+        <a
+          key={base.nome}
+          href={temFicha ? base.fichaDoCas(numero) : base.busca}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 rounded font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+        >
+          {base.nome}
+          <ExternalLink size={11} aria-hidden="true" />
+        </a>
+      ))}
+    </span>
+  )
+}
 
 const OPCOES_ORIGEM: OrigemMedicao[] = ['perito', 'empresa', 'nao_informado']
 
@@ -301,6 +354,7 @@ export function AgenteNr15Fields({ agente, onChange }: AgenteNr15FieldsProps) {
   const unidades = referencia ? unidadesDisponiveis(referencia) : []
   const unidade = agente.unidadeMedicao ?? ''
   const limite = referencia?.limites?.[agente.unidadeMedicao!]
+  const exibeCas = obterRegraAnexo(agente.anexoNr15)?.exibeCas ?? false
 
   return (
     <div className="mt-3 rounded-lg border border-brand-100 bg-brand-50/40 p-3">
@@ -309,7 +363,12 @@ export function AgenteNr15Fields({ agente, onChange }: AgenteNr15FieldsProps) {
         {agente.referenciaNormativaId && <button type="button" className="rounded text-xs font-medium text-brand-700 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600" onClick={limparReferencia}>Limpar referência</button>}
       </div>
       <BuscaNormativa itens={configuracao.itens} value={agente.referenciaNormativaId ?? ''} onSelect={selecionarReferenciaNr15} placeholder={configuracao.placeholder} />
-      {referencia && <p className="mt-2 text-xs text-ink-600">Referência selecionada: {referencia.label}{referencia.cas ? ` — CAS ${referencia.cas}` : ''}</p>}
+      <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        {referencia
+          ? <p className="text-xs text-ink-600">Referência selecionada: {referencia.label}{referencia.cas ? ` — CAS ${referencia.cas}` : ''}</p>
+          : <span aria-hidden="true" />}
+        {exibeCas && <LinkConsultaCas cas={agente.cas ?? referencia?.cas} />}
+      </div>
       {referenciaLegadaAusente && <AvisoReferenciaLegada className="mt-2" />}
 
       {referencia && unidades.length > 0 && (
@@ -403,6 +462,12 @@ function CamposGenericos({
           />
         )}
       </div>
+      {regra?.exibeCas && (
+        <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          {agente.cas ? <p className="text-xs text-ink-600">CAS {agente.cas}</p> : <span aria-hidden="true" />}
+          <LinkConsultaCas cas={agente.cas} />
+        </div>
+      )}
       {regra?.calculo === 'ruido_nrrsf' && <FonteDoRuido agente={agente} onChange={onChange} />}
       {regra?.exibeMedicao && <OrigemDaMedicao agente={agente} onChange={onChange} unidade={unidadeMedicao} />}
       {agente.medido && regra?.exibeMedicao && !agente.valorMedido && (
