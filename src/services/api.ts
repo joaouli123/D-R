@@ -124,6 +124,54 @@ async function baixar(path: string, init?: RequestInit): Promise<{ blob: Blob; n
 
 const ehRest = MODE === 'rest'
 
+/**
+ * Resolve o caminho de um arquivo servido pela API (as fotos da vistoria).
+ *
+ * A API devolve `/uploads/<arquivo>` — relativo, sem host. Quem completa e
+ * o front, contra a MESMA base que ele usa para as chamadas REST: em
+ * producao a API vive sob `/api` no mesmo dominio, entao a foto esta em
+ * `/api/uploads/<arquivo>`; sem o prefixo, `/uploads/...` cai no
+ * index.html do proprio site e a imagem aparece quebrada.
+ *
+ * URLs absolutas (`http…`) e `blob:` do modo mock passam intactas — isso
+ * mantem o app funcionando com respostas antigas, de antes de a API passar
+ * a devolver o caminho relativo.
+ */
+export function urlDeUpload(url: string): string {
+  return url.startsWith('/uploads/') ? `${BASE_URL.replace(/\/$/, '')}${url}` : url
+}
+
+/**
+ * Mensagem de erro pronta para a tela, ja com o detalhe que o backend
+ * mandou junto. O `detalhes` costuma ser a parte acionavel ("legenda:
+ * obrigatoria"); descartar isso deixava o perito com "Dados invalidos." e
+ * nada mais.
+ */
+export function mensagemDeErro(e: unknown, padrao: string): string {
+  if (e instanceof ErroApi) {
+    const detalhe = typeof e.detalhes === 'string' ? e.detalhes : ''
+    return detalhe ? `${e.message} — ${detalhe}` : e.message
+  }
+  return e instanceof Error ? e.message : padrao
+}
+
+/** Aplica `urlDeUpload` em todas as fotos de uma pericia. */
+function comFotosResolvidas(p: Pericia): Pericia {
+  return { ...p, fotos: p.fotos.map((f) => ({ ...f, url: urlDeUpload(f.url) })) }
+}
+
+/**
+ * Resolve a logo do perito pelo mesmo caminho das fotos.
+ *
+ * O `logoUrl` chega relativo (`/uploads/<arquivo>`) e precisa do prefixo da
+ * API para virar `<img src>` — sem isso ele cai no index.html do site e o
+ * perito vê a marca quebrada. Passa por AQUI toda resposta que traz usuário:
+ * login, sessão restaurada, listagem e as duas rotas da logo.
+ */
+function comLogoResolvida<T extends { logoUrl?: string }>(u: T): T {
+  return u.logoUrl ? { ...u, logoUrl: urlDeUpload(u.logoUrl) } : u
+}
+
 export interface AplicacaoEpiCatalogo {
   anexo: string
   categoria: string
@@ -455,10 +503,12 @@ export function snapshotCa(
 export const auth = {
   async login(email: string, senha: string): Promise<Usuario> {
     if (ehRest) {
-      return http<Usuario>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, senha }),
-      })
+      return comLogoResolvida(
+        await http<Usuario>('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, senha }),
+        }),
+      )
     }
     const usuario = mock.USUARIOS.find((u) => u.email.toLowerCase() === email.toLowerCase() && u.ativo)
     if (!usuario || senha.length < 4) {
@@ -480,7 +530,7 @@ export const auth = {
   async eu(): Promise<Usuario | null> {
     if (!ehRest) return null
     try {
-      return await http<Usuario>('/auth/eu')
+      return comLogoResolvida(await http<Usuario>('/auth/eu'))
     } catch (e) {
       if (e instanceof ErroApi && e.sessaoExpirada) return null
       throw e
@@ -494,13 +544,40 @@ export const auth = {
 }
 
 export const usuarios = {
-  listar: () => (ehRest ? http<Usuario[]>('/usuarios') : delay(mock.USUARIOS)),
+  listar: () =>
+    ehRest
+      ? http<Usuario[]>('/usuarios').then((l) => l.map(comLogoResolvida))
+      : delay(mock.USUARIOS),
   salvar: (u: Usuario & { senha?: string }) =>
-    ehRest ? http<Usuario>('/usuarios', { method: 'POST', body: JSON.stringify(u) }) : delay(u),
+    ehRest
+      ? http<Usuario>('/usuarios', { method: 'POST', body: JSON.stringify(u) }).then(comLogoResolvida)
+      : delay(u),
   redefinirSenha: (id: string, nova: string) =>
     ehRest
       ? http<void>(`/usuarios/${id}/senha`, { method: 'POST', body: JSON.stringify({ nova }) })
       : delay(undefined),
+
+  /**
+   * Sobe a logo do perito (white-label).
+   *
+   * Vai em multipart porque é arquivo, e não pelo `salvar`: quem decide o
+   * nome dentro do volume é o servidor. A resposta é o cadastro já
+   * atualizado — é dela que a tela tira o novo `logoUrl`.
+   */
+  async enviarLogo(id: string, arquivo: File): Promise<Usuario> {
+    if (!ehRest) throw new ErroApi(503, 'Trocar a logo exige o backend ativo.')
+    const form = new FormData()
+    form.append('logo', arquivo)
+    return comLogoResolvida(
+      await http<Usuario>(`/usuarios/${id}/logo`, { method: 'POST', body: form }),
+    )
+  },
+
+  /** Volta o perito para a arte embutida do sistema. */
+  async removerLogo(id: string): Promise<Usuario> {
+    if (!ehRest) throw new ErroApi(503, 'Trocar a logo exige o backend ativo.')
+    return comLogoResolvida(await http<Usuario>(`/usuarios/${id}/logo`, { method: 'DELETE' }))
+  },
 }
 
 // ---------------- Módulo B — Empresas ----------------
@@ -528,11 +605,20 @@ export interface LimpezaEmpresas {
 
 // ---------------- Módulo C/D/E — Perícias ----------------
 export const pericias = {
-  listar: () => (ehRest ? http<Pericia[]>('/pericias') : delay(mock.PERICIAS)),
+  listar: () =>
+    ehRest
+      ? http<Pericia[]>('/pericias').then((l) => l.map(comFotosResolvidas))
+      : delay(mock.PERICIAS),
   obter: (id: string) =>
-    ehRest ? http<Pericia>(`/pericias/${id}`) : delay(mock.PERICIAS.find((p) => p.id === id)!),
+    ehRest
+      ? http<Pericia>(`/pericias/${id}`).then(comFotosResolvidas)
+      : delay(mock.PERICIAS.find((p) => p.id === id)!),
   salvar: (p: Pericia) =>
-    ehRest ? http<Pericia>('/pericias', { method: 'POST', body: JSON.stringify(p) }) : delay(p),
+    ehRest
+      ? http<Pericia>('/pericias', { method: 'POST', body: JSON.stringify(p) }).then(
+          comFotosResolvidas,
+        )
+      : delay(p),
   remover: (id: string) =>
     ehRest ? http<void>(`/pericias/${id}`, { method: 'DELETE' }) : delay(undefined),
 }
@@ -666,7 +752,11 @@ export const fotos = {
     form.append('secao', secao)
     lista.forEach((f) => form.append('fotos', f))
 
-    return http<Foto[]>(`/pericias/${periciaId}/fotos`, { method: 'POST', body: form })
+    const enviadas = await http<Foto[]>(`/pericias/${periciaId}/fotos`, {
+      method: 'POST',
+      body: form,
+    })
+    return enviadas.map((f) => ({ ...f, url: urlDeUpload(f.url) }))
   },
 
   remover: (periciaId: string, fotoId: string) =>

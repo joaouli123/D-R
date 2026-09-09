@@ -12,6 +12,11 @@
 # Roda em todo push da main de propósito, sem filtro de caminho:
 # alguns minutos de build a mais valem menos que um filtro errado
 # deixando a produção defasada de novo.
+#
+# Antes dos dois deploys vem o job `verificar`: typecheck dos dois
+# projetos e a suíte inteira. O perito assina o que este sistema
+# imprime — código quebrado não pode chegar em produção só porque
+# alguém deu push com pressa.
 # ============================================================
 
 name: Deploy de produção
@@ -26,7 +31,43 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar as duas árvores de dependências
+        run: |
+          set -euo pipefail
+          npm ci
+          npm ci --prefix server
+
+      - name: Gerar o cliente do Prisma
+        # Sem isso o `tsc` da API não acha os tipos de `@prisma/client`, e a
+        # suíte também não: os testes de serviço importam de server/src.
+        run: npm run prisma:generate --prefix server
+
+      - name: Typecheck do frontend
+        run: npm run typecheck
+
+      - name: Typecheck da API
+        run: npm run typecheck --prefix server
+
+      - name: Suíte de testes
+        # `vitest` roda da raiz e pega também os testes de server/src —
+        # inclusive os de paridade entre as duas cópias do gerador de
+        # documento, que são justamente os que impedem a tela e o arquivo
+        # assinado de divergirem.
+        run: npm test
+
   deploy:
+    needs: verificar
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -119,6 +160,7 @@ jobs:
           exit 1
 
   deploy-frontend:
+    needs: verificar
     runs-on: ubuntu-latest
     timeout-minutes: 25
 

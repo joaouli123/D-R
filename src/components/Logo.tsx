@@ -1,20 +1,40 @@
 import { cn } from '@/lib/utils'
 import logoOficial from '@/assets/logo-dr-oficial.jpeg'
 
+/** Alt fixo da arte embutida — o teste de marca depende dele. */
+export const LOGO_PADRAO_ALT =
+  'D&R Perícia Trabalhista — Engenharia de Segurança e Higiene Ocupacional'
+
+/** O mínimo que a marca precisa saber sobre o dono dela. */
+export interface DonoDaMarca {
+  nome?: string | null
+  logoUrl?: string | null
+}
+
 /**
- * Marca oficial aprovada da D&R Perícia Trabalhista.
+ * A marca impressa no app e no cabeçalho dos documentos.
  *
- * A arte já contém símbolo, nome e assinatura institucional. Por isso ela
- * nunca é remontada com texto nem recebe filtros que alterem suas cores.
+ * White-label: quando `perito` já subiu uma logo (Configurações › Meu perfil),
+ * é ela que sai — no menu, na pré-visualização, no PDF e no DOCX. A arte da
+ * D&R deixou de ser "a logo do sistema" e virou a logo de UM perito; o que
+ * sobra aqui é o fallback de quem ainda não subiu nada, e as telas sem sessão
+ * (login e splash), que não têm perito para consultar.
+ *
+ * A arte embutida continua sendo usada inteira, sem remontar a marca com
+ * texto e sem filtro que altere as cores dela. As dimensões intrínsecas só
+ * acompanham essa arte: a logo de outro perito tem proporção própria e
+ * declarar 1600x549 nela reservaria uma caixa errada durante o carregamento.
  */
 export function Logo({
   size = 'md',
   className,
+  perito,
 }: {
   size?: 'sm' | 'md' | 'lg' | 'xl'
   invert?: boolean
   showTagline?: boolean
   className?: string
+  perito?: DonoDaMarca | null
 }) {
   const sizes = {
     sm: 'w-[190px]',
@@ -23,13 +43,17 @@ export function Logo({
     xl: 'w-[520px]',
   }
 
+  const propria = perito?.logoUrl?.trim()
+  const alt = propria
+    ? `Logo de ${perito?.nome?.trim() || 'perito responsável'}`
+    : LOGO_PADRAO_ALT
+
   return (
     <div className={cn('inline-flex max-w-full items-center justify-center overflow-hidden rounded bg-white p-1', sizes[size], className)}>
       <img
-        src={logoOficial}
-        alt="D&R Perícia Trabalhista — Engenharia de Segurança e Higiene Ocupacional"
-        width={1600}
-        height={549}
+        src={propria || logoOficial}
+        alt={alt}
+        {...(propria ? {} : { width: 1600, height: 549 })}
         className="h-auto w-full max-w-full object-contain"
       />
     </div>

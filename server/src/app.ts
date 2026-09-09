@@ -14,7 +14,7 @@ import { periciasRouter } from './routes/pericias.js'
 import { quesitosRouter } from './routes/quesitos.js'
 import { textosRouter } from './routes/textos.js'
 import { usuariosRouter } from './routes/usuarios.js'
-import { PASTA_UPLOADS } from './services/armazenamento.js'
+import { PASTA_UPLOADS, estadoDosUploads } from './services/armazenamento.js'
 import { emailDisponivel } from './services/email.js'
 
 // ============================================================
@@ -54,13 +54,26 @@ export function criarApp(): Express {
     }),
   )
 
-  app.get('/saude', (_req, res) => {
-    res.json({
-      ok: true,
-      versao: '1.0.0',
-      ambiente: env.NODE_ENV,
-      email: emailDisponivel() ? 'configurado' : 'indisponível',
-    })
+  // `uploads` esta aqui para ser lido de fora, com um curl, sem entrar no
+  // servidor: e a resposta para "o perito diz que a foto nao sobe".
+  //   gravavel:false  -> o volume nao aceita escrita (permissao ou montagem);
+  //   arquivos:0 depois de um deploy -> nao ha volume persistente e o
+  //   relatorio fotografico foi junto com o container antigo.
+  // A rota continua devolvendo 200 mesmo com o volume ruim: quem chama e o
+  // healthcheck do Coolify, e derrubar a API inteira por causa das fotos
+  // deixaria o perito sem sistema nenhum.
+  app.get('/saude', (_req, res, next) => {
+    estadoDosUploads()
+      .then((uploads) => {
+        res.json({
+          ok: true,
+          versao: '1.0.0',
+          ambiente: env.NODE_ENV,
+          email: emailDisponivel() ? 'configurado' : 'indisponível',
+          uploads,
+        })
+      })
+      .catch(next)
   })
 
   app.use('/auth', authRouter)

@@ -74,6 +74,12 @@ export const agenteSchema = z.object({
   areaRisco: texto.optional(),
   exposicaoPericulosidade: z.enum(['permanente', 'intermitente', 'eventual', 'nao_constatada']).optional(),
   resultadoPericulosidade: z.enum(['caracterizada', 'nao_caracterizada', 'prejudicada']).optional(),
+  // A redação própria e os pontos de verificação do anexo entram como
+  // opcionais de propósito: perícias já gravadas não os têm e precisam
+  // continuar validando na hora de salvar.
+  exposicaoPericulosidadeTexto: texto.optional(),
+  resultadoPericulosidadeTexto: texto.optional(),
+  detalhesNr16: z.array(z.object({ id: texto, rotulo: texto, valor: texto })).max(20).optional(),
   unidadeMedicao: z.enum([
     'ppm', 'mg/m³', '% O₂ em volume', 'dB(A)', 'dB(C)', 'dB(Linear)',
     'IBUTG °C', 'mSv/ano', 'm/s²', 'm/s¹·⁷⁵', 'fibras/cm³',

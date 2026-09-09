@@ -21,8 +21,11 @@ const schema = z.object({
   /// Origens autorizadas do frontend, separadas por vírgula.
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
 
-  /// URL pública desta API — usada para montar as URLs das fotos.
-  API_PUBLIC_URL: z.string().default('http://localhost:3333'),
+  // API_PUBLIC_URL foi removida de proposito. Ela so servia para montar a
+  // URL das fotos, e era um pe de barro: sem a variavel no painel, toda
+  // foto saia apontando para localhost e sumia da tela do perito. Hoje a
+  // URL e relativa — ver urlDaFoto em mappers.ts. Se a variavel ainda
+  // estiver definida no ambiente, e simplesmente ignorada.
 
   UPLOAD_DIR: z.string().default('./uploads'),
   UPLOAD_MAX_MB: z.coerce.number().positive().default(15),

@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client'
 import type { NextFunction, Request, Response } from 'express'
+import multer from 'multer'
 import { ZodError } from 'zod'
 import { env } from './env.js'
 
@@ -49,6 +50,41 @@ export function tratarErros(
 ): void {
   if (erro instanceof ErroHttp) {
     res.status(erro.status).json({ erro: erro.message, detalhes: erro.detalhes })
+    return
+  }
+
+  // Falhas do multer chegavam aqui como erro desconhecido e viravam
+  // "Erro interno do servidor." — sem detalhe nenhum em producao. Era o
+  // que o perito via quando o upload de foto falhava: uma caixa vermelha
+  // generica, indistinguivel de um servidor fora do ar.
+  if (erro instanceof multer.MulterError) {
+    // O limite de PDF e quatro vezes o de imagem (ver armazenamento.ts).
+    const limiteMb = erro.field === 'anexo' ? env.UPLOAD_MAX_MB * 4 : env.UPLOAD_MAX_MB
+    const mensagens: Record<string, [number, string]> = {
+      LIMIT_FILE_SIZE: [
+        413,
+        `Arquivo grande demais. O limite e ${limiteMb} MB por arquivo — reduza a resolucao da foto e envie de novo.`,
+      ],
+      LIMIT_FILE_COUNT: [400, 'Fotos demais de uma vez. Envie no maximo 30 por vez.'],
+      LIMIT_UNEXPECTED_FILE: [
+        400,
+        'O servidor nao reconheceu o campo do arquivo enviado. Atualize a pagina e tente de novo.',
+      ],
+    }
+    const [status, mensagem] = mensagens[erro.code] ?? [
+      400,
+      `Nao foi possivel receber o arquivo (${erro.code}).`,
+    ]
+    res.status(status).json({ erro: mensagem })
+    return
+  }
+
+  // body-parser: JSON acima do limite de express.json(). Acontece quando a
+  // pericia fica muito longa; sem esta ramificacao virava 500 mudo.
+  if ((erro as { type?: string }).type === 'entity.too.large') {
+    res.status(413).json({
+      erro: 'Os dados da pericia ficaram grandes demais para uma unica gravacao. Salve o rascunho e avise o suporte.',
+    })
     return
   }
 

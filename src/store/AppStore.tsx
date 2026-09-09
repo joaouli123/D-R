@@ -17,6 +17,8 @@ interface AppState {
   login: (email: string, senha: string) => Promise<void>
   logout: () => void
   salvarUsuario: (u: Usuario & { senha?: string }) => Promise<void>
+  trocarLogo: (id: string, arquivo: File) => Promise<void>
+  removerLogo: (id: string) => Promise<void>
 
   // Módulo B
   empresas: Empresa[]
@@ -234,6 +236,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    /** Substitui o cadastro na listagem e, se for o meu, também na sessão. */
+    function adotarUsuario(salvo: Usuario): void {
+      setUsuarios((atual) => atual.map((u) => (u.id === salvo.id ? salvo : u)))
+      setUsuario((atual) => (atual?.id === salvo.id ? salvo : atual))
+    }
+
     return {
       usuario,
       usuarios,
@@ -245,6 +253,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // e na assinatura dos documentos.
         if (u.id === usuario?.id) setUsuario((atual) => (atual ? { ...atual, ...u } : atual))
       },
+
+      // A logo não passa por salvarUsuario: é arquivo, vai em multipart e
+      // quem decide o nome dela no volume é o servidor. Por isso as duas
+      // rotas devolvem o cadastro pronto e a tela só o adota — sem
+      // atualização otimista, que aqui mostraria uma marca que talvez o
+      // servidor tenha recusado (formato ou tamanho).
+      trocarLogo: async (id, arquivo) => adotarUsuario(await api.usuarios.enviarLogo(id, arquivo)),
+      removerLogo: async (id) => adotarUsuario(await api.usuarios.removerLogo(id)),
 
       empresas,
       // Devolve a empresa como o servidor gravou: quem cadastra de

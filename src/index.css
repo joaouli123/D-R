@@ -62,8 +62,36 @@
   .doc-sheet p.no-indent {
     text-indent: 0;
   }
+  /* Listas da matriz do perito: marcador em 1,25cm, texto em 2,25cm.
+     Espelha p.item-lista de server/src/services/documento-html.ts. */
+  .doc-sheet p.item-lista {
+    @apply mb-0.5;
+    text-align: left;
+    text-indent: 0;
+    margin-left: 2.25cm;
+    position: relative;
+  }
+  .doc-sheet p.item-lista::before {
+    content: '\2022';
+    position: absolute;
+    left: -1cm;
+  }
+  .doc-sheet p.item-lista-sem-marcador {
+    @apply mb-0.5;
+    text-align: left;
+    text-indent: 0;
+    margin-left: 1.25cm;
+  }
   .doc-sheet table {
     @apply w-full border-collapse my-3 text-[10pt];
+  }
+  /* Ficha das partes da capa: mesmo vão e mesma largura de rótulo do PDF
+     (.parecer-manual .ficha-processual) e do DOCX (COLUNAS_FICHA). */
+  .doc-sheet .ficha-processual {
+    margin: 0 0 34px;
+  }
+  .doc-sheet .ficha-processual th {
+    width: 32%;
   }
   .doc-sheet th,
   .doc-sheet td {

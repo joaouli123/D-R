@@ -1,5 +1,15 @@
-import { useState } from 'react'
-import { KeyRound, Mail, Plus, Server, ShieldCheck, User, UserCog } from 'lucide-react'
+import { useRef, useState } from 'react'
+import {
+  ImageUp,
+  KeyRound,
+  Mail,
+  Plus,
+  Server,
+  ShieldCheck,
+  Trash2,
+  User,
+  UserCog,
+} from 'lucide-react'
 import {
   Badge,
   Button,
@@ -31,8 +41,10 @@ const PERFIL: Record<PerfilUsuario, { label: string; tone: 'green' | 'navy' | 'g
 }
 
 export default function Configuracoes() {
-  const { usuario, usuarios, salvarUsuario } = useApp()
+  const { usuario, usuarios, salvarUsuario, trocarLogo, removerLogo } = useApp()
   const toast = useToast()
+  const campoLogo = useRef<HTMLInputElement>(null)
+  const [logoOcupada, setLogoOcupada] = useState(false)
   const [aba, setAba] = useState<'perfil' | 'usuarios' | 'documento' | 'sistema'>('perfil')
   const [novo, setNovo] = useState<(Usuario & { senha?: string }) | null>(null)
   const [perfilLocal, setPerfilLocal] = useState<Usuario>(usuario!)
@@ -50,6 +62,40 @@ export default function Configuracoes() {
       toast(e instanceof Error ? e.message : 'Não foi possível salvar o perfil.', 'error')
     } finally {
       setSalvando(false)
+    }
+  }
+
+  /**
+   * Envia a logo escolhida e limpa o campo de arquivo.
+   *
+   * O `value = ''` no fim não é cosmético: sem ele, escolher o MESMO arquivo
+   * de novo (depois de corrigir o PNG, por exemplo) não dispara `change` e o
+   * botão fica mudo.
+   */
+  async function enviarLogo(arquivo: File | undefined) {
+    if (!arquivo || !usuario) return
+    setLogoOcupada(true)
+    try {
+      await trocarLogo(usuario.id, arquivo)
+      toast('Logo atualizada. Ela já sai nos próximos documentos.')
+    } catch (e) {
+      toast(api.mensagemDeErro(e, 'Não foi possível enviar a logo.'), 'error')
+    } finally {
+      setLogoOcupada(false)
+      if (campoLogo.current) campoLogo.current.value = ''
+    }
+  }
+
+  async function apagarLogo() {
+    if (!usuario) return
+    setLogoOcupada(true)
+    try {
+      await removerLogo(usuario.id)
+      toast('Logo removida. Os documentos voltam a sair com a arte padrão.')
+    } catch (e) {
+      toast(api.mensagemDeErro(e, 'Não foi possível remover a logo.'), 'error')
+    } finally {
+      setLogoOcupada(false)
     }
   }
 
@@ -158,8 +204,52 @@ export default function Configuracoes() {
           </Card>
 
           <div className="flex flex-col gap-4">
-            <Card className="p-6 text-center">
-              <Logo size="lg" showTagline />
+            <Card>
+              <CardHeader
+                title="Minha logo"
+                subtitle="Sai no menu, na pré-visualização, no PDF e no DOCX."
+                icon={<ImageUp size={18} />}
+              />
+              <div className="flex flex-col items-center gap-3 p-5 text-center">
+                <Logo size="lg" perito={usuario} />
+                <p className="text-[11px] leading-snug text-ink-500">
+                  {usuario?.logoUrl
+                    ? 'Esta é a sua marca — ela assina todos os documentos que você emitir.'
+                    : 'Você ainda não enviou logo: os documentos saem com a arte padrão do sistema.'}
+                </p>
+                <input
+                  ref={campoLogo}
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  className="hidden"
+                  aria-label="Arquivo da logo"
+                  onChange={(e) => void enviarLogo(e.target.files?.[0])}
+                />
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    loading={logoOcupada}
+                    icon={<ImageUp size={15} />}
+                    onClick={() => campoLogo.current?.click()}
+                  >
+                    {usuario?.logoUrl ? 'Trocar logo' : 'Enviar logo'}
+                  </Button>
+                  {usuario?.logoUrl && (
+                    <Button
+                      variant="ghost"
+                      disabled={logoOcupada}
+                      icon={<Trash2 size={15} />}
+                      onClick={() => void apagarLogo()}
+                    >
+                      Remover
+                    </Button>
+                  )}
+                </div>
+                <p className="text-[10px] leading-snug text-ink-400">
+                  PNG (de preferência com fundo transparente) ou JPEG, até 4 MB. O Word não
+                  aceita embutir WebP — por isso esses dois formatos apenas.
+                </p>
+              </div>
             </Card>
             <SeloCredenciado className="flex-1" />
           </div>

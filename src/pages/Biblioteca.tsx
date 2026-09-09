@@ -13,6 +13,7 @@ import {
   useToast,
 } from '@/components/ui'
 import { BibliotecaCategorias } from '@/components/BibliotecaCategorias'
+import { TextosOficiaisMatriz } from '@/components/TextosOficiaisMatriz'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { useApp } from '@/store/AppStore'
 import type { SecaoTexto, TextoBiblioteca } from '@/types'
@@ -138,6 +139,11 @@ export default function Biblioteca() {
           </Button>
         }
       />
+
+      {/* Antes da biblioteca pessoal: era aqui que o perito procurava os textos
+          oficiais e não achava — no formulário eles ficam travados em caixas de
+          poucas linhas. Esta seção é só leitura. */}
+      <TextosOficiaisMatriz />
 
       <Card className="mb-4 overflow-hidden">
         <BibliotecaCategorias

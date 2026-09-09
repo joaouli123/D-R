@@ -6,6 +6,7 @@ import {
   Footer,
   HeadingLevel,
   ImageRun,
+  LevelFormat,
   PageNumber,
   Packer,
   Paragraph,
@@ -18,13 +19,15 @@ import {
 } from 'docx'
 import sharp from 'sharp'
 import type { PericiaCompleta } from '../mappers.js'
-import { LOGO_OFICIAL_ALT, LOGO_OFICIAL_JPEG } from './logo-oficial.js'
+import { type MarcaDoDocumento, marcaDoDocumento } from './logo-oficial.js'
 import {
   AGENTE_LABEL,
+  agenteExibeConclusao,
   type ConteudoEsclarecimento,
   type ConteudoManifestacao,
   type ConteudoQuesitos,
   MARCA,
+  MARCADOR_LISTA,
   ORIGEM_PONTO,
   type TecnicoJson,
   atividadesDoPeriodo,
@@ -32,7 +35,9 @@ import {
   dadosAssinaturaDocumento,
   emParagrafos,
   extenso,
+  fotosEmOrdemDeDocumento,
   intervaloDoPeriodo,
+  linhasDoBloco,
   mascaraCnpj,
   mascaraCpf,
   montarApresentacaoAgente,
@@ -58,6 +63,11 @@ import {
 const FONTE = 'Arial'
 const CORPO = 22 // meio-pontos → 11pt
 const RECUO_PRIMEIRA_LINHA = 709 // 1,25cm em twips
+// Listas da matriz do perito: marcador em 1,25cm e texto em 2,25cm.
+// O deslocamento (hanging) e a diferenca entre os dois, 1cm.
+const RECUO_ITEM_TEXTO = 1276 // 2,25cm em twips
+const RECUO_ITEM_DESLOCADO = 567 // 1cm em twips
+const REFERENCIA_LISTA = 'lista-parecer'
 const LARGURA_UTIL_DXA = 9070
 const RECUO_TABELA_DXA = 120
 const LARGURA_TABELA_DXA = LARGURA_UTIL_DXA - RECUO_TABELA_DXA
@@ -84,12 +94,48 @@ const texto = (
   })
 
 /** Parágrafo do corpo: justificado, com recuo de primeira linha. */
-const p = (t: string) =>
+const p = (t: string, manterComProximo = false) =>
   new Paragraph({
     alignment: AlignmentType.JUSTIFIED,
     indent: { firstLine: RECUO_PRIMEIRA_LINHA },
+    keepNext: manterComProximo,
     spacing: { after: 120, line: 340 },
     children: [texto(t)],
+  })
+
+/**
+ * Item de lista com marcador. O marcador vem da numeração nativa do Word
+ * (REFERENCIA_LISTA), e não do texto: assim o perito continua podendo
+ * editar, recuar e continuar a lista dentro do Word.
+ */
+const pItem = (t: string, manterComProximo = false) =>
+  new Paragraph({
+    alignment: AlignmentType.LEFT,
+    numbering: { reference: REFERENCIA_LISTA, level: 0 },
+    keepNext: manterComProximo,
+    spacing: { after: 40, line: 340 },
+    children: [texto(t)],
+  })
+
+/** Linha recuada sem marcador — os Anexos da NR-16 (item 4.2.1). */
+const pItemSemMarcador = (t: string, manterComProximo = false) =>
+  new Paragraph({
+    alignment: AlignmentType.LEFT,
+    indent: { left: RECUO_PRIMEIRA_LINHA },
+    keepNext: manterComProximo,
+    spacing: { after: 40, line: 340 },
+    children: [texto(t)],
+  })
+
+/**
+ * Um bloco vira uma sequência de parágrafos: linha comum é parágrafo
+ * justificado, "• " é item de lista e TAB é linha recuada sem marcador.
+ */
+const linhasEmParagrafos = (bloco: string, manterComProximo = false): Paragraph[] =>
+  linhasDoBloco(bloco).map((linha) => {
+    if (linha.tipo === 'item') return pItem(linha.texto, manterComProximo)
+    if (linha.tipo === 'item-sem-marcador') return pItemSemMarcador(linha.texto, manterComProximo)
+    return p(linha.texto, manterComProximo)
   })
 
 /** Parágrafo sem recuo — endereçamento, rótulos, encerramento. */
@@ -101,7 +147,7 @@ const pSemRecuo = (t: string, negrito = false, manterComProximo = false) =>
     children: [texto(t, { negrito })],
   })
 
-const h1 = (t: string, centralizado = false, quebrarNoTravessao = false) => {
+const h1 = (t: string, centralizado = false, quebrarNoTravessao = false, espacoAntes = 240) => {
   const titulo = t.toUpperCase()
   const indiceTravessao = quebrarNoTravessao ? titulo.lastIndexOf(' — ') : -1
   const estilo = { negrito: true, tamanho: 36, cor: MARCA.documentoTitulo }
@@ -116,7 +162,7 @@ const h1 = (t: string, centralizado = false, quebrarNoTravessao = false) => {
         space: 6,
       },
     },
-    spacing: { before: 240, after: 240 },
+    spacing: { before: espacoAntes, after: 240 },
     children:
       indiceTravessao >= 0
         ? [
@@ -157,34 +203,25 @@ const h4 = (t: string) =>
 const blocos = (t?: string | null): Paragraph[] => {
   const partes = emParagrafos(t)
   if (!partes.length) return []
-  return partes.map(p)
+  return partes.flatMap((parte) => linhasEmParagrafos(parte))
 }
 
 const blocosEstruturados = (t?: string | null): Paragraph[] => {
   const partes = emParagrafos(t)
   if (!partes.length) return blocos(t)
-  return partes.map((parte) => {
-    const titulo = parte.trim().match(/^([45]\.\d+(?:\.\d+)?\.)\s+(.+)$/s)
-    if (!titulo) return p(parte)
+  return partes.flatMap((parte) => {
+    const titulo = parte.trim().match(/^([45]\.\d+(?:\.\d+)?\.)\s+([^\n]+)$/)
+    if (!titulo) return linhasEmParagrafos(parte)
     const prefixo = titulo[1] ?? ''
     const textoTitulo = titulo[2] ?? ''
     const nivel = prefixo.split('.').filter(Boolean).length
-    return nivel >= 3 ? h4(`${prefixo} ${textoTitulo}`) : h3(`${prefixo} ${textoTitulo}`)
+    return [nivel >= 3 ? h4(`${prefixo} ${textoTitulo}`) : h3(`${prefixo} ${textoTitulo}`)]
   })
 }
 
 const blocosComProximo = (t?: string | null): Paragraph[] => {
   const partes = emParagrafos(t)
-  return partes.map(
-    (parte) =>
-      new Paragraph({
-        alignment: AlignmentType.JUSTIFIED,
-        indent: { firstLine: RECUO_PRIMEIRA_LINHA },
-        keepNext: true,
-        spacing: { after: 120, line: 340 },
-        children: [texto(parte)],
-      }),
-  )
+  return partes.flatMap((parte) => linhasEmParagrafos(parte, true))
 }
 
 const borda = { style: BorderStyle.SINGLE, size: 4, color: MARCA.documentoBorda }
@@ -259,8 +296,11 @@ async function figuraDocx(
       .jpeg({ quality: 88, mozjpeg: true })
       .toBuffer({ resolveWithObject: true })
 
+    // Mesmo teto dos outros dois renderizadores: 540 px = a largura do texto
+    // e 416 px = 11 cm a 96 dpi, o `max-height` de figure img em
+    // documento-html.ts e o max-h-[11cm] de DocumentoPreview.tsx.
     const larguraMaxima = 540
-    const alturaMaxima = 390
+    const alturaMaxima = 416
     const escala = Math.min(larguraMaxima / info.width, alturaMaxima / info.height, 1)
     const largura = Math.max(1, Math.round(info.width * escala))
     const altura = Math.max(1, Math.round(info.height * escala))
@@ -377,7 +417,7 @@ const enderecamentoDoParecer = (
     (linha, indice) =>
       new Paragraph({
         alignment: AlignmentType.JUSTIFIED,
-        spacing: { after: indice === linhas.length - 1 ? 420 : 80, line: 340 },
+        spacing: { after: indice === linhas.length - 1 ? 290 : 80, line: 340 },
         children: [texto(linha, { negrito: true })],
       }),
   )
@@ -401,7 +441,15 @@ function rodape(): Footer {
   })
 }
 
-function marcaOficial(): Paragraph {
+/**
+ * Cabeçalho com a logo do perito responsável (white-label).
+ *
+ * `tipo` e as dimensões vêm prontos de marcaDoDocumento e não são mais
+ * constantes: o Word exige declarar o formato da imagem embutida, e a caixa
+ * fixa de 270x93pt — a proporção exata da arte da D&R — esticaria a marca de
+ * qualquer perito com logo de outro formato.
+ */
+function marcaDoPerito(marca: MarcaDoDocumento): Paragraph {
   return new Paragraph({
     alignment: AlignmentType.CENTER,
     keepNext: true,
@@ -409,22 +457,46 @@ function marcaOficial(): Paragraph {
     spacing: { after: 180 },
     children: [
       new ImageRun({
-        type: 'jpg',
-        data: LOGO_OFICIAL_JPEG,
-        transformation: { width: 270, height: 93 },
+        type: marca.tipo,
+        data: marca.dados,
+        transformation: { width: marca.largura, height: marca.altura },
         altText: {
-          title: LOGO_OFICIAL_ALT,
-          description: LOGO_OFICIAL_ALT,
-          name: LOGO_OFICIAL_ALT,
+          title: marca.alt,
+          description: marca.alt,
+          name: marca.alt,
         },
       }),
     ],
   })
 }
 
-function montarDocumento(filhos: (Paragraph | Table)[]): Document {
+function montarDocumento(filhos: (Paragraph | Table)[], marca: MarcaDoDocumento): Document {
   return new Document({
     styles: { default: { document: { run: { font: FONTE, size: CORPO } } } },
+    // Numeração nativa das listas com marcador da matriz do perito. Fica
+    // aqui, e não em cada parágrafo, porque o Word exige a definição no
+    // documento para o marcador aparecer e continuar editável.
+    numbering: {
+      config: [
+        {
+          reference: REFERENCIA_LISTA,
+          levels: [
+            {
+              level: 0,
+              format: LevelFormat.BULLET,
+              text: MARCADOR_LISTA,
+              alignment: AlignmentType.LEFT,
+              style: {
+                run: { font: FONTE, size: CORPO, color: MARCA.documentoTexto },
+                paragraph: {
+                  indent: { left: RECUO_ITEM_TEXTO, hanging: RECUO_ITEM_DESLOCADO },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    },
     sections: [
       {
         properties: {
@@ -435,7 +507,7 @@ function montarDocumento(filhos: (Paragraph | Table)[]): Document {
           },
         },
         footers: { default: rodape() },
-        children: [marcaOficial(), ...filhos],
+        children: [marcaDoPerito(marca), ...filhos],
       },
     ],
   })
@@ -458,7 +530,7 @@ async function docParecer(
     .map((r) => porId.get(r.empresaId))
     .filter((e): e is Empresa => Boolean(e))
 
-  const fotosOrdenadas = [...pericia.fotos].sort((a, b) => a.ordem - b.ordem)
+  const fotosOrdenadas = fotosEmOrdemDeDocumento(pericia.fotos)
   const numeroDaFoto = new Map(fotosOrdenadas.map((foto, indice) => [foto.id, indice + 1]))
   const fotosDasSecoes = async (secoes: string[]) => {
     const elementos: (Paragraph | Table)[] = []
@@ -495,11 +567,12 @@ async function docParecer(
 
   const filhos: (Paragraph | Table)[] = [
     ...enderecamentoDoParecer(pericia.vara, pericia.comarca),
+    h3('IDENTIFICAÇÃO DAS PARTES'),
     tabela([
       fichaLinha('Processo nº', pericia.numeroProcesso),
       fichaLinha(
         'Reclamante',
-        `${pericia.reclamante}${pericia.cpfReclamante ? ` — CPF ${mascaraCpf(pericia.cpfReclamante)}` : ''}`,
+        `${pericia.reclamante}${pericia.cpfReclamante ? ` — CPF: ${mascaraCpf(pericia.cpfReclamante)}` : ''}`,
       ),
       fichaLinha(
         'Reclamada',
@@ -507,7 +580,7 @@ async function docParecer(
       ),
       ...solidarias.map((e) => fichaLinha('Reclamada', `${e.razaoSocial} — CNPJ ${mascaraCnpj(e.cnpj)}`)),
     ]),
-    h1(titulo, true),
+    h1(titulo, true, false, 510),
     h3('APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA'),
     ...blocos(t.apresentacao),
     h2(num.secao('OBJETO DA PERÍCIA E DADOS CONTRATUAIS')),
@@ -553,8 +626,10 @@ async function docParecer(
   }
 
   filhos.push(
+    // Título de nível 1 sem texto próprio: o 3.1 vem colado no 3, igual ao
+    // PDF e à pré-visualização. `t.descricaoEmpresa` segue gravado nas
+    // perícias antigas, mas não é mais impresso (pedido do perito).
     h2(num.secao('DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA')),
-    ...blocos(t.descricaoEmpresa),
     h3(num.sub('Instalações Físicas')),
     ...blocos(t.descricaoAmbiente),
   )
@@ -578,7 +653,17 @@ async function docParecer(
     ...blocos(t.produtosUtilizados),
   )
   filhos.push(...(await fotosDasSecoes(['produtos'])))
-  filhos.push(h2(num.secao('HISTÓRICO LABORAL, PERÍODOS E ATIVIDADES HABITUAIS EXERCIDAS')))
+  // O 7.1 abre a secao 7, antes da tabela de periodos (pedido do perito).
+  // Os argumentos de um mesmo push avaliam da esquerda para a direita, entao
+  // num.secao roda antes de num.sub e o subtitulo continua sendo o 7.1.
+  // O h3 tem de ficar FORA do `if (t.periodos?.length)` abaixo: dentro dele,
+  // pericia sem periodos perderia o 7.1 e todos os subitens seguintes da
+  // secao 7 subiriam um numero, dessincronizando o DOCX do PDF e da previa.
+  filhos.push(
+    h2(num.secao('HISTÓRICO LABORAL, PERÍODOS E ATIVIDADES HABITUAIS EXERCIDAS')),
+    h3(num.sub('Atividades Efetivamente Exercidas')),
+    ...blocos(t.atividadesFuncoes),
+  )
 
   if (t.periodos?.length) {
     const largurasPeriodos = [3043, 2506, 3401] as const
@@ -630,8 +715,6 @@ async function docParecer(
     )
   }
 
-  filhos.push(h3(num.sub('Atividades Efetivamente Exercidas')), ...blocos(t.atividadesFuncoes))
-
   const rotuloNatureza = (tipo?: string) => ({
     fisico: 'Agente Físico',
     quimico: 'Agente Químico',
@@ -659,7 +742,7 @@ async function docParecer(
           }),
           ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor)),
         ])] : []),
-        ...(agente.tipo === 'periculosidade' ? [] : [h4('Conclusão'), ...blocos(agente.observacao)]),
+        ...(agenteExibeConclusao(agente) ? [h4('Conclusão'), ...blocos(agente.observacao)] : []),
       )
     }
   }
@@ -701,8 +784,16 @@ async function docParecer(
 
   filhos.push(h2(num.secao('DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)')))
   filhos.push(...blocos(t.notaTecnicaEpis))
+  // A seção de EPIs precisa enxergar exatamente os mesmos agentes que o resto
+  // do documento. Enquanto varria a lista inteira, uma perícia só de
+  // periculosidade imprimia aqui os EPIs de agentes NR-15 herdados do
+  // cadastro — agentes que nenhum outro item do laudo mencionava, porque a
+  // modalidade já os tinha excluído. Ficavam proteções órfãs, atribuídas a
+  // um agente que o leitor não encontrava em lugar nenhum.
   let numeroProtecao = 1
-  for (const agente of agentes.filter((item) => item.identificadoNaAtividade !== false)) {
+  for (const agente of agentes.filter((item) =>
+    item.identificadoNaAtividade !== false
+    && (item.tipo === 'periculosidade' ? temPericulosidade : temInsalubridade))) {
     const apresentacao = montarApresentacaoAgente(agente)
     if (!apresentacao.protecoes.length) continue
     filhos.push(h3(apresentacao.titulo))
@@ -757,7 +848,7 @@ async function docParecer(
           ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor)),
           ...(protecoes ? [fichaLinha('Proteções associadas', protecoes)] : []),
         ])] : []),
-        ...(agente.tipo === 'periculosidade' ? [] : [h4('Conclusão'), ...blocos(agente.observacao)]),
+        ...(agenteExibeConclusao(agente) ? [h4('Conclusão'), ...blocos(agente.observacao)] : []),
       )
     })
   }
@@ -953,5 +1044,5 @@ export async function gerarDocx(
       break
   }
 
-  return Packer.toBuffer(montarDocumento(filhos))
+  return Packer.toBuffer(montarDocumento(filhos, await marcaDoDocumento(perito)))
 }

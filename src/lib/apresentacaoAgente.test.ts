@@ -203,4 +203,80 @@ describe('montarApresentacaoAgente', () => {
     expect(apresentacao.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'CAS' }))
     expect(apresentacao.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'Limite de tolerância' }))
   })
+
+  it('esconde o adicional de 30% quando nada foi enquadrado — a tabela do cenário negativo', () => {
+    const apresentacao = montarApresentacaoAgente({
+      id: 'periculosidade-2',
+      nome: 'Ausência de atividade ou operação perigosa enquadrável na NR-16',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      exposicaoPericulosidade: 'nao_constatada',
+      resultadoPericulosidade: 'nao_caracterizada',
+    } as AgenteAvaliado)
+
+    // “30%” impresso logo acima de “não caracterizada” era lido como se algo
+    // fosse devido. O resto da tabela continua igual.
+    expect(apresentacao.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'Adicional' }))
+    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Natureza', valor: 'Periculosidade' })
+    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Critério', valor: 'Qualitativo' })
+    expect(apresentacao.linhas).toContainEqual(expect.objectContaining({ rotulo: 'Resultado técnico' }))
+  })
+
+  it('imprime os pontos de verificação do anexo, na ordem gravada e sem os vazios', () => {
+    const apresentacao = montarApresentacaoAgente({
+      id: 'periculosidade-3',
+      nome: 'Inflamáveis',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      anexoNr16: 'ANEXO_02',
+      areaRisco: 'Bomba de abastecimento no pátio',
+      exposicaoPericulosidade: 'permanente',
+      resultadoPericulosidade: 'caracterizada',
+      detalhesNr16: [
+        { id: 'produto', rotulo: 'Produto inflamável ou combustível', valor: 'Óleo diesel S10' },
+        { id: 'fds', rotulo: 'Ficha com Dados de Segurança (FDS)', valor: '   ' },
+        { id: 'local', rotulo: 'Local da operação', valor: 'Tanque aéreo' },
+      ],
+    } as AgenteAvaliado)
+
+    const rotulos = apresentacao.linhas.map((linha) => linha.rotulo)
+    expect(apresentacao.linhas).toContainEqual({
+      rotulo: 'Produto inflamável ou combustível',
+      valor: 'Óleo diesel S10',
+    })
+    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Local da operação', valor: 'Tanque aéreo' })
+    // Campo em branco não vira linha vazia no meio da tabela.
+    expect(rotulos).not.toContain('Ficha com Dados de Segurança (FDS)')
+    // Os pontos entram depois da área de risco e antes da exposição.
+    expect(rotulos.indexOf('Produto inflamável ou combustível'))
+      .toBeGreaterThan(rotulos.indexOf('Condição ou área de risco'))
+    expect(rotulos.indexOf('Local da operação')).toBeLessThan(rotulos.indexOf('Exposição'))
+  })
+
+  it('deixa a redação própria vencer o seletor, inclusive para o adicional', () => {
+    const apresentacao = montarApresentacaoAgente({
+      id: 'periculosidade-4',
+      nome: 'Inflamáveis',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      anexoNr16: 'ANEXO_02',
+      exposicaoPericulosidade: 'permanente',
+      resultadoPericulosidade: 'nao_caracterizada',
+      exposicaoPericulosidadeTexto: 'Exposição nas três horas diárias de abastecimento da frota.',
+      resultadoPericulosidadeTexto: 'Caracterizada a periculosidade apenas de 2019 a 2022.',
+    } as AgenteAvaliado)
+
+    expect(apresentacao.linhas).toContainEqual({
+      rotulo: 'Exposição',
+      valor: 'Exposição nas três horas diárias de abastecimento da frota.',
+    })
+    expect(apresentacao.linhas).toContainEqual({
+      rotulo: 'Resultado técnico',
+      valor: 'Caracterizada a periculosidade apenas de 2019 a 2022.',
+    })
+    expect(apresentacao.linhas).not.toContainEqual({ rotulo: 'Exposição', valor: 'Permanente' })
+    // Escrito à mão, o resultado deixa de ser o “não caracterizada” da lista
+    // e a tabela volta a ser a do cenário com enquadramento.
+    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Adicional', valor: '30%' })
+  })
 })

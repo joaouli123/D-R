@@ -43,6 +43,9 @@ model Usuario {
   registroProfissional String?
   titulo               String?
   telefone             String?
+  /// Nome do arquivo da logo no volume de uploads (white-label: cada perito
+  /// usa a própria marca no app e nos documentos). NULL = usa a arte embutida.
+  logoArquivo          String?
   ativo                Boolean   @default(true)
   ultimoAcesso         DateTime?
   criadoEm             DateTime  @default(now())

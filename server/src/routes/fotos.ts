@@ -36,21 +36,34 @@ fotosRouter.post(
 
     const secao = secoes.parse(req.body.secao ?? 'ambiente')
 
-    const jaExistem = await prisma.foto.count({ where: { periciaId, secao } })
+    // Contagem por PERÍCIA, não por seção: `ordem` é lida globalmente em
+    // routes/pericias.ts e os três renderizadores numeram "Fotografia N" na
+    // sequência global. Contando por seção, a 1ª foto de "Ambiente" e a 1ª de
+    // "EPIs" empatavam em ordem 1 e a legenda saía fora de sequência.
+    const jaExistem = await prisma.foto.count({ where: { periciaId } })
 
-    const criadas = await prisma.$transaction(
-      arquivos.map((arquivo, i) =>
-        prisma.foto.create({
-          data: {
-            periciaId,
-            secao,
-            arquivo: arquivo.filename,
-            legenda: arquivo.originalname.replace(/\.[^.]+$/, ''),
-            ordem: jaExistem + i + 1,
-          },
-        }),
-      ),
-    )
+    // Se o INSERT falhar, os arquivos ja estao no disco: sem esta limpeza
+    // eles ficariam ocupando o volume para sempre, sem nenhuma foto no
+    // banco apontando para eles.
+    let criadas
+    try {
+      criadas = await prisma.$transaction(
+        arquivos.map((arquivo, i) =>
+          prisma.foto.create({
+            data: {
+              periciaId,
+              secao,
+              arquivo: arquivo.filename,
+              legenda: arquivo.originalname.replace(/\.[^.]+$/, ''),
+              ordem: jaExistem + i + 1,
+            },
+          }),
+        ),
+      )
+    } catch (e) {
+      await Promise.all(arquivos.map((a) => apagarUpload(a.filename)))
+      throw e
+    }
 
     res.status(201).json(
       criadas.map((f) => ({

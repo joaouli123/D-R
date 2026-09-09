@@ -8,11 +8,14 @@ import {
   TEXTO_AUSENCIA_RECLAMANTE,
 } from '@/lib/participantes'
 import { montarApresentacaoAgente } from '@/lib/apresentacaoAgente'
+import { agenteExibeConclusao } from '@/lib/conclusoesAgentes'
 import { intervaloDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
 import { dadosAssinatura } from '@/lib/assinaturaDocumento'
 import { objetivoPadraoDaPericia } from '@/content/textosPadrao'
 import { horarioDaVistoria } from '@/lib/vistoria'
 import { atividadesDoPeriodo } from '@/lib/periodos'
+import { emParagrafos, linhasDoBloco } from '@/lib/listasDocumento'
+import { fotosEmOrdemDeDocumento } from '@/lib/fotosDocumento'
 import { Logo } from '@/components/Logo'
 
 // ============================================================
@@ -21,30 +24,53 @@ import { Logo } from '@/components/Logo'
 // de PDF e DOCX e segue o modelo enxuto aprovado pelo cliente.
 // ============================================================
 
-function Paragrafos({ texto }: { texto?: string | null }) {
-  if (!texto?.trim()) return null
+/**
+ * Um bloco vira uma sequência de parágrafos: linha comum é parágrafo
+ * justificado, "• " é item de lista e TAB é linha recuada sem marcador.
+ * O glifo do marcador vem do CSS (::before), nunca do texto — é o que
+ * garante o alinhamento em 1,25 cm / 2,25 cm da matriz do perito.
+ */
+function LinhasDoBloco({ bloco }: { bloco: string }) {
   return (
     <>
-      {texto.split(/\n{2,}/).map((paragrafo, indice) => (
-        <p key={indice}>{paragrafo.trim()}</p>
+      {linhasDoBloco(bloco).map((linha, indice) => {
+        if (linha.tipo === 'item') return <p key={indice} className="item-lista">{linha.texto}</p>
+        if (linha.tipo === 'item-sem-marcador') {
+          return <p key={indice} className="item-lista-sem-marcador">{linha.texto}</p>
+        }
+        return <p key={indice}>{linha.texto}</p>
+      })}
+    </>
+  )
+}
+
+function Paragrafos({ texto }: { texto?: string | null }) {
+  const partes = emParagrafos(texto)
+  if (!partes.length) return null
+  return (
+    <>
+      {partes.map((parte, indice) => (
+        <LinhasDoBloco key={indice} bloco={parte} />
       ))}
     </>
   )
 }
 
 function ConteudoEstruturado({ texto }: { texto?: string | null }) {
-  if (!texto?.trim()) return null
+  const partes = emParagrafos(texto)
+  if (!partes.length) return null
 
   return (
     <>
-      {texto.split(/\n{2,}/).map((bloco, indice) => {
-        const conteudo = bloco.trim()
-        const titulo = conteudo.match(/^([45]\.\d+(?:\.\d+)?\.)\s+(.+)$/s)
-        if (!titulo) return <p key={indice}>{conteudo}</p>
-        const nivel = titulo[1].split('.').filter(Boolean).length
+      {partes.map((parte, indice) => {
+        const titulo = parte.trim().match(/^([45]\.\d+(?:\.\d+)?\.)\s+([^\n]+)$/)
+        if (!titulo) return <LinhasDoBloco key={indice} bloco={parte} />
+        const prefixo = titulo[1] ?? ''
+        const textoTitulo = titulo[2] ?? ''
+        const nivel = prefixo.split('.').filter(Boolean).length
         return nivel >= 3
-          ? <h4 key={indice}>{titulo[1]} {titulo[2]}</h4>
-          : <h3 key={indice}>{titulo[1]} {titulo[2]}</h3>
+          ? <h4 key={indice}>{prefixo} {textoTitulo}</h4>
+          : <h3 key={indice}>{prefixo} {textoTitulo}</h3>
       })}
     </>
   )
@@ -74,7 +100,7 @@ export function DocumentoPreview({
   // simplesmente não aparece — janela chutada no laudo é pior que nenhuma.
   const periodo = periodoAvaliacaoEmpresa(pericia)
 
-  const fotosOrdenadas = [...pericia.fotos].sort((a, b) => a.ordem - b.ordem)
+  const fotosOrdenadas = fotosEmOrdemDeDocumento(pericia.fotos)
   const numeroDaFoto = new Map(fotosOrdenadas.map((foto, indice) => [foto.id, indice + 1]))
   const fotosDasSecoes = (secoes: SecaoFoto[]) => {
     const fotos = fotosOrdenadas.filter((foto) => secoes.includes(foto.secao))
@@ -90,10 +116,14 @@ export function DocumentoPreview({
           return <figure key={foto.id} className="break-inside-avoid text-center">
             <div className="flex items-center justify-center overflow-hidden border border-ink-300 bg-white p-2">
               {foto.url ? (
+                // 11 cm é o teto do PDF (documento-html.ts, figure img) e do
+                // DOCX (docx.ts, alturaMaxima). Os três precisam do mesmo teto,
+                // senão a mesma foto quebra de página em lugar diferente em
+                // cada saída.
                 <img
                   src={foto.url}
                   alt={foto.legenda}
-                  className="max-h-[19cm] max-w-full object-contain"
+                  className="max-h-[11cm] max-w-full object-contain"
                 />
               ) : (
                 <span className="py-20 text-[9pt] text-ink-400">Imagem indisponível</span>
@@ -170,7 +200,7 @@ export function DocumentoPreview({
                   ))}
                 </tbody>
               </table>}
-              {agente.tipo !== 'periculosidade' && <><h4>Conclusão</h4><Paragrafos texto={agente.observacao} /></>}
+              {agenteExibeConclusao(agente) && <><h4>Conclusão</h4><Paragrafos texto={agente.observacao} /></>}
             </section>
           )
         })}
@@ -214,7 +244,7 @@ export function DocumentoPreview({
                   )}
                 </tbody>
               </table>}
-              {agente.tipo !== 'periculosidade' && <><h4>Conclusão</h4><Paragrafos texto={agente.observacao} /></>}
+              {agenteExibeConclusao(agente) && <><h4>Conclusão</h4><Paragrafos texto={agente.observacao} /></>}
             </section>
           )
         })}
@@ -222,7 +252,16 @@ export function DocumentoPreview({
     </section>
   ) : null
 
-  const protecoes = t.agentes.filter((agente) => agente.identificadoNaAtividade !== false).flatMap((agente) => {
+  // A seção de EPIs precisa enxergar exatamente os mesmos agentes que o resto
+  // do documento. Enquanto varria a lista inteira, uma perícia só de
+  // periculosidade imprimia aqui os EPIs de agentes NR-15 herdados do
+  // cadastro — agentes que nenhum outro item do laudo mencionava, porque a
+  // modalidade já os tinha excluído. Ficavam proteções órfãs, atribuídas a
+  // um agente que o leitor não encontrava em lugar nenhum.
+  const protecoes = t.agentes.filter((agente) =>
+    agente.identificadoNaAtividade !== false
+    && (agente.tipo === 'periculosidade' ? temPericulosidade : temInsalubridade),
+  ).flatMap((agente) => {
     const apresentacao = montarApresentacaoAgente(agente)
     return apresentacao.protecoes.length ? [{ agente, apresentacao }] : []
   })
@@ -243,7 +282,7 @@ export function DocumentoPreview({
   return (
     <article className="doc-sheet mx-auto w-full max-w-[820px] bg-white px-10 py-12 shadow-card print-area sm:px-14">
       <header className="marca-oficial mb-8 border-b-2 border-[#007a3d] pb-5 text-center">
-        <Logo size="lg" className="mx-auto" />
+        <Logo size="lg" className="mx-auto" perito={perito} />
         {perito && (
           <p className="no-indent mt-2 text-center text-[8.5pt] text-ink-500">
             {perito.nome}{perito.titulo ? ` — ${perito.titulo}` : ''}
@@ -251,35 +290,28 @@ export function DocumentoPreview({
           </p>
         )}
       </header>
-      <section className="mb-8">
-        <p className="no-indent font-bold uppercase">
-          {`EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA ${[pericia.vara, pericia.comarca]
-            .filter(Boolean)
-            .join(' — ')}`.toUpperCase()}
-        </p>
-      </section>
+      <p className="no-indent font-bold uppercase mb-[34px]">
+        {`EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA ${[pericia.vara, pericia.comarca]
+          .filter(Boolean)
+          .join(' — ')}`.toUpperCase()}
+      </p>
 
+      <h3 className="mt-0 mb-2">IDENTIFICAÇÃO DAS PARTES</h3>
       <table className="ficha-processual">
         <tbody>
           <tr>
-            <th className="w-[32%]">Processo nº</th>
+            <th>Processo nº</th>
             <td>{pericia.numeroProcesso}</td>
-          </tr>
-          <tr>
-            <th>Vara / Comarca</th>
-            <td>
-              {pericia.vara} — {pericia.comarca}
-            </td>
           </tr>
           <tr>
             <th>Reclamante</th>
             <td>
               {pericia.reclamante}
-              {pericia.cpfReclamante ? ` — CPF ${maskCPF(pericia.cpfReclamante)}` : ''}
+              {pericia.cpfReclamante ? ` — CPF: ${maskCPF(pericia.cpfReclamante)}` : ''}
             </td>
           </tr>
           <tr>
-            <th>Reclamada principal</th>
+            <th>Reclamada</th>
             <td>
               {empresaPrincipal
                 ? `${empresaPrincipal.razaoSocial} — CNPJ ${maskCNPJ(empresaPrincipal.cnpj)}`
@@ -288,7 +320,7 @@ export function DocumentoPreview({
           </tr>
           {outras.map((e) => (
             <tr key={e.id}>
-              <th>Reclamada solidária</th>
+              <th>Reclamada</th>
               <td>
                 {e.razaoSocial} — CNPJ {maskCNPJ(e.cnpj)}
               </td>
@@ -298,7 +330,7 @@ export function DocumentoPreview({
       </table>
 
       <h1>{titulo}</h1>
-      <h3>APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA</h3>
+      <h3 className="mt-0 mb-2">APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA</h3>
       <Paragrafos texto={t.apresentacao} />
 
       <h2>1. Objeto da Perícia e Dados Contratuais</h2>
@@ -350,8 +382,10 @@ export function DocumentoPreview({
         </table>
       )}
 
+      {/* Título de nível 1 sem texto próprio: o 3.1 sobe colado no 3 (pedido
+          do perito). `t.descricaoEmpresa` continua no modelo por causa das
+          perícias já gravadas, mas não aparece mais em nenhum renderizador. */}
       <h2>3. Descrição das Instalações da Reclamada</h2>
-      <Paragrafos texto={t.descricaoEmpresa} />
       <h3>3.1. Instalações Físicas</h3>
       <Paragrafos texto={t.descricaoAmbiente} />
       {fotosDasSecoes(['ambiente'])}
@@ -376,6 +410,8 @@ export function DocumentoPreview({
       {fotosDasSecoes(['produtos'])}
 
       <h2>7. Histórico Laboral, Períodos e Atividades Habituais Exercidas</h2>
+      <h3>7.1. Atividades Efetivamente Exercidas</h3>
+      <Paragrafos texto={t.atividadesFuncoes} />
       {t.periodos.length > 0 && (
         <table>
           <tbody>
@@ -403,8 +439,6 @@ export function DocumentoPreview({
           </tbody>
         </table>
       )}
-      <h3>7.1. Atividades Efetivamente Exercidas</h3>
-      <Paragrafos texto={t.atividadesFuncoes} />
       {temInsalubridade && <><h3>{numeroAvaliacaoNr15}. NR-15 — Avaliação da Exposição Ocupacional</h3>{agentesSemProtecoes(agentesNr15, numeroAvaliacaoNr15 ?? undefined)}</>}
       {temPericulosidade && <>
         <h3>{numeroAvaliacaoNr16}. NR-16 — Avaliação das Atividades e Operações Perigosas</h3>

@@ -1,9 +1,9 @@
 import type { DocumentoGerado, Empresa, Usuario } from '@prisma/client'
 import type { PericiaCompleta } from '../mappers.js'
-import { comoDataUri } from './armazenamento.js'
-import { LOGO_OFICIAL_ALT, LOGO_OFICIAL_DATA_URI } from './logo-oficial.js'
+import { marcaDoDocumento } from './logo-oficial.js'
 import {
   AGENTE_LABEL,
+  agenteExibeConclusao,
   type ConteudoEsclarecimento,
   type ConteudoManifestacao,
   type ConteudoQuesitos,
@@ -16,6 +16,8 @@ import {
   atividadesDoPeriodo,
   emParagrafos,
   extenso,
+  fotosEmOrdemDeDocumento,
+  linhasDoBloco,
   intervaloDoPeriodo,
   mascaraCnpj,
   mascaraCpf,
@@ -51,18 +53,34 @@ function esc(v: unknown): string {
     .replace(/'/g, '&#39;')
 }
 
+/**
+ * Um bloco vira uma sequência de parágrafos: linha comum é parágrafo
+ * justificado, "• " é item de lista e TAB é linha recuada sem marcador.
+ * O glifo do marcador vem do CSS (::before), nunca do texto — é o que
+ * garante o alinhamento em 1,25 cm / 2,25 cm da matriz do perito.
+ */
+function linhasEmHtml(bloco: string): string {
+  return linhasDoBloco(bloco)
+    .map((linha) => {
+      if (linha.tipo === 'item') return `<p class="item-lista">${esc(linha.texto)}</p>`
+      if (linha.tipo === 'item-sem-marcador') return `<p class="item-lista-sem-marcador">${esc(linha.texto)}</p>`
+      return `<p>${esc(linha.texto)}</p>`
+    })
+    .join('')
+}
+
 function paragrafos(texto?: string | null): string {
   const partes = emParagrafos(texto)
   if (!partes.length) return ''
-  return partes.map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('')
+  return partes.map(linhasEmHtml).join('')
 }
 
 function paragrafosEstruturados(texto?: string | null): string {
   const partes = emParagrafos(texto)
   if (!partes.length) return ''
   return partes.map((parte) => {
-    const titulo = parte.trim().match(/^([45]\.\d+(?:\.\d+)?\.)\s+(.+)$/s)
-    if (!titulo) return `<p>${esc(parte).replace(/\n/g, '<br>')}</p>`
+    const titulo = parte.trim().match(/^([45]\.\d+(?:\.\d+)?\.)\s+([^\n]+)$/)
+    if (!titulo) return linhasEmHtml(parte)
     const prefixo = titulo[1] ?? ''
     const textoTitulo = titulo[2] ?? ''
     const nivel = prefixo.split('.').filter(Boolean).length
@@ -124,6 +142,11 @@ const CSS = `
   p { margin: 0 0 8px; text-indent: 1.25cm; }
   p.sem-recuo { text-indent: 0; }
   p.vazio { font-style: italic; color: ${css(MARCA.tinta400)}; text-indent: 0; }
+  /* Listas da matriz do perito: marcador em 1,25cm, texto em 2,25cm.
+     O glifo vem do ::before para o texto alinhar tambem na primeira linha. */
+  p.item-lista { text-align: left; text-indent: 0; margin: 0 0 2px 2.25cm; position: relative; }
+  p.item-lista::before { content: '\\2022'; position: absolute; left: -1cm; }
+  p.item-lista-sem-marcador { text-align: left; text-indent: 0; margin: 0 0 2px 1.25cm; }
   .nota { font-size: 8.5pt; color: ${css(MARCA.tinta500)}; }
   /* Uma tabela pode atravessar páginas; cada linha continua inteira e o
      cabeçalho reaparece na continuação. Manter a tabela toda indivisível
@@ -161,12 +184,12 @@ const CSS = `
   .resultado-positivo,
   .resultado-negativo,
   .resultado-aviso { font-weight: 700; }
-  .parecer-manual h1 { color: var(--documento-titulo); text-align: center; }
+  .parecer-manual h1 { color: var(--documento-titulo); text-align: center; text-transform: uppercase; }
   .parecer-manual h2,
   .parecer-manual h3 { color: var(--documento-titulo); }
   .parecer-manual .enderecamento-judicial { margin: 0 0 34px; font-weight: 700; }
   .parecer-manual .ficha-processual { margin: 0 0 34px; }
-  .parecer-manual .ficha-processual th { width: 25%; background: transparent; }
+  .parecer-manual .ficha-processual th { width: 32%; }
   .parecer-manual .titulo-qualificacao {
     margin: 0 0 8px;
     color: var(--documento-secao);
@@ -195,22 +218,27 @@ const CSS = `
   .assinatura .dado { font-size: 10pt; }
 `
 
-function moldura(
+async function moldura(
   titulo: string,
   perito: Usuario | null,
   corpo: string,
   opcoes: { comMarca?: boolean; classeCorpo?: string } = {},
-): string {
+): Promise<string> {
   const credencial = perito
     ? `<p class="perito-cabecalho">${esc(perito.nome)}${perito.titulo ? ` — ${esc(perito.titulo)}` : ''}${
         perito.registroProfissional ? ` · ${esc(perito.registroProfissional)}` : ''
       }</p>`
     : ''
 
+  // A logo vem do perito responsável, não mais do sistema: cada um assina o
+  // documento com a própria marca (Configurações › Meu perfil). Quem não subiu
+  // nenhuma continua com a arte embutida — marcaDoDocumento resolve os dois
+  // casos e nunca lança.
   const comMarca = opcoes.comMarca !== false
-  const cabecalho = comMarca
+  const marca = comMarca ? await marcaDoDocumento(perito) : null
+  const cabecalho = marca
     ? `<header class="marca">
-    <img class="logo-oficial" src="${LOGO_OFICIAL_DATA_URI}" alt="${esc(LOGO_OFICIAL_ALT)}">
+    <img class="logo-oficial" src="${marca.dataUri}" alt="${esc(marca.alt)}">
     ${credencial}
   </header>`
     : ''
@@ -277,7 +305,7 @@ export async function htmlDoParecer(
   const identificacao = `
   <table class="ficha-processual"><tbody>
     ${linha('Processo nº', esc(pericia.numeroProcesso))}
-    ${linha('Reclamante', `${esc(pericia.reclamante)}${pericia.cpfReclamante ? ` — CPF ${esc(mascaraCpf(pericia.cpfReclamante))}` : ''}`)}
+    ${linha('Reclamante', `${esc(pericia.reclamante)}${pericia.cpfReclamante ? ` — CPF: ${esc(mascaraCpf(pericia.cpfReclamante))}` : ''}`)}
     ${linha('Reclamada', principal ? `${esc(principal.razaoSocial)} — CNPJ ${esc(mascaraCnpj(principal.cnpj))}` : '—')}
     ${solidarias.map((e) => linha('Reclamada', `${esc(e.razaoSocial)} — CNPJ ${esc(mascaraCnpj(e.cnpj))}`)).join('')}
   </tbody></table>`
@@ -366,13 +394,23 @@ export async function htmlDoParecer(
         const titulo = prefixo
           ? `${prefixo}.${indice + 1}. ${rotuloNatureza(agente.tipo)} — ${apresentacao.titulo}`
           : apresentacao.titulo
-        const conclusao = agente.tipo === 'periculosidade' ? '' : `<h4>Conclusão</h4>${paragrafos(agente.observacao)}`
+        const conclusao = agenteExibeConclusao(agente) ? `<h4>Conclusão</h4>${paragrafos(agente.observacao)}` : ''
         return `<section class="agente-bloco"><div class="agente-resumo"><h3 class="agente-titulo">${esc(titulo)}</h3>${identificado ? tabelaLinhasAgente(apresentacao.linhas, true) : ''}</div>${conclusao}</section>`
       }).join('')
     : ''
 
+  // A seção de EPIs precisa enxergar exatamente os mesmos agentes que o resto
+  // do documento. Enquanto varria a lista inteira, uma perícia só de
+  // periculosidade imprimia aqui os EPIs de agentes NR-15 herdados do
+  // cadastro — agentes que nenhum outro item do laudo mencionava, porque a
+  // modalidade já os tinha excluído. Ficavam proteções órfãs, atribuídas a
+  // um agente que o leitor não encontrava em lugar nenhum.
+  const agentesComProtecao = agentes.filter((agente) =>
+    agente.identificadoNaAtividade !== false
+    && (agente.tipo === 'periculosidade' ? temPericulosidade : temInsalubridade))
+
   let numeroProtecao = 1
-  const blocoProtecoes = agentes.filter((agente) => agente.identificadoNaAtividade !== false).flatMap((agente) => {
+  const blocoProtecoes = agentesComProtecao.flatMap((agente) => {
     const apresentacao = montarApresentacaoAgente(agente)
     if (!apresentacao.protecoes.length) return []
     return [
@@ -388,11 +426,15 @@ export async function htmlDoParecer(
   }).join('')
 
   // Fotos viram data URI: o Chromium roda com a rede bloqueada.
-  const fotosOrdenadas = [...pericia.fotos].sort((a, b) => a.ordem - b.ordem)
+  const fotosOrdenadas = fotosEmOrdemDeDocumento(pericia.fotos)
   const numeroDaFoto = new Map(fotosOrdenadas.map((foto, indice) => [foto.id, indice + 1]))
   const fotosDasSecoes = async (secoes: string[]) => {
     const fotos = fotosOrdenadas.filter((foto) => secoes.includes(foto.secao))
     if (!fotos.length) return ''
+    // Carrega o armazenamento apenas quando há foto para embutir, como o
+    // docx.ts já faz: o import estático puxava env.ts, que chama
+    // process.exit(1) sem DATABASE_URL e matava o worker do vitest.
+    const { comoDataUri } = await import('./armazenamento.js')
     const figuras = await Promise.all(
       fotos.map(async (f) => {
           const numeroAtual = numeroDaFoto.get(f.id)
@@ -444,7 +486,7 @@ export async function htmlDoParecer(
         const linhas = protecoes
           ? [...apresentacao.linhas, { rotulo: 'Proteções associadas', valor: protecoes }]
           : apresentacao.linhas
-        const conclusao = agente.tipo === 'periculosidade' ? '' : `<h4>Conclusão</h4>${paragrafos(agente.observacao)}`
+        const conclusao = agenteExibeConclusao(agente) ? `<h4>Conclusão</h4>${paragrafos(agente.observacao)}` : ''
         return `<h4>10.${grupo}.${indice + 1}. ${esc(apresentacao.titulo)}</h4>${identificado ? tabelaLinhasAgente(linhas, true) : ''}${conclusao}`
       }).join('')
       return `<h3>10.${grupo}. ${esc(tituloGrupo)}</h3>${quadros}`
@@ -483,6 +525,7 @@ export async function htmlDoParecer(
 
   const partes: string[] = [
     enderecamentoDoParecer(pericia.vara, pericia.comarca),
+    '<h3 class="titulo-qualificacao">IDENTIFICAÇÃO DAS PARTES</h3>',
     identificacao,
     `<h1>${esc(titulo)}</h1>`,
     '<h3 class="titulo-qualificacao">APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA</h3>',
@@ -493,8 +536,12 @@ export async function htmlDoParecer(
     blocoConteudo(textoVistoria + tabelaParticipantes),
     `<h2>${num.secao('DESCRIÇÃO DAS INSTALAÇÕES DA RECLAMADA')}</h2>`,
     blocoConteudo(
-      paragrafos(t.descricaoEmpresa) +
-        `<h3>${num.sub('Instalações Físicas')}</h3>` +
+      // Título de nível 1 não leva texto próprio: o 3.1 sobe colado no 3 e a
+      // seção passa a ser título → subitem → texto → foto → legenda (pedido
+      // do perito). O antigo `t.descricaoEmpresa` continua gravado nas
+      // perícias já salvas, mas deixou de ser impresso e de ser oferecido no
+      // formulário — ver src/pages/PericiaEditor.tsx.
+      `<h3>${num.sub('Instalações Físicas')}</h3>` +
         paragrafos(t.descricaoAmbiente) +
         fotosAmbiente,
     ),
@@ -518,9 +565,13 @@ export async function htmlDoParecer(
     ),
     `<h2>${num.secao('HISTÓRICO LABORAL, PERÍODOS E ATIVIDADES HABITUAIS EXERCIDAS')}</h2>`,
     blocoConteudo(
-      tabelaPeriodos +
-        `<h3>${num.sub('Atividades Efetivamente Exercidas')}</h3>` +
+      // O 7.1 abre a secao 7, antes da tabela de periodos (pedido do perito).
+      // So `tabelaPeriodos` pode trocar de lugar aqui: e uma const pura, sem
+      // num.sub() dentro. Mover qualquer bloco que chame num.sub renumera
+      // 7.2/7.3/7.4/7.5 em cascata.
+      `<h3>${num.sub('Atividades Efetivamente Exercidas')}</h3>` +
         paragrafos(t.atividadesFuncoes) +
+        tabelaPeriodos +
         (temInsalubridade
           ? (() => {
               const cabecalho = num.sub('NR-15 — Avaliação da Exposição Ocupacional')
@@ -564,12 +615,12 @@ export async function htmlDoParecer(
 
 // ---------------- quesitos (Módulo K) ----------------
 
-function htmlDosQuesitos(
+async function htmlDosQuesitos(
   doc: DocumentoGerado,
   pericia: PericiaCompleta | null,
   empresa: Empresa | null,
   perito: Usuario | null,
-): string {
+): Promise<string> {
   const conteudo = (doc.conteudo ?? {}) as ConteudoQuesitos
   const itens = conteudo.quesitos ?? []
 
@@ -607,12 +658,12 @@ function htmlDosQuesitos(
 
 // ---------------- manifestação / impugnação (Módulo L) ----------------
 
-function htmlDaManifestacao(
+async function htmlDaManifestacao(
   doc: DocumentoGerado,
   pericia: PericiaCompleta | null,
   empresa: Empresa | null,
   perito: Usuario | null,
-): string {
+): Promise<string> {
   const c = (doc.conteudo ?? {}) as ConteudoManifestacao
   const ehConcordancia = c.posicionamento === 'concordancia'
 
@@ -649,12 +700,12 @@ function htmlDaManifestacao(
 
 // ---------------- esclarecimentos ----------------
 
-function htmlDoEsclarecimento(
+async function htmlDoEsclarecimento(
   doc: DocumentoGerado,
   pericia: PericiaCompleta | null,
   empresa: Empresa | null,
   perito: Usuario | null,
-): string {
+): Promise<string> {
   const c = (doc.conteudo ?? {}) as ConteudoEsclarecimento
 
   const identificacao = pericia

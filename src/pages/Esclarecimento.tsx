@@ -271,7 +271,7 @@ export default function Esclarecimento() {
         <div className="overflow-x-auto rounded-xl bg-ink-100 p-4 lg:p-6">
           <article className="doc-sheet mx-auto w-full max-w-[820px] bg-white px-10 py-12 shadow-card print-area sm:px-14">
             <header className="mb-8 border-b-2 border-brand-700 pb-5 text-center">
-              <Logo size="lg" />
+              <Logo size="lg" perito={usuario} />
               <p className="mt-3 text-[9pt] font-bold uppercase tracking-[0.2em] text-navy-600">
                 Plataforma Inteligente de Perícia Trabalhista
               </p>

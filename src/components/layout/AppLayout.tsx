@@ -1,51 +1,69 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import {
-  BookOpen,
-  Building2,
-  ChevronDown,
-  FileText,
-  FileSearch,
-  Files,
-  Fingerprint,
-  HelpCircle,
-  LayoutGrid,
-  LogOut,
-  Menu,
-  ScrollText,
-  ShieldAlert,
-  Settings,
-  X,
-} from 'lucide-react'
+import { ChevronDown, LogOut, Menu, Settings, X } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { BuscaGlobal } from '@/components/BuscaGlobal'
 import { useApp } from '@/store/AppStore'
 import { cn } from '@/lib/utils'
 
+// ============================================================
+// Os ícones do menu são EMOJIS, e não desenhos do lucide: o perito pediu o menu
+// colorido, e o emoji já traz a cor embutida na fonte do sistema — não depende
+// de arte nova por item nem de um `fill` que teria de ser mantido item a item.
+// Como a cor é da própria fonte, ela sobrevive ao `text-white/65` do item
+// inativo, que é justamente o efeito pedido.
+//
+// Eles são DECORATIVOS: quem nomeia o link é o rótulo ao lado. Por isso saem
+// com `aria-hidden` e ficam fora do nome acessível — sem isso, o leitor de tela
+// anunciaria o nome do emoji antes de cada item do menu.
+//
+// Mexeu na lista? Ajuste também AppLayout.test.tsx: o emoji entra no
+// `textContent` do link (ao contrário do nome acessível) e o teste compara os
+// dois de propósito.
+// ============================================================
+
 const NAV = [
-  { to: '/', label: 'Início', icon: LayoutGrid, end: true },
-  { to: '/clientes', label: 'Cadastrar Empresa', icon: Building2 },
-  { to: '/pericias/nova?tipo=parecer', label: 'Gerar Parecer Técnico Pericial', icon: FileText },
-  { to: '/pericias/nova?tipo=laudo', label: 'Gerar Laudo Técnico Pericial', icon: Files },
-  { to: '/quesitos', label: 'Elaborar Quesitos Técnicos', icon: HelpCircle },
-  { to: '/manifestacao/concordancia', label: 'Elaborar Manifestação sobre o Laudo', icon: ScrollText },
-  { to: '/manifestacao/impugnacao_laudo', label: 'Elaborar Impugnação ao Laudo', icon: ShieldAlert },
-  { to: '/esclarecimentos', label: 'Elaborar Esclarecimentos Técnicos', icon: FileSearch },
-  { to: '/biblioteca', label: 'Biblioteca', icon: BookOpen },
+  { to: '/', label: 'Início', emoji: '🏠', end: true },
+  { to: '/clientes', label: 'Cadastrar Empresa', emoji: '🏢' },
+  { to: '/pericias/nova?tipo=parecer', label: 'Gerar Parecer Técnico Pericial', emoji: '📄' },
+  { to: '/pericias/nova?tipo=laudo', label: 'Gerar Laudo Técnico Pericial', emoji: '📑' },
+  { to: '/quesitos', label: 'Elaborar Quesitos Técnicos', emoji: '❓' },
+  { to: '/manifestacao/concordancia', label: 'Elaborar Manifestação sobre o Laudo', emoji: '📝' },
+  { to: '/manifestacao/impugnacao_laudo', label: 'Elaborar Impugnação ao Laudo', emoji: '⚖️' },
+  { to: '/esclarecimentos', label: 'Elaborar Esclarecimentos Técnicos', emoji: '🔎' },
+  { to: '/biblioteca', label: 'Biblioteca', emoji: '📚' },
 ]
 
 const NAV_FOOTER = [
-  { to: '/configuracoes', label: 'Configurações', icon: Settings },
-  { to: '/ajuda', label: 'Ajuda', icon: HelpCircle },
+  { to: '/configuracoes', label: 'Configurações', emoji: '⚙️' },
+  { to: '/ajuda', label: 'Ajuda', emoji: '🛟' },
 ]
 
 const EM_DESENVOLVIMENTO = [
-  { label: 'Gerar PGR', icon: FileText },
-  { label: 'Gerar Laudo de Insalubridade', icon: FileText },
-  { label: 'Gerar Laudo de Periculosidade', icon: FileText },
-  { label: 'Gerar LTCAT', icon: FileText },
-  { label: 'Entrega de EPIs por biometria/facial', icon: Fingerprint },
+  { label: 'Gerar PGR', emoji: '📋' },
+  { label: 'Gerar Laudo de Insalubridade', emoji: '🧪' },
+  { label: 'Gerar Laudo de Periculosidade', emoji: '⚠️' },
+  { label: 'Gerar LTCAT', emoji: '📊' },
+  { label: 'Entrega de EPIs por biometria/facial', emoji: '🦺' },
 ]
+
+/**
+ * Ícone (emoji) de um item do menu.
+ *
+ * Largura fixa para os rótulos alinharem entre si, `font-emoji` para o glifo
+ * colorido sair igual no Windows, no Mac e no Linux, e `aria-hidden` porque ele
+ * não acrescenta nada ao que o rótulo ao lado já diz.
+ */
+function IconeMenu({ emoji, className }: { emoji: string; className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn('w-[18px] shrink-0 text-center font-emoji text-[15px] leading-5', className)}
+    >
+      {emoji}
+    </span>
+  )
+}
 
 export function AppLayout() {
   const { usuario, logout } = useApp()
@@ -85,7 +103,7 @@ export function AppLayout() {
         )}
       >
         <div className="flex items-center justify-between px-4 py-5">
-          <Logo size="sm" invert />
+          <Logo size="sm" invert perito={usuario} />
           <button
             className="rounded-lg p-1.5 text-white/70 hover:bg-white/10 lg:hidden"
             onClick={() => setMenuAberto(false)}
@@ -96,18 +114,18 @@ export function AppLayout() {
         </div>
 
         <nav aria-label="Navegação principal" className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
-          {NAV.map(({ to, label, icon: Icon, end }) => (
+          {NAV.map(({ to, label, emoji, end }) => (
             <NavLink key={to} to={to} end={end} className={linkClass(to)} onClick={() => setMenuAberto(false)}>
-              <Icon size={17} strokeWidth={1.9} />
+              <IconeMenu emoji={emoji} />
               <span>{label}</span>
             </NavLink>
           ))}
 
           <div className="my-3 border-t border-white/10" />
 
-          {NAV_FOOTER.map(({ to, label, icon: Icon }) => (
+          {NAV_FOOTER.map(({ to, label, emoji }) => (
             <NavLink key={to} to={to} className={linkClass(to)} onClick={() => setMenuAberto(false)}>
-              <Icon size={17} strokeWidth={1.9} />
+              <IconeMenu emoji={emoji} />
               <span>{label}</span>
             </NavLink>
           ))}
@@ -117,14 +135,16 @@ export function AppLayout() {
               Em desenvolvimento
             </p>
             <div className="space-y-1">
-              {EM_DESENVOLVIMENTO.map(({ label, icon: Icon }) => (
+              {EM_DESENVOLVIMENTO.map(({ label, emoji }) => (
                 <button
                   key={label}
                   type="button"
                   disabled
                   className="flex w-full cursor-not-allowed items-start gap-3 rounded-lg border-l-[3px] border-transparent px-2.5 py-2 text-left text-[12.5px] leading-4 text-white/35"
                 >
-                  <Icon size={16} className="mt-px shrink-0" strokeWidth={1.8} />
+                  {/* Meio apagado: o emoji ignora o `text-white/35` do botão e, em
+                      cor cheia, faria o item desabilitado parecer clicável. */}
+                  <IconeMenu emoji={emoji} className="mt-px opacity-50" />
                   <span className="min-w-0 flex-1">{label}</span>{' '}
                   <span className="shrink-0 rounded-full border border-white/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/35">
                     Em breve

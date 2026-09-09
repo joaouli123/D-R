@@ -228,6 +228,7 @@ async function main() {
   )
   const ordemAbertura = [
     'EXCELENTÍSSIMO',
+    'IDENTIFICAÇÃO DAS PARTES',
     'Processo',
     'PARECER TÉCNICO PERICIAL',
     'APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA',

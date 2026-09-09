@@ -257,12 +257,38 @@ Defina no painel do Coolify, nunca no repositório:
 | `POSTGRES_PASSWORD` | — |
 | `JWT_SECRET` | mínimo 32 caracteres — `openssl rand -base64 48` |
 | `CORS_ORIGINS` | URL pública do frontend |
-| `API_PUBLIC_URL` | URL pública da API — monta o endereço das fotos |
 | `ADMIN_EMAIL` / `ADMIN_SENHA` | carga inicial, idempotente |
 | `BREVO_API_KEY` | chave preferencial da API transacional da Brevo |
 | `BREVO_SMTP_USER` / `BREVO_SMTP_PASSWORD` | fallback opcional pelo relay SMTP da Brevo |
 
+### O volume das fotos
+
 O volume `uploads` guarda as fotos das vistorias e os anexos em PDF — **perdê-lo significa perder o relatório fotográfico dos laudos.**
+
+`docker-compose.yml` declara esse volume, mas **em produção ele não vale**: a aplicação da API no Coolify é do tipo Dockerfile (base `/server`), e o compose deste repositório nunca entra no caminho. Sem um *Persistent Storage* configurado no painel, `/app/uploads` vive dentro do container e **some a cada deploy** — e como a API redeploya a cada push na `main`, as fotos duram até a próxima correção.
+
+No painel do Coolify, na aplicação da API → *Storages* → *Add*:
+
+| Campo | Valor |
+|---|---|
+| Tipo | **Volume Mount** (não *Bind Mount*) |
+| Name | `uploads` |
+| Destination Path | `/app/uploads` |
+
+*Bind Mount* apontaria para uma pasta do host, que o container roda como usuário `node` e normalmente não pode escrever — o upload falharia com `EACCES`.
+
+Para conferir de fora, sem entrar no servidor:
+
+```bash
+curl -s https://drpericiatrabalhista.com.br/api/saude
+```
+
+O campo `uploads` responde por si:
+
+- `"gravavel": false` → o volume não aceita escrita (permissão ou montagem errada) e nenhum upload vai gravar;
+- `"arquivos": 0` logo depois de um deploy, num sistema que já tinha fotos → não há volume persistente e o relatório fotográfico foi junto com o container antigo.
+
+A URL pública da foto **não depende de configuração nenhuma**: a API devolve o caminho relativo `/uploads/<arquivo>` e o front resolve contra a mesma base das chamadas REST (`/api`). Antes vinha de `API_PUBLIC_URL`, e faltando a variável toda foto saía apontando para `localhost` — o upload gravava e a imagem não aparecia.
 
 **Primeira subida com o Módulo L:** depois do `prisma migrate deploy`, a tabela do CAEPI sobe vazia e a consulta por CA responde "base não carregada" até a primeira carga. Faça a carga em *Configurações → Sistema*, arrastando o arquivo do portal — não é preciso acesso ao container. O que o perito preencheu de NRRsf sobrevive a todas as cargas seguintes.
 

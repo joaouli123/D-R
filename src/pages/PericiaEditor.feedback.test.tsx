@@ -221,7 +221,8 @@ describe('PericiaEditor — feedback noturno de 28/08', () => {
     fireEvent.click(screen.getByRole('button', { name: /Preenchimento/ }))
 
     expect(screen.getByText('APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA')).toBeDefined()
-    expect(screen.getByText('3. Descrição das Instalações da Reclamada')).toBeDefined()
+    // Título de nível 1 não tem caixa de texto: o 3.1 abre a seção 3 direto.
+    expect(screen.queryByText('3. Descrição das Instalações da Reclamada')).toBeNull()
     expect(screen.getByText('3.1. Instalações Físicas')).toBeDefined()
     expect(screen.getByText('6.1. Descrição do Posto de Trabalho')).toBeDefined()
     expect(screen.getByText('7.1. Atividades Efetivamente Exercidas')).toBeDefined()

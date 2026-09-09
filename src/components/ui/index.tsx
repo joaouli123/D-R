@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { AlertTriangle, Check, Info, Loader2, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, Info, Loader2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ============================================================
@@ -237,6 +237,74 @@ export function Checkbox({
         {description && <span className="block text-xs text-ink-500 mt-0.5">{description}</span>}
       </span>
     </label>
+  )
+}
+
+// ---------------- SecaoColapsavel ----------------
+/**
+ * Bloco que o perito pode recolher.
+ *
+ * Nasceu do retorno do cliente: "ao inserir um anexo e EPI, eles vão ficando
+ * na tela, está um pouco confuso". Com cinco agentes cadastrados a etapa de
+ * avaliações virava uma parede — cada um com medição, EPIs e conclusão
+ * abertos ao mesmo tempo.
+ *
+ * Duas decisões que parecem detalhe e não são:
+ *
+ * 1. `abertoInicial` é lido UMA vez, na montagem. Quem chama passa algo como
+ *    "está incompleto?", e esse valor muda enquanto o perito digita. Se o
+ *    estado acompanhasse a prop, a seção fecharia sozinha no exato instante
+ *    em que ele terminasse de preencher a conclusão — com o cursor dentro do
+ *    campo.
+ *
+ * 2. O corpo continua MONTADO quando fechado; `hidden` só o esconde. Recolher
+ *    uma avaliação não pode descartar rascunho de texto, aba aberta do
+ *    seletor de EPIs nem resultado de busca de CA.
+ */
+export function SecaoColapsavel({
+  titulo,
+  resumo,
+  abertoInicial = true,
+  acoes,
+  className,
+  children,
+}: {
+  titulo: React.ReactNode
+  resumo?: React.ReactNode
+  abertoInicial?: boolean
+  acoes?: React.ReactNode
+  className?: string
+  children: React.ReactNode
+}) {
+  const [aberto, setAberto] = useState(abertoInicial)
+  const corpoId = React.useId()
+
+  return (
+    <div className={className}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setAberto((v) => !v)}
+          aria-expanded={aberto}
+          aria-controls={corpoId}
+          className="group -ml-1 flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-ink-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+        >
+          <ChevronDown
+            size={16}
+            aria-hidden="true"
+            className={cn('shrink-0 text-ink-400 transition-transform', !aberto && '-rotate-90')}
+          />
+          <span className="min-w-0 truncate text-sm font-semibold text-ink-800">{titulo}</span>
+          {resumo && (
+            <span className="min-w-0 truncate text-xs font-normal text-ink-500">{resumo}</span>
+          )}
+        </button>
+        {acoes}
+      </div>
+      <div id={corpoId} hidden={!aberto}>
+        {children}
+      </div>
+    </div>
   )
 }
 

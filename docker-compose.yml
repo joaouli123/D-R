@@ -42,7 +42,6 @@ services:
       JWT_EXPIRACAO: ${JWT_EXPIRACAO:-8h}
 
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
-      API_PUBLIC_URL: ${API_PUBLIC_URL:-http://localhost:3333}
 
       UPLOAD_DIR: /app/uploads
       UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-15}

@@ -99,13 +99,47 @@ export const GRAU: Record<string, string> = {
   nao_caracterizado: 'Não caracterizado',
 }
 
+// Ordem em que as secoes de fotografia aparecem NO DOCUMENTO.
+// Espelha src/lib/fotosDocumento.ts: os dois precisam mudar juntos, senao a
+// previa numera as fotos diferente do PDF e do DOCX.
+//
+// Atencao: nao e a ordem de SECOES_FOTO do editor (src/pages/PericiaEditor.tsx),
+// que lista 'epi' antes de 'produtos'. Aqui 'produtos' sai no item 6.4 e 'epi'
+// so no item 8.
+export const ORDEM_SECAO_FOTO: Record<string, number> = {
+  ambiente: 0,
+  atividades: 1,
+  equipamentos: 2,
+  produtos: 3,
+  documentos: 4,
+  epi: 5,
+}
+
 export const SECAO_FOTO: Record<string, string> = {
   ambiente: 'Ambiente de Trabalho',
   atividades: 'Atividades Desenvolvidas',
   equipamentos: 'Equipamentos e Máquinas',
-  epi: 'Equipamentos de Proteção Individual',
   produtos: 'Produtos Químicos Utilizados',
   documentos: 'Documentos Apresentados',
+  epi: 'Equipamentos de Proteção Individual',
+}
+
+/**
+ * Ordena as fotos na sequencia em que elas saem no documento e nao pela
+ * coluna `ordem` sozinha: ate a correcao de server/src/routes/fotos.ts o
+ * contador de `ordem` era por secao, entao fotos de secoes diferentes
+ * empatam nas pericias ja gravadas e a legenda "Fotografia N" saia fora de
+ * sequencia. O desempate final pelo id mantem o resultado estavel.
+ */
+export function fotosEmOrdemDeDocumento<T extends { secao: string; ordem: number; id: string }>(
+  fotos: readonly T[],
+): T[] {
+  return [...fotos].sort(
+    (a, b) =>
+      ((ORDEM_SECAO_FOTO[a.secao] ?? 99) - (ORDEM_SECAO_FOTO[b.secao] ?? 99)) ||
+      a.ordem - b.ordem ||
+      a.id.localeCompare(b.id),
+  )
 }
 
 export const AGENTE_LABEL: Record<string, string> = {
@@ -296,13 +330,63 @@ export function mascaraTelefone(valor?: string | null): string {
   return (valor ?? '').trim() || '—'
 }
 
-/** Texto livre → parágrafos, quebrando nas linhas em branco. */
+/**
+ * Texto livre → parágrafos, quebrando nas linhas em branco.
+ *
+ * O recorte das pontas preserva o TAB inicial de propósito: ele é o
+ * marcador de "linha recuada sem marcador" da matriz do perito (item
+ * 4.2.1, Anexos da NR-16) e some se usarmos `trim()` puro quando a
+ * primeira linha do bloco já é um item recuado.
+ */
 export function emParagrafos(texto?: string | null): string[] {
   if (!texto?.trim()) return []
   return texto
     .split(/\n{2,}/)
-    .map((p) => p.trim())
+    .map((p) => p.replace(/^[ \r\n]+/, '').replace(/\s+$/, ''))
     .filter(Boolean)
+}
+
+/**
+ * Espelha src/lib/listasDocumento.ts. Os dois precisam mudar juntos.
+ *
+ * A matriz do perito usa dois formatos de lista dentro de um mesmo
+ * bloco de texto, e os três renderizadores (pré-visualização, PDF e
+ * DOCX) precisam lê-los do mesmo jeito:
+ *   "• item"  → item de lista com marcador (marcador em 1,25 cm,
+ *               texto em 2,25 cm, alinhado à esquerda);
+ *   "\titem"  → linha recuada SEM marcador (os Anexos da NR-16).
+ * Qualquer outra linha continua sendo parágrafo justificado.
+ *
+ * Só o TAB conta como recuo sem marcador. Espaços à esquerda não
+ * contam: os mesmos campos guardam texto colado de outros documentos,
+ * que costuma vir indentado com espaços sem nenhuma intenção de lista.
+ *
+ * O marcador e o TAB são REMOVIDOS do texto — quem devolve o glifo é o
+ * renderizador. É isso que permite ao DOCX usar a numeração nativa do
+ * Word em vez de escrever "•" como caractere comum.
+ */
+export type TipoLinhaBloco = 'texto' | 'item' | 'item-sem-marcador'
+export interface LinhaBloco {
+  tipo: TipoLinhaBloco
+  texto: string
+}
+export const MARCADOR_LISTA = '•'
+
+export function linhasDoBloco(bloco: string): LinhaBloco[] {
+  return bloco.split(/\r?\n/).flatMap<LinhaBloco>((linha) => {
+    const comMarcador = linha.match(/^\s*•\s*(.*)$/)
+    if (comMarcador) {
+      const conteudo = (comMarcador[1] ?? '').trim()
+      return conteudo ? [{ tipo: 'item', texto: conteudo }] : []
+    }
+    const recuada = linha.match(/^\t+(.*)$/)
+    if (recuada) {
+      const conteudo = (recuada[1] ?? '').trim()
+      return conteudo ? [{ tipo: 'item-sem-marcador', texto: conteudo }] : []
+    }
+    const conteudo = linha.trim()
+    return conteudo ? [{ tipo: 'texto', texto: conteudo }] : []
+  })
 }
 
 /**
@@ -387,6 +471,12 @@ export interface AgenteDocumento {
   areaRisco?: string
   exposicaoPericulosidade?: 'permanente' | 'intermitente' | 'eventual' | 'nao_constatada'
   resultadoPericulosidade?: 'caracterizada' | 'nao_caracterizada' | 'prejudicada'
+  /** Redação própria da exposição; vence `exposicaoPericulosidade`. */
+  exposicaoPericulosidadeTexto?: string
+  /** Redação própria do resultado; vence `resultadoPericulosidade`. */
+  resultadoPericulosidadeTexto?: string
+  /** Pontos de verificação do anexo da NR-16, na ordem de impressão. */
+  detalhesNr16?: { id: string; rotulo: string; valor: string }[]
   unidadeMedicao?: 'ppm' | 'mg/m³' | '% O₂ em volume' | 'dB(A)' | 'dB(C)' | 'dB(Linear)' | 'IBUTG °C' | 'mSv/ano' | 'm/s²' | 'm/s¹·⁷⁵' | 'fibras/cm³'
   epis?: EpiDocumento[]
   epiEficaz?: boolean
@@ -395,7 +485,14 @@ export interface AgenteDocumento {
   observacao?: string
 }
 
-/** Avaliações NR-15 sempre precisam levar sua conclusão individual ao documento. */
+/**
+ * Avaliações NR-15 sempre precisam levar sua conclusão individual ao documento.
+ *
+ * Espelha src/lib/conclusoesAgentes.ts. Os dois precisam mudar juntos: esta
+ * cópia recusa a geração no servidor, a do front acende a pendência na tela
+ * do editor. Quando divergiram, o perito viu o editor cobrar a conclusão de
+ * um agente que a modalidade do processo já tinha escondido dele.
+ */
 export function agentesNr15SemConclusao(
   tecnico?: { agentes?: AgenteDocumento[] } | null,
   modalidade?: string | null,
@@ -405,6 +502,22 @@ export function agentesNr15SemConclusao(
   return (tecnico?.agentes ?? [])
     .filter((agente) => agente.tipo !== 'periculosidade' && !agente.observacao?.trim())
     .map((agente) => agente.nome?.trim() || 'Agente sem identificação')
+}
+
+/**
+ * O bloco "Conclusão" só existe quando há o que escrever nele.
+ *
+ * Espelha src/lib/conclusoesAgentes.ts. A regra tem duas metades: avaliação de
+ * periculosidade nunca leva conclusão individual (a NR-16 conclui no bloco
+ * próprio, mais abaixo) e avaliação NR-15 sem texto também não — o título
+ * sozinho, pendurado no fim do quadro, era o que o perito via como pendência
+ * dentro do documento pronto.
+ *
+ * Chamada pelo HTML/PDF e pelo DOCX; a pré-visualização chama a cópia do
+ * front. É o que mantém os três renderizadores idênticos.
+ */
+export function agenteExibeConclusao(agente: Pick<AgenteDocumento, 'tipo' | 'observacao'>): boolean {
+  return agente.tipo !== 'periculosidade' && Boolean(agente.observacao?.trim())
 }
 
 export const TEXTO_AUSENCIA_RECLAMANTE =
@@ -702,28 +815,53 @@ function protecaoDocumento(
 
 export function montarApresentacaoAgente(agente: AgenteDocumento): ApresentacaoAgenteDocumento {
   if (agente.tipo === 'periculosidade') {
+    // ------------------------------------------------------------
+    // Dois cenários, uma tabela só.
+    //
+    // Sem enquadramento (o negativo), ela sai enxuta: some a linha do
+    // adicional, porque “30%” impresso logo acima de “não caracterizada” era
+    // lido como se algo fosse devido. Com enquadramento, entram também os
+    // pontos que aquele anexo manda examinar — os `detalhesNr16`, que a tela
+    // carrega conforme o anexo escolhido.
+    //
+    // Exposição e resultado aceitam redação própria, e ela VENCE a opção do
+    // seletor: a lista fechada resolve o caso comum, o texto livre resolve o
+    // que ela não previu. Sem isso o perito não tinha saída quando o caso
+    // concreto não cabia em nenhuma das opções.
+    // ------------------------------------------------------------
     const resultado = agente.resultadoPericulosidade
       ? RESULTADO_PERICULOSIDADE[agente.resultadoPericulosidade]
       : undefined
+    const exposicaoTexto = agente.exposicaoPericulosidadeTexto?.trim()
+    const resultadoTexto = agente.resultadoPericulosidadeTexto?.trim()
+    const semEnquadramento =
+      !resultadoTexto && agente.resultadoPericulosidade === 'nao_caracterizada'
     return {
       titulo: agente.nome || 'Risco de periculosidade não informado',
       linhas: [
         ...(agente.anexoNr16 ? [{ rotulo: 'Anexo NR-16', valor: anexoNr16Legivel(agente.anexoNr16) }] : []),
         { rotulo: 'Natureza', valor: 'Periculosidade' },
         { rotulo: 'Critério', valor: 'Qualitativo' },
-        { rotulo: 'Adicional', valor: '30%' },
+        ...(semEnquadramento ? [] : [{ rotulo: 'Adicional', valor: '30%' }]),
         ...(agente.atividadeEnquadrada?.trim()
           ? [{ rotulo: 'Atividade ou operação avaliada', valor: agente.atividadeEnquadrada.trim() }]
           : []),
         ...(agente.areaRisco?.trim()
           ? [{ rotulo: 'Condição ou área de risco', valor: agente.areaRisco.trim() }]
           : []),
-        ...(agente.exposicaoPericulosidade
-          ? [{ rotulo: 'Exposição', valor: EXPOSICAO_PERICULOSIDADE[agente.exposicaoPericulosidade]! }]
-          : []),
-        ...(resultado
-          ? [{ rotulo: 'Resultado técnico', valor: resultado.valor, destaque: resultado.destaque }]
-          : []),
+        ...(agente.detalhesNr16 ?? [])
+          .filter((detalhe) => detalhe.valor.trim())
+          .map((detalhe) => ({ rotulo: detalhe.rotulo, valor: detalhe.valor.trim() })),
+        ...(exposicaoTexto
+          ? [{ rotulo: 'Exposição', valor: exposicaoTexto }]
+          : agente.exposicaoPericulosidade
+            ? [{ rotulo: 'Exposição', valor: EXPOSICAO_PERICULOSIDADE[agente.exposicaoPericulosidade]! }]
+            : []),
+        ...(resultadoTexto
+          ? [{ rotulo: 'Resultado técnico', valor: resultadoTexto }]
+          : resultado
+            ? [{ rotulo: 'Resultado técnico', valor: resultado.valor, destaque: resultado.destaque }]
+            : []),
       ],
       protecoes: [],
     }

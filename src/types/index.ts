@@ -19,6 +19,13 @@ export interface Usuario {
   registroProfissional?: string // ex.: CREA-SP 5063...
   titulo?: string // ex.: Engenheiro de Segurança do Trabalho
   telefone?: string
+  /**
+   * Logo do próprio perito, já resolvida contra a base da API.
+   *
+   * White-label: cada um assina o app e os documentos com a marca dele
+   * (Configurações › Meu perfil). Ausente = usa a arte embutida do sistema.
+   */
+  logoUrl?: string
   ativo: boolean
   ultimoAcesso?: string
 }
@@ -172,6 +179,19 @@ export type FonteRuido = 'maquinas' | 'ruido_fundo' | 'administrativa'
 export type ExposicaoPericulosidade = 'permanente' | 'intermitente' | 'eventual' | 'nao_constatada'
 export type ResultadoPericulosidade = 'caracterizada' | 'nao_caracterizada' | 'prejudicada'
 
+/**
+ * Um ponto de verificação do anexo da NR-16, do jeito que foi respondido.
+ *
+ * O rótulo viaja junto com o valor de propósito: o catálogo de campos pode ser
+ * reescrito amanhã, e um laudo já emitido não pode mudar de texto por causa
+ * disso. Quem edita regrava o rótulo vigente a cada alteração.
+ */
+export interface DetalheNr16 {
+  id: string
+  rotulo: string
+  valor: string
+}
+
 export interface AgenteAvaliado {
   id: UUID
   nome: string
@@ -205,6 +225,16 @@ export interface AgenteAvaliado {
   exposicaoPericulosidade?: ExposicaoPericulosidade
   /** Resultado da avaliação do enquadramento na NR-16. */
   resultadoPericulosidade?: ResultadoPericulosidade
+  /**
+   * Redação própria da exposição. Quando preenchida, vence a opção do seletor
+   * nos três renderizadores: a lista fechada resolve o caso comum e este campo
+   * resolve o que a lista não previu.
+   */
+  exposicaoPericulosidadeTexto?: string
+  /** Redação própria do resultado técnico. Vence `resultadoPericulosidade`. */
+  resultadoPericulosidadeTexto?: string
+  /** Pontos de verificação do anexo da NR-16, na ordem em que serão impressos. */
+  detalhesNr16?: DetalheNr16[]
   /** Qual das duas o laudo adota. Ausente = perito, como sempre foi. */
   origemMedicao?: OrigemMedicao
   unidadeMedicao?: UnidadeMedicao

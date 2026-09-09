@@ -29,8 +29,17 @@ const pericia = {
     descricaoPostoTrabalho: 'Posto de trabalho descrito',
     maquinasFerramentas: 'Máquinas descritas',
     produtosUtilizados: 'Produtos descritos',
-    atividadesFuncoes: '',
-    periodos: [],
+    atividadesFuncoes: 'Operação de tornos com manuseio de fluido de corte.',
+    periodos: [
+      {
+        id: 'periodo-1',
+        funcao: 'Auxiliar de Produção',
+        setor: 'Usinagem',
+        inicio: '2018-03-12',
+        fim: '2024-11-08',
+        descricaoAtividades: 'Apoio à operação e movimentação de peças.',
+      },
+    ],
     agentes: [
       {
         id: 'agente-estruturado',
@@ -115,12 +124,22 @@ const pericia = {
     encerramento: 'Parecer elaborado em observância aos critérios técnicos.',
     observacoesAdicionais: '',
   },
+  // As duas fotos empatam em `ordem`: é o dado que as perícias gravadas antes
+  // da correção do contador em server/src/routes/fotos.ts têm no banco. Quem
+  // desempata é a ordem das seções no documento.
   fotos: [
     {
       id: 'foto-epi',
       secao: 'epi',
       url: '/foto-epi.jpg',
       legenda: 'EPI reconhecido na diligência',
+      ordem: 1,
+    },
+    {
+      id: 'foto-ambiente',
+      secao: 'ambiente',
+      url: '/foto-ambiente.jpg',
+      legenda: 'Vista geral do galpão',
       ordem: 1,
     },
   ],
@@ -196,6 +215,66 @@ describe('DocumentoPreview', () => {
 
     expect(html).toMatch(/<table class="agente-propriedades">[\s\S]*?<\/table><h[34]>Conclusão<\/h[34]>[\s\S]*?Conclusão técnica exclusiva do agente frio\./)
   })
+
+  it('omite o título "Conclusão" quando a avaliação NR-15 está sem texto', () => {
+    // Um <h4>Conclusão</h4> seguido de nada — era o que o perito lia como
+    // pendência dentro do documento já emitido.
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={{
+          ...pericia,
+          modalidade: 'insalubridade',
+          tecnico: {
+            ...pericia.tecnico,
+            agentes: [{
+              id: 'sem-conclusao', nome: 'Calor', tipo: 'fisico', criterio: 'qualitativo',
+            } as never],
+          },
+        }}
+        empresas={[]}
+        titulo="Parecer de teste"
+      />,
+    )
+
+    expect(html).toContain('Calor')
+    expect(html).not.toMatch(/<h[34]>Conclusão<\/h[34]>/)
+  })
+
+  it('tira da seção de EPIs os agentes que a modalidade excluiu', () => {
+    // Perícia só de periculosidade com um agente NR-15 herdado do cadastro: ele
+    // não aparece em quadro nenhum, então os EPIs dele também não podem sair —
+    // seriam proteções atribuídas a um agente que o leitor não encontra.
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={{
+          ...pericia,
+          modalidade: 'periculosidade',
+          tecnico: {
+            ...pericia.tecnico,
+            agentes: [
+              {
+                id: 'nr15-herdado', nome: 'Ruído contínuo herdado', tipo: 'fisico',
+                anexoNr15: 'Anexo 1', criterio: 'quantitativo',
+                epis: [{ categoria: 'Protetor auricular', modelo: 'Plug 3M 1100', caUnico: '5745' }],
+              },
+              {
+                id: 'nr16-vigente', nome: 'Inflamáveis líquidos', tipo: 'periculosidade',
+                anexoNr16: 'ANEXO_02', criterio: 'qualitativo',
+                areaRisco: 'Pátio de abastecimento', resultadoPericulosidade: 'caracterizada',
+                epis: [{ categoria: 'Luva', modelo: 'Nitrílica NL-30', caUnico: '9111' }],
+              },
+            ] as never,
+          },
+        }}
+        empresas={[]}
+        titulo="Parecer de teste"
+      />,
+    )
+
+    expect(html).toContain('Nitrílica NL-30')
+    expect(html).not.toContain('Ruído contínuo herdado')
+    expect(html).not.toContain('Plug 3M 1100')
+  })
   it('renderiza snapshots estruturados de medição e EPI sem reescrever dados históricos', () => {
     const html = renderToStaticMarkup(
       <DocumentoPreview pericia={pericia} empresas={[]} titulo="Parecer de teste" />,
@@ -251,6 +330,82 @@ describe('DocumentoPreview', () => {
     expect(secaoEpis).toContain('90 - 17 = 73 dB(A)')
     expect(secaoEpis).toMatch(/Eficácia comprovada<\/th><td[^>]*>Sim/)
     expect(secaoEpis).toContain('EPI reconhecido na diligência')
+  })
+
+  // Espelha server/src/services/documento-parecer.test.ts (PDF) e
+  // docx-parecer.test.ts (DOCX): os três renderizadores têm de emitir a
+  // seção 7 e as fotografias na mesma ordem.
+  it('abre a seção 7 pelo 7.1, antes da tabela de períodos', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={pericia} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    expect(html).toContain('7.1. Atividades Efetivamente Exercidas')
+    expect(html.indexOf('7.1. Atividades Efetivamente Exercidas')).toBeLessThan(
+      html.indexOf('Auxiliar de Produção'),
+    )
+  })
+
+  it('abre a seção 3 pelo 3.1, sem texto de nível 1', () => {
+    // Título de nível 1 não leva texto próprio: o subitem sobe colado no
+    // título. O campo antigo entra preenchido de propósito — é assim que se
+    // vê que a prévia não volta a imprimi-lo, igual ao PDF e ao DOCX.
+    const comTextoAntigo = {
+      ...pericia,
+      tecnico: { ...pericia.tecnico, descricaoEmpresa: 'Texto antigo do nível 1.' },
+    } as Pericia
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={comTextoAntigo} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    expect(html).not.toContain('Texto antigo do nível 1.')
+    expect(html).toContain(
+      '<h2>3. Descrição das Instalações da Reclamada</h2><h3>3.1. Instalações Físicas</h3>',
+    )
+  })
+
+  it('numera as fotografias na sequência em que elas saem no documento', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={pericia} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    // A foto de "Ambiente" sai no item 3.1 e a de "EPIs" só no item 8, ainda
+    // que as duas tenham sido gravadas com ordem 1.
+    expect(html.indexOf('Fotografia 1 – Vista geral do galpão')).toBeLessThan(
+      html.indexOf('Fotografia 2 – EPI reconhecido na diligência'),
+    )
+    expect(html.indexOf('3.1. Instalações Físicas')).toBeLessThan(
+      html.indexOf('Fotografia 1'),
+    )
+  })
+
+  it('abre a capa na ordem que o perito aprovou', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={pericia} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    // Endereçamento → IDENTIFICAÇÃO DAS PARTES → ficha → título → qualificação.
+    // A mesma ordem está travada no PDF e no DOCX (server/scripts/smoke-*.ts).
+    const abertura = [
+      'EXCELENTÍSSIMO',
+      'IDENTIFICAÇÃO DAS PARTES',
+      'Processo nº',
+      '<h1>',
+      'APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA',
+    ]
+
+    let posicaoAnterior = -1
+    for (const trecho of abertura) {
+      const posicao = html.indexOf(trecho)
+      expect(posicao, trecho).toBeGreaterThan(posicaoAnterior)
+      posicaoAnterior = posicao
+    }
+
+    // A ficha antiga da prévia não pode voltar: a vara já está no
+    // endereçamento e PDF e DOCX rotulam toda reclamada de "Reclamada".
+    expect(html).not.toContain('Vara / Comarca')
+    expect(html).not.toContain('Reclamada principal')
+    expect(html).not.toContain('Reclamada solidária')
   })
 
   it('segue a estrutura enxuta aprovada com numeração jurídica fixa de 1 a 14', () => {
@@ -436,7 +591,7 @@ describe('DocumentoPreview', () => {
     expect(html).toContain('Descrição')
     expect(html).toContain('Validade do CA')
     expect(html).not.toMatch(/>Categoria<|>Modelo<|>Marca</)
-    expect(html).toContain('Fotografia 1 – EPI reconhecido na diligência - Fonte: Ato pericial.')
+    expect(html).toContain('Fotografia 2 – EPI reconhecido na diligência - Fonte: Ato pericial.')
     expect(html).toContain('10.1.1. Acetaldeído')
     expect(html).toContain('Proteções associadas')
     expect(html.indexOf('Proteção 1')).toBeLessThan(html.indexOf('Proteção 2'))
@@ -503,7 +658,7 @@ describe('DocumentoPreview', () => {
     )
 
     expect(html).toMatch(
-      /<th>Reclamante<\/th><td>\s*Pessoa reclamante\s*— CPF 123\.456\.789-00\s*<\/td>/,
+      /<th>Reclamante<\/th><td>\s*Pessoa reclamante\s*— CPF: 123\.456\.789-00\s*<\/td>/,
     )
     expect(html).not.toMatch(/<th>Reclamante<\/th><td>[^<]*Operador de Produção/)
     expect(html).toMatch(/<th>Função Inicial<\/th><td>Operador de Produção<\/td>/)

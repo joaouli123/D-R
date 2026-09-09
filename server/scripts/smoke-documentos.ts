@@ -540,7 +540,7 @@ async function main() {
   assert.doesNotMatch(htmlParecer, />Tramitação</, 'o PDF não deve repetir a modalidade no campo Tramitação')
   assert.match(
     htmlParecer,
-    /<th>Reclamante<\/th><td[^>]*>José Aparecido da Silva — CPF 123\.456\.789-00<\/td>/,
+    /<th>Reclamante<\/th><td[^>]*>José Aparecido da Silva — CPF: 123\.456\.789-00<\/td>/,
     'o cabeçalho do parecer deve identificar o reclamante pelo CPF',
   )
   assert.doesNotMatch(
@@ -553,7 +553,7 @@ async function main() {
     /<th>Função Inicial<\/th><td[^>]*>Operador de Máquinas<\/td>/,
     'a função contratual precisa ser rotulada como Função Inicial',
   )
-  assert.match(parecerGerado?.xml ?? '', /José Aparecido da Silva — CPF 123\.456\.789-00/)
+  assert.match(parecerGerado?.xml ?? '', /José Aparecido da Silva — CPF: 123\.456\.789-00/)
   assert.match(parecerGerado?.xml ?? '', /Função Inicial/)
   assert.doesNotMatch(
     parecerGerado?.xml ?? '',
@@ -639,10 +639,14 @@ async function main() {
   }
 
   for (const saida of saidasVisuais) {
+    // O formato não é mais fixo: com o white-label, a marca do cabeçalho é a
+    // logo que o perito subiu (PNG ou JPEG) e só cai na arte embutida quando
+    // ele não subiu nenhuma. O que continua obrigatório é o dado embutido —
+    // um src apontando para a rede quebraria o PDF gerado sem internet.
     assert.match(
       saida.html,
-      /<header class="marca">[\s\S]*?<img class="logo-oficial" src="data:image\/jpeg;base64,/,
-      `${saida.nome}: o documento deve usar o logo oficial aprovado`,
+      /<header class="marca">[\s\S]*?<img class="logo-oficial" src="data:image\/(?:jpeg|png|gif|bmp);base64,/,
+      `${saida.nome}: o cabeçalho deve trazer a marca embutida no próprio HTML`,
     )
     assert.match(
       saida.html,
@@ -844,6 +848,7 @@ async function main() {
   const ordemAbertura = [
     'class="logo-oficial"',
     'EXCELENTÍSSIMO',
+    'IDENTIFICAÇÃO DAS PARTES',
     'class="ficha-processual"',
     '<h1>Parecer Técnico Pericial — Insalubridade</h1>',
     'APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA',

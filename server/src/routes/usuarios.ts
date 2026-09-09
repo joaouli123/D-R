@@ -2,9 +2,10 @@ import bcrypt from 'bcryptjs'
 import { Router } from 'express'
 import { z } from 'zod'
 import { exigirPerfil, exigirSessao, sessaoDe } from '../auth.js'
-import { ErroHttp, parametro, rota, semPermissao } from '../erros.js'
+import { ErroHttp, naoEncontrado, parametro, rota, semPermissao } from '../erros.js'
 import { usuarioParaApi } from '../mappers.js'
 import { prisma } from '../prisma.js'
+import { apagarUpload, uploadLogo } from '../services/armazenamento.js'
 
 export const usuariosRouter = Router()
 usuariosRouter.use(exigirSessao)
@@ -121,5 +122,73 @@ usuariosRouter.post(
     })
 
     res.status(204).end()
+  }),
+)
+
+// ---------------- logo do perito (white-label) ----------------
+
+/**
+ * Quem pode mexer na logo de quem.
+ *
+ * A logo sai no cabeçalho de um documento assinado — trocar a de outra
+ * pessoa é assinar com a marca dela. Vale a mesma regra do cadastro: cada um
+ * cuida da própria, o administrador cuida de todas.
+ */
+async function usuarioQuePodeEditar(req: Parameters<typeof exigirSessao>[0]) {
+  const id = parametro(req, 'id')
+  const sessao = sessaoDe(req)
+  if (sessao.perfil !== 'admin' && sessao.id !== id) {
+    throw semPermissao('Somente o administrador pode trocar a logo de outro usuário.')
+  }
+  const usuario = await prisma.usuario.findUnique({ where: { id } })
+  if (!usuario) throw naoEncontrado('Usuário')
+  return usuario
+}
+
+/** POST /usuarios/:id/logo — multipart, campo "logo". */
+usuariosRouter.post(
+  '/:id/logo',
+  uploadLogo.single('logo'),
+  rota(async (req, res) => {
+    const arquivo = req.file
+    if (!arquivo) throw new ErroHttp(400, 'Nenhuma imagem enviada.')
+
+    let usuario
+    try {
+      usuario = await usuarioQuePodeEditar(req)
+    } catch (e) {
+      // O multer já gravou no volume antes de a rota rodar. Sem esta limpeza,
+      // toda tentativa barrada deixaria um arquivo órfão ocupando o disco.
+      await apagarUpload(arquivo.filename)
+      throw e
+    }
+
+    const anterior = usuario.logoArquivo
+    const atualizado = await prisma.usuario.update({
+      where: { id: usuario.id },
+      data: { logoArquivo: arquivo.filename },
+    })
+
+    // Só depois de o banco confirmar: se o UPDATE falhasse antes, o perito
+    // ficaria sem logo nenhuma — a antiga apagada e a nova sem referência.
+    await apagarUpload(anterior)
+
+    res.status(201).json(usuarioParaApi(atualizado))
+  }),
+)
+
+/** DELETE /usuarios/:id/logo — volta à arte embutida do sistema. */
+usuariosRouter.delete(
+  '/:id/logo',
+  rota(async (req, res) => {
+    const usuario = await usuarioQuePodeEditar(req)
+
+    const atualizado = await prisma.usuario.update({
+      where: { id: usuario.id },
+      data: { logoArquivo: null },
+    })
+    await apagarUpload(usuario.logoArquivo)
+
+    res.json(usuarioParaApi(atualizado))
   }),
 )

@@ -9,7 +9,6 @@ import type {
   TextoBiblioteca,
   Usuario,
 } from '@prisma/client'
-import { env } from './env.js'
 
 // ============================================================
 // Tradução Prisma → formato consumido pelo frontend
@@ -21,8 +20,20 @@ import { env } from './env.js'
 
 const dia = (d: Date): string => d.toISOString().slice(0, 10)
 
+/**
+ * URL da imagem para o navegador. Sai RELATIVA de proposito: quem resolve
+ * e o front, contra a mesma base que ele ja usa para falar com a API
+ * (`/api` em producao, o proxy do Vite em desenvolvimento) — ver
+ * `urlDeUpload` em src/services/api.ts.
+ *
+ * Antes o prefixo vinha de API_PUBLIC_URL. Bastava a variavel faltar no
+ * painel do Coolify para toda foto virar `http://localhost:3333/uploads/...`
+ * na maquina do perito: o upload funcionava, a imagem nao aparecia, e ele
+ * lia isso como "a foto nao subiu". Nenhuma configuracao pode quebrar isto
+ * agora — o caminho publico e sempre <base da API>/uploads/<arquivo>.
+ */
 export const urlDaFoto = (arquivo: string): string =>
-  `${env.API_PUBLIC_URL.replace(/\/$/, '')}/uploads/${arquivo}`
+  `/uploads/${encodeURIComponent(arquivo)}`
 
 export function usuarioParaApi(u: Usuario) {
   return {
@@ -33,6 +44,10 @@ export function usuarioParaApi(u: Usuario) {
     registroProfissional: u.registroProfissional ?? undefined,
     titulo: u.titulo ?? undefined,
     telefone: u.telefone ?? undefined,
+    // White-label: cada perito assina o app e os documentos com a própria
+    // marca. Sai como caminho relativo pelo mesmo motivo das fotos — ver o
+    // comentário de urlDaFoto logo acima.
+    logoUrl: u.logoArquivo ? urlDaFoto(u.logoArquivo) : undefined,
     ativo: u.ativo,
     ultimoAcesso: u.ultimoAcesso?.toISOString(),
   }

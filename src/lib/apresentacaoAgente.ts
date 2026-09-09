@@ -141,28 +141,53 @@ function linhasProtecao(
 
 export function montarApresentacaoAgente(agente: AgenteAvaliado): ApresentacaoAgente {
   if (agente.tipo === 'periculosidade') {
+    // ------------------------------------------------------------
+    // Dois cenários, uma tabela só.
+    //
+    // Sem enquadramento (o negativo), ela sai enxuta: some a linha do
+    // adicional, porque “30%” impresso logo acima de “não caracterizada” era
+    // lido como se algo fosse devido. Com enquadramento, entram também os
+    // pontos que aquele anexo manda examinar — os `detalhesNr16`, que a tela
+    // carrega conforme o anexo escolhido.
+    //
+    // Exposição e resultado aceitam redação própria, e ela VENCE a opção do
+    // seletor: a lista fechada resolve o caso comum, o texto livre resolve o
+    // que ela não previu. Sem isso o perito não tinha saída quando o caso
+    // concreto não cabia em nenhuma das opções.
+    // ------------------------------------------------------------
     const resultado = agente.resultadoPericulosidade
       ? RESULTADO_PERICULOSIDADE[agente.resultadoPericulosidade]
       : undefined
+    const exposicaoTexto = agente.exposicaoPericulosidadeTexto?.trim()
+    const resultadoTexto = agente.resultadoPericulosidadeTexto?.trim()
+    const semEnquadramento =
+      !resultadoTexto && agente.resultadoPericulosidade === 'nao_caracterizada'
     return {
       titulo: agente.nome || 'Risco de periculosidade não informado',
       linhas: [
         ...(agente.anexoNr16 ? [{ rotulo: 'Anexo NR-16', valor: labelAnexoNr16(agente.anexoNr16) }] : []),
         { rotulo: 'Natureza', valor: 'Periculosidade' },
         { rotulo: 'Critério', valor: 'Qualitativo' },
-        { rotulo: 'Adicional', valor: '30%' },
+        ...(semEnquadramento ? [] : [{ rotulo: 'Adicional', valor: '30%' }]),
         ...(agente.atividadeEnquadrada?.trim()
           ? [{ rotulo: 'Atividade ou operação avaliada', valor: agente.atividadeEnquadrada.trim() }]
           : []),
         ...(agente.areaRisco?.trim()
           ? [{ rotulo: 'Condição ou área de risco', valor: agente.areaRisco.trim() }]
           : []),
-        ...(agente.exposicaoPericulosidade
-          ? [{ rotulo: 'Exposição', valor: EXPOSICAO_PERICULOSIDADE[agente.exposicaoPericulosidade] }]
-          : []),
-        ...(resultado
-          ? [{ rotulo: 'Resultado técnico', valor: resultado.valor, destaque: resultado.destaque }]
-          : []),
+        ...(agente.detalhesNr16 ?? [])
+          .filter((detalhe) => detalhe.valor.trim())
+          .map((detalhe) => ({ rotulo: detalhe.rotulo, valor: detalhe.valor.trim() })),
+        ...(exposicaoTexto
+          ? [{ rotulo: 'Exposição', valor: exposicaoTexto }]
+          : agente.exposicaoPericulosidade
+            ? [{ rotulo: 'Exposição', valor: EXPOSICAO_PERICULOSIDADE[agente.exposicaoPericulosidade] }]
+            : []),
+        ...(resultadoTexto
+          ? [{ rotulo: 'Resultado técnico', valor: resultadoTexto }]
+          : resultado
+            ? [{ rotulo: 'Resultado técnico', valor: resultado.valor, destaque: resultado.destaque }]
+            : []),
       ],
       protecoes: [],
     }

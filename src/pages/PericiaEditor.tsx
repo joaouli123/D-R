@@ -26,6 +26,7 @@ import {
   Checkbox,
   Input,
   Modal,
+  SecaoColapsavel,
   Select,
   Stepper,
   Textarea,
@@ -38,6 +39,7 @@ import type { OrigemConsulta } from '@/components/BuscaCnpj'
 import { DocumentoPreview } from '@/components/DocumentoPreview'
 import { AgenteNr15Fields } from '@/components/AgenteNr15Fields'
 import { PericulosidadeNr16Fields } from '@/components/PericulosidadeNr16Fields'
+import { agentesNr15SemConclusao } from '@/lib/conclusoesAgentes'
 import { EpiSelector } from '@/components/EpiSelector'
 import { empresaVazia, ModalEmpresa } from '@/components/ModalEmpresa'
 import { useApp } from '@/store/AppStore'
@@ -100,17 +102,88 @@ const PASSOS = [
   // topo trunca o que não cabe.
   { label: 'Avaliações e EPIs', description: 'Módulo D' },
   { label: 'Fotografias', description: 'Módulo E' },
-  { label: 'Conclusão', description: 'Módulo D' },
+  // "Conclusão do laudo" e não "Conclusão": o perito procurou o campo da
+  // conclusão nesta etapa e encontrou a do documento inteiro, quando o que
+  // ele queria era a conclusão de um agente — que fica na etapa anterior,
+  // dentro da avaliação. Os dois campos existem e são diferentes; o rótulo
+  // agora diz qual é qual.
+  { label: 'Conclusão do laudo', description: 'Módulo D' },
   { label: 'Documento', description: 'Módulos G–I' },
 ]
 
+// ============================================================
+// Estado das avaliações na etapa 3
+//
+// Retorno do cliente: "ao inserir um anexo e EPI, eles vão ficando na tela,
+// está um pouco confuso". Com quatro ou cinco agentes cadastrados a etapa
+// virava uma parede de campos, todos abertos ao mesmo tempo.
+//
+// A regra do que nasce aberto é: o que ainda depende do perito. Avaliação
+// pronta chega recolhida, com um resumo de uma linha; o que falta chega
+// aberta. Nada é escondido — tudo continua a um clique, e o resumo diz o
+// que há dentro sem precisar abrir.
+// ============================================================
+
+const RESUMO_RESULTADO_NR16: Record<string, string> = {
+  caracterizada: 'periculosidade caracterizada',
+  nao_caracterizada: 'não caracterizada',
+  prejudicada: 'avaliação prejudicada',
+}
+
+/** Uma linha que responde, com a avaliação NR-15 fechada: o que falta aqui? */
+function resumoNr15(a: AgenteAvaliado): string {
+  const epis = a.epis?.length ?? 0
+  return [
+    a.grau ? ROTULOS_GRAU[a.grau] : null,
+    epis ? `${epis} EPI${epis > 1 ? 's' : ''}` : null,
+    a.observacao?.trim() ? null : 'conclusão pendente',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
+
+/** Avaliação NR-15 que já pode ir ao documento — nasce recolhida. */
+function nr15Completa(a: AgenteAvaliado): boolean {
+  return Boolean(a.nome?.trim()) && Boolean(a.observacao?.trim())
+}
+
+function resumoNr16(a: AgenteAvaliado): string {
+  return [
+    a.areaRisco?.trim() || null,
+    a.resultadoPericulosidade
+      ? RESUMO_RESULTADO_NR16[a.resultadoPericulosidade]
+      : 'resultado pendente',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
+
+/** Avaliação NR-16 fechada: tem enquadramento e resultado. */
+function nr16Completa(a: AgenteAvaliado): boolean {
+  return Boolean(a.anexoNr16) && Boolean(a.resultadoPericulosidade)
+}
+
+// Rótulo da modalidade impresso no título do documento. Espelha
+// MODALIDADE_LABEL de server/src/services/documento-comum.ts — os dois
+// precisam mudar juntos, senão a prévia e o PDF divergem. Não dá para
+// reaproveitar o MODALIDADE de Pericias.tsx: lá o rótulo da listagem usa
+// "Insalubridade + Periculosidade", que não é o texto do documento.
+const MODALIDADE_TITULO: Record<Pericia['modalidade'], string> = {
+  insalubridade: 'Insalubridade',
+  periculosidade: 'Periculosidade',
+  ambas: 'Insalubridade e Periculosidade',
+}
+
+// Na ordem em que as fotos saem no documento, com o item entre parênteses:
+// é assim que o perito confere se subiu na seção certa. Espelha
+// ORDEM_SECAO_FOTO de src/lib/fotosDocumento.ts.
 const SECOES_FOTO: { value: SecaoFoto; label: string }[] = [
-  { value: 'ambiente', label: 'Ambiente de trabalho' },
-  { value: 'atividades', label: 'Atividades desenvolvidas' },
-  { value: 'equipamentos', label: 'Equipamentos e máquinas' },
-  { value: 'epi', label: 'EPIs utilizados' },
-  { value: 'produtos', label: 'Produtos químicos' },
-  { value: 'documentos', label: 'Documentos apresentados' },
+  { value: 'ambiente', label: 'Ambiente de trabalho (item 3.1)' },
+  { value: 'atividades', label: 'Atividades desenvolvidas (item 6.1)' },
+  { value: 'equipamentos', label: 'Equipamentos e máquinas (item 6.2)' },
+  { value: 'produtos', label: 'Produtos químicos (item 6.4)' },
+  { value: 'documentos', label: 'Documentos apresentados (final do item 7)' },
+  { value: 'epi', label: 'EPIs utilizados (item 8)' },
 ]
 
 function novaPericia(responsavelId: string): Pericia {
@@ -368,6 +441,11 @@ export default function PericiaEditor() {
     toast('Texto padrão restaurado neste campo.')
   }
 
+  // Título completo do documento: é o que a prévia mostra, o que fica
+  // gravado no histórico e o que o PDF/DOCX imprimem no H1. Vinha com a
+  // modalidade crua ("— insalubridade", minúsculo) para modalidade única.
+  const tituloDocumento = `${titulo} — ${MODALIDADE_TITULO[p.modalidade]}`
+
   const docsDaPericia = documentos.filter((d) => d.periciaId === p.id)
   const avaliacoesVisiveis = p.tecnico.agentes.filter((avaliacao) =>
     p.modalidade === 'ambas'
@@ -450,29 +528,51 @@ export default function PericiaEditor() {
     }
   }
 
+  /**
+   * Tira a perícia da fila de pendências quando o documento fica pronto.
+   *
+   * A perícia nascia "rascunho" e nada, em lugar nenhum, mudava isso: mesmo
+   * depois de gerar, exportar e anexar o laudo ela continuava contada como
+   * pendente no painel e na aba "Rascunho" da listagem. Era esse o "ele
+   * sempre permanece nas pendências" do retorno do cliente.
+   *
+   * Gerar o documento é o marco que conclui a perícia. Quem já está
+   * "entregue" não regride — a entrega é um passo adiante da conclusão.
+   */
+  async function concluirPericia(salva: Pericia): Promise<void> {
+    if (salva.status !== 'rascunho' && salva.status !== 'em_andamento') return
+    try {
+      setP(await salvarPericia({ ...salva, status: 'concluida' }))
+    } catch {
+      // Falhar aqui não pode derrubar a geração do documento, que é o que o
+      // perito pediu. O status volta a ser tentado na próxima gravação.
+    }
+  }
+
   /** Grava (ou atualiza) o documento no histórico e devolve o id. */
   async function finalizarDocumento(silencioso = false): Promise<string | null> {
-    const semConclusao = p.tecnico.agentes.filter(
-      (agente) => agente.tipo !== 'periculosidade' && !agente.observacao?.trim(),
-    )
+    // A regra vem de src/lib/conclusoesAgentes.ts, a mesma que a API aplica
+    // ao gerar o arquivo. Enquanto era calculada aqui, direto e sem a
+    // modalidade, uma perícia só de periculosidade travava cobrando a
+    // conclusão de um agente NR-15 herdado — que o filtro da tela tinha
+    // escondido. O perito não conseguia fechar o documento e não tinha
+    // como descobrir por quê.
+    const semConclusao = agentesNr15SemConclusao(p.tecnico, p.modalidade)
     if (semConclusao.length) {
-      const nomes = semConclusao.map((agente) => agente.nome.trim() || 'agente sem nome').join(', ')
       setPasso(2)
-      toast(`Preencha a conclusão da avaliação: ${nomes}.`, 'error')
+      toast(`Preencha a conclusão da avaliação: ${semConclusao.join(', ')}.`, 'error')
       return null
     }
     const salva = await salvarRascunho(true)
     if (!salva) return null
 
     const hoje = new Date().toISOString().slice(0, 10)
-    const modalidade =
-      p.modalidade === 'ambas' ? 'Insalubridade e Periculosidade' : p.modalidade
 
     try {
       const doc = await salvarDocumento({
         id: documentoId ?? uid('doc'),
         tipo: tipoDoc,
-        titulo: `${titulo} — ${modalidade}`,
+        titulo: tituloDocumento,
         periciaId: salva.id,
         numeroProcesso: p.numeroProcesso || '—',
         reclamante: p.reclamante || '—',
@@ -484,6 +584,7 @@ export default function PericiaEditor() {
       })
 
       setDocumentoId(doc.id)
+      await concluirPericia(salva)
       if (!silencioso) {
         toast(
           documentoId
@@ -553,7 +654,7 @@ export default function PericiaEditor() {
       setP(sincronizada)
       toast(`${novas.length} foto(s) adicionada(s) em "${rotulo}".`)
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Falha ao enviar as fotos.', 'error')
+      toast(api.mensagemDeErro(e, 'Falha ao enviar as fotos.'), 'error')
     } finally {
       setEnviandoFotos(false)
     }
@@ -1047,10 +1148,16 @@ export default function PericiaEditor() {
       {/* ============ PASSO 1 — PREENCHIMENTO TÉCNICO (Módulo D) ============ */}
       {passo === 1 && (
         <div className="space-y-4">
+          {/*
+            Títulos de nível 1 (o 3 e o 7) não têm campo de texto: no documento
+            o subitem sobe colado no título, e a ordem é título → subitem →
+            texto → foto → legenda da foto (pedido do perito). Por isso a
+            lista começa no 3.1: `descricaoEmpresa` continua no modelo por
+            causa das perícias já gravadas, mas não é mais editado nem impresso.
+          */}
           {(
             [
               { campo: 'apresentacao', secao: 'apresentacao', referencia: undefined, label: 'APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA', rows: 5 },
-              { campo: 'descricaoEmpresa', secao: 'empresa', referencia: '3', label: '3. Descrição das Instalações da Reclamada', rows: 5 },
               { campo: 'descricaoAmbiente', secao: 'ambiente', referencia: '3.1', label: '3.1. Instalações Físicas', rows: 6 },
               { campo: 'descricaoPostoTrabalho', secao: 'ambiente', referencia: '6.1', label: '6.1. Descrição do Posto de Trabalho', rows: 6 },
               { campo: 'maquinasFerramentas', secao: 'atividades', referencia: '6.2', label: '6.2. Máquinas, Ferramentas e Equipamentos Utilizados', rows: 5 },
@@ -1066,7 +1173,7 @@ export default function PericiaEditor() {
                 subtitle={campoPadrao
                   ? ehAdministrador
                     ? 'Texto oficial da matriz — edição administrativa habilitada.'
-                    : 'Texto oficial da matriz — protegido contra alterações durante o preenchimento.'
+                    : 'Texto oficial da matriz — protegido contra alterações. Para ler inteiro: Biblioteca › Textos oficiais da matriz.'
                   : undefined}
                 icon={<FileText size={18} />}
                 action={
@@ -1261,23 +1368,31 @@ export default function PericiaEditor() {
                 if (a.tipo === 'periculosidade') {
                   return (
                     <div key={a.id} className="rounded-lg border border-ink-200 border-l-4 border-l-amber-500 p-3">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <ol aria-label="Fluxo técnico da periculosidade" className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+                      <SecaoColapsavel
+                        titulo={a.nome?.trim() || 'Nova avaliação NR-16'}
+                        resumo={resumoNr16(a)}
+                        abertoInicial={!nr16Completa(a)}
+                        acoes={
+                          <div className="flex items-center gap-2">
+                            <Badge tone="navy">Item {numeroNr16Editor}.2</Badge>
+                            <Button
+                              variant="ghost"
+                              className="text-red-600 hover:bg-red-50"
+                              icon={<Trash2 size={15} />}
+                              onClick={() => removerAgente(a.id)}
+                              aria-label="Remover avaliação NR-16"
+                            />
+                          </div>
+                        }
+                      >
+                        <ol aria-label="Fluxo técnico da periculosidade" className="mb-3 mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                           <li className="text-amber-700">Risco</li><li aria-hidden="true">→</li><li>Enquadramento</li><li aria-hidden="true">→</li><li>Conclusão</li>
                         </ol>
-                        <Badge tone="navy">Item {numeroNr16Editor}.2</Badge>
-                        <Button
-                          variant="ghost"
-                          className="text-red-600 hover:bg-red-50"
-                          icon={<Trash2 size={15} />}
-                          onClick={() => removerAgente(a.id)}
-                          aria-label="Remover avaliação NR-16"
+                        <PericulosidadeNr16Fields
+                          avaliacao={a}
+                          onChange={(avaliacaoAtualizada) => atualizarAgente(a.id, () => avaliacaoAtualizada)}
                         />
-                      </div>
-                      <PericulosidadeNr16Fields
-                        avaliacao={a}
-                        onChange={(avaliacaoAtualizada) => atualizarAgente(a.id, () => avaliacaoAtualizada)}
-                      />
+                      </SecaoColapsavel>
                     </div>
                   )
                 }
@@ -1298,15 +1413,29 @@ export default function PericiaEditor() {
                     : '7.2.1'
                 return (
                 <div key={a.id} className="rounded-lg border border-ink-200 border-l-4 border-l-navy-700 p-3">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <ol aria-label="Fluxo técnico do agente" className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
-                      <li className="text-navy-700">Agente</li><li aria-hidden="true">→</li><li>Medição</li><li aria-hidden="true">→</li><li>Proteção</li>
-                    </ol>
-                    <Badge tone="navy">Item {referenciaAvaliacao}</Badge>
-                  </div>
+                  <SecaoColapsavel
+                    titulo={a.nome?.trim() || regraAnexo?.agenteFixo || 'Novo agente NR-15'}
+                    resumo={resumoNr15(a)}
+                    abertoInicial={!nr15Completa(a)}
+                    acoes={
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Badge tone="navy">Item {referenciaAvaliacao}</Badge>
+                        <Button
+                          variant="ghost"
+                          className="text-red-600 hover:bg-red-50"
+                          icon={<Trash2 size={15} />}
+                          onClick={() => removerAgente(a.id)}
+                          aria-label="Remover agente"
+                        />
+                      </div>
+                    }
+                  >
+                  <ol aria-label="Fluxo técnico do agente" className="mb-3 mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+                    <li className="text-navy-700">Agente</li><li aria-hidden="true">→</li><li>Medição</li><li aria-hidden="true">→</li><li>Proteção</li><li aria-hidden="true">→</li><li>Conclusão</li>
+                  </ol>
                   <div className={`grid gap-3 ${exibeCas
-                    ? 'md:grid-cols-[minmax(220px,1.4fr)_minmax(120px,0.65fr)_minmax(230px,1fr)_minmax(130px,0.65fr)_auto]'
-                    : 'md:grid-cols-[minmax(240px,1.5fr)_minmax(240px,1fr)_minmax(150px,0.7fr)_auto]'}`}>
+                    ? 'md:grid-cols-[minmax(220px,1.4fr)_minmax(120px,0.65fr)_minmax(230px,1fr)_minmax(130px,0.65fr)]'
+                    : 'md:grid-cols-[minmax(240px,1.5fr)_minmax(240px,1fr)_minmax(150px,0.7fr)]'}`}>
                     <Input
                       label="Agente"
                       value={regraAnexo?.agenteFixo ?? a.nome}
@@ -1346,13 +1475,39 @@ export default function PericiaEditor() {
                         <option key={grau} value={grau}>{ROTULOS_GRAU[grau]}</option>
                       ))}
                     </Select>
-                    <Button
-                      variant="ghost"
-                      className="mb-1 self-end text-red-600 hover:bg-red-50"
-                      icon={<Trash2 size={15} />}
-                      onClick={() => removerAgente(a.id)}
-                      aria-label="Remover agente"
+                  </div>
+                  {/* A conclusão subiu para logo abaixo da identificação do
+                      agente. Ela ficava no fim do cartão, depois da medição,
+                      dos EPIs e de dois blocos de texto normativo — e o
+                      perito perguntou "em qual campo insiro o texto da
+                      conclusão?". Estava lá, com o mesmo peso visual de tudo
+                      o mais, ao fim de uma rolagem longa. Agora é a primeira
+                      coisa depois do nome do agente, destacada e marcada
+                      como obrigatória. */}
+                  <div className="mt-3 rounded-lg border border-brand-200 bg-brand-50/40 p-3">
+                    <Textarea
+                      label="Conclusão da avaliação"
+                      required
+                      rows={4}
+                      value={a.observacao ?? ''}
+                      onChange={(e) => atualizarAgente(a.id, (atual) => ({
+                        ...atual,
+                        observacao: e.target.value,
+                      }))}
+                      placeholder="Registre a conclusão específica deste agente. Campo obrigatório para emitir o documento."
+                      hint={`Sai no item ${referenciaAvaliacao} do documento, dentro desta avaliação. A conclusão do laudo inteiro é outro campo, na etapa "Conclusão do laudo".`}
                     />
+                    <div className="mt-2 flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        icon={<BookOpen size={14} />}
+                        aria-label={`Abrir biblioteca da conclusão de ${a.nome || 'agente'}`}
+                        onClick={() => setBibliotecaPara({ agenteId: a.id, secao: 'conclusao', referencia: referenciaAvaliacao })}
+                      >
+                        Biblioteca
+                      </Button>
+                    </div>
                   </div>
                   <AgenteNr15Fields
                     agente={a}
@@ -1368,29 +1523,6 @@ export default function PericiaEditor() {
                         identificadoNaAtividade: e.target.checked,
                       }))}
                     />
-                  </div>
-                  <div className="mt-3">
-                    <Textarea
-                      label="Conclusão da avaliação"
-                      rows={4}
-                      value={a.observacao ?? ''}
-                      onChange={(e) => atualizarAgente(a.id, (atual) => ({
-                        ...atual,
-                        observacao: e.target.value,
-                      }))}
-                      placeholder="Registre a conclusão específica deste agente. Campo obrigatório para emitir o documento."
-                    />
-                    <div className="mt-2 flex justify-end">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        icon={<BookOpen size={14} />}
-                        aria-label={`Abrir biblioteca da conclusão de ${a.nome || 'agente'}`}
-                        onClick={() => setBibliotecaPara({ agenteId: a.id, secao: 'conclusao', referencia: referenciaAvaliacao })}
-                      >
-                        Biblioteca
-                      </Button>
-                    </div>
                   </div>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <Select
@@ -1448,6 +1580,7 @@ export default function PericiaEditor() {
                       </p>
                     </div>
                   )}
+                  </SecaoColapsavel>
                 </div>
               )})}
               {avaliacoesVisiveis.length === 0 && (
@@ -1592,7 +1725,7 @@ export default function PericiaEditor() {
                 subtitle={campoPadrao
                   ? ehAdministrador
                     ? 'Texto oficial da matriz — edição administrativa habilitada.'
-                    : 'Texto oficial da matriz — protegido contra alterações durante o preenchimento.'
+                    : 'Texto oficial da matriz — protegido contra alterações. Para ler inteiro: Biblioteca › Textos oficiais da matriz.'
                   : undefined}
                 icon={<FileText size={18} />}
                 action={
@@ -1761,7 +1894,7 @@ export default function PericiaEditor() {
           </div>
 
           <div className="overflow-x-auto rounded-xl bg-ink-100 p-4 lg:p-6">
-            <DocumentoPreview pericia={p} empresas={empresas} perito={usuario} titulo={titulo} />
+            <DocumentoPreview pericia={p} empresas={empresas} perito={usuario} titulo={tituloDocumento} />
             {anexo && (
               <div className="mx-auto mt-4 max-w-[820px] rounded-lg border-2 border-dashed border-ink-300 bg-white px-6 py-8 text-center no-print">
                 <Paperclip size={20} className="mx-auto mb-2 text-ink-400" />

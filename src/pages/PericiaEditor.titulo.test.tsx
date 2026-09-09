@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -71,5 +71,36 @@ describe('PericiaEditor — cabeçalho do documento novo', () => {
     abrirEditor('/pericias/nova')
 
     expect(titulo()).toBe('Novo Parecer Técnico')
+  })
+})
+
+// O título impresso no documento é o do seletor MAIS a modalidade. Ele
+// precisa ser o mesmo na prévia, no histórico e no PDF/DOCX — antes a
+// prévia mostrava só "Parecer Técnico da Reclamada" e o PDF vinha com
+// "— insalubridade", em minúsculo, para modalidade única.
+describe('PericiaEditor — modalidade no título do documento', () => {
+  const irParaODocumento = () =>
+    fireEvent.click(screen.getByRole('button', { name: /Documento/ }))
+
+  const tituloDaPrevia = () =>
+    screen.getByRole('heading', { level: 1, name: /Parecer Técnico da Reclamada/ }).textContent
+
+  it('escreve a modalidade única com inicial maiúscula', () => {
+    abrirEditor('/pericias/nova?tipo=parecer')
+    irParaODocumento()
+
+    expect(tituloDaPrevia()).toBe('Parecer Técnico da Reclamada — Insalubridade')
+  })
+
+  it('escreve as duas modalidades por extenso quando a perícia é "ambas"', () => {
+    abrirEditor('/pericias/nova?tipo=parecer')
+    fireEvent.change(screen.getByLabelText('Modalidade da perícia'), {
+      target: { value: 'ambas' },
+    })
+    irParaODocumento()
+
+    expect(tituloDaPrevia()).toBe(
+      'Parecer Técnico da Reclamada — Insalubridade e Periculosidade',
+    )
   })
 })
