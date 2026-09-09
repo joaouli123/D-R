@@ -36,6 +36,32 @@ describe('referências da biblioteca do parecer', () => {
       .not.toBe('Critério de Avaliação')
   })
 
+  it('os títulos do 10.2 são os literais, não “o que o gerador der”', () => {
+    // O laço acima monta o esperado com `itemListaAnexoNr16` — a MESMA
+    // função que produz estas entradas. Ele trava o esquema de numeração e
+    // nada mais: mudar o texto dos títulos nos dois gêmeos passava por ele
+    // sem acusar. Aqui os títulos ficam escritos.
+    //
+    // Um anexo novo na NR-16 quebra este teste de propósito. Estes números
+    // são onde o perito guarda texto: se a chave escorregar um item, o que
+    // ele salvou em Inflamáveis reaparece em Explosivos, calado.
+    expect(
+      REFERENCIAS_PARECER.filter((referencia) => referencia.numero.startsWith('10.2.'))
+        .map((referencia) => `${referencia.numero} ${referencia.titulo}`),
+    ).toEqual([
+      '10.2.1 Explosivos',
+      '10.2.2 Inflamáveis',
+      '10.2.3 Segurança pessoal ou patrimonial',
+      '10.2.4 Energia elétrica',
+      '10.2.5 Motocicleta',
+      '10.2.6 Agentes das autoridades de trânsito',
+      // O anexo sem número é o único que carrega o rótulo no título: sem o
+      // "(*)", o 10.2.7 viraria um "Anexo 7" que a norma não tem.
+      '10.2.7 Anexo (*) – Radiações ionizantes ou substâncias radioativas',
+      '10.2.8 Sem Risco',
+    ])
+  })
+
   it('cataloga cada campo do editor num item que existe no índice', () => {
     for (const [campo, numero] of Object.entries(CHAVE_BIBLIOTECA_POR_CAMPO)) {
       expect(REFERENCIAS_PARECER.find((referencia) => referencia.numero === numero), campo).toBeDefined()

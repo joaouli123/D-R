@@ -27,6 +27,11 @@ describe('recusaPorTamanho', () => {
     expect(aviso).toContain('7,4 MB')
     expect(aviso).toContain('3 MB')
     expect(aviso).not.toContain('boa.jpg')
+    // No singular. É o caminho principal da troca de logo, que manda um
+    // arquivo só — e "“logo.png” (7,4 MB) passam do limite" é o tipo de
+    // erro que ninguém vê no código e todo mundo vê na tela.
+    expect(aviso).toContain('passa do limite')
+    expect(aviso).not.toContain('passam')
   })
 
   it('resume quando são muitas, em vez de despejar a lista inteira', () => {

@@ -207,6 +207,8 @@ describe('tabela da NR-16 nos dois quadros', () => {
         { id: 'sobra', nome: 'Sem risco' },
         { id: 'inf', nome: 'Inflamáveis', anexoNr16: 'ANEXO_02' },
       ],
+      // O anexo sem número, que é o único a passar pelo ramo do "(*)".
+      [{ id: 'rad', nome: 'Radiações', anexoNr16: 'ANEXO_RADIACOES' }],
     ]) {
       expect(quadrosNr16DoItem10(agentes, '10.2')).toEqual(quadrosNoFront(agentes, '10.2'))
     }
@@ -270,6 +272,34 @@ describe('tabela da NR-16 nos dois quadros', () => {
       '10.2.1. Inflamáveis – Avaliação, Resultado e Conclusão (Óleo diesel)',
       '10.2.2. Inflamáveis – Avaliação, Resultado e Conclusão (Gasolina)',
     ])
+  })
+
+  it('o anexo sem número mantém o "(*)" no título do quadro', () => {
+    // `itemListaAnexoNr16` tem um ramo só para este anexo: os outros seis
+    // saem pelo assunto puro ("Inflamáveis"), porque o número já vem do
+    // subitem, mas o das radiações não tem número na norma. Sem o "(*)" o
+    // leitor toma o quadro por um "Anexo 7", que a NR-16 não tem.
+    //
+    // Travado no LITERAL de propósito: os testes de paridade comparam os
+    // gêmeos com o próprio gerador, então apagar o ramo nos dois lados
+    // passava por eles sem acusar nada.
+    const radiacoes = { id: 'rad', nome: 'Radiações', anexoNr16: 'ANEXO_RADIACOES' }
+
+    expect(quadrosNr16DoItem10([radiacoes], '10.2')[0]?.titulo)
+      .toBe('Anexo (*) – Radiações ionizantes ou substâncias radioativas – Avaliação, Resultado e Conclusão')
+    // E o outro lado escreve o mesmo, não só "o que o gerador dele der".
+    expect(quadrosNoFront([radiacoes], '10.2')[0]?.titulo)
+      .toBe('Anexo (*) – Radiações ionizantes ou substâncias radioativas – Avaliação, Resultado e Conclusão')
+  })
+
+  it('os outros seis anexos saem pelo assunto, sem repetir o número', () => {
+    // A contraprova do teste acima: se o ramo do "(*)" fosse generalizado,
+    // o item 10 passaria a dizer "Anexo 2 – Inflamáveis" onde o modelo do
+    // perito diz só "Inflamáveis" — e o número já está no subitem.
+    const inflamaveis = { id: 'inf', nome: 'Inflamáveis', anexoNr16: 'ANEXO_02' }
+
+    expect(quadrosNr16DoItem10([inflamaveis], '10.2')[0]?.titulo)
+      .toBe('Inflamáveis – Avaliação, Resultado e Conclusão')
   })
 
   it('agente com anexo fora da lista não some do item 10', () => {
