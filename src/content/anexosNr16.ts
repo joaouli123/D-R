@@ -12,7 +12,7 @@ export interface AnexoNr16Info {
   /** Como o anexo é chamado no corpo do documento: "1"…"6" e "(*)". */
   numero: string
   label: string
-  /** Nome curto do assunto, o que sai na lista do item 10.2. */
+  /** Nome curto do assunto, o que nomeia o subitem do item 10. */
   assunto: string
   risco: string
   atividadesSugeridas: string[]
@@ -477,18 +477,35 @@ export function labelAnexoNr16(id?: string): string {
   return anexoNr16PorId(id)?.label ?? id
 }
 
+/**
+ * O agente aponta mesmo para um anexo da NR-16?
+ *
+ * Não basta `anexoNr16` estar preenchido: as perícias antigas guardavam o
+ * rótulo ("Anexo 2") onde hoje vai o id ("ANEXO_02"). Um valor desses não
+ * casa com anexo nenhum, e é `quadrosNr16DoItem10` quem o recolhe no quadro
+ * "Sem Risco" — a conclusão precisa concordar com esse título e imprimir o
+ * rol, ou o quadro diz uma coisa no cabeçalho e outra no corpo.
+ */
+export function temAnexoNr16Valido(agente: { anexoNr16?: string }): boolean {
+  return ANEXOS_NR16.some((anexo) => anexo.id === agente.anexoNr16)
+}
+
 /** "Anexo 2 – Inflamáveis" — como o anexo aparece dentro do texto. */
 export function linhaAnexoNr16(anexo: AnexoNr16Info): string {
   return `Anexo ${anexo.numero} – ${anexo.assunto}`
 }
 
 /**
- * Como o anexo entra na lista numerada do item 10.
+ * Como o anexo nomeia um subitem numerado.
  *
- * O número do subitem já acompanha o do anexo (10.2.2 → Anexo 2), então
- * repetir "Anexo 2" seria redundante. A exceção é o anexo sem número: ali o
- * "(*)" precisa aparecer, ou o leitor toma o sétimo subitem por "Anexo 7",
- * que não existe na norma.
+ * Serve dois lugares: o título do quadro do item 10 e o índice da
+ * Biblioteca (`referenciasParecer.ts`). Em nenhum dos dois o rótulo repete
+ * "Anexo 2" — no índice porque o número do subitem acompanha o do anexo
+ * (10.2.2 → Anexo 2); no item 10 porque o assunto ("Inflamáveis") já é como
+ * a norma é citada. A exceção é o anexo sem número: ali o "(*)" precisa
+ * aparecer, ou o leitor toma o subitem por "Anexo 7", que não existe na
+ * norma. Dentro da tabela quem escreve é `linhaAnexoNr16`, com o "Anexo N –"
+ * por extenso.
  */
 export function itemListaAnexoNr16(anexo: AnexoNr16Info): string {
   return anexo.numero === '(*)' ? `Anexo (*) – ${anexo.assunto}` : anexo.assunto
@@ -513,41 +530,35 @@ export function conclusaoSemRiscoNr16(): string {
 }
 
 /**
- * Os subitens do item 10 para a NR-16, na ordem fixa dos anexos.
+ * Os subitens do item 10 para a NR-16 — um por agente avaliado.
  *
- * A numeração acompanha o anexo, sempre: Inflamáveis é o subitem 2 mesmo
- * quando é o único avaliado. É assim que o perito numera — e assim o leitor
- * sabe, só pelo número, contra qual anexo aquele quadro foi concluído. Se a
- * numeração seguisse a ordem dos agentes cadastrados, o mesmo anexo mudaria
- * de número a cada perícia.
+ * O perito riscou do modelo a lista solta dos sete anexos que saía aqui, um
+ * subitem para cada: o rol dos anexos observados pertence ao corpo do
+ * quadro, na célula “Resultado técnico / Conclusão” — é `conclusaoSemRiscoNr16`
+ * quem o imprime. Nas palavras dele, “ele só deve aparecer dentro da tabela”.
  *
- * Anexo sem agente entra só como linha da lista: o item 10 declara que os
- * sete foram percorridos, e o quadro completo fica para os que foram
- * efetivamente enquadrados. O cenário negativo — agente sem anexo escolhido
- * — fecha a lista como “Sem Risco”.
+ * Retirada a lista, a numeração passa a ser sequencial. Numerar pelo anexo
+ * deixaria buraco: uma perícia com um só agente de Inflamáveis abriria o
+ * item 10 em “10.2.2”, com o 10.2.1 em lugar nenhum. A ordem continua sendo
+ * a dos anexos da NR-16, e o cenário negativo — agente sem anexo escolhido —
+ * fecha a sequência como “Sem Risco”.
  */
 export function quadrosNr16DoItem10<A extends { nome?: string; anexoNr16?: string }>(
   agentes: A[],
   prefixo: string,
-): { numero: string; titulo: string; agente?: A }[] {
-  const quadros: { numero: string; titulo: string; agente?: A }[] = []
+): { numero: string; titulo: string; agente: A }[] {
   const comSufixo = (base: string, lista: A[], agente: A, indice: number) =>
     lista.length > 1 ? `${base} (${agente.nome?.trim() || `Risco ${indice + 1}`})` : base
 
-  ANEXOS_NR16.forEach((anexo, indice) => {
-    const numero = `${prefixo}.${indice + 1}`
+  const avaliados: { titulo: string; agente: A }[] = []
+  ANEXOS_NR16.forEach((anexo) => {
     const doAnexo = agentes.filter((agente) => agente.anexoNr16 === anexo.id)
-    if (!doAnexo.length) {
-      const ultimo = indice === ANEXOS_NR16.length - 1
-      quadros.push({ numero, titulo: `${itemListaAnexoNr16(anexo)}${ultimo ? '' : ';'}` })
-      return
-    }
     doAnexo.forEach((agente, i) => {
-      // Mesmo rótulo da linha de lista: sem isso o sétimo anexo perde o
+      // Mesmo rótulo do rol de anexos: sem isso o sétimo anexo perde o
       // "(*)" justamente no quadro em que foi avaliado, e o leitor toma o
       // subitem por "Anexo 7", que a norma não tem.
       const base = `${itemListaAnexoNr16(anexo)} – Avaliação, Resultado e Conclusão`
-      quadros.push({ numero, titulo: comSufixo(base, doAnexo, agente, i), agente })
+      avaliados.push({ titulo: comSufixo(base, doAnexo, agente, i), agente })
     })
   })
 
@@ -555,15 +566,14 @@ export function quadrosNr16DoItem10<A extends { nome?: string; anexoNr16?: strin
   // anexo. Agente gravado com valor que não é id de anexo (as perícias
   // antigas guardavam "Anexo 2") não casava com nada e sumia do item 10 sem
   // aviso; agora ele cai aqui.
-  const colocados = new Set(quadros.map((quadro) => quadro.agente))
+  const colocados = new Set(avaliados.map((quadro) => quadro.agente))
   const semAnexo = agentes.filter((agente) => !colocados.has(agente))
-  const numeroSemRisco = `${prefixo}.${ANEXOS_NR16.length + 1}`
   semAnexo.forEach((agente, i) => {
     const base = 'Sem Risco – Avaliação, Resultado e Conclusão'
-    quadros.push({ numero: numeroSemRisco, titulo: comSufixo(base, semAnexo, agente, i), agente })
+    avaliados.push({ titulo: comSufixo(base, semAnexo, agente, i), agente })
   })
 
-  return quadros
+  return avaliados.map((quadro, indice) => ({ numero: `${prefixo}.${indice + 1}`, ...quadro }))
 }
 
 export function aplicarAnexoNr16(agente: AgenteAvaliado, id: string): AgenteAvaliado {

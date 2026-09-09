@@ -294,20 +294,20 @@ describe('DocumentoPreview', () => {
       />,
     )
 
-    expect(html).toContain('10.1.8. Sem Risco – Avaliação, Resultado e Conclusão')
+    expect(html).toContain('10.1.1. Sem Risco – Avaliação, Resultado e Conclusão')
     expect(html).toContain('Condição / Atividades')
     expect(html).toContain('Resultado técnico / Conclusão')
-    // Cada anexo em sua linha: a célula quebra o texto em <div>, não
-    // despeja tudo num parágrafo só.
+    // O rol dos anexos só existe aqui dentro, e cada um em sua linha: a
+    // célula quebra o texto em <div>, não despeja tudo num parágrafo só.
     expect(html).toContain('<div>• Anexo 1 – Explosivos;</div>')
     expect(html).toContain('<div>• Anexo (*) – Radiações ionizantes ou substâncias radioativas;</div>')
   })
 
-  it('percorre os sete anexos da NR-16 no item 10, um a um', () => {
+  it('não repete o rol dos anexos como subitem do item 10', () => {
     // Gêmeo do teste do PDF (documento-parecer.test.ts) e do DOCX
-    // (docx-parecer.test.ts). Sem ele, a prévia podia parar de listar os
-    // anexos sem agente e nenhuma suíte reclamava — e a prévia é a tela que
-    // o perito revisa antes de assinar.
+    // (docx-parecer.test.ts). O perito riscou os subitens “10.x.1
+    // Explosivos; …” do modelo: o rol fica dentro da tabela, e o item 10 só
+    // numera os quadros dos agentes efetivamente avaliados.
     const html = renderToStaticMarkup(
       <DocumentoPreview
         pericia={{
@@ -328,13 +328,10 @@ describe('DocumentoPreview', () => {
     )
 
     expect(html).toContain('10.1. NR-16 — Avaliação das Atividades e Operações Perigosas')
-    expect(html).toContain('10.1.1. Explosivos;')
-    expect(html).toContain('10.1.2. Inflamáveis – Avaliação, Resultado e Conclusão')
-    expect(html).toContain('10.1.3. Segurança pessoal ou patrimonial;')
-    expect(html).toContain('10.1.7. Anexo (*) – Radiações ionizantes ou substâncias radioativas')
-    // O anexo avaliado troca a linha da lista pelo quadro sem mudar de
-    // número: Inflamáveis é o 10.1.2 mesmo sendo o único avaliado.
-    expect(html).not.toContain('10.1.2. Inflamáveis;')
+    expect(html).toContain('10.1.1. Inflamáveis – Avaliação, Resultado e Conclusão')
+    expect(html).not.toContain('10.1.1. Explosivos;')
+    expect(html).not.toContain('Segurança pessoal ou patrimonial;')
+    expect(html).not.toContain('10.1.2.')
   })
 
   it('numera o grupo do item 10 pela modalidade, não pelo tamanho da lista', () => {
@@ -364,7 +361,7 @@ describe('DocumentoPreview', () => {
     expect(html).toContain('7.3. NR-16')
     expect(html).toContain('10.2. NR-16')
     expect(html).not.toContain('10.1. NR-16')
-    expect(html).toContain('10.2.2. Inflamáveis – Avaliação, Resultado e Conclusão')
+    expect(html).toContain('10.2.1. Inflamáveis – Avaliação, Resultado e Conclusão')
   })
 
   it('transcreve no 7.3.2 o risco alegado pela parte, com a folha da inicial', () => {

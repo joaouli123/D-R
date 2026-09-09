@@ -66,12 +66,18 @@ export const REFERENCIAS_PARECER: readonly ReferenciaParecer[] = [
   { numero: '10.1.2', titulo: 'Agentes Químicos', secao: 'analise' },
   { numero: '10.1.3', titulo: 'Agentes Biológicos', secao: 'analise' },
   { numero: '10.2', titulo: 'NR-16 — Avaliação das Atividades e Operações Perigosas', secao: 'analise' },
-  // Os subitens do 10.2 são os sete anexos da NR-16, na ordem e com o rótulo
-  // que `quadrosNr16DoItem10` imprime — mais o oitavo, "Sem Risco". Escritos
-  // à mão, o índice ainda oferecia "10.2.1 Critério de Avaliação" e "10.2.2
-  // Agente de Risco", números que no modelo novo pertencem a Explosivos e a
-  // Inflamáveis: o texto que o perito salvasse na Biblioteca ia reaparecer
-  // sob o anexo errado. Derivado da lista viva, um anexo novo entra sozinho.
+  // Os subitens do 10.2 são os sete anexos da NR-16, na ordem, mais o
+  // oitavo, "Sem Risco". Escritos à mão, o índice oferecia "10.2.1 Critério
+  // de Avaliação" e "10.2.2 Agente de Risco", números que no modelo novo
+  // pertencem a Explosivos e a Inflamáveis: o texto que o perito salvasse na
+  // Biblioteca ia reaparecer sob o anexo errado. Derivado da lista viva, um
+  // anexo novo entra sozinho.
+  //
+  // Isto é chave de arquivo, não o ordinal impresso — como todo o resto do
+  // catálogo, que está inteiro na numeração de "ambas". O item 10 numera os
+  // quadros em sequência sobre os agentes avaliados, então o "10.2.2" daqui
+  // e o "10.2.2" do documento não são o mesmo lugar, do mesmo modo que o
+  // 7.2.x já era por natureza e não por posição.
   ...ANEXOS_NR16.map((anexo, indice) => ({
     numero: `10.2.${indice + 1}`,
     titulo: itemListaAnexoNr16(anexo),

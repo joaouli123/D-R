@@ -293,8 +293,9 @@ export function DocumentoPreview({
   ) : null
 
   /**
-   * Item 10 da NR-16: os sete anexos, na ordem deles, e o quadro de conclusão
-   * em cada um que foi efetivamente avaliado.
+   * Item 10 da NR-16: um subitem por agente avaliado, na ordem dos anexos da
+   * norma, numerado em sequência. O rol dos sete anexos não sai mais como
+   * lista solta — ele vive dentro da tabela, na célula de conclusão.
    *
    * Diferente do item 7 (que levanta) e do quadro da NR-15 (que descreve): a
    * tabela daqui tem duas linhas — o que foi examinado e a que se concluiu.
@@ -303,7 +304,9 @@ export function DocumentoPreview({
     <section>
       <h3>{prefixo}. NR-16 — Avaliação das Atividades e Operações Perigosas</h3>
       {quadrosNr16DoItem10(agentesNr16, prefixo).map((quadro, indice) => {
-        const apresentacao = quadro.agente && quadro.agente.identificadoNaAtividade !== false
+        // Todo quadro tem agente; sem tabela fica só o que o perito marcou
+        // como não identificado na atividade.
+        const apresentacao = quadro.agente.identificadoNaAtividade !== false
           ? montarApresentacaoAgente(quadro.agente, { conclusiva: true })
           : null
         const chave = `nr16-${quadro.numero}-${indice}`

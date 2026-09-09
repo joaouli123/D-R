@@ -909,15 +909,17 @@ async function docParecer(
   }
 
   /**
-   * O grupo da NR-16 não é uma lista de agentes: é a lista dos sete anexos,
-   * sempre inteira, com o quadro conclusivo em cada um que foi avaliado.
+   * O grupo da NR-16 é um subitem por agente avaliado, numerado em
+   * sequência. A lista solta dos sete anexos saiu daqui por determinação do
+   * perito — o rol observado sai dentro da tabela, na célula “Resultado
+   * técnico / Conclusão”. Quem monta é `quadrosNr16DoItem10`.
    * Espelha `quadrosNr16DeAnalise` da prévia e `montarGrupoNr16` do PDF.
    */
   const adicionarQuadrosNr16 = (lista: typeof agentes, prefixo: string | null) => {
     if (!prefixo || !lista.length) return
     filhos.push(h3(`${prefixo}. NR-16 — Avaliação das Atividades e Operações Perigosas`))
     for (const quadro of quadrosNr16DoItem10(lista, prefixo)) {
-      const apresentacao = quadro.agente && quadro.agente.identificadoNaAtividade !== false
+      const apresentacao = quadro.agente.identificadoNaAtividade !== false
         ? montarApresentacaoAgente(quadro.agente, { conclusiva: true })
         : null
       filhos.push(

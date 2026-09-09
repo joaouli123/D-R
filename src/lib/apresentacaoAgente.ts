@@ -7,6 +7,7 @@ import {
   LAPSO_TEMPORAL_NR16,
   conclusaoSemRiscoNr16,
   labelAnexoNr16,
+  temAnexoNr16Valido,
 } from '@/content/anexosNr16'
 
 import { FONTE_RUIDO, formatarMedicaoEmpresa, medicaoAdotada, tipoMedicaoEmpresaDe } from './medicoes'
@@ -217,9 +218,15 @@ export function montarApresentacaoAgente(
       // Sem anexo escolhido o quadro é o "Sem Risco": aí a conclusão precisa
       // dizer que TODOS os anexos foram percorridos, e não só que nada foi
       // caracterizado. Com anexo, quem responde é o resultado daquele anexo.
+      //
+      // A pergunta é a mesma que `quadrosNr16DoItem10` faz para escolher o
+      // título do quadro; se aqui fosse só `!agente.anexoNr16`, a perícia
+      // antiga com "Anexo 2" gravado sairia intitulada "Sem Risco" e sem o
+      // rol — que, retirada a lista do item 10, não tem outro lugar onde
+      // aparecer.
       const conclusao = resultadoTexto
         ? { valor: resultadoTexto }
-        : semEnquadramento && !agente.anexoNr16
+        : semEnquadramento && !temAnexoNr16Valido(agente)
           ? { valor: conclusaoSemRiscoNr16(), destaque: 'positivo' as const }
           : resultado
             ? { valor: resultado.valor, destaque: resultado.destaque }

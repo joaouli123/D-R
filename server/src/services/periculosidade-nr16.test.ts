@@ -87,6 +87,20 @@ const CASOS: { nome: string; agente: AgenteAvaliado }[] = [
     },
   },
   {
+    // Perícia antiga: guardava o rótulo onde hoje vai o id. Não casa com
+    // anexo nenhum, e por isso o item 10 o recolhe no quadro "Sem Risco" —
+    // o que faz a célula de conclusão dele ter de imprimir o rol.
+    nome: 'anexo gravado com o rótulo antigo, sem enquadramento',
+    agente: {
+      id: 'nr16-legado',
+      nome: 'Inflamáveis líquidos',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      anexoNr16: 'Anexo 2',
+      resultadoPericulosidade: 'nao_caracterizada',
+    },
+  },
+  {
     nome: 'agente recém-criado, ainda sem nada preenchido',
     agente: {
       id: 'nr16-vazio',
@@ -187,36 +201,75 @@ describe('tabela da NR-16 nos dois quadros', () => {
       [{ id: 'a', nome: 'Inflamáveis líquidos', anexoNr16: 'ANEXO_02' }],
       // Perícia antiga, que gravava o rótulo em vez do id.
       [{ id: 'legado', nome: 'Inflamáveis líquidos', anexoNr16: 'Anexo 2' }],
+      // Dois anexos e uma sobra: pega divergência de ordem e de numeração.
+      [
+        { id: 'moto', nome: 'Motocicleta', anexoNr16: 'ANEXO_05' },
+        { id: 'sobra', nome: 'Sem risco' },
+        { id: 'inf', nome: 'Inflamáveis', anexoNr16: 'ANEXO_02' },
+      ],
     ]) {
       expect(quadrosNr16DoItem10(agentes, '10.2')).toEqual(quadrosNoFront(agentes, '10.2'))
     }
   })
 
-  it('lista os sete anexos mesmo sem agente nenhum enquadrado', () => {
-    const quadros = quadrosNr16DoItem10([{ id: 'sem-anexo', nome: 'Sem risco' }], '10.2')
+  it('sem agente enquadrado, o item 10 sai só com o quadro Sem Risco', () => {
+    const agente = { id: 'sem-anexo', nome: 'Sem risco' }
+    const quadros = quadrosNr16DoItem10([agente], '10.2')
 
-    // Sete linhas de anexo + o quadro do agente sem enquadramento.
-    expect(quadros).toHaveLength(8)
-    expect(quadros.slice(0, 7).every((quadro) => !quadro.agente)).toBe(true)
-    expect(quadros[0]).toEqual({ numero: '10.2.1', titulo: 'Explosivos;' })
-    // Ponto e vírgula em todos menos no último da lista.
-    expect(quadros[6]).toEqual({
-      numero: '10.2.7',
-      titulo: 'Anexo (*) – Radiações ionizantes ou substâncias radioativas',
-    })
-    expect(quadros[7]?.titulo).toBe('Sem Risco – Avaliação, Resultado e Conclusão')
+    // A lista solta dos sete anexos saiu do item 10 por determinação do
+    // perito: o rol sai dentro da tabela, na célula de conclusão.
+    expect(quadros).toEqual([{
+      numero: '10.2.1',
+      titulo: 'Sem Risco – Avaliação, Resultado e Conclusão',
+      agente,
+    }])
+    expect(conclusaoSemRiscoNr16()).toContain('Todos os anexos foram observados:')
+    expect(conclusaoSemRiscoNr16()).toContain('• Anexo 1 – Explosivos;')
+    expect(conclusaoSemRiscoNr16())
+      .toContain('• Anexo (*) – Radiações ionizantes ou substâncias radioativas;')
   })
 
-  it('o anexo avaliado troca a linha da lista pelo quadro, sem mudar de número', () => {
+  it('numera os quadros em sequência, sem buraco de anexo não avaliado', () => {
     const agente = { id: 'a', nome: 'Inflamáveis líquidos', anexoNr16: 'ANEXO_02' }
     const quadros = quadrosNr16DoItem10([agente], '10.2')
 
-    expect(quadros).toHaveLength(7)
-    expect(quadros[1]).toEqual({
-      numero: '10.2.2',
+    // Inflamáveis é o Anexo 2, mas é o único quadro do item: enquanto a
+    // numeração acompanhava o anexo, o item 10 abria em “10.2.2” e o 10.2.1
+    // não existia em lugar nenhum.
+    expect(quadros).toEqual([{
+      numero: '10.2.1',
       titulo: 'Inflamáveis – Avaliação, Resultado e Conclusão',
       agente,
-    })
+    }])
+  })
+
+  it('mantém a ordem dos anexos e deixa o Sem Risco por último', () => {
+    const moto = { id: 'moto', nome: 'Motocicleta', anexoNr16: 'ANEXO_05' }
+    const sobra = { id: 'sobra', nome: 'Sem risco' }
+    const inflamaveis = { id: 'inf', nome: 'Inflamáveis', anexoNr16: 'ANEXO_02' }
+
+    // Cadastrados fora de ordem de propósito: quem manda é o anexo.
+    const quadros = quadrosNr16DoItem10([moto, sobra, inflamaveis], '10.2')
+
+    expect(quadros.map((quadro) => `${quadro.numero}. ${quadro.titulo}`)).toEqual([
+      '10.2.1. Inflamáveis – Avaliação, Resultado e Conclusão',
+      '10.2.2. Motocicleta – Avaliação, Resultado e Conclusão',
+      '10.2.3. Sem Risco – Avaliação, Resultado e Conclusão',
+    ])
+  })
+
+  it('dois agentes no mesmo anexo ganham um subitem cada, com o nome no título', () => {
+    // Dúvida do perito, respondida pelo comportamento: eles não dividem o
+    // subitem. Cada um tem o seu quadro, e o nome do risco entra entre
+    // parênteses para o leitor saber qual é qual.
+    const diesel = { id: 'd', nome: 'Óleo diesel', anexoNr16: 'ANEXO_02' }
+    const gasolina = { id: 'g', nome: 'Gasolina', anexoNr16: 'ANEXO_02' }
+    const quadros = quadrosNr16DoItem10([diesel, gasolina], '10.2')
+
+    expect(quadros.map((quadro) => `${quadro.numero}. ${quadro.titulo}`)).toEqual([
+      '10.2.1. Inflamáveis – Avaliação, Resultado e Conclusão (Óleo diesel)',
+      '10.2.2. Inflamáveis – Avaliação, Resultado e Conclusão (Gasolina)',
+    ])
   })
 
   it('agente com anexo fora da lista não some do item 10', () => {
@@ -226,9 +279,58 @@ describe('tabela da NR-16 nos dois quadros', () => {
     const quadros = quadrosNr16DoItem10([legado], '10.2')
 
     expect(quadros.map((quadro) => quadro.agente)).toContain(legado)
-    expect(quadros.filter((quadro) => quadro.agente)).toHaveLength(1)
-    // Vai para o último subitem, o "Sem Risco" do modelo do perito.
-    expect(quadros.find((quadro) => quadro.agente)?.numero).toBe('10.2.8')
+    expect(quadros).toHaveLength(1)
+    // Cai no "Sem Risco" do modelo do perito, aqui o único subitem.
+    expect(quadros[0]?.numero).toBe('10.2.1')
+    expect(quadros[0]?.titulo).toBe('Sem Risco – Avaliação, Resultado e Conclusão')
+  })
+
+  it('o quadro Sem Risco por anexo legado também imprime o rol na conclusão', () => {
+    // O título e o corpo têm de responder à MESMA pergunta. Enquanto a
+    // conclusão olhava só se `anexoNr16` estava preenchido, este agente
+    // entrava no quadro "Sem Risco" e saía com a frase curta do seletor:
+    // cabeçalho dizendo que nenhum anexo se aplica, corpo sem dizer quais
+    // foram observados. Com a lista solta fora do item 10, o rol não tem
+    // outro lugar onde aparecer.
+    const legado = {
+      id: 'legado',
+      nome: 'Inflamáveis líquidos',
+      tipo: 'periculosidade' as const,
+      criterio: 'qualitativo' as const,
+      anexoNr16: 'Anexo 2',
+      resultadoPericulosidade: 'nao_caracterizada' as const,
+    }
+
+    const conclusiva = montarApresentacaoAgente(legado, { conclusiva: true })
+
+    expect(conclusiva.linhas).toContainEqual({
+      rotulo: 'Resultado técnico / Conclusão',
+      valor: conclusaoSemRiscoNr16(),
+      destaque: 'positivo',
+    })
+  })
+
+  it('agente de anexo válido não caracterizado NÃO puxa o rol', () => {
+    // A contraprova: aqui o quadro se chama "Inflamáveis", não "Sem Risco".
+    // O rol responderia por sete anexos quando o laudo examinou um.
+    const valido = {
+      id: 'valido',
+      nome: 'Inflamáveis',
+      tipo: 'periculosidade' as const,
+      criterio: 'qualitativo' as const,
+      anexoNr16: 'ANEXO_02',
+      resultadoPericulosidade: 'nao_caracterizada' as const,
+    }
+
+    const conclusiva = montarApresentacaoAgente(valido, { conclusiva: true })
+    const conclusao = conclusiva.linhas.find(
+      (linha) => linha.rotulo === 'Resultado técnico / Conclusão',
+    )
+
+    expect(conclusao?.valor).toBeTruthy()
+    expect(conclusao?.valor).not.toContain('Todos os anexos foram observados:')
+    expect(quadrosNr16DoItem10([valido], '10.2')[0]?.titulo)
+      .toBe('Inflamáveis – Avaliação, Resultado e Conclusão')
   })
 
   it('os EPIs do agente de periculosidade só têm onde sair no item 10', () => {

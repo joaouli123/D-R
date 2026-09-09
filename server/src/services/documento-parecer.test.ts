@@ -67,8 +67,8 @@ describe('parecer em HTML (motor do PDF)', () => {
     expect(html).toContain('7.3. NR-16')
     expect(html).toContain('10.2. NR-16')
     expect(html).not.toContain('10.1. NR-16')
-    // E os subitens acompanham o grupo: o Anexo 2 é o 10.2.2, não o 10.1.2.
-    expect(html).toContain('10.2.2. Inflamáveis – Avaliação, Resultado e Conclusão')
+    // E os subitens acompanham o grupo: o quadro é o 10.2.1, não o 10.1.1.
+    expect(html).toContain('10.2.1. Inflamáveis – Avaliação, Resultado e Conclusão')
   })
 
   it('numera as fotografias na sequência em que elas saem no documento', async () => {
@@ -143,7 +143,7 @@ describe('parecer em HTML (motor do PDF)', () => {
     expect(posicoes).toEqual([...posicoes].sort((a, b) => a - b))
   })
 
-  it('fecha o item 10 com o quadro Sem Risco e a lista dos anexos em linhas', async () => {
+  it('fecha o item 10 com o quadro Sem Risco, e o rol dos anexos dentro dele', async () => {
     const pericia = periciaSoPericulosidade()
     ;(pericia.tecnico as unknown as { agentes: unknown[] }).agentes = [{
       id: 'nr16-sem-risco',
@@ -155,25 +155,24 @@ describe('parecer em HTML (motor do PDF)', () => {
 
     const html = await gerar(pericia)
 
-    expect(html).toContain('10.1.8. Sem Risco – Avaliação, Resultado e Conclusão')
+    expect(html).toContain('10.1.1. Sem Risco – Avaliação, Resultado e Conclusão')
     expect(html).toContain('<th>Condição / Atividades</th>')
-    // A quebra de linha da célula vira <br>: sem isso a lista dos sete
-    // anexos sai como um parágrafo corrido dentro do quadro.
+    // A quebra de linha da célula vira <br>: sem isso o rol dos sete anexos
+    // sai como um parágrafo corrido dentro do quadro.
     expect(html).toContain('<br>• Anexo 1 – Explosivos;')
     expect(html).toContain('<br>• Anexo (*) – Radiações ionizantes ou substâncias radioativas;')
   })
 
-  it('percorre os sete anexos da NR-16 no item 10, um a um', async () => {
-    // O item 10 declara que os sete anexos foram observados: os que não têm
-    // agente entram como linha da lista, e só o último fica sem ponto e
-    // vírgula. É o modelo que o perito mandou.
+  it('não repete o rol dos anexos como subitem do item 10', async () => {
+    // O item 10 declara que os sete anexos foram observados — mas dentro da
+    // tabela, na célula de conclusão, e não como sete subitens soltos. É o
+    // modelo que o perito mandou, com os subitens riscados à mão.
     const html = await gerar(periciaSoPericulosidade())
 
     expect(html).toContain('10.1. NR-16 — Avaliação das Atividades e Operações Perigosas')
-    expect(html).toContain('10.1.1. Explosivos;')
-    expect(html).toContain('10.1.2. Inflamáveis – Avaliação, Resultado e Conclusão')
-    expect(html).toContain('10.1.7. Anexo (*) – Radiações ionizantes ou substâncias radioativas')
-    expect(html).not.toContain('Radiações ionizantes ou substâncias radioativas;')
+    expect(html).toContain('10.1.1. Inflamáveis – Avaliação, Resultado e Conclusão')
+    expect(html).not.toContain('10.1.1. Explosivos;')
+    expect(html).not.toContain('Radiações ionizantes ou substâncias radioativas')
   })
 
   it('abre a capa pela identificação das partes', async () => {

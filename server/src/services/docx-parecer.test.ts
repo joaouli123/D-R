@@ -132,7 +132,7 @@ describe('parecer em DOCX', () => {
     expect(posicoes).toEqual([...posicoes].sort((a, b) => a - b))
   })
 
-  it('fecha o item 10 com o quadro Sem Risco e a lista dos anexos em linhas', async () => {
+  it('fecha o item 10 com o quadro Sem Risco, e o rol dos anexos dentro dele', async () => {
     const pericia = periciaSoPericulosidade()
     ;(pericia.tecnico as unknown as { agentes: unknown[] }).agentes = [{
       id: 'nr16-sem-risco',
@@ -144,11 +144,11 @@ describe('parecer em DOCX', () => {
 
     const texto = await textoDoDocx(pericia)
 
-    expect(texto).toContain('10.1.8. Sem Risco – Avaliação, Resultado e Conclusão')
+    expect(texto).toContain('10.1.1. Sem Risco – Avaliação, Resultado e Conclusão')
     expect(texto).toContain('Condição / Atividades')
     // No DOCX cada linha da célula é um parágrafo próprio; o texto corrido do
     // teste junta os <w:t> com espaço, então o que se mede é a presença de
-    // cada item da lista.
+    // cada item do rol.
     expect(texto).toContain('• Anexo 1 – Explosivos;')
     expect(texto).toContain('• Anexo (*) – Radiações ionizantes ou substâncias radioativas;')
   })
@@ -161,15 +161,15 @@ describe('parecer em DOCX', () => {
     expect(texto).toContain('7.3. NR-16')
     expect(texto).toContain('10.2. NR-16')
     expect(texto).not.toContain('10.1. NR-16')
-    expect(texto).toContain('10.2.2. Inflamáveis – Avaliação, Resultado e Conclusão')
+    expect(texto).toContain('10.2.1. Inflamáveis – Avaliação, Resultado e Conclusão')
   })
 
-  it('percorre os sete anexos da NR-16 no item 10, um a um', async () => {
+  it('não repete o rol dos anexos como subitem do item 10', async () => {
     const texto = await textoDoDocx(periciaSoPericulosidade())
 
-    expect(texto).toContain('10.1.1. Explosivos;')
-    expect(texto).toContain('10.1.2. Inflamáveis – Avaliação, Resultado e Conclusão')
-    expect(texto).toContain('10.1.7. Anexo (*) – Radiações ionizantes ou substâncias radioativas')
+    expect(texto).toContain('10.1.1. Inflamáveis – Avaliação, Resultado e Conclusão')
+    expect(texto).not.toContain('10.1.1. Explosivos;')
+    expect(texto).not.toContain('Radiações ionizantes ou substâncias radioativas')
   })
 
   it('mantém em negrito, no Word, a linha de resultado do quadro do item 10', async () => {

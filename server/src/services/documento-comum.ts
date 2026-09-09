@@ -765,47 +765,46 @@ export const ANEXOS_NR16_DOCUMENTO: { id: string; numero: string; assunto: strin
   { id: 'ANEXO_RADIACOES', numero: '(*)', assunto: 'Radiações ionizantes ou substâncias radioativas' },
 ]
 
+/** Espelha `temAnexoNr16Valido` do front. */
+export function temAnexoNr16ValidoDocumento(agente: { anexoNr16?: string }): boolean {
+  return ANEXOS_NR16_DOCUMENTO.some((anexo) => anexo.id === agente.anexoNr16)
+}
+
 /** Espelha `itemListaAnexoNr16` do front. */
 export function itemListaAnexoNr16Documento(anexo: { numero: string; assunto: string }): string {
   return anexo.numero === '(*)' ? `Anexo (*) – ${anexo.assunto}` : anexo.assunto
 }
 
 /**
- * Os subitens do item 10 para a NR-16, na ordem fixa dos anexos.
+ * Os subitens do item 10 para a NR-16 — um por agente avaliado.
  *
- * A numeração acompanha o anexo, sempre: Inflamáveis é o subitem 2 mesmo
- * quando é o único avaliado. É assim que o perito numera — e assim o leitor
- * sabe, só pelo número, contra qual anexo aquele quadro foi concluído. Se a
- * numeração seguisse a ordem dos agentes cadastrados, o mesmo anexo mudaria
- * de número a cada perícia.
+ * O perito riscou do modelo a lista solta dos sete anexos que saía aqui, um
+ * subitem para cada: o rol dos anexos observados pertence ao corpo do
+ * quadro, na célula “Resultado técnico / Conclusão” — é `conclusaoSemRiscoNr16`
+ * quem o imprime. Nas palavras dele, “ele só deve aparecer dentro da tabela”.
  *
- * Anexo sem agente entra só como linha da lista: o item 10 declara que os
- * sete foram percorridos, e o quadro completo fica para os que foram
- * efetivamente enquadrados. O cenário negativo — agente sem anexo escolhido
- * — fecha a lista como “Sem Risco”.
+ * Retirada a lista, a numeração passa a ser sequencial. Numerar pelo anexo
+ * deixaria buraco: uma perícia com um só agente de Inflamáveis abriria o
+ * item 10 em “10.2.2”, com o 10.2.1 em lugar nenhum. A ordem continua sendo
+ * a dos anexos da NR-16, e o cenário negativo — agente sem anexo escolhido —
+ * fecha a sequência como “Sem Risco”.
  */
 export function quadrosNr16DoItem10<A extends { nome?: string; anexoNr16?: string }>(
   agentes: A[],
   prefixo: string,
-): { numero: string; titulo: string; agente?: A }[] {
-  const quadros: { numero: string; titulo: string; agente?: A }[] = []
+): { numero: string; titulo: string; agente: A }[] {
   const comSufixo = (base: string, lista: A[], agente: A, indice: number) =>
     lista.length > 1 ? `${base} (${agente.nome?.trim() || `Risco ${indice + 1}`})` : base
 
-  ANEXOS_NR16_DOCUMENTO.forEach((anexo, indice) => {
-    const numero = `${prefixo}.${indice + 1}`
+  const avaliados: { titulo: string; agente: A }[] = []
+  ANEXOS_NR16_DOCUMENTO.forEach((anexo) => {
     const doAnexo = agentes.filter((agente) => agente.anexoNr16 === anexo.id)
-    if (!doAnexo.length) {
-      const ultimo = indice === ANEXOS_NR16_DOCUMENTO.length - 1
-      quadros.push({ numero, titulo: `${itemListaAnexoNr16Documento(anexo)}${ultimo ? '' : ';'}` })
-      return
-    }
     doAnexo.forEach((agente, i) => {
-      // Mesmo rótulo da linha de lista: sem isso o sétimo anexo perde o
+      // Mesmo rótulo do rol de anexos: sem isso o sétimo anexo perde o
       // "(*)" justamente no quadro em que foi avaliado, e o leitor toma o
       // subitem por "Anexo 7", que a norma não tem.
       const base = `${itemListaAnexoNr16Documento(anexo)} – Avaliação, Resultado e Conclusão`
-      quadros.push({ numero, titulo: comSufixo(base, doAnexo, agente, i), agente })
+      avaliados.push({ titulo: comSufixo(base, doAnexo, agente, i), agente })
     })
   })
 
@@ -813,15 +812,14 @@ export function quadrosNr16DoItem10<A extends { nome?: string; anexoNr16?: strin
   // anexo. Agente gravado com valor que não é id de anexo (as perícias
   // antigas guardavam "Anexo 2") não casava com nada e sumia do item 10 sem
   // aviso; agora ele cai aqui.
-  const colocados = new Set(quadros.map((quadro) => quadro.agente))
+  const colocados = new Set(avaliados.map((quadro) => quadro.agente))
   const semAnexo = agentes.filter((agente) => !colocados.has(agente))
-  const numeroSemRisco = `${prefixo}.${ANEXOS_NR16_DOCUMENTO.length + 1}`
   semAnexo.forEach((agente, i) => {
     const base = 'Sem Risco – Avaliação, Resultado e Conclusão'
-    quadros.push({ numero: numeroSemRisco, titulo: comSufixo(base, semAnexo, agente, i), agente })
+    avaliados.push({ titulo: comSufixo(base, semAnexo, agente, i), agente })
   })
 
-  return quadros
+  return avaliados.map((quadro, indice) => ({ numero: `${prefixo}.${indice + 1}`, ...quadro }))
 }
 
 export const ANALISE_ATIVIDADES_NR16 =
@@ -968,9 +966,11 @@ export function montarApresentacaoAgente(
     const titulo = agente.nome || 'Risco de periculosidade não informado'
 
     if (opcoes.conclusiva) {
+      // Mesma pergunta que `quadrosNr16DoItem10` faz para dar o título ao
+      // quadro. Ver `temAnexoNr16ValidoDocumento`.
       const conclusao = resultadoTexto
         ? { valor: resultadoTexto }
-        : semEnquadramento && !agente.anexoNr16
+        : semEnquadramento && !temAnexoNr16ValidoDocumento(agente)
           ? { valor: conclusaoSemRiscoNr16(), destaque: 'positivo' as const }
           : resultado
             ? { valor: resultado.valor, destaque: resultado.destaque }
