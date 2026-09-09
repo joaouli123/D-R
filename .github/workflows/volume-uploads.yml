@@ -1,0 +1,160 @@
+# ============================================================
+# Garante o volume persistente das fotos e das logos na app da API.
+#
+# Sem ele o container grava em /app/uploads normalmente — e perde tudo
+# no deploy seguinte, porque a camada de escrita do container morre
+# junto com o container. Era por isso que as fotos do laudo e a logo
+# própria "subiam" e sumiam.
+#
+# Fica como workflow em vez de clique no painel de propósito: se a app
+# for recriada algum dia, o requisito está escrito aqui e é só rodar de
+# novo. É idempotente — se o volume já existir, não faz nada.
+#
+# Só roda quando alguém dispara à mão (Actions -> este workflow -> Run).
+# ============================================================
+
+name: Volume de uploads
+
+on:
+  workflow_dispatch:
+    inputs:
+      redeploy:
+        description: 'Redeploy da API depois de criar (necessário para o volume montar)'
+        type: boolean
+        default: true
+
+# Mesmo grupo do deploy-api.yml: dois deploys da mesma app ao mesmo
+# tempo é receita de container meio trocado. Aqui a fila espera.
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  garantir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+      APP_UUID: ${{ secrets.COOLIFY_API_APP_UUID }}
+      NOME: uploads
+      DESTINO: /app/uploads
+
+    steps:
+      - name: Ver o que já existe
+        id: atual
+        run: |
+          set -euo pipefail
+          resposta=$(curl -sS --fail-with-body --connect-timeout 20 \
+            --retry 5 --retry-delay 10 --retry-all-errors \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "$COOLIFY_URL/api/v1/applications/$APP_UUID/storages")
+
+          echo "Storages hoje:"
+          printf '%s\n' "$resposta" | jq -r '.[] | "  - \(.name) -> \(.mount_path) (host_path: \(.host_path // "nenhum"))"'
+
+          # Casa pelo caminho de destino, não pelo nome: o que quebra o
+          # container é montar duas coisas no mesmo ponto.
+          if printf '%s' "$resposta" | jq -e --arg d "$DESTINO" 'any(.[]; .mount_path == $d)' >/dev/null; then
+            echo "ja_existe=sim" >> "$GITHUB_OUTPUT"
+          else
+            echo "ja_existe=nao" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Criar o volume
+        if: steps.atual.outputs.ja_existe == 'nao'
+        run: |
+          set -euo pipefail
+          # Sem "host_path" no corpo: é isso que faz o Coolify criar um
+          # Volume Mount (volume nomeado do Docker) em vez de um Bind
+          # Mount amarrado a uma pasta do host.
+          corpo=$(jq -nc --arg n "$NOME" --arg d "$DESTINO" \
+            '{name: $n, mount_path: $d}')
+
+          resposta=$(curl -sS --fail-with-body -X POST \
+            --connect-timeout 20 --retry 5 --retry-delay 10 --retry-all-errors \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d "$corpo" \
+            "$COOLIFY_URL/api/v1/applications/$APP_UUID/storages")
+
+          echo "Resposta da criação:"
+          printf '%s\n' "$resposta" | jq . || printf '%s\n' "$resposta"
+
+      - name: Conferir que ficou de pé
+        run: |
+          set -euo pipefail
+          resposta=$(curl -sS --fail-with-body --connect-timeout 20 \
+            --retry 5 --retry-delay 10 --retry-all-errors \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "$COOLIFY_URL/api/v1/applications/$APP_UUID/storages")
+
+          printf '%s\n' "$resposta" | jq -r '.[] | "  - \(.name) -> \(.mount_path) (host_path: \(.host_path // "nenhum"))"'
+
+          if ! printf '%s' "$resposta" | jq -e --arg d "$DESTINO" 'any(.[]; .mount_path == $d)' >/dev/null; then
+            echo "O volume em $DESTINO não apareceu na lista."
+            exit 1
+          fi
+
+          # Bind mount em vez de volume nomeado é meio-caminho: sobrevive
+          # ao deploy, mas amarra os arquivos a uma pasta do host e some
+          # se a app mudar de servidor. Avisa alto em vez de passar batido.
+          if printf '%s' "$resposta" | jq -e --arg d "$DESTINO" \
+              'any(.[]; .mount_path == $d and (.host_path // "") != "")' >/dev/null; then
+            echo "::warning::O storage em $DESTINO ficou como Bind Mount, não Volume Mount."
+          fi
+
+          echo "Volume de uploads garantido."
+
+      - name: Redeploy da API para montar o volume
+        if: inputs.redeploy
+        run: |
+          set -euo pipefail
+          # O volume só entra no container no próximo deploy. Mesmo
+          # padrão do deploy-api.yml: dispara e espera terminar de
+          # verdade, para a falha aparecer aqui e não em silêncio.
+          resposta=$(curl -sS --fail-with-body -X POST \
+            --connect-timeout 20 --retry 8 --retry-delay 20 --retry-all-errors \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "$COOLIFY_URL/api/v1/deploy?uuid=$APP_UUID")
+
+          uuid=$(printf '%s' "$resposta" | jq -r '.deployments[0].deployment_uuid // empty')
+          if [ -z "$uuid" ]; then
+            echo "O Coolify não devolveu um deployment. Resposta:"
+            printf '%s\n' "$resposta"
+            exit 1
+          fi
+          echo "Deployment $uuid enfileirado."
+
+          for _ in $(seq 1 120); do
+            estado=$(curl -sS --connect-timeout 15 --retry 3 --retry-delay 5 --retry-all-errors \
+              -H "Authorization: Bearer $COOLIFY_TOKEN" \
+              "$COOLIFY_URL/api/v1/deployments/$uuid" 2>/dev/null | jq -r '.status // "desconhecido"' 2>/dev/null || echo "desconhecido")
+
+            case "$estado" in
+              finished)   echo "Deploy concluído."; break ;;
+              failed|cancelled-by-user)
+                echo "Deploy terminou como \"$estado\". Veja os logs no painel."
+                exit 1 ;;
+              *) echo "  $estado…"; sleep 10 ;;
+            esac
+          done
+
+      - name: Conferir /api/saude
+        if: inputs.redeploy
+        run: |
+          set -euo pipefail
+          for tentativa in $(seq 1 18); do
+            corpo=$(curl -s --max-time 20 https://drpericiatrabalhista.com.br/api/saude || echo '')
+            if printf '%s' "$corpo" | jq -e '.uploads.gravavel == true' >/dev/null 2>&1; then
+              echo "API no ar e /app/uploads gravável (tentativa $tentativa):"
+              printf '%s\n' "$corpo" | jq .uploads
+              exit 0
+            fi
+            echo "  ainda não… ($corpo)"
+            sleep 10
+          done
+
+          echo "A API não confirmou /app/uploads gravável."
+          exit 1
