@@ -4,6 +4,7 @@ import path from 'node:path'
 import multer from 'multer'
 import { env } from '../env.js'
 import { ErroHttp } from '../erros.js'
+import { LIMITE_FOTOS_POR_ENVIO, LIMITE_MULTER_BYTES } from '../limites.js'
 
 // ============================================================
 // Armazenamento local dos uploads (fotos da vistoria e anexos
@@ -94,7 +95,9 @@ const IMAGENS = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', '
 
 export const uploadImagens = multer({
   storage: armazenamento,
-  limits: { fileSize: env.UPLOAD_MAX_MB * 1024 * 1024, files: 30 },
+  // Toda imagem para em LIMITE_IMAGEM_MB, e não em UPLOAD_MAX_MB: o
+  // navegador confere o mesmo número antes de enviar, e ele não lê o .env.
+  limits: { fileSize: LIMITE_MULTER_BYTES, files: LIMITE_FOTOS_POR_ENVIO },
   fileFilter: (_req, file, cb) => {
     if (!IMAGENS.has(file.mimetype)) {
       // HEIC/HEIF e o padrao das fotos de iPhone e nao abre no navegador
@@ -116,7 +119,7 @@ export const uploadImagens = multer({
 })
 
 /**
- * Logo do perito: só PNG e JPEG, um arquivo, 4 MB.
+ * Logo do perito: só PNG e JPEG, um arquivo, no mesmo teto das fotos.
  *
  * O recorte de formatos não é zelo estético. Esta imagem é EMBUTIDA no DOCX,
  * e o Word só aceita alguns formatos: um WebP aceito aqui viraria um
@@ -126,7 +129,7 @@ export const uploadImagens = multer({
  */
 export const uploadLogo = multer({
   storage: armazenamento,
-  limits: { fileSize: 4 * 1024 * 1024, files: 1 },
+  limits: { fileSize: LIMITE_MULTER_BYTES, files: 1 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype !== 'image/png' && file.mimetype !== 'image/jpeg') {
       cb(new ErroHttp(415, `Formato não suportado: ${file.mimetype}. A logo deve ser PNG (de preferência, com fundo transparente) ou JPEG.`))
@@ -138,6 +141,8 @@ export const uploadLogo = multer({
 
 export const uploadPdf = multer({
   storage: armazenamento,
+  // De propósito fora do teto das imagens: um processo digitalizado passa
+  // longe de 3 MB, e recusar o anexo inteiro seria pior que a doença.
   limits: { fileSize: env.UPLOAD_MAX_MB * 4 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype !== 'application/pdf') {

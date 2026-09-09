@@ -42,12 +42,24 @@ describe('tratarErros — envio de arquivos', () => {
   it('foto acima do limite vira 413 dizendo o limite', () => {
     const visto = tratar(new multer.MulterError('LIMIT_FILE_SIZE', 'fotos'))
     expect(visto.status).toBe(413)
-    expect(visto.corpo?.erro).toContain('15 MB')
+    expect(visto.corpo?.erro).toContain('3 MB')
   })
 
-  it('o limite do anexo em PDF e quatro vezes o da foto', () => {
-    const visto = tratar(new multer.MulterError('LIMIT_FILE_SIZE', 'anexo'))
-    expect(visto.corpo?.erro).toContain('60 MB')
+  it('a logo grande demais recebe o mesmo teto da foto', () => {
+    // "limite tudo em 3mb qlq imagem do sistema" — a logo tinha um 4 fixo
+    // no meio do multer e ninguem conferia.
+    const visto = tratar(new multer.MulterError('LIMIT_FILE_SIZE', 'logo'))
+    expect(visto.status).toBe(413)
+    expect(visto.corpo?.erro).toContain('3 MB')
+  })
+
+  it('a imagem nao acompanha UPLOAD_MAX_MB, so o anexo em PDF acompanha', () => {
+    // O mock acima poe UPLOAD_MAX_MB em 15: se a imagem voltasse a seguir o
+    // ambiente, esta mensagem diria 15 MB de novo.
+    expect(tratar(new multer.MulterError('LIMIT_FILE_SIZE', 'fotos')).corpo?.erro)
+      .not.toContain('15 MB')
+    expect(tratar(new multer.MulterError('LIMIT_FILE_SIZE', 'anexo')).corpo?.erro)
+      .toContain('60 MB')
   })
 
   it('fotos demais de uma vez vira 400 explicando o maximo', () => {

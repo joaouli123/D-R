@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from 'express'
 import multer from 'multer'
 import { ZodError } from 'zod'
 import { env } from './env.js'
+import { LIMITE_FOTOS_POR_ENVIO, LIMITE_IMAGEM_MB } from './limites.js'
 
 /** Erro com status HTTP e mensagem já pronta para o usuário final. */
 export class ErroHttp extends Error {
@@ -58,14 +59,18 @@ export function tratarErros(
   // que o perito via quando o upload de foto falhava: uma caixa vermelha
   // generica, indistinguivel de um servidor fora do ar.
   if (erro instanceof multer.MulterError) {
-    // O limite de PDF e quatro vezes o de imagem (ver armazenamento.ts).
-    const limiteMb = erro.field === 'anexo' ? env.UPLOAD_MAX_MB * 4 : env.UPLOAD_MAX_MB
+    // Imagem (foto ou logo) para no teto fixo; so o anexo em PDF, que nao e
+    // imagem, segue o ambiente. Ver limites.ts e armazenamento.ts.
+    const limiteMb = erro.field === 'anexo' ? env.UPLOAD_MAX_MB * 4 : LIMITE_IMAGEM_MB
     const mensagens: Record<string, [number, string]> = {
       LIMIT_FILE_SIZE: [
         413,
         `Arquivo grande demais. O limite e ${limiteMb} MB por arquivo — reduza a resolucao da foto e envie de novo.`,
       ],
-      LIMIT_FILE_COUNT: [400, 'Fotos demais de uma vez. Envie no maximo 30 por vez.'],
+      LIMIT_FILE_COUNT: [
+        400,
+        `Fotos demais de uma vez. Envie no maximo ${LIMITE_FOTOS_POR_ENVIO} por vez.`,
+      ],
       LIMIT_UNEXPECTED_FILE: [
         400,
         'O servidor nao reconheceu o campo do arquivo enviado. Atualize a pagina e tente de novo.',

@@ -4,6 +4,7 @@ import { exigirSessao } from '../auth.js'
 import { ErroHttp, naoEncontrado, parametro, rota } from '../erros.js'
 import { urlDaFoto } from '../mappers.js'
 import { prisma } from '../prisma.js'
+import { LIMITE_FOTOS_POR_ENVIO } from '../limites.js'
 import { apagarUpload, uploadImagens } from '../services/armazenamento.js'
 
 // ============================================================
@@ -21,7 +22,7 @@ const secoes = z.enum(['ambiente', 'atividades', 'equipamentos', 'epi', 'produto
 /** POST /pericias/:periciaId/fotos — multipart, campo "fotos". */
 fotosRouter.post(
   '/',
-  uploadImagens.array('fotos', 30),
+  uploadImagens.array('fotos', LIMITE_FOTOS_POR_ENVIO),
   rota(async (req, res) => {
     const periciaId = parametro(req, 'periciaId')
     const arquivos = (req.files as Express.Multer.File[] | undefined) ?? []

@@ -67,6 +67,12 @@ import {
 } from '@/content/textosPadrao'
 import { erroCas } from '@/lib/cas'
 import { patchDoProcesso } from '@/lib/consultas'
+import {
+  LIMITE_FOTOS_POR_ENVIO,
+  LIMITE_IMAGEM_MB,
+  recusaPorQuantidade,
+  recusaPorTamanho,
+} from '@/lib/limitesUpload'
 import { aplicarAnexo, referenciaNr15PorId, usaAtenuacaoRuido } from '@/lib/nr15'
 import {
   dadosPapel,
@@ -654,6 +660,17 @@ export default function PericiaEditor() {
   async function adicionarFotos(files: FileList | null) {
     if (!files?.length) return
     const rotulo = SECOES_FOTO.find((s) => s.value === secaoFotoAtual)?.label
+
+    // Confere ANTES de enviar. Um lote com uma foto grande demais falhava
+    // inteiro depois de subir tudo — e, com corpo grande, o 413 costuma
+    // chegar ao navegador como falha de rede, sem dizer o motivo. Vale para
+    // a quantidade também: o subtítulo do cartão promete um teto que o
+    // <input multiple> não impõe sozinho.
+    const recusa = recusaPorQuantidade(files) ?? recusaPorTamanho(Array.from(files))
+    if (recusa) {
+      toast(recusa, 'error')
+      return
+    }
 
     setEnviandoFotos(true)
     try {
@@ -1639,7 +1656,7 @@ export default function PericiaEditor() {
           <Card>
             <CardHeader
               title="5.1.3. Registro fotográfico e evidências"
-              subtitle="As fotos são organizadas dentro das seções correspondentes do documento."
+              subtitle={`Organizadas dentro das seções do documento. Até ${LIMITE_IMAGEM_MB} MB por foto, ${LIMITE_FOTOS_POR_ENVIO} por vez.`}
               icon={<Camera size={18} />}
               action={
                 <div className="flex gap-2">

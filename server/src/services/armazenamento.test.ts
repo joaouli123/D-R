@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { LIMITE_FOTOS_POR_ENVIO } from '../limites.js'
 
 // ============================================================
 // A sondagem de escrita no volume de uploads.
@@ -24,6 +25,39 @@ async function carregar(dir: string) {
 afterEach(async () => {
   vi.doUnmock('../env.js')
   await fs.rm(raiz, { recursive: true, force: true })
+})
+
+describe('limites de tamanho', () => {
+  // O multer guarda o que recebeu; o tipo publico do @types/multer nao
+  // declara `limits`, dai o acesso estruturado.
+  const teto = (upload: unknown) => (upload as { limits?: { fileSize?: number } }).limits?.fileSize
+  const quantas = (upload: unknown) => (upload as { limits?: { files?: number } }).limits?.files
+
+  it('toda imagem para em 3 MB, mesmo com UPLOAD_MAX_MB maior', async () => {
+    // carregar() mocka UPLOAD_MAX_MB em 15. A foto seguia esse numero e a
+    // logo tinha um 4 fixo; agora as duas param no mesmo teto, e so o PDF
+    // — que nao e imagem — continua acompanhando o ambiente.
+    const { uploadImagens, uploadLogo, uploadPdf } = await carregar(path.join(raiz, 'limites'))
+
+    // O + 1 e a borda do busboy, nao folga: quem conta os bytes dispara
+    // `limit` quando o acumulado FICA IGUAL a fileSize, entao o numero
+    // entregue ao multer e o primeiro tamanho RECUSADO. O teto que o
+    // perito le continua sendo 3 MB, e 3 MB cravados sobem. Ver
+    // limites.test.ts.
+    expect(teto(uploadImagens)).toBe(3 * 1024 * 1024 + 1)
+    expect(teto(uploadLogo)).toBe(3 * 1024 * 1024 + 1)
+    expect(teto(uploadPdf)).toBe(60 * 1024 * 1024)
+  })
+
+  it('o lote de fotos para no mesmo numero que a tela anuncia', async () => {
+    // O numero estava escrito a mao aqui, na rota e na mensagem de erro; a
+    // tela prometia o mesmo teto sem que ninguem o conferisse antes do
+    // envio. A logo continua sendo uma so.
+    const { uploadImagens, uploadLogo } = await carregar(path.join(raiz, 'contagem'))
+
+    expect(quantas(uploadImagens)).toBe(LIMITE_FOTOS_POR_ENVIO)
+    expect(quantas(uploadLogo)).toBe(1)
+  })
 })
 
 describe('estadoDosUploads', () => {

@@ -28,6 +28,7 @@ import { useApp } from '@/store/AppStore'
 import * as api from '@/services/api'
 import { API_MODE } from '@/services/api'
 import type { PerfilUsuario, Usuario } from '@/types'
+import { recusaPorTamanho } from '@/lib/limitesUpload'
 import { formatDateTime, uid } from '@/lib/utils'
 
 // ============================================================
@@ -74,6 +75,16 @@ export default function Configuracoes() {
    */
   async function enviarLogo(arquivo: File | undefined) {
     if (!arquivo || !usuario) return
+
+    // Barra antes de subir: com o arquivo grande a resposta 413 as vezes nem
+    // chega legivel ao navegador, e o perito ve so uma falha de rede.
+    const recusa = recusaPorTamanho([arquivo])
+    if (recusa) {
+      toast(recusa, 'error')
+      if (campoLogo.current) campoLogo.current.value = ''
+      return
+    }
+
     setLogoOcupada(true)
     try {
       await trocarLogo(usuario.id, arquivo)
@@ -246,7 +257,7 @@ export default function Configuracoes() {
                   )}
                 </div>
                 <p className="text-[10px] leading-snug text-ink-400">
-                  PNG (de preferência com fundo transparente) ou JPEG, até 4 MB. O Word não
+                  PNG (de preferência com fundo transparente) ou JPEG, até 3 MB. O Word não
                   aceita embutir WebP — por isso esses dois formatos apenas.
                 </p>
               </div>
