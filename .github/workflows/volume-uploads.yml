@@ -3,12 +3,13 @@
 #
 # Sem ele o container grava em /app/uploads normalmente — e perde tudo
 # no deploy seguinte, porque a camada de escrita do container morre
-# junto com o container. Era por isso que as fotos do laudo e a logo
-# própria "subiam" e sumiam.
+# junto com o container.
 #
-# Fica como workflow em vez de clique no painel de propósito: se a app
-# for recriada algum dia, o requisito está escrito aqui e é só rodar de
-# novo. É idempotente — se o volume já existir, não faz nada.
+# Em 09/09/2026 o volume JÁ existia (criado em 04/08). Este workflow não
+# nasceu para criar de novo: nasceu para que ninguém precise abrir o
+# painel para saber se ele está lá, e para que o requisito fique escrito
+# em algum lugar caso a app seja recriada. É idempotente — se já existir,
+# só confere e sai.
 #
 # Só roda quando alguém dispara à mão (Actions -> este workflow -> Run).
 # ============================================================
@@ -19,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       redeploy:
-        description: 'Redeploy da API depois de criar (necessário para o volume montar)'
+        description: 'Redeploy da API se o volume tiver sido criado agora'
         type: boolean
         default: true
 
@@ -51,13 +52,20 @@ jobs:
             -H "Authorization: Bearer $COOLIFY_TOKEN" \
             "$COOLIFY_URL/api/v1/applications/$APP_UUID/storages")
 
+          # A API devolve {"persistent_storages":[...],"file_storages":[...]},
+          # não uma lista pura — o jq quebrava com "Cannot index array with
+          # string". O `// .` mantém o passo funcionando se a forma mudar.
+          lista=$(printf '%s' "$resposta" | jq '.persistent_storages // .')
+
           echo "Storages hoje:"
-          printf '%s\n' "$resposta" | jq -r '.[] | "  - \(.name) -> \(.mount_path) (host_path: \(.host_path // "nenhum"))"'
+          printf '%s\n' "$lista" | jq -r '.[] | "  - \(.name) -> \(.mount_path) (host_path: \(.host_path // "nenhum"))"'
 
           # Casa pelo caminho de destino, não pelo nome: o que quebra o
-          # container é montar duas coisas no mesmo ponto.
-          if printf '%s' "$resposta" | jq -e --arg d "$DESTINO" 'any(.[]; .mount_path == $d)' >/dev/null; then
+          # container é montar duas coisas no mesmo ponto. E o nome real
+          # no painel é "<uuid>-dr-pericia-uploads", não "uploads".
+          if printf '%s' "$lista" | jq -e --arg d "$DESTINO" 'any(.[]; .mount_path == $d)' >/dev/null; then
             echo "ja_existe=sim" >> "$GITHUB_OUTPUT"
+            echo "Volume em $DESTINO já está configurado — nada a fazer."
           else
             echo "ja_existe=nao" >> "$GITHUB_OUTPUT"
           fi
@@ -66,11 +74,10 @@ jobs:
         if: steps.atual.outputs.ja_existe == 'nao'
         run: |
           set -euo pipefail
-          # Sem "host_path" no corpo: é isso que faz o Coolify criar um
-          # Volume Mount (volume nomeado do Docker) em vez de um Bind
-          # Mount amarrado a uma pasta do host.
-          corpo=$(jq -nc --arg n "$NOME" --arg d "$DESTINO" \
-            '{name: $n, mount_path: $d}')
+          # Sem "host_path" no corpo de propósito: é isso que faz o Coolify
+          # criar um Volume Mount (volume nomeado do Docker) em vez de um
+          # Bind Mount amarrado a uma pasta do host.
+          corpo=$(jq -nc --arg n "$NOME" --arg d "$DESTINO" '{name: $n, mount_path: $d}')
 
           resposta=$(curl -sS --fail-with-body -X POST \
             --connect-timeout 20 --retry 5 --retry-delay 10 --retry-all-errors \
@@ -90,30 +97,30 @@ jobs:
             -H "Authorization: Bearer $COOLIFY_TOKEN" \
             "$COOLIFY_URL/api/v1/applications/$APP_UUID/storages")
 
-          printf '%s\n' "$resposta" | jq -r '.[] | "  - \(.name) -> \(.mount_path) (host_path: \(.host_path // "nenhum"))"'
+          lista=$(printf '%s' "$resposta" | jq '.persistent_storages // .')
+          printf '%s\n' "$lista" | jq -r '.[] | "  - \(.name) -> \(.mount_path) (host_path: \(.host_path // "nenhum"))"'
 
-          if ! printf '%s' "$resposta" | jq -e --arg d "$DESTINO" 'any(.[]; .mount_path == $d)' >/dev/null; then
+          if ! printf '%s' "$lista" | jq -e --arg d "$DESTINO" 'any(.[]; .mount_path == $d)' >/dev/null; then
             echo "O volume em $DESTINO não apareceu na lista."
             exit 1
           fi
 
           # Bind mount em vez de volume nomeado é meio-caminho: sobrevive
-          # ao deploy, mas amarra os arquivos a uma pasta do host e some
-          # se a app mudar de servidor. Avisa alto em vez de passar batido.
-          if printf '%s' "$resposta" | jq -e --arg d "$DESTINO" \
+          # ao deploy, mas amarra os arquivos a uma pasta do host e some se
+          # a app mudar de servidor. Avisa alto em vez de passar batido.
+          if printf '%s' "$lista" | jq -e --arg d "$DESTINO" \
               'any(.[]; .mount_path == $d and (.host_path // "") != "")' >/dev/null; then
-            echo "::warning::O storage em $DESTINO ficou como Bind Mount, não Volume Mount."
+            echo "::warning::O storage em $DESTINO é Bind Mount, não Volume Mount."
           fi
 
           echo "Volume de uploads garantido."
 
       - name: Redeploy da API para montar o volume
-        if: inputs.redeploy
+        # Só quando o volume nasceu agora: se já existia, ele já está
+        # montado e um deploy a mais é minuto de produção fora do ar à toa.
+        if: inputs.redeploy && steps.atual.outputs.ja_existe == 'nao'
         run: |
           set -euo pipefail
-          # O volume só entra no container no próximo deploy. Mesmo
-          # padrão do deploy-api.yml: dispara e espera terminar de
-          # verdade, para a falha aparecer aqui e não em silêncio.
           resposta=$(curl -sS --fail-with-body -X POST \
             --connect-timeout 20 --retry 8 --retry-delay 20 --retry-all-errors \
             -H "Authorization: Bearer $COOLIFY_TOKEN" \
@@ -142,9 +149,10 @@ jobs:
           done
 
       - name: Conferir /api/saude
-        if: inputs.redeploy
         run: |
           set -euo pipefail
+          # Vale mesmo sem redeploy: é o que prova, de fora, que a pasta
+          # montada aceita escrita de verdade.
           for tentativa in $(seq 1 18); do
             corpo=$(curl -s --max-time 20 https://drpericiatrabalhista.com.br/api/saude || echo '')
             if printf '%s' "$corpo" | jq -e '.uploads.gravavel == true' >/dev/null 2>&1; then
