@@ -125,3 +125,23 @@ export function periciaSoPericulosidade(): PericiaCompleta {
   ]
   return pericia as unknown as PericiaCompleta
 }
+
+/**
+ * Perícia das DUAS modalidades cujo cadastro só tem agente de periculosidade.
+ *
+ * É o caso que fazia o mesmo arquivo se contradizer: o item 7 numerava por
+ * modalidade e chamava a norma de 7.3; o item 10 numerava pelo tamanho da
+ * lista e, com a lista da NR-15 vazia, chamava a mesma norma de 10.1. Acontece
+ * sempre que o perito abre a perícia como “ambas” e só chega a cadastrar o
+ * risco de periculosidade — nada de excepcional.
+ */
+export function periciaAmbasSoNr16(): PericiaCompleta {
+  const pericia = periciaSoPericulosidade() as unknown as {
+    modalidade: string
+    tecnico: { agentes: { tipo?: string }[]; conclusaoInsalubridade?: string }
+  }
+  pericia.modalidade = 'ambas'
+  pericia.tecnico.conclusaoInsalubridade = 'Conclui-se pela não caracterização da insalubridade.'
+  pericia.tecnico.agentes = pericia.tecnico.agentes.filter((agente) => agente.tipo === 'periculosidade')
+  return pericia as unknown as PericiaCompleta
+}

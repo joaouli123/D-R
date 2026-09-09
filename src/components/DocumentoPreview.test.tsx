@@ -303,6 +303,70 @@ describe('DocumentoPreview', () => {
     expect(html).toContain('<div>• Anexo (*) – Radiações ionizantes ou substâncias radioativas;</div>')
   })
 
+  it('percorre os sete anexos da NR-16 no item 10, um a um', () => {
+    // Gêmeo do teste do PDF (documento-parecer.test.ts) e do DOCX
+    // (docx-parecer.test.ts). Sem ele, a prévia podia parar de listar os
+    // anexos sem agente e nenhuma suíte reclamava — e a prévia é a tela que
+    // o perito revisa antes de assinar.
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={{
+          ...pericia,
+          modalidade: 'periculosidade',
+          tecnico: {
+            ...pericia.tecnico,
+            agentes: [{
+              id: 'risco-inflamaveis', nome: 'Inflamáveis', tipo: 'periculosidade',
+              criterio: 'qualitativo', anexoNr16: 'ANEXO_02',
+              resultadoPericulosidade: 'caracterizada',
+            }] as never,
+          },
+        }}
+        empresas={[]}
+        titulo="Parecer de teste"
+      />,
+    )
+
+    expect(html).toContain('10.1. NR-16 — Avaliação das Atividades e Operações Perigosas')
+    expect(html).toContain('10.1.1. Explosivos;')
+    expect(html).toContain('10.1.2. Inflamáveis – Avaliação, Resultado e Conclusão')
+    expect(html).toContain('10.1.3. Segurança pessoal ou patrimonial;')
+    expect(html).toContain('10.1.7. Anexo (*) – Radiações ionizantes ou substâncias radioativas')
+    // O anexo avaliado troca a linha da lista pelo quadro sem mudar de
+    // número: Inflamáveis é o 10.1.2 mesmo sendo o único avaliado.
+    expect(html).not.toContain('10.1.2. Inflamáveis;')
+  })
+
+  it('numera o grupo do item 10 pela modalidade, não pelo tamanho da lista', () => {
+    // A perícia é “ambas” e só tem agente de periculosidade cadastrado. O item
+    // 7 numera por modalidade (7.3); o item 10 tem de acompanhar (10.2), ou o
+    // mesmo documento dá dois números à mesma seção. Espelha o caso em
+    // server/src/services/documento-parecer.test.ts e em docx-parecer.test.ts.
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={{
+          ...pericia,
+          modalidade: 'ambas',
+          tecnico: {
+            ...pericia.tecnico,
+            agentes: [{
+              id: 'nr16-inflamaveis', nome: 'Inflamáveis líquidos', tipo: 'periculosidade',
+              anexoNr16: 'ANEXO_02', criterio: 'qualitativo',
+              resultadoPericulosidade: 'caracterizada',
+            }] as never,
+          },
+        }}
+        empresas={[]}
+        titulo="Parecer de teste"
+      />,
+    )
+
+    expect(html).toContain('7.3. NR-16')
+    expect(html).toContain('10.2. NR-16')
+    expect(html).not.toContain('10.1. NR-16')
+    expect(html).toContain('10.2.2. Inflamáveis – Avaliação, Resultado e Conclusão')
+  })
+
   it('transcreve no 7.3.2 o risco alegado pela parte, com a folha da inicial', () => {
     // O 7.3.2 é transcrição: o que a parte alegou na inicial, palavra por
     // palavra, e a folha de onde saiu. Vem depois do critério (7.3.1) e antes

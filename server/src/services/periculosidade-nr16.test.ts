@@ -8,7 +8,10 @@ import {
   quadrosNr16DoItem10,
 } from './documento-comum'
 import { montarApresentacaoAgente as montarNoFront } from '../../../src/lib/apresentacaoAgente'
-import { PADRAO_NR16_SEM_ENQUADRAMENTO } from '../../../src/content/anexosNr16'
+import {
+  PADRAO_NR16_SEM_ENQUADRAMENTO,
+  quadrosNr16DoItem10 as quadrosNoFront,
+} from '../../../src/content/anexosNr16'
 import type { AgenteAvaliado } from '../../../src/types'
 
 // ============================================================
@@ -115,8 +118,40 @@ describe('tabela da NR-16 nos dois quadros', () => {
     for (const quadro of [negativo, comAgente]) {
       expect(quadro.linhas).toContainEqual({ rotulo: 'Adicional Pretendido', valor: '30%' })
       expect(quadro.linhas).toContainEqual({ rotulo: 'Lapso temporal', valor: LAPSO_TEMPORAL_NR16 })
-      expect(quadro.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'Resultado técnico' }))
+      // `objectContaining({ rotulo: 'Resultado técnico' })` casa por igualdade
+      // exata: não via o rótulo composto do item 10 se ele voltasse a aparecer
+      // aqui. O `stringContaining` vê os dois.
+      expect(quadro.linhas).not.toContainEqual(
+        expect.objectContaining({ rotulo: expect.stringContaining('Resultado técnico') }),
+      )
     }
+
+    // A ORDEM também é o modelo do perito, não só a presença: o print põe
+    // natureza, critério, lapso e adicional antes do que foi avaliado, e a
+    // exposição por último. Reordenar uma linha não quebrava teste nenhum.
+    expect(negativo.linhas.map((linha) => linha.rotulo)).toEqual([
+      'Natureza',
+      'Critério',
+      'Lapso temporal',
+      'Adicional Pretendido',
+      'Atividade ou operação avaliada',
+      'Análise dos Anexos',
+      'Exposição',
+    ])
+    expect(comAgente.linhas.map((linha) => linha.rotulo)).toEqual([
+      'Anexo NR-16',
+      'Natureza',
+      'Critério',
+      'Lapso temporal',
+      'Adicional Pretendido',
+      'Atividade ou operação avaliada',
+      'Condição ou área de risco',
+      // Os pontos de verificação do anexo entram depois do levantamento fixo e
+      // antes da exposição, na ordem em que o perito os cadastrou.
+      'Produto inflamável ou combustível',
+      'Ficha com Dados de Segurança (FDS)',
+      'Exposição',
+    ])
     expect(negativo.linhas).toContainEqual({ rotulo: 'Análise dos Anexos', valor: PADRAO_NR16_SEM_ENQUADRAMENTO.analiseAnexos })
     expect(comAgente.linhas).toContainEqual({
       rotulo: 'Produto inflamável ou combustível',
@@ -140,6 +175,21 @@ describe('tabela da NR-16 nos dois quadros', () => {
         destaque: 'positivo',
       },
     ])
+  })
+
+  it('a API e o front montam a mesma lista de subitens do item 10', () => {
+    // `ANEXOS_NR16` × `ANEXOS_NR16_DOCUMENTO` e `itemListaAnexoNr16` ×
+    // `itemListaAnexoNr16Documento` são cópias (o front não pode importar de
+    // server/src). Sem esta comparação, o número e o rótulo de cada anexo
+    // podem divergir entre a tela e o arquivo assinado sem ninguém ver.
+    for (const agentes of [
+      [{ id: 'sem-anexo', nome: 'Sem risco' }],
+      [{ id: 'a', nome: 'Inflamáveis líquidos', anexoNr16: 'ANEXO_02' }],
+      // Perícia antiga, que gravava o rótulo em vez do id.
+      [{ id: 'legado', nome: 'Inflamáveis líquidos', anexoNr16: 'Anexo 2' }],
+    ]) {
+      expect(quadrosNr16DoItem10(agentes, '10.2')).toEqual(quadrosNoFront(agentes, '10.2'))
+    }
   })
 
   it('lista os sete anexos mesmo sem agente nenhum enquadrado', () => {

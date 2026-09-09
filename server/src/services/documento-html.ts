@@ -487,10 +487,15 @@ export async function htmlDoParecer(
   // condicionais e o documento não pode pular de "11." para "13.".
   const num = numeradorDeSecoes()
   const quadrosAnalise = (() => {
+    // O número do grupo sai da MODALIDADE, não do tamanho da lista: com
+    // 'ambas' a NR-15 é 10.1 e a NR-16 é 10.2 mesmo sem nenhum agente de
+    // insalubridade cadastrado. Contando pela lista, o mesmo documento saía
+    // com "7.3. NR-16" no item 7 e "10.1. NR-16" no item 10.
     let grupo = 0
-    const montarGrupo = (lista: typeof agentes, tituloGrupo: string) => {
-      if (!lista.length) return ''
-      grupo += 1
+    const numeroNr15 = temInsalubridade ? `10.${++grupo}` : null
+    const numeroNr16 = temPericulosidade ? `10.${++grupo}` : null
+    const montarGrupo = (lista: typeof agentes, tituloGrupo: string, prefixo: string | null) => {
+      if (!prefixo || !lista.length) return ''
       const quadros = lista.map((agente, indice) => {
         const apresentacao = montarApresentacaoAgente(agente)
         const identificado = agente.identificadoNaAtividade !== false
@@ -499,9 +504,9 @@ export async function htmlDoParecer(
           ? [...apresentacao.linhas, { rotulo: 'Proteções associadas', valor: protecoes }]
           : apresentacao.linhas
         const conclusao = agenteExibeConclusao(agente) ? `<h4>Conclusão</h4>${paragrafos(agente.observacao)}` : ''
-        return `<h4>10.${grupo}.${indice + 1}. ${esc(apresentacao.titulo)}</h4>${identificado ? tabelaLinhasAgente(linhas, true) : ''}${conclusao}`
+        return `<section class="agente-bloco"><h4>${prefixo}.${indice + 1}. ${esc(apresentacao.titulo)}</h4>${identificado ? tabelaLinhasAgente(linhas, true) : ''}${conclusao}</section>`
       }).join('')
-      return `<h3>10.${grupo}. ${esc(tituloGrupo)}</h3>${quadros}`
+      return `<h3>${prefixo}. ${esc(tituloGrupo)}</h3>${quadros}`
     }
 
     /**
@@ -509,10 +514,8 @@ export async function htmlDoParecer(
      * sempre inteira, com o quadro conclusivo em cada um que foi avaliado.
      * Espelha `quadrosNr16DeAnalise` da prévia.
      */
-    const montarGrupoNr16 = (lista: typeof agentes) => {
-      if (!lista.length) return ''
-      grupo += 1
-      const prefixo = `10.${grupo}`
+    const montarGrupoNr16 = (lista: typeof agentes, prefixo: string | null) => {
+      if (!prefixo || !lista.length) return ''
       const quadros = quadrosNr16DoItem10(lista, prefixo).map((quadro) => {
         const apresentacao = quadro.agente && quadro.agente.identificadoNaAtividade !== false
           ? montarApresentacaoAgente(quadro.agente, { conclusiva: true })
@@ -526,8 +529,8 @@ export async function htmlDoParecer(
     }
 
     return (
-      (temInsalubridade ? montarGrupo(agentesNr15, 'NR-15 — Avaliação da Exposição Ocupacional') : '') +
-      (temPericulosidade ? montarGrupoNr16(agentesNr16) : '')
+      montarGrupo(agentesNr15, 'NR-15 — Avaliação da Exposição Ocupacional', numeroNr15) +
+      montarGrupoNr16(agentesNr16, numeroNr16)
     )
   })()
   const blocoDivergencias = () => {

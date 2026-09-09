@@ -58,6 +58,7 @@ import type {
 } from '@/types'
 import { ANEXOS_NR15 } from '@/content/anexosNr15'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
+import { CHAVE_BIBLIOTECA_POR_CAMPO } from '@/content/referenciasParecer'
 import {
   CAMPOS_COM_TEXTO_PADRAO,
   patchDeTextosPadrao,
@@ -309,7 +310,10 @@ export default function PericiaEditor() {
     campo?: keyof Pericia['tecnico']
     agenteId?: string
     secao: SecaoTexto
+    /** Chave do catálogo — sempre a numeração de “ambas”. */
     referencia?: string
+    /** Número que ESTE documento imprime, só para o perito ler. */
+    rotuloReferencia?: string
   } | null>(null)
   const [emailAberto, setEmailAberto] = useState(false)
   const [enviando, setEnviando] = useState(false)
@@ -464,7 +468,13 @@ export default function PericiaEditor() {
         ? avaliacao.tipo === 'periculosidade'
         : avaliacao.tipo !== 'periculosidade',
   )
+  // Os renderizadores filtram `t.agentes` inteiro por tipo, não a lista
+  // visível do editor — e numeram os subitens do 7.2 pela POSIÇÃO nessa
+  // lista. Quem manda no crachá e no hint tem de ser este índice, ou o
+  // editor promete um número que o arquivo assinado não usa.
+  const agentesNr15Editor = p.tecnico.agentes.filter((avaliacao) => avaliacao.tipo !== 'periculosidade')
   const numeroNr16Editor = p.modalidade === 'ambas' ? '7.3' : '7.2'
+  const numeroAnaliseNr16Editor = p.modalidade === 'ambas' ? '10.2' : '10.1'
   const numeroDivergenciasEditor = p.modalidade === 'ambas' ? '7.4' : '7.3'
   const numeroConsideracoesEditor = p.modalidade === 'ambas' ? '7.5' : '7.4'
   const vinculoPrincipal = p.reclamadas.find((item) => item.principal)
@@ -1203,7 +1213,13 @@ export default function PericiaEditor() {
                       variant="outline"
                       icon={<BookOpen size={14} />}
                       aria-label={f.referencia ? `Abrir biblioteca do item ${f.referencia}` : 'Abrir biblioteca da apresentação'}
-                      onClick={() => setBibliotecaPara({ campo: f.campo, secao: f.secao, referencia: f.referencia })}
+                      onClick={() => setBibliotecaPara({
+                        campo: f.campo,
+                        secao: f.secao,
+                        // Cataloga pela chave canônica; mostra o número impresso.
+                        referencia: CHAVE_BIBLIOTECA_POR_CAMPO[f.campo] ?? f.referencia,
+                        rotuloReferencia: f.referencia,
+                      })}
                     >
                       Biblioteca
                     </Button>}
@@ -1384,7 +1400,11 @@ export default function PericiaEditor() {
                         abertoInicial={!nr16Completa(a)}
                         acoes={
                           <div className="flex items-center gap-2">
-                            <Badge tone="navy">Item {numeroNr16Editor}.2</Badge>
+                            {/* O quadro da avaliação NR-16 não tem número próprio:
+                                ele sai dentro da tabela do item 7 e como quadro do
+                                item 10. O ".2" daqui apontava para o 7.3.2, que é a
+                                transcrição do risco alegado — outro campo. */}
+                            <Badge tone="navy">Itens {numeroNr16Editor} e {numeroAnaliseNr16Editor}</Badge>
                             <Button
                               variant="ghost"
                               className="text-red-600 hover:bg-red-50"
@@ -1416,7 +1436,14 @@ export default function PericiaEditor() {
                 // 12. As atividades do Anexo 13 não trazem CAS — ali o perito
                 // registra o do composto específico, quando houver.
                 const casImposto = Boolean(referenciaNr15PorId(a.referenciaNormativaId)?.cas) || Boolean(regraAnexo?.casFixo)
-                const referenciaAvaliacao = a.tipo === 'biologico'
+                // O número que sai no documento é posicional (documento-html.ts,
+                // docx.ts e DocumentoPreview.tsx usam `indice + 1` sobre a lista
+                // dos agentes NR-15).
+                const numeroAvaliacao = `7.2.${agentesNr15Editor.findIndex((item) => item.id === a.id) + 1}`
+                // Já a Biblioteca cataloga por natureza: REFERENCIAS_PARECER é
+                // fixo (7.2.1 Físico, 7.2.2 Químico, 7.2.3 Biológico) e é por ele
+                // que o filtro dos textos salvos casa.
+                const referenciaBiblioteca = a.tipo === 'biologico'
                   ? '7.2.3'
                   : a.tipo === 'quimico'
                     ? '7.2.2'
@@ -1429,7 +1456,7 @@ export default function PericiaEditor() {
                     abertoInicial={!nr15Completa(a)}
                     acoes={
                       <div className="flex shrink-0 items-center gap-2">
-                        <Badge tone="navy">Item {referenciaAvaliacao}</Badge>
+                        <Badge tone="navy">Item {numeroAvaliacao}</Badge>
                         <Button
                           variant="ghost"
                           className="text-red-600 hover:bg-red-50"
@@ -1505,7 +1532,7 @@ export default function PericiaEditor() {
                         observacao: e.target.value,
                       }))}
                       placeholder="Registre a conclusão específica deste agente. Campo obrigatório para emitir o documento."
-                      hint={`Sai no item ${referenciaAvaliacao} do documento, dentro desta avaliação. A conclusão do laudo inteiro é outro campo, na etapa "Conclusão do laudo".`}
+                      hint={`Sai no item ${numeroAvaliacao} do documento, dentro desta avaliação. A conclusão do laudo inteiro é outro campo, na etapa "Conclusão do laudo".`}
                     />
                     <div className="mt-2 flex justify-end">
                       <Button
@@ -1513,7 +1540,12 @@ export default function PericiaEditor() {
                         variant="outline"
                         icon={<BookOpen size={14} />}
                         aria-label={`Abrir biblioteca da conclusão de ${a.nome || 'agente'}`}
-                        onClick={() => setBibliotecaPara({ agenteId: a.id, secao: 'conclusao', referencia: referenciaAvaliacao })}
+                        onClick={() => setBibliotecaPara({
+                          agenteId: a.id,
+                          secao: 'conclusao',
+                          referencia: referenciaBiblioteca,
+                          rotuloReferencia: numeroAvaliacao,
+                        })}
                       >
                         Biblioteca
                       </Button>
@@ -1731,6 +1763,11 @@ export default function PericiaEditor() {
           ).filter((f) =>
             (f.campo !== 'conclusaoInsalubridade' || p.modalidade !== 'periculosidade') &&
             (f.campo !== 'conclusaoPericulosidade' || p.modalidade !== 'insalubridade') &&
+            // O critério da NR-16 acompanha a transcrição e a fonte: os três
+            // renderizadores só o imprimem sob `temPericulosidade`, então numa
+            // perícia só de insalubridade o card virava um "7.2.1" que colide
+            // com o 7.2 da NR-15 e nunca chega ao documento.
+            (f.campo !== 'criterioAvaliacaoPericulosidade' || p.modalidade !== 'insalubridade') &&
             (f.campo !== 'riscoAlegadoPericulosidade' || p.modalidade !== 'insalubridade') &&
             (f.campo !== 'fonteRiscoAlegado' || p.modalidade !== 'insalubridade'),
           ).map((f) => {
@@ -1762,7 +1799,13 @@ export default function PericiaEditor() {
                       variant="outline"
                       icon={<BookOpen size={14} />}
                       aria-label={`Abrir biblioteca do item ${f.referencia}`}
-                      onClick={() => setBibliotecaPara({ campo: f.campo, secao: f.secao, referencia: f.referencia })}
+                      onClick={() => setBibliotecaPara({
+                        campo: f.campo,
+                        secao: f.secao,
+                        // Cataloga pela chave canônica; mostra o número impresso.
+                        referencia: CHAVE_BIBLIOTECA_POR_CAMPO[f.campo] ?? f.referencia,
+                        rotuloReferencia: f.referencia,
+                      })}
                     >
                       Biblioteca
                     </Button>}
@@ -1963,6 +2006,7 @@ export default function PericiaEditor() {
         secao={bibliotecaPara?.secao}
         tipoDocumento={tipoDoc}
         referencia={bibliotecaPara?.referencia}
+        rotuloReferencia={bibliotecaPara?.rotuloReferencia}
         onInserir={(conteudo) => {
           if (!bibliotecaPara) return
           if (bibliotecaPara.agenteId) {

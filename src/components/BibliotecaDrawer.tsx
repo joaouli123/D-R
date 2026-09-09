@@ -16,6 +16,7 @@ export function BibliotecaDrawer({
   secao,
   tipoDocumento,
   referencia,
+  rotuloReferencia,
   onInserir,
 }: {
   open: boolean
@@ -23,6 +24,14 @@ export function BibliotecaDrawer({
   secao?: SecaoTexto
   tipoDocumento?: TipoDocumento
   referencia?: string
+  /**
+   * O que aparece no crachá “Destino no documento”.
+   *
+   * `referencia` é a chave do catálogo (numeração de “ambas”, estável); numa
+   * perícia de uma modalidade só o documento imprime outro número, e é esse
+   * que o perito precisa ler aqui.
+   */
+  rotuloReferencia?: string
   onInserir: (conteudo: string) => void
 }) {
   const { textos, salvarTexto } = useApp()
@@ -105,7 +114,7 @@ export function BibliotecaDrawer({
       {referencia && (
         <div className="mb-3 flex items-center gap-2 rounded-lg border border-navy-200 bg-navy-50 px-3 py-2 text-xs text-navy-800">
           <span className="font-semibold">Destino no documento</span>
-          <Badge tone="navy">Item {referencia}</Badge>
+          <Badge tone="navy">Item {rotuloReferencia ?? referencia}</Badge>
         </div>
       )}
 

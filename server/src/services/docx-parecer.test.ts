@@ -3,7 +3,7 @@ import JSZip from 'jszip'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { PericiaCompleta } from '../mappers.js'
-import { empresa, periciaDeTeste, periciaSoPericulosidade, perito } from './parecer.fixture.js'
+import { empresa, periciaAmbasSoNr16, periciaDeTeste, periciaSoPericulosidade, perito } from './parecer.fixture.js'
 
 // Sem disco: `lerUpload` devolve um buffer vazio, o sharp falha e o
 // renderizador cai no ramo "imagem indisponível" — que ainda imprime a
@@ -153,12 +153,44 @@ describe('parecer em DOCX', () => {
     expect(texto).toContain('• Anexo (*) – Radiações ionizantes ou substâncias radioativas;')
   })
 
+  it('numera o grupo do item 10 pela modalidade, não pelo tamanho da lista', async () => {
+    // Espelha o mesmo caso em documento-parecer.test.ts e em
+    // DocumentoPreview.test.tsx: os três têm de dar o mesmo número.
+    const texto = await textoDoDocx(periciaAmbasSoNr16())
+
+    expect(texto).toContain('7.3. NR-16')
+    expect(texto).toContain('10.2. NR-16')
+    expect(texto).not.toContain('10.1. NR-16')
+    expect(texto).toContain('10.2.2. Inflamáveis – Avaliação, Resultado e Conclusão')
+  })
+
   it('percorre os sete anexos da NR-16 no item 10, um a um', async () => {
     const texto = await textoDoDocx(periciaSoPericulosidade())
 
     expect(texto).toContain('10.1.1. Explosivos;')
     expect(texto).toContain('10.1.2. Inflamáveis – Avaliação, Resultado e Conclusão')
     expect(texto).toContain('10.1.7. Anexo (*) – Radiações ionizantes ou substâncias radioativas')
+  })
+
+  it('mantém em negrito, no Word, a linha de resultado do quadro do item 10', async () => {
+    // A prévia e o PDF marcam a célula com `destaque` em peso 700
+    // (.resultado-negativo). O DOCX era o único dos três que imprimia a linha
+    // da conclusão com o mesmo peso do resto — e o extrator de texto dos
+    // outros testes joga a formatação fora, então ninguém via.
+    const buffer = await gerarDocx(documento, periciaSoPericulosidade(), [empresa], perito)
+    const zip = await JSZip.loadAsync(buffer)
+    const xml = await zip.file('word/document.xml')!.async('string')
+
+    const celulas = xml.match(/<w:tc>[\s\S]*?<\/w:tc>/g) ?? []
+    const conclusiva = celulas.find((celula) => celula.includes('Periculosidade caracterizada'))
+    expect(conclusiva).toBeDefined()
+    expect(conclusiva).toContain('<w:b/>')
+
+    // E o negrito é do destaque, não de todas as células de valor: a linha do
+    // levantamento ao lado continua em peso normal.
+    const semDestaque = celulas.find((celula) => celula.includes('Pátio de abastecimento'))
+    expect(semDestaque).toBeDefined()
+    expect(semDestaque).not.toContain('<w:b/>')
   })
 
   it('abre a capa pela identificação das partes', async () => {

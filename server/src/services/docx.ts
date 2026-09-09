@@ -29,6 +29,7 @@ import {
   MARCA,
   MARCADOR_LISTA,
   ORIGEM_PONTO,
+  type LinhaApresentacaoAgente,
   type TecnicoJson,
   atividadesDoPeriodo,
   data,
@@ -262,6 +263,15 @@ function celula(
     columnSpan?: number
     paragrafos?: Paragraph[]
     manterComProxima?: boolean
+    /**
+     * Negrito por conta própria, fora do cabeçalho.
+     *
+     * A prévia e o PDF imprimem em peso 700 toda célula com `destaque`
+     * (`.resultado-positivo|negativo|aviso`). Sem esta opção o DOCX era o
+     * único dos três em que a linha "Resultado técnico / Conclusão" saía
+     * com o mesmo peso das demais — justo a linha que o leitor procura.
+     */
+    negrito?: boolean
   } = {},
 ) {
   return new TableCell({
@@ -278,7 +288,7 @@ function celula(
       new Paragraph({
         keepNext: opcoes.manterComProxima,
         spacing: { after: 0 },
-        children: [texto(linha, { negrito: opcoes.cabecalho, tamanho: 20 })],
+        children: [texto(linha, { negrito: opcoes.negrito ?? opcoes.cabecalho, tamanho: 20 })],
       }),
     ),
   })
@@ -294,12 +304,17 @@ const tabela = (linhas: TableRow[], larguras: readonly number[] = COLUNAS_FICHA)
   })
 
 /** Tabela rótulo/valor, como as fichas de identificação do parecer. */
-const fichaLinha = (rotulo: string, valor: string, manterComProxima = false) =>
+const fichaLinha = (
+  rotulo: string,
+  valor: string,
+  manterComProxima = false,
+  destaque?: LinhaApresentacaoAgente['destaque'],
+) =>
   new TableRow({
     cantSplit: true,
     children: [
       celula(rotulo, { cabecalho: true, larguraDxa: COLUNAS_FICHA[0], manterComProxima }),
-      celula(valor, { larguraDxa: COLUNAS_FICHA[1], manterComProxima }),
+      celula(valor, { larguraDxa: COLUNAS_FICHA[1], manterComProxima, negrito: Boolean(destaque) }),
     ],
   })
 
@@ -771,7 +786,7 @@ async function docParecer(
               celula('Informação', { cabecalho: true, larguraDxa: COLUNAS_FICHA[1] }),
             ],
           }),
-          ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor)),
+          ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor, false, item.destaque)),
         ])] : []),
         ...(agenteExibeConclusao(agente) ? [h4('Conclusão'), ...blocos(agente.observacao)] : []),
       )
@@ -841,7 +856,7 @@ async function docParecer(
         : protecao.titulo
       filhos.push(
         new Paragraph({ keepNext: true, spacing: { before: 140, after: 60 }, children: [texto(tituloProtecao, { negrito: true, tamanho: 20 })] }),
-        tabela(protecao.linhas.map((item, indice, linhas) => fichaLinha(item.rotulo, item.valor, indice < linhas.length - 1))),
+        tabela(protecao.linhas.map((item, indice, linhas) => fichaLinha(item.rotulo, item.valor, indice < linhas.length - 1, item.destaque))),
       )
     }
   }
@@ -856,17 +871,26 @@ async function docParecer(
   const numeroAnalise = cabecalhoAnalise.split('. ')[0]
   filhos.push(h2(cabecalhoAnalise), ...blocos(t.analiseTecnica))
 
+  // Mesma regra do PDF e da prévia: o número do grupo vem da modalidade,
+  // não do tamanho da lista. Lista vazia continua suprimindo o bloco, mas
+  // não pode mais empurrar a NR-16 para o 10.1 num documento que já chamou
+  // a mesma norma de 7.3.
   let grupoAnalise = 0
-  const adicionarQuadrosDeAnalise = (lista: typeof agentes, tituloGrupo: string) => {
-    if (!lista.length) return
-    grupoAnalise += 1
-    filhos.push(h3(`${numeroAnalise}.${grupoAnalise}. ${tituloGrupo}`))
+  const numeroAnaliseNr15 = temInsalubridade ? `${numeroAnalise}.${++grupoAnalise}` : null
+  const numeroAnaliseNr16 = temPericulosidade ? `${numeroAnalise}.${++grupoAnalise}` : null
+  const adicionarQuadrosDeAnalise = (
+    lista: typeof agentes,
+    tituloGrupo: string,
+    prefixo: string | null,
+  ) => {
+    if (!prefixo || !lista.length) return
+    filhos.push(h3(`${prefixo}. ${tituloGrupo}`))
     lista.forEach((agente, indice) => {
       const apresentacao = montarApresentacaoAgente(agente)
       const identificado = agente.identificadoNaAtividade !== false
       const protecoes = resumoProtecoesAssociadas(agente.epis)
       filhos.push(
-        h4(`${numeroAnalise}.${grupoAnalise}.${indice + 1}. ${apresentacao.titulo}`),
+        h4(`${prefixo}.${indice + 1}. ${apresentacao.titulo}`),
         ...(identificado ? [tabela([
           new TableRow({
             tableHeader: true,
@@ -876,7 +900,7 @@ async function docParecer(
               celula('Informação', { cabecalho: true, larguraDxa: COLUNAS_FICHA[1] }),
             ],
           }),
-          ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor)),
+          ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor, false, item.destaque)),
           ...(protecoes ? [fichaLinha('Proteções associadas', protecoes)] : []),
         ])] : []),
         ...(agenteExibeConclusao(agente) ? [h4('Conclusão'), ...blocos(agente.observacao)] : []),
@@ -889,10 +913,8 @@ async function docParecer(
    * sempre inteira, com o quadro conclusivo em cada um que foi avaliado.
    * Espelha `quadrosNr16DeAnalise` da prévia e `montarGrupoNr16` do PDF.
    */
-  const adicionarQuadrosNr16 = (lista: typeof agentes) => {
-    if (!lista.length) return
-    grupoAnalise += 1
-    const prefixo = `${numeroAnalise}.${grupoAnalise}`
+  const adicionarQuadrosNr16 = (lista: typeof agentes, prefixo: string | null) => {
+    if (!prefixo || !lista.length) return
     filhos.push(h3(`${prefixo}. NR-16 — Avaliação das Atividades e Operações Perigosas`))
     for (const quadro of quadrosNr16DoItem10(lista, prefixo)) {
       const apresentacao = quadro.agente && quadro.agente.identificadoNaAtividade !== false
@@ -901,14 +923,14 @@ async function docParecer(
       filhos.push(
         h4(`${quadro.numero}. ${quadro.titulo}`),
         ...(apresentacao
-          ? [tabela(apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor)))]
+          ? [tabela(apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor, false, item.destaque)))]
           : []),
       )
     }
   }
 
-  if (temInsalubridade) adicionarQuadrosDeAnalise(agentesNr15, 'NR-15 — Avaliação da Exposição Ocupacional')
-  if (temPericulosidade) adicionarQuadrosNr16(agentesNr16)
+  adicionarQuadrosDeAnalise(agentesNr15, 'NR-15 — Avaliação da Exposição Ocupacional', numeroAnaliseNr15)
+  adicionarQuadrosNr16(agentesNr16, numeroAnaliseNr16)
   if (temInsalubridade) filhos.push(h2(num.secao('NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr15))
   if (temPericulosidade) filhos.push(h2(num.secao('NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr16))
   if (t.respostasQuesitos?.trim()) filhos.push(h2(num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')), ...blocos(t.respostasQuesitos))

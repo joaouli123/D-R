@@ -283,7 +283,7 @@ export function PericulosidadeNr16Fields({ avaliacao, onChange }: Periculosidade
         </Button>
       </div>
       <p className="mt-2 text-xs text-ink-500">
-        Critério qualitativo. A conclusão deve considerar a atividade, a área de risco e a frequência de exposição verificadas no caso concreto. A fundamentação da NR-16 é escrita no item de conclusão sobre periculosidade, mais abaixo nesta mesma tela.
+        Critério qualitativo. A conclusão deve considerar a atividade, a área de risco e a frequência de exposição verificadas no caso concreto. A fundamentação da NR-16 é outro campo, na etapa “Conclusão do laudo”.
       </p>
     </div>
   )

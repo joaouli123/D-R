@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { PericiaCompleta } from '../mappers.js'
-import { empresa, periciaDeTeste, periciaSoPericulosidade, perito } from './parecer.fixture.js'
+import { empresa, periciaAmbasSoNr16, periciaDeTeste, periciaSoPericulosidade, perito } from './parecer.fixture.js'
 
 // O renderizador carrega o armazenamento sob demanda, só quando há foto para
 // embutir. Aqui o disco não existe: devolvendo `null`, a figura sai com o
@@ -55,6 +55,20 @@ describe('parecer em HTML (motor do PDF)', () => {
     expect(html).toContain('7.1. Atividades Efetivamente Exercidas')
     // Se o 7.1 sumisse, a NR-15 subiria para 7.1 e o DOCX/prévia divergiriam.
     expect(html).toContain('7.2. NR-15')
+  })
+
+  it('numera o grupo do item 10 pela modalidade, não pelo tamanho da lista', async () => {
+    // Perícia “ambas” sem nenhum agente de insalubridade: o item 7 chamava a
+    // NR-16 de 7.3 (numerado por modalidade) e o item 10 chamava a mesma
+    // norma de 10.1 (numerado pela lista, vazia do lado da NR-15). O mesmo
+    // arquivo assinado dava dois números à mesma seção.
+    const html = await gerar(periciaAmbasSoNr16())
+
+    expect(html).toContain('7.3. NR-16')
+    expect(html).toContain('10.2. NR-16')
+    expect(html).not.toContain('10.1. NR-16')
+    // E os subitens acompanham o grupo: o Anexo 2 é o 10.2.2, não o 10.1.2.
+    expect(html).toContain('10.2.2. Inflamáveis – Avaliação, Resultado e Conclusão')
   })
 
   it('numera as fotografias na sequência em que elas saem no documento', async () => {

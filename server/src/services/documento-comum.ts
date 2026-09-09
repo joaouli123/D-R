@@ -801,7 +801,10 @@ export function quadrosNr16DoItem10<A extends { nome?: string; anexoNr16?: strin
       return
     }
     doAnexo.forEach((agente, i) => {
-      const base = `${anexo.assunto} – Avaliação, Resultado e Conclusão`
+      // Mesmo rótulo da linha de lista: sem isso o sétimo anexo perde o
+      // "(*)" justamente no quadro em que foi avaliado, e o leitor toma o
+      // subitem por "Anexo 7", que a norma não tem.
+      const base = `${itemListaAnexoNr16Documento(anexo)} – Avaliação, Resultado e Conclusão`
       quadros.push({ numero, titulo: comSufixo(base, doAnexo, agente, i), agente })
     })
   })
