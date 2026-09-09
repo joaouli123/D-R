@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import { montarApresentacaoAgente } from './apresentacaoAgente'
+import {
+  ANALISE_ANEXOS_NR16,
+  ANALISE_ATIVIDADES_NR16,
+  CRITERIO_QUALITATIVO_NR16,
+  LAPSO_TEMPORAL_NR16,
+  conclusaoSemRiscoNr16,
+} from '@/content/anexosNr16'
 import type { AgenteAvaliado } from '@/types'
 
 const ruido: AgenteAvaliado = {
@@ -187,39 +194,100 @@ describe('montarApresentacaoAgente', () => {
       rotulo: 'Anexo NR-16',
       valor: 'Anexo 2 — Atividades e Operações Perigosas com Inflamáveis',
     })
-    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Adicional', valor: '30%' })
+    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Adicional Pretendido', valor: '30%' })
     expect(apresentacao.linhas).toContainEqual({
       rotulo: 'Condição ou área de risco',
       valor: 'Área de operação da bomba de inflamáveis líquidos',
     })
     expect(apresentacao.linhas).toContainEqual({ rotulo: 'Exposição', valor: 'Intermitente' })
-    expect(apresentacao.linhas).toContainEqual({
-      rotulo: 'Resultado técnico',
-      valor: 'Periculosidade caracterizada',
-      destaque: 'negativo',
-    })
+    // O item 7 levanta; quem conclui é o item 10. Imprimir o resultado aqui
+    // antecipava a conclusão e tornava os dois itens redundantes — foi o
+    // próprio perito quem apontou.
+    expect(apresentacao.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'Resultado técnico' }))
     expect(apresentacao.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'Anexo NR-15' }))
     expect(apresentacao.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'Grau' }))
     expect(apresentacao.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'CAS' }))
     expect(apresentacao.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'Limite de tolerância' }))
   })
 
-  it('esconde o adicional de 30% quando nada foi enquadrado — a tabela do cenário negativo', () => {
+  it('mantém o adicional pretendido no cenário negativo — é o que a parte pede', () => {
     const apresentacao = montarApresentacaoAgente({
       id: 'periculosidade-2',
       nome: 'Ausência de atividade ou operação perigosa enquadrável na NR-16',
       tipo: 'periculosidade',
       criterio: 'qualitativo',
+      analiseAnexos: ANALISE_ANEXOS_NR16,
       exposicaoPericulosidade: 'nao_constatada',
       resultadoPericulosidade: 'nao_caracterizada',
     } as AgenteAvaliado)
 
-    // “30%” impresso logo acima de “não caracterizada” era lido como se algo
-    // fosse devido. O resto da tabela continua igual.
-    expect(apresentacao.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'Adicional' }))
+    // Os 30% são a pretensão da inicial, não o que o laudo reconhece — por
+    // isso o rótulo por extenso, e por isso a linha sai também aqui.
+    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Adicional Pretendido', valor: '30%' })
     expect(apresentacao.linhas).toContainEqual({ rotulo: 'Natureza', valor: 'Periculosidade' })
-    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Critério', valor: 'Qualitativo' })
-    expect(apresentacao.linhas).toContainEqual(expect.objectContaining({ rotulo: 'Resultado técnico' }))
+    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Critério', valor: CRITERIO_QUALITATIVO_NR16 })
+    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Lapso temporal', valor: LAPSO_TEMPORAL_NR16 })
+    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Análise dos Anexos', valor: ANALISE_ANEXOS_NR16 })
+    expect(apresentacao.linhas).toContainEqual({
+      rotulo: 'Exposição',
+      valor: 'Não constatada exposição a condição de risco que atenda aos critérios normativos de caracterização.',
+    })
+    // A conclusão é do item 10.
+    expect(apresentacao.linhas).not.toContainEqual(expect.objectContaining({ rotulo: 'Resultado técnico' }))
+  })
+
+  it('monta o quadro conclusivo do item 10 com as duas linhas do modelo', () => {
+    const apresentacao = montarApresentacaoAgente({
+      id: 'periculosidade-2b',
+      nome: 'Ausência de atividade ou operação perigosa enquadrável na NR-16',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      exposicaoPericulosidade: 'nao_constatada',
+      resultadoPericulosidade: 'nao_caracterizada',
+    } as AgenteAvaliado, { conclusiva: true })
+
+    expect(apresentacao.linhas).toHaveLength(2)
+    expect(apresentacao.linhas[0]).toEqual({
+      rotulo: 'Condição / Atividades',
+      valor: `${ANALISE_ATIVIDADES_NR16}\n${LAPSO_TEMPORAL_NR16}`,
+    })
+    // Sem anexo escolhido, a conclusão percorre os sete anexos — não basta
+    // dizer que nada foi caracterizado.
+    expect(apresentacao.linhas[1]).toEqual({
+      rotulo: 'Resultado técnico / Conclusão',
+      valor: conclusaoSemRiscoNr16(),
+      destaque: 'positivo',
+    })
+    expect(apresentacao.linhas[1]?.valor).toContain('Todos os anexos foram observados:')
+    expect(apresentacao.linhas[1]?.valor).toContain('Anexo 1 – Explosivos')
+    expect(apresentacao.linhas[1]?.valor).toContain('Anexo (*) – Radiações ionizantes ou substâncias radioativas')
+  })
+
+  it('leva a observação e os EPIs do agente para o quadro do item 10', () => {
+    const apresentacao = montarApresentacaoAgente({
+      id: 'periculosidade-2c',
+      nome: 'Inflamáveis',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      anexoNr16: 'ANEXO_02',
+      resultadoPericulosidade: 'caracterizada',
+      observacao: 'Ressalva quanto ao período anterior à reforma do pátio.',
+      epis: [{ categoria: 'Luva', modelo: 'Nitrílica NL-30', caUnico: '9111' }],
+    } as AgenteAvaliado, { conclusiva: true })
+
+    // A observação entra junto da conclusão que ela comenta, separada por uma
+    // linha em branco — não tem outro lugar no laudo onde sair.
+    expect(apresentacao.linhas[1]).toEqual({
+      rotulo: 'Resultado técnico / Conclusão',
+      valor: 'Periculosidade caracterizada\n\nRessalva quanto ao período anterior à reforma do pátio.',
+      destaque: 'negativo',
+    })
+    // O agente de periculosidade não entra na seção de EPIs: este quadro é o
+    // único lugar do laudo onde as proteções dele aparecem.
+    expect(apresentacao.linhas).toContainEqual({
+      rotulo: 'Proteções associadas',
+      valor: 'Proteção 1: Nitrílica NL-30 — CA 9111',
+    })
   })
 
   it('imprime os pontos de verificação do anexo, na ordem gravada e sem os vazios', () => {
@@ -270,13 +338,26 @@ describe('montarApresentacaoAgente', () => {
       rotulo: 'Exposição',
       valor: 'Exposição nas três horas diárias de abastecimento da frota.',
     })
-    expect(apresentacao.linhas).toContainEqual({
-      rotulo: 'Resultado técnico',
+    expect(apresentacao.linhas).not.toContainEqual({ rotulo: 'Exposição', valor: 'Permanente' })
+    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Adicional Pretendido', valor: '30%' })
+
+    // O resultado escrito à mão vence o seletor — e vence no item 10, que é
+    // onde o resultado sai.
+    const conclusiva = montarApresentacaoAgente({
+      id: 'periculosidade-4',
+      nome: 'Inflamáveis',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      anexoNr16: 'ANEXO_02',
+      exposicaoPericulosidade: 'permanente',
+      resultadoPericulosidade: 'nao_caracterizada',
+      exposicaoPericulosidadeTexto: 'Exposição nas três horas diárias de abastecimento da frota.',
+      resultadoPericulosidadeTexto: 'Caracterizada a periculosidade apenas de 2019 a 2022.',
+    } as AgenteAvaliado, { conclusiva: true })
+
+    expect(conclusiva.linhas).toContainEqual({
+      rotulo: 'Resultado técnico / Conclusão',
       valor: 'Caracterizada a periculosidade apenas de 2019 a 2022.',
     })
-    expect(apresentacao.linhas).not.toContainEqual({ rotulo: 'Exposição', valor: 'Permanente' })
-    // Escrito à mão, o resultado deixa de ser o “não caracterizada” da lista
-    // e a tabela volta a ser a do cenário com enquadramento.
-    expect(apresentacao.linhas).toContainEqual({ rotulo: 'Adicional', valor: '30%' })
   })
 })

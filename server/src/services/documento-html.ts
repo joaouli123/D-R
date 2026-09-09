@@ -23,6 +23,8 @@ import {
   mascaraCpf,
   montarApresentacaoAgente,
   numeradorDeSecoes,
+  quadrosNr16DoItem10,
+  resumoProtecoesAssociadas,
   objetivoAutomaticoDocumento,
   periodoAvaliacaoDocumento,
   horarioDaVistoriaDocumento,
@@ -73,6 +75,20 @@ function paragrafos(texto?: string | null): string {
   const partes = emParagrafos(texto)
   if (!partes.length) return ''
   return partes.map(linhasEmHtml).join('')
+}
+
+/**
+ * Transcrição literária de uma peça do processo. Espelha `<Transcricao>` de
+ * src/components/DocumentoPreview.tsx: aspas na primeira e na última linha,
+ * itálico no meio — a voz da parte não pode se confundir com a do perito.
+ */
+function transcricao(texto?: string | null): string {
+  const linhas = (texto ?? '').split('\n').map((item) => item.trim()).filter(Boolean)
+  if (!linhas.length) return ''
+  return linhas
+    .map((item, indice) => `<p class="transcricao">${indice === 0 ? '“' : ''}${esc(item)}${
+      indice === linhas.length - 1 ? '”' : ''}</p>`)
+    .join('')
 }
 
 function paragrafosEstruturados(texto?: string | null): string {
@@ -142,6 +158,9 @@ const CSS = `
   p { margin: 0 0 8px; text-indent: 1.25cm; }
   p.sem-recuo { text-indent: 0; }
   p.vazio { font-style: italic; color: ${css(MARCA.tinta400)}; text-indent: 0; }
+  /* Espelha .doc-sheet p.transcricao / p.fonte-transcricao de src/index.css. */
+  p.transcricao { font-style: italic; margin-bottom: 4px; }
+  p.fonte-transcricao { font-size: 9pt; color: ${css(MARCA.tinta600)}; text-indent: 0; }
   /* Listas da matriz do perito: marcador em 1,25cm, texto em 2,25cm.
      O glifo vem do ::before para o texto alinhar tambem na primeira linha. */
   p.item-lista { text-align: left; text-indent: 0; margin: 0 0 2px 2.25cm; position: relative; }
@@ -475,14 +494,7 @@ export async function htmlDoParecer(
       const quadros = lista.map((agente, indice) => {
         const apresentacao = montarApresentacaoAgente(agente)
         const identificado = agente.identificadoNaAtividade !== false
-        const protecoes = (agente.epis ?? []).map((epi, indiceEpi) => {
-          const cas = [
-            epi.caUnico?.trim() ? `CA ${epi.caUnico.trim()}` : '',
-            epi.caPecaFacial?.trim() ? `CA peça facial ${epi.caPecaFacial.trim()}` : '',
-            epi.caFiltroCartucho?.trim() ? `CA cartucho/filtro ${epi.caFiltroCartucho.trim()}` : '',
-          ].filter(Boolean).join(' / ')
-          return `Proteção ${indiceEpi + 1}: ${epi.modelo}${cas ? ` — ${cas}` : ''}`
-        }).join('\n')
+        const protecoes = resumoProtecoesAssociadas(agente.epis)
         const linhas = protecoes
           ? [...apresentacao.linhas, { rotulo: 'Proteções associadas', valor: protecoes }]
           : apresentacao.linhas
@@ -492,9 +504,30 @@ export async function htmlDoParecer(
       return `<h3>10.${grupo}. ${esc(tituloGrupo)}</h3>${quadros}`
     }
 
+    /**
+     * O grupo da NR-16 não é uma lista de agentes: é a lista dos sete anexos,
+     * sempre inteira, com o quadro conclusivo em cada um que foi avaliado.
+     * Espelha `quadrosNr16DeAnalise` da prévia.
+     */
+    const montarGrupoNr16 = (lista: typeof agentes) => {
+      if (!lista.length) return ''
+      grupo += 1
+      const prefixo = `10.${grupo}`
+      const quadros = quadrosNr16DoItem10(lista, prefixo).map((quadro) => {
+        const apresentacao = quadro.agente && quadro.agente.identificadoNaAtividade !== false
+          ? montarApresentacaoAgente(quadro.agente, { conclusiva: true })
+          : null
+        const cabecalho = `<h4>${esc(`${quadro.numero}. ${quadro.titulo}`)}</h4>`
+        return apresentacao
+          ? `<section class="agente-bloco">${cabecalho}${tabelaLinhasAgente(apresentacao.linhas)}</section>`
+          : cabecalho
+      }).join('')
+      return `<h3>${prefixo}. NR-16 — Avaliação das Atividades e Operações Perigosas</h3>${quadros}`
+    }
+
     return (
       (temInsalubridade ? montarGrupo(agentesNr15, 'NR-15 — Avaliação da Exposição Ocupacional') : '') +
-      (temPericulosidade ? montarGrupo(agentesNr16, 'NR-16 — Avaliação das Atividades e Operações Perigosas') : '')
+      (temPericulosidade ? montarGrupoNr16(agentesNr16) : '')
     )
   })()
   const blocoDivergencias = () => {
@@ -583,7 +616,14 @@ export async function htmlDoParecer(
           ? (() => {
               const cabecalho = num.sub('NR-16 — Avaliação das Atividades e Operações Perigosas')
               const numero = cabecalho.split('. ')[0]
-              return `<h3>${cabecalho}</h3><h4>${numero}.1. Critério de Avaliação</h4>${paragrafos(t.criterioAvaliacaoPericulosidade)}${tabelaAgentes(agentesNr16)}`
+              const alegado = t.riscoAlegadoPericulosidade?.trim()
+                ? `<h4>${numero}.2. Risco de Periculosidade Alegado pela Parte Reclamante</h4>`
+                  + transcricao(t.riscoAlegadoPericulosidade)
+                  + (t.fonteRiscoAlegado?.trim()
+                    ? `<p class="fonte-transcricao">Fonte: ${esc(t.fonteRiscoAlegado.trim())}</p>`
+                    : '')
+                : ''
+              return `<h3>${cabecalho}</h3><h4>${numero}.1. Critério de Avaliação</h4>${paragrafos(t.criterioAvaliacaoPericulosidade)}${alegado}${tabelaAgentes(agentesNr16)}`
             })()
           : '') +
         blocoDivergencias() +

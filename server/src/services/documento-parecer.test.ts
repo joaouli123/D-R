@@ -106,6 +106,62 @@ describe('parecer em HTML (motor do PDF)', () => {
     expect(html).not.toContain('Plug 3M 1100')
   })
 
+  it('transcreve no 7.3.2 o risco alegado pela parte, com a folha da inicial', async () => {
+    const pericia = periciaDeTeste()
+    // Com as duas modalidades a NR-16 é a terceira subseção do item 7 — é o
+    // 7.3 do modelo que o perito mandou.
+    ;(pericia as { modalidade: string }).modalidade = 'ambas'
+    Object.assign(pericia.tecnico as object, {
+      criterioAvaliacaoPericulosidade: 'Critério qualitativo.',
+      riscoAlegadoPericulosidade: 'Sustenta a parte Reclamante que laborava no abastecimento de veículos.',
+      fonteRiscoAlegado: 'Inicial do processo - Fls.: 8',
+    })
+
+    const html = await gerar(pericia)
+
+    const posicoes = [
+      '7.3.1. Critério de Avaliação',
+      '7.3.2. Risco de Periculosidade Alegado pela Parte Reclamante',
+      'Sustenta a parte Reclamante que laborava no abastecimento de veículos.',
+      'Fonte: Inicial do processo - Fls.: 8',
+    ].map((trecho) => html.indexOf(trecho))
+    expect(posicoes.every((posicao) => posicao >= 0)).toBe(true)
+    expect(posicoes).toEqual([...posicoes].sort((a, b) => a - b))
+  })
+
+  it('fecha o item 10 com o quadro Sem Risco e a lista dos anexos em linhas', async () => {
+    const pericia = periciaSoPericulosidade()
+    ;(pericia.tecnico as unknown as { agentes: unknown[] }).agentes = [{
+      id: 'nr16-sem-risco',
+      nome: 'Sem risco',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      resultadoPericulosidade: 'nao_caracterizada',
+    }]
+
+    const html = await gerar(pericia)
+
+    expect(html).toContain('10.1.8. Sem Risco – Avaliação, Resultado e Conclusão')
+    expect(html).toContain('<th>Condição / Atividades</th>')
+    // A quebra de linha da célula vira <br>: sem isso a lista dos sete
+    // anexos sai como um parágrafo corrido dentro do quadro.
+    expect(html).toContain('<br>• Anexo 1 – Explosivos;')
+    expect(html).toContain('<br>• Anexo (*) – Radiações ionizantes ou substâncias radioativas;')
+  })
+
+  it('percorre os sete anexos da NR-16 no item 10, um a um', async () => {
+    // O item 10 declara que os sete anexos foram observados: os que não têm
+    // agente entram como linha da lista, e só o último fica sem ponto e
+    // vírgula. É o modelo que o perito mandou.
+    const html = await gerar(periciaSoPericulosidade())
+
+    expect(html).toContain('10.1. NR-16 — Avaliação das Atividades e Operações Perigosas')
+    expect(html).toContain('10.1.1. Explosivos;')
+    expect(html).toContain('10.1.2. Inflamáveis – Avaliação, Resultado e Conclusão')
+    expect(html).toContain('10.1.7. Anexo (*) – Radiações ionizantes ou substâncias radioativas')
+    expect(html).not.toContain('Radiações ionizantes ou substâncias radioativas;')
+  })
+
   it('abre a capa pela identificação das partes', async () => {
     const html = await gerar()
 

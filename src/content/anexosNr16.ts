@@ -9,7 +9,11 @@ import type { AgenteAvaliado } from '@/types'
  */
 export interface AnexoNr16Info {
   id: string
+  /** Como o anexo é chamado no corpo do documento: "1"…"6" e "(*)". */
+  numero: string
   label: string
+  /** Nome curto do assunto, o que sai na lista do item 10.2. */
+  assunto: string
   risco: string
   atividadesSugeridas: string[]
 }
@@ -24,9 +28,34 @@ export interface AnexoNr16Info {
 export const NOME_PADRAO_SEM_ENQUADRAMENTO =
   'Ausência de atividade ou operação perigosa enquadrável na NR-16'
 
+/**
+ * O critério, por extenso, como o perito quer ler na tabela.
+ *
+ * "Qualitativo" sozinho não diz o que foi feito; a frase inteira diz — e é a
+ * mesma que abre a linha "Condição / Atividades" da análise do item 10.
+ */
+export const ANALISE_ATIVIDADES_NR16 =
+  'Análise das atividades, inspeção nos locais de trabalho e adjacentes'
+
+export const CRITERIO_QUALITATIVO_NR16 = `Qualitativo – ${ANALISE_ATIVIDADES_NR16}`
+
+/** Período abrangido pelo exame. */
+export const LAPSO_TEMPORAL_NR16 = 'Análise de todo o período válido para inspeção pericial'
+
+/**
+ * O que a perícia fez com os anexos — os examinou todos, não só o alegado.
+ *
+ * É o que sustenta a conclusão negativa: sem esta linha, o laudo afirma que
+ * não há enquadramento sem dizer contra o que a atividade foi confrontada.
+ */
+export const ANALISE_ANEXOS_NR16 =
+  'Foram avaliados os anexos pertinentes da NR-16, considerando as atividades desenvolvidas, '
+  + 'as condições de trabalho, os locais e áreas adjacentes, bem como os respectivos critérios '
+  + 'técnicos e normativos estabelecidos em cada anexo.'
+
 export const PADRAO_NR16_SEM_ENQUADRAMENTO = {
-  atividadeEnquadrada: 'Avaliada a atividade efetivamente desempenhada pelo trabalhador.',
-  areaRisco: 'Não identificada condição ou área de risco enquadrável na NR-16 e seus anexos.',
+  atividadeEnquadrada: 'Avaliada a atividade efetivamente desempenhada pela parte Reclamante.',
+  analiseAnexos: ANALISE_ANEXOS_NR16,
   exposicaoPericulosidade: 'nao_constatada' as const,
   resultadoPericulosidade: 'nao_caracterizada' as const,
 }
@@ -34,6 +63,8 @@ export const PADRAO_NR16_SEM_ENQUADRAMENTO = {
 export const ANEXOS_NR16: AnexoNr16Info[] = [
   {
     id: 'ANEXO_01',
+    numero: '1',
+    assunto: 'Explosivos',
     label: 'Anexo 1 — Atividades e Operações Perigosas com Explosivos',
     risco: 'Explosivos',
     atividadesSugeridas: [
@@ -49,6 +80,8 @@ export const ANEXOS_NR16: AnexoNr16Info[] = [
   },
   {
     id: 'ANEXO_02',
+    numero: '2',
+    assunto: 'Inflamáveis',
     label: 'Anexo 2 — Atividades e Operações Perigosas com Inflamáveis',
     risco: 'Inflamáveis',
     atividadesSugeridas: [
@@ -68,6 +101,8 @@ export const ANEXOS_NR16: AnexoNr16Info[] = [
   },
   {
     id: 'ANEXO_03',
+    numero: '3',
+    assunto: 'Segurança pessoal ou patrimonial',
     label: 'Anexo 3 — Segurança Pessoal ou Patrimonial',
     risco: 'Roubos ou outras espécies de violência física',
     atividadesSugeridas: [
@@ -84,6 +119,8 @@ export const ANEXOS_NR16: AnexoNr16Info[] = [
   },
   {
     id: 'ANEXO_04',
+    numero: '4',
+    assunto: 'Energia elétrica',
     label: 'Anexo 4 — Atividades e Operações Perigosas com Energia Elétrica',
     risco: 'Energia elétrica',
     atividadesSugeridas: [
@@ -95,6 +132,8 @@ export const ANEXOS_NR16: AnexoNr16Info[] = [
   },
   {
     id: 'ANEXO_05',
+    numero: '5',
+    assunto: 'Motocicleta',
     label: 'Anexo 5 — Atividades Perigosas em Motocicleta',
     risco: 'Motocicleta',
     atividadesSugeridas: [
@@ -103,6 +142,8 @@ export const ANEXOS_NR16: AnexoNr16Info[] = [
   },
   {
     id: 'ANEXO_06',
+    numero: '6',
+    assunto: 'Agentes das autoridades de trânsito',
     label: 'Anexo 6 — Agentes das Autoridades de Trânsito',
     risco: 'Colisões, atropelamentos ou outras espécies de acidentes ou violências',
     atividadesSugeridas: [
@@ -111,6 +152,8 @@ export const ANEXOS_NR16: AnexoNr16Info[] = [
   },
   {
     id: 'ANEXO_RADIACOES',
+    numero: '(*)',
+    assunto: 'Radiações ionizantes ou substâncias radioativas',
     label: 'Anexo sem número — Radiações Ionizantes ou Substâncias Radioativas',
     risco: 'Radiações ionizantes ou substâncias radioativas',
     atividadesSugeridas: [
@@ -434,6 +477,92 @@ export function labelAnexoNr16(id?: string): string {
   return anexoNr16PorId(id)?.label ?? id
 }
 
+/** "Anexo 2 – Inflamáveis" — como o anexo aparece dentro do texto. */
+export function linhaAnexoNr16(anexo: AnexoNr16Info): string {
+  return `Anexo ${anexo.numero} – ${anexo.assunto}`
+}
+
+/**
+ * Como o anexo entra na lista numerada do item 10.
+ *
+ * O número do subitem já acompanha o do anexo (10.2.2 → Anexo 2), então
+ * repetir "Anexo 2" seria redundante. A exceção é o anexo sem número: ali o
+ * "(*)" precisa aparecer, ou o leitor toma o sétimo subitem por "Anexo 7",
+ * que não existe na norma.
+ */
+export function itemListaAnexoNr16(anexo: AnexoNr16Info): string {
+  return anexo.numero === '(*)' ? `Anexo (*) – ${anexo.assunto}` : anexo.assunto
+}
+
+/**
+ * Conclusão do quadro "Sem Risco" do item 10.
+ *
+ * Sai montada da lista viva de anexos: se a NR-16 ganhar um anexo, ele entra
+ * aqui sozinho. Uma lista digitada à mão envelheceria em silêncio, e o laudo
+ * afirmaria ter observado todos os anexos sem ter observado o novo.
+ */
+export function conclusaoSemRiscoNr16(): string {
+  return [
+    'Não foi caracterizada periculosidade, por ausência de enquadramento das atividades e '
+      + 'condições de trabalho nos critérios técnicos e normativos aplicáveis.',
+    ['Todos os anexos foram observados:', ...ANEXOS_NR16.map((anexo) => `\u2022 ${linhaAnexoNr16(anexo)};`)]
+      .join('\n'),
+    'Inaplicáveis às atividades e condições de trabalho do Reclamante, não havendo enquadramento '
+      + 'nas hipóteses de caracterização de periculosidade.',
+  ].join('\n\n')
+}
+
+/**
+ * Os subitens do item 10 para a NR-16, na ordem fixa dos anexos.
+ *
+ * A numeração acompanha o anexo, sempre: Inflamáveis é o subitem 2 mesmo
+ * quando é o único avaliado. É assim que o perito numera — e assim o leitor
+ * sabe, só pelo número, contra qual anexo aquele quadro foi concluído. Se a
+ * numeração seguisse a ordem dos agentes cadastrados, o mesmo anexo mudaria
+ * de número a cada perícia.
+ *
+ * Anexo sem agente entra só como linha da lista: o item 10 declara que os
+ * sete foram percorridos, e o quadro completo fica para os que foram
+ * efetivamente enquadrados. O cenário negativo — agente sem anexo escolhido
+ * — fecha a lista como “Sem Risco”.
+ */
+export function quadrosNr16DoItem10<A extends { nome?: string; anexoNr16?: string }>(
+  agentes: A[],
+  prefixo: string,
+): { numero: string; titulo: string; agente?: A }[] {
+  const quadros: { numero: string; titulo: string; agente?: A }[] = []
+  const comSufixo = (base: string, lista: A[], agente: A, indice: number) =>
+    lista.length > 1 ? `${base} (${agente.nome?.trim() || `Risco ${indice + 1}`})` : base
+
+  ANEXOS_NR16.forEach((anexo, indice) => {
+    const numero = `${prefixo}.${indice + 1}`
+    const doAnexo = agentes.filter((agente) => agente.anexoNr16 === anexo.id)
+    if (!doAnexo.length) {
+      const ultimo = indice === ANEXOS_NR16.length - 1
+      quadros.push({ numero, titulo: `${itemListaAnexoNr16(anexo)}${ultimo ? '' : ';'}` })
+      return
+    }
+    doAnexo.forEach((agente, i) => {
+      const base = `${anexo.assunto} – Avaliação, Resultado e Conclusão`
+      quadros.push({ numero, titulo: comSufixo(base, doAnexo, agente, i), agente })
+    })
+  })
+
+  // Sobra tudo o que não entrou em anexo nenhum — e não só quem está sem
+  // anexo. Agente gravado com valor que não é id de anexo (as perícias
+  // antigas guardavam "Anexo 2") não casava com nada e sumia do item 10 sem
+  // aviso; agora ele cai aqui.
+  const colocados = new Set(quadros.map((quadro) => quadro.agente))
+  const semAnexo = agentes.filter((agente) => !colocados.has(agente))
+  const numeroSemRisco = `${prefixo}.${ANEXOS_NR16.length + 1}`
+  semAnexo.forEach((agente, i) => {
+    const base = 'Sem Risco – Avaliação, Resultado e Conclusão'
+    quadros.push({ numero: numeroSemRisco, titulo: comSufixo(base, semAnexo, agente, i), agente })
+  })
+
+  return quadros
+}
+
 export function aplicarAnexoNr16(agente: AgenteAvaliado, id: string): AgenteAvaliado {
   const anexo = anexoNr16PorId(id)
   const {
@@ -456,6 +585,7 @@ export function aplicarAnexoNr16(agente: AgenteAvaliado, id: string): AgenteAval
     epis: _epis,
     atividadeEnquadrada: _atividade,
     areaRisco: _area,
+    analiseAnexos: _analiseAnexos,
     exposicaoPericulosidade: _exposicao,
     resultadoPericulosidade: _resultado,
     exposicaoPericulosidadeTexto: _exposicaoTexto,

@@ -116,7 +116,7 @@ export function periciaSoPericulosidade(): PericiaCompleta {
       id: 'agn-nr16',
       nome: 'Inflamáveis líquidos',
       tipo: 'periculosidade',
-      anexoNr16: 'Anexo 2',
+      anexoNr16: 'ANEXO_02',
       criterio: 'qualitativo',
       areaRisco: 'Pátio de abastecimento',
       resultadoPericulosidade: 'caracterizada',

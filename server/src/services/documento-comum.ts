@@ -469,6 +469,7 @@ export interface AgenteDocumento {
   origemMedicao?: OrigemMedicaoDocumento
   fonteRuido?: FonteRuidoDocumento
   areaRisco?: string
+  analiseAnexos?: string
   exposicaoPericulosidade?: 'permanente' | 'intermitente' | 'eventual' | 'nao_constatada'
   resultadoPericulosidade?: 'caracterizada' | 'nao_caracterizada' | 'prejudicada'
   /** Redação própria da exposição; vence `exposicaoPericulosidade`. */
@@ -669,6 +670,27 @@ export function formatarCasEpi(epi: EpiDocumento): string[] {
   ].filter((linha): linha is string => Boolean(linha))
 }
 
+/**
+ * As proteções do agente resumidas em uma linha por EPI, para caber numa
+ * célula só do quadro de análise do item 10.
+ *
+ * Vive aqui porque os quatro renderizadores montavam a mesma string cada um
+ * por si — e quando o quadro da NR-16 passou a ser montado à parte, a linha
+ * simplesmente não foi junto. Os EPIs de periculosidade sumiram do laudo
+ * inteiro: a seção de EPIs só alcança agente com bloco de proteção próprio,
+ * e o de periculosidade não tem.
+ */
+export function resumoProtecoesAssociadas(epis?: EpiDocumento[]): string {
+  return (epis ?? []).map((epi, indice) => {
+    const cas = [
+      epi.caUnico?.trim() ? `CA ${epi.caUnico.trim()}` : '',
+      epi.caPecaFacial?.trim() ? `CA peça facial ${epi.caPecaFacial.trim()}` : '',
+      epi.caFiltroCartucho?.trim() ? `CA cartucho/filtro ${epi.caFiltroCartucho.trim()}` : '',
+    ].filter(Boolean).join(' / ')
+    return `Proteção ${indice + 1}: ${epi.modelo}${cas ? ` — ${cas}` : ''}`
+  }).join('\n')
+}
+
 export interface LinhaApresentacaoAgente {
   rotulo: string
   valor: string
@@ -724,6 +746,100 @@ function anexoNr16Legivel(anexo?: string): string {
     ANEXO_RADIACOES: 'Anexo sem número — Radiações Ionizantes ou Substâncias Radioativas',
   }
   return anexo ? (rotulos[anexo] ?? anexo) : ''
+}
+
+/**
+ * Os anexos da NR-16 na ordem em que o documento os lista.
+ *
+ * Cópia de `ANEXOS_NR16` de src/content/anexosNr16.ts — o front não pode ser
+ * importado daqui. Mudou lá, muda aqui: quem cobra a paridade é
+ * server/src/services/periculosidade-nr16.test.ts.
+ */
+export const ANEXOS_NR16_DOCUMENTO: { id: string; numero: string; assunto: string }[] = [
+  { id: 'ANEXO_01', numero: '1', assunto: 'Explosivos' },
+  { id: 'ANEXO_02', numero: '2', assunto: 'Inflamáveis' },
+  { id: 'ANEXO_03', numero: '3', assunto: 'Segurança pessoal ou patrimonial' },
+  { id: 'ANEXO_04', numero: '4', assunto: 'Energia elétrica' },
+  { id: 'ANEXO_05', numero: '5', assunto: 'Motocicleta' },
+  { id: 'ANEXO_06', numero: '6', assunto: 'Agentes das autoridades de trânsito' },
+  { id: 'ANEXO_RADIACOES', numero: '(*)', assunto: 'Radiações ionizantes ou substâncias radioativas' },
+]
+
+/** Espelha `itemListaAnexoNr16` do front. */
+export function itemListaAnexoNr16Documento(anexo: { numero: string; assunto: string }): string {
+  return anexo.numero === '(*)' ? `Anexo (*) – ${anexo.assunto}` : anexo.assunto
+}
+
+/**
+ * Os subitens do item 10 para a NR-16, na ordem fixa dos anexos.
+ *
+ * A numeração acompanha o anexo, sempre: Inflamáveis é o subitem 2 mesmo
+ * quando é o único avaliado. É assim que o perito numera — e assim o leitor
+ * sabe, só pelo número, contra qual anexo aquele quadro foi concluído. Se a
+ * numeração seguisse a ordem dos agentes cadastrados, o mesmo anexo mudaria
+ * de número a cada perícia.
+ *
+ * Anexo sem agente entra só como linha da lista: o item 10 declara que os
+ * sete foram percorridos, e o quadro completo fica para os que foram
+ * efetivamente enquadrados. O cenário negativo — agente sem anexo escolhido
+ * — fecha a lista como “Sem Risco”.
+ */
+export function quadrosNr16DoItem10<A extends { nome?: string; anexoNr16?: string }>(
+  agentes: A[],
+  prefixo: string,
+): { numero: string; titulo: string; agente?: A }[] {
+  const quadros: { numero: string; titulo: string; agente?: A }[] = []
+  const comSufixo = (base: string, lista: A[], agente: A, indice: number) =>
+    lista.length > 1 ? `${base} (${agente.nome?.trim() || `Risco ${indice + 1}`})` : base
+
+  ANEXOS_NR16_DOCUMENTO.forEach((anexo, indice) => {
+    const numero = `${prefixo}.${indice + 1}`
+    const doAnexo = agentes.filter((agente) => agente.anexoNr16 === anexo.id)
+    if (!doAnexo.length) {
+      const ultimo = indice === ANEXOS_NR16_DOCUMENTO.length - 1
+      quadros.push({ numero, titulo: `${itemListaAnexoNr16Documento(anexo)}${ultimo ? '' : ';'}` })
+      return
+    }
+    doAnexo.forEach((agente, i) => {
+      const base = `${anexo.assunto} – Avaliação, Resultado e Conclusão`
+      quadros.push({ numero, titulo: comSufixo(base, doAnexo, agente, i), agente })
+    })
+  })
+
+  // Sobra tudo o que não entrou em anexo nenhum — e não só quem está sem
+  // anexo. Agente gravado com valor que não é id de anexo (as perícias
+  // antigas guardavam "Anexo 2") não casava com nada e sumia do item 10 sem
+  // aviso; agora ele cai aqui.
+  const colocados = new Set(quadros.map((quadro) => quadro.agente))
+  const semAnexo = agentes.filter((agente) => !colocados.has(agente))
+  const numeroSemRisco = `${prefixo}.${ANEXOS_NR16_DOCUMENTO.length + 1}`
+  semAnexo.forEach((agente, i) => {
+    const base = 'Sem Risco – Avaliação, Resultado e Conclusão'
+    quadros.push({ numero: numeroSemRisco, titulo: comSufixo(base, semAnexo, agente, i), agente })
+  })
+
+  return quadros
+}
+
+export const ANALISE_ATIVIDADES_NR16 =
+  'Análise das atividades, inspeção nos locais de trabalho e adjacentes'
+
+export const CRITERIO_QUALITATIVO_NR16 = `Qualitativo – ${ANALISE_ATIVIDADES_NR16}`
+
+export const LAPSO_TEMPORAL_NR16 = 'Análise de todo o período válido para inspeção pericial'
+
+/** Espelha `conclusaoSemRiscoNr16` do front. */
+export function conclusaoSemRiscoNr16(): string {
+  return [
+    'Não foi caracterizada periculosidade, por ausência de enquadramento das atividades e '
+      + 'condições de trabalho nos critérios técnicos e normativos aplicáveis.',
+    [
+      'Todos os anexos foram observados:',
+      ...ANEXOS_NR16_DOCUMENTO.map((anexo) => `\u2022 Anexo ${anexo.numero} – ${anexo.assunto};`),
+    ].join('\n'),
+    'Inaplicáveis às atividades e condições de trabalho do Reclamante, não havendo enquadramento '
+      + 'nas hipóteses de caracterização de periculosidade.',
+  ].join('\n\n')
 }
 
 const EXPOSICAO_PERICULOSIDADE: Record<string, string> = {
@@ -813,21 +929,31 @@ function protecaoDocumento(
   return { titulo: `Proteção ${indice + 1}`, linhas }
 }
 
-export function montarApresentacaoAgente(agente: AgenteDocumento): ApresentacaoAgenteDocumento {
+export interface OpcoesApresentacaoAgenteDocumento {
+  /** Ver `OpcoesApresentacaoAgente` em src/lib/apresentacaoAgente.ts. */
+  conclusiva?: boolean
+}
+
+export function montarApresentacaoAgente(
+  agente: AgenteDocumento,
+  opcoes: OpcoesApresentacaoAgenteDocumento = {},
+): ApresentacaoAgenteDocumento {
   if (agente.tipo === 'periculosidade') {
     // ------------------------------------------------------------
-    // Dois cenários, uma tabela só.
+    // O mesmo agente, dois quadros.
     //
-    // Sem enquadramento (o negativo), ela sai enxuta: some a linha do
-    // adicional, porque “30%” impresso logo acima de “não caracterizada” era
-    // lido como se algo fosse devido. Com enquadramento, entram também os
-    // pontos que aquele anexo manda examinar — os `detalhesNr16`, que a tela
-    // carrega conforme o anexo escolhido.
+    // No item 7 sai o levantamento: o que foi avaliado, sob que critério, em
+    // que período, contra quais anexos e com que exposição. Nenhuma linha de
+    // resultado — é só o registro do exame.
     //
-    // Exposição e resultado aceitam redação própria, e ela VENCE a opção do
-    // seletor: a lista fechada resolve o caso comum, o texto livre resolve o
-    // que ela não previu. Sem isso o perito não tinha saída quando o caso
-    // concreto não cabia em nenhuma das opções.
+    // No item 10 sai a conclusão, em duas linhas: o que foi examinado e o que
+    // se concluiu. No cenário negativo a conclusão é a lista inteira dos
+    // anexos observados, montada por `conclusaoSemRiscoNr16`.
+    //
+    // "Adicional Pretendido" aparece nos dois cenários de propósito: os 30%
+    // são o que a parte pede, não o que o laudo reconhece.
+    //
+    // Espelha src/lib/apresentacaoAgente.ts — mudou aqui, muda lá.
     // ------------------------------------------------------------
     const resultado = agente.resultadoPericulosidade
       ? RESULTADO_PERICULOSIDADE[agente.resultadoPericulosidade]
@@ -836,18 +962,60 @@ export function montarApresentacaoAgente(agente: AgenteDocumento): ApresentacaoA
     const resultadoTexto = agente.resultadoPericulosidadeTexto?.trim()
     const semEnquadramento =
       !resultadoTexto && agente.resultadoPericulosidade === 'nao_caracterizada'
+    const titulo = agente.nome || 'Risco de periculosidade não informado'
+
+    if (opcoes.conclusiva) {
+      const conclusao = resultadoTexto
+        ? { valor: resultadoTexto }
+        : semEnquadramento && !agente.anexoNr16
+          ? { valor: conclusaoSemRiscoNr16(), destaque: 'positivo' as const }
+          : resultado
+            ? { valor: resultado.valor, destaque: resultado.destaque }
+            : undefined
+      const observacao = agente.observacao?.trim()
+      const corpo = [conclusao?.valor, observacao].filter(Boolean).join('\n\n')
+      // Quando o perito registrou EPIs no agente de periculosidade, este é o
+      // único quadro do laudo em que eles aparecem. No cenário negativo não há
+      // EPI nenhum e a tabela sai com as duas linhas do print.
+      const protecoesAssociadas = resumoProtecoesAssociadas(agente.epis)
+      return {
+        titulo,
+        linhas: [
+          {
+            rotulo: 'Condição / Atividades',
+            valor: [ANALISE_ATIVIDADES_NR16, LAPSO_TEMPORAL_NR16].join('\n'),
+          },
+          ...(corpo
+            ? [{
+                rotulo: 'Resultado técnico / Conclusão',
+                valor: corpo,
+                ...(conclusao?.destaque ? { destaque: conclusao.destaque } : {}),
+              }]
+            : []),
+          ...(protecoesAssociadas
+            ? [{ rotulo: 'Proteções associadas', valor: protecoesAssociadas }]
+            : []),
+        ],
+        protecoes: [],
+      }
+    }
+
     return {
-      titulo: agente.nome || 'Risco de periculosidade não informado',
+      titulo,
       linhas: [
         ...(agente.anexoNr16 ? [{ rotulo: 'Anexo NR-16', valor: anexoNr16Legivel(agente.anexoNr16) }] : []),
         { rotulo: 'Natureza', valor: 'Periculosidade' },
-        { rotulo: 'Critério', valor: 'Qualitativo' },
-        ...(semEnquadramento ? [] : [{ rotulo: 'Adicional', valor: '30%' }]),
+        { rotulo: 'Critério', valor: CRITERIO_QUALITATIVO_NR16 },
+        { rotulo: 'Lapso temporal', valor: LAPSO_TEMPORAL_NR16 },
+        { rotulo: 'Adicional Pretendido', valor: '30%' },
         ...(agente.atividadeEnquadrada?.trim()
           ? [{ rotulo: 'Atividade ou operação avaliada', valor: agente.atividadeEnquadrada.trim() }]
           : []),
         ...(agente.areaRisco?.trim()
           ? [{ rotulo: 'Condição ou área de risco', valor: agente.areaRisco.trim() }]
+          : []),
+        ...(agente.analiseAnexos?.trim()
+          ? [{ rotulo: 'Análise dos Anexos', valor: agente.analiseAnexos.trim() }]
           : []),
         ...(agente.detalhesNr16 ?? [])
           .filter((detalhe) => detalhe.valor.trim())
@@ -856,11 +1024,6 @@ export function montarApresentacaoAgente(agente: AgenteDocumento): ApresentacaoA
           ? [{ rotulo: 'Exposição', valor: exposicaoTexto }]
           : agente.exposicaoPericulosidade
             ? [{ rotulo: 'Exposição', valor: EXPOSICAO_PERICULOSIDADE[agente.exposicaoPericulosidade]! }]
-            : []),
-        ...(resultadoTexto
-          ? [{ rotulo: 'Resultado técnico', valor: resultadoTexto }]
-          : resultado
-            ? [{ rotulo: 'Resultado técnico', valor: resultado.valor, destaque: resultado.destaque }]
             : []),
       ],
       protecoes: [],
@@ -996,6 +1159,8 @@ export interface TecnicoJson {
   informacoesReclamada?: string
   consideracoesDivergencias?: string
   criterioAvaliacaoPericulosidade?: string
+  riscoAlegadoPericulosidade?: string
+  fonteRiscoAlegado?: string
   notaTecnicaEpis?: string
   protecoesColetivas?: string
   analiseTecnica: string

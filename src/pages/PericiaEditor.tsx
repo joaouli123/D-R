@@ -149,7 +149,7 @@ function nr15Completa(a: AgenteAvaliado): boolean {
 
 function resumoNr16(a: AgenteAvaliado): string {
   return [
-    a.areaRisco?.trim() || null,
+    a.atividadeEnquadrada?.trim() || a.areaRisco?.trim() || null,
     a.resultadoPericulosidade
       ? RESUMO_RESULTADO_NR16[a.resultadoPericulosidade]
       : 'resultado pendente',
@@ -158,9 +158,17 @@ function resumoNr16(a: AgenteAvaliado): string {
     .join(' · ')
 }
 
-/** Avaliação NR-16 fechada: tem enquadramento e resultado. */
+/**
+ * Avaliação NR-16 fechada: tem resultado — e tem anexo quando o resultado
+ * afirma o enquadramento.
+ *
+ * O cenário negativo não escolhe anexo nenhum: é o próprio "quando não tem
+ * nada". Exigir um deixava a avaliação padrão eternamente aberta como
+ * pendência na tela, que foi o que o perito reclamou.
+ */
 function nr16Completa(a: AgenteAvaliado): boolean {
-  return Boolean(a.anexoNr16) && Boolean(a.resultadoPericulosidade)
+  if (!a.resultadoPericulosidade) return false
+  return a.resultadoPericulosidade === 'caracterizada' ? Boolean(a.anexoNr16) : true
 }
 
 // Rótulo da modalidade impresso no título do documento. Espelha
@@ -237,6 +245,8 @@ function novaPericia(responsavelId: string): Pericia {
       informacoesReclamada: '',
       consideracoesDivergencias: '',
       criterioAvaliacaoPericulosidade: '',
+      riscoAlegadoPericulosidade: '',
+      fonteRiscoAlegado: '',
       notaTecnicaEpis: '',
       protecoesColetivas: '',
       analiseTecnica: '',
@@ -1695,6 +1705,11 @@ export default function PericiaEditor() {
               { campo: 'informacoesReclamada', secao: 'generico', referencia: `${numeroDivergenciasEditor}.2`, label: `${numeroDivergenciasEditor}.2. Informações prestadas pela Reclamada`, rows: 5 },
               { campo: 'consideracoesDivergencias', secao: 'analise', referencia: numeroConsideracoesEditor, label: `${numeroConsideracoesEditor}. Considerações sobre as Divergências Fáticas`, rows: 6 },
               { campo: 'criterioAvaliacaoPericulosidade', secao: 'analise', referencia: `${numeroNr16Editor}.1`, label: `${numeroNr16Editor}.1. NR-16 — Critério de Avaliação`, rows: 4 },
+              // Transcrição da inicial, e a folha de onde ela saiu. Não tem
+              // texto padrão nem sugestão: o que vai aqui é a palavra da parte,
+              // e o sistema não escreve pela parte.
+              { campo: 'riscoAlegadoPericulosidade', secao: 'analise', referencia: `${numeroNr16Editor}.2`, label: `${numeroNr16Editor}.2. NR-16 — Risco de Periculosidade Alegado pela Parte Reclamante`, rows: 5 },
+              { campo: 'fonteRiscoAlegado', secao: 'analise', referencia: `${numeroNr16Editor}.2`, label: `${numeroNr16Editor}.2. Fonte da transcrição (ex.: Inicial do processo - Fls.: 8)`, rows: 2 },
               { campo: 'notaTecnicaEpis', secao: 'analise', referencia: '8', label: '8. Dos Equipamentos de Proteção Individual (NR-06)', rows: 7 },
               { campo: 'protecoesColetivas', secao: 'analise', referencia: '9', label: '9. Das Proteções Coletivas', rows: 5 },
               {
@@ -1715,7 +1730,9 @@ export default function PericiaEditor() {
             ] as const
           ).filter((f) =>
             (f.campo !== 'conclusaoInsalubridade' || p.modalidade !== 'periculosidade') &&
-            (f.campo !== 'conclusaoPericulosidade' || p.modalidade !== 'insalubridade'),
+            (f.campo !== 'conclusaoPericulosidade' || p.modalidade !== 'insalubridade') &&
+            (f.campo !== 'riscoAlegadoPericulosidade' || p.modalidade !== 'insalubridade') &&
+            (f.campo !== 'fonteRiscoAlegado' || p.modalidade !== 'insalubridade'),
           ).map((f) => {
             const campoPadrao = campoPadraoDe(f.campo)
             return (

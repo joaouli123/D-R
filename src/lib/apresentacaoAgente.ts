@@ -1,7 +1,13 @@
 import { labelAnexoNr15 } from '@/content/anexosNr15'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
 import type { AgenteAvaliado, EpiSelecionado } from '@/types'
-import { labelAnexoNr16 } from '@/content/anexosNr16'
+import {
+  ANALISE_ATIVIDADES_NR16,
+  CRITERIO_QUALITATIVO_NR16,
+  LAPSO_TEMPORAL_NR16,
+  conclusaoSemRiscoNr16,
+  labelAnexoNr16,
+} from '@/content/anexosNr16'
 
 import { FONTE_RUIDO, formatarMedicaoEmpresa, medicaoAdotada, tipoMedicaoEmpresaDe } from './medicoes'
 import { usaAtenuacaoRuido } from './nr15'
@@ -22,6 +28,19 @@ export interface ApresentacaoAgente {
   titulo: string
   linhas: LinhaAgente[]
   protecoes: BlocoProtecaoAgente[]
+}
+
+export interface OpcoesApresentacaoAgente {
+  /**
+   * Monta o quadro do item 10, não o do item 7.
+   *
+   * Os dois itens falam do mesmo agente com propósitos diferentes, e o perito
+   * foi explícito quanto a isso: o item 7 é levantamento — o que foi avaliado,
+   * em que período, sob que critério — e não conclui nada; o item 10 é onde a
+   * conclusão pericial aparece. Imprimir "Resultado técnico" já no item 7
+   * antecipava a conclusão e tornava os dois itens redundantes.
+   */
+  conclusiva?: boolean
 }
 
 const CRITERIO: Record<string, string> = {
@@ -97,6 +116,27 @@ export function formatarCasEpi(epi: EpiSelecionado): LinhaAgente[] {
   ].filter((linha): linha is LinhaAgente => Boolean(linha))
 }
 
+/**
+ * As proteções do agente resumidas em uma linha por EPI, para caber numa
+ * célula só do quadro de análise do item 10.
+ *
+ * Vive aqui porque os quatro renderizadores montavam a mesma string cada um
+ * por si — e quando o quadro da NR-16 passou a ser montado à parte, a linha
+ * simplesmente não foi junto. Os EPIs de periculosidade sumiram do laudo
+ * inteiro: a seção de EPIs só alcança agente com bloco de proteção próprio,
+ * e o de periculosidade não tem.
+ */
+export function resumoProtecoesAssociadas(epis?: EpiSelecionado[]): string {
+  return (epis ?? []).map((epi, indice) => {
+    const cas = [
+      epi.caUnico?.trim() ? `CA ${epi.caUnico.trim()}` : '',
+      epi.caPecaFacial?.trim() ? `CA peça facial ${epi.caPecaFacial.trim()}` : '',
+      epi.caFiltroCartucho?.trim() ? `CA cartucho/filtro ${epi.caFiltroCartucho.trim()}` : '',
+    ].filter(Boolean).join(' / ')
+    return `Proteção ${indice + 1}: ${epi.modelo}${cas ? ` — ${cas}` : ''}`
+  }).join('\n')
+}
+
 function linhasProtecao(
   agente: AgenteAvaliado,
   epi: EpiSelecionado,
@@ -139,21 +179,30 @@ function linhasProtecao(
   return { titulo: `Proteção ${indice + 1}`, linhas }
 }
 
-export function montarApresentacaoAgente(agente: AgenteAvaliado): ApresentacaoAgente {
+export function montarApresentacaoAgente(
+  agente: AgenteAvaliado,
+  opcoes: OpcoesApresentacaoAgente = {},
+): ApresentacaoAgente {
   if (agente.tipo === 'periculosidade') {
     // ------------------------------------------------------------
-    // Dois cenários, uma tabela só.
+    // O mesmo agente, dois quadros.
     //
-    // Sem enquadramento (o negativo), ela sai enxuta: some a linha do
-    // adicional, porque “30%” impresso logo acima de “não caracterizada” era
-    // lido como se algo fosse devido. Com enquadramento, entram também os
-    // pontos que aquele anexo manda examinar — os `detalhesNr16`, que a tela
-    // carrega conforme o anexo escolhido.
+    // No item 7 sai o levantamento: o que foi avaliado, sob que critério, em
+    // que período, contra quais anexos e com que exposição. Nenhuma linha de
+    // resultado — é só o registro do exame.
+    //
+    // No item 10 sai a conclusão, em duas linhas: o que foi examinado e o que
+    // se concluiu. No cenário negativo a conclusão é a lista inteira dos
+    // anexos observados, montada por `conclusaoSemRiscoNr16`.
+    //
+    // "Adicional Pretendido" aparece nos dois cenários de propósito: os 30%
+    // são o que a parte pede, não o que o laudo reconhece. Foi o próprio
+    // perito quem pediu o rótulo por extenso justamente para desfazer essa
+    // leitura — antes a linha sumia no cenário negativo para não confundir.
     //
     // Exposição e resultado aceitam redação própria, e ela VENCE a opção do
     // seletor: a lista fechada resolve o caso comum, o texto livre resolve o
-    // que ela não previu. Sem isso o perito não tinha saída quando o caso
-    // concreto não cabia em nenhuma das opções.
+    // que ela não previu.
     // ------------------------------------------------------------
     const resultado = agente.resultadoPericulosidade
       ? RESULTADO_PERICULOSIDADE[agente.resultadoPericulosidade]
@@ -162,18 +211,65 @@ export function montarApresentacaoAgente(agente: AgenteAvaliado): ApresentacaoAg
     const resultadoTexto = agente.resultadoPericulosidadeTexto?.trim()
     const semEnquadramento =
       !resultadoTexto && agente.resultadoPericulosidade === 'nao_caracterizada'
+    const titulo = agente.nome || 'Risco de periculosidade não informado'
+
+    if (opcoes.conclusiva) {
+      // Sem anexo escolhido o quadro é o "Sem Risco": aí a conclusão precisa
+      // dizer que TODOS os anexos foram percorridos, e não só que nada foi
+      // caracterizado. Com anexo, quem responde é o resultado daquele anexo.
+      const conclusao = resultadoTexto
+        ? { valor: resultadoTexto }
+        : semEnquadramento && !agente.anexoNr16
+          ? { valor: conclusaoSemRiscoNr16(), destaque: 'positivo' as const }
+          : resultado
+            ? { valor: resultado.valor, destaque: resultado.destaque }
+            : undefined
+      // A observação do agente não tinha onde sair na periculosidade: este é
+      // o lugar dela, junto da conclusão que ela comenta.
+      const observacao = agente.observacao?.trim()
+      const corpo = [conclusao?.valor, observacao].filter(Boolean).join('\n\n')
+      // Quando o perito registrou EPIs no agente de periculosidade, este é o
+      // único quadro do laudo em que eles aparecem. No cenário negativo não há
+      // EPI nenhum e a tabela sai com as duas linhas do print.
+      const protecoesAssociadas = resumoProtecoesAssociadas(agente.epis)
+      return {
+        titulo,
+        linhas: [
+          {
+            rotulo: 'Condição / Atividades',
+            valor: [ANALISE_ATIVIDADES_NR16, LAPSO_TEMPORAL_NR16].join('\n'),
+          },
+          ...(corpo
+            ? [{
+                rotulo: 'Resultado técnico / Conclusão',
+                valor: corpo,
+                ...(conclusao?.destaque ? { destaque: conclusao.destaque } : {}),
+              }]
+            : []),
+          ...(protecoesAssociadas
+            ? [{ rotulo: 'Proteções associadas', valor: protecoesAssociadas }]
+            : []),
+        ],
+        protecoes: [],
+      }
+    }
+
     return {
-      titulo: agente.nome || 'Risco de periculosidade não informado',
+      titulo,
       linhas: [
         ...(agente.anexoNr16 ? [{ rotulo: 'Anexo NR-16', valor: labelAnexoNr16(agente.anexoNr16) }] : []),
         { rotulo: 'Natureza', valor: 'Periculosidade' },
-        { rotulo: 'Critério', valor: 'Qualitativo' },
-        ...(semEnquadramento ? [] : [{ rotulo: 'Adicional', valor: '30%' }]),
+        { rotulo: 'Critério', valor: CRITERIO_QUALITATIVO_NR16 },
+        { rotulo: 'Lapso temporal', valor: LAPSO_TEMPORAL_NR16 },
+        { rotulo: 'Adicional Pretendido', valor: '30%' },
         ...(agente.atividadeEnquadrada?.trim()
           ? [{ rotulo: 'Atividade ou operação avaliada', valor: agente.atividadeEnquadrada.trim() }]
           : []),
         ...(agente.areaRisco?.trim()
           ? [{ rotulo: 'Condição ou área de risco', valor: agente.areaRisco.trim() }]
+          : []),
+        ...(agente.analiseAnexos?.trim()
+          ? [{ rotulo: 'Análise dos Anexos', valor: agente.analiseAnexos.trim() }]
           : []),
         ...(agente.detalhesNr16 ?? [])
           .filter((detalhe) => detalhe.valor.trim())
@@ -182,11 +278,6 @@ export function montarApresentacaoAgente(agente: AgenteAvaliado): ApresentacaoAg
           ? [{ rotulo: 'Exposição', valor: exposicaoTexto }]
           : agente.exposicaoPericulosidade
             ? [{ rotulo: 'Exposição', valor: EXPOSICAO_PERICULOSIDADE[agente.exposicaoPericulosidade] }]
-            : []),
-        ...(resultadoTexto
-          ? [{ rotulo: 'Resultado técnico', valor: resultadoTexto }]
-          : resultado
-            ? [{ rotulo: 'Resultado técnico', valor: resultado.valor, destaque: resultado.destaque }]
             : []),
       ],
       protecoes: [],

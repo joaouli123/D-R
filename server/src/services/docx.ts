@@ -42,6 +42,8 @@ import {
   mascaraCpf,
   montarApresentacaoAgente,
   numeradorDeSecoes,
+  quadrosNr16DoItem10,
+  resumoProtecoesAssociadas,
   objetivoAutomaticoDocumento,
   periodoAvaliacaoDocumento,
   horarioDaVistoriaDocumento,
@@ -206,6 +208,31 @@ const blocos = (t?: string | null): Paragraph[] => {
   return partes.flatMap((parte) => linhasEmParagrafos(parte))
 }
 
+/**
+ * Transcrição literária de uma peça do processo. Espelha `<Transcricao>` de
+ * src/components/DocumentoPreview.tsx: aspas na primeira e na última linha,
+ * itálico no meio — a voz da parte não pode se confundir com a do perito.
+ */
+const blocosTranscricao = (t?: string | null): Paragraph[] => {
+  const linhas = (t ?? '').split('\n').map((linha) => linha.trim()).filter(Boolean)
+  return linhas.map((linha, indice) => new Paragraph({
+    alignment: AlignmentType.JUSTIFIED,
+    indent: { firstLine: RECUO_PRIMEIRA_LINHA },
+    spacing: { after: 60, line: 340 },
+    children: [texto(
+      `${indice === 0 ? '“' : ''}${linha}${indice === linhas.length - 1 ? '”' : ''}`,
+      { italico: true },
+    )],
+  }))
+}
+
+/** A folha de onde a transcrição acima foi tirada. */
+const pFonte = (t: string) => new Paragraph({
+  alignment: AlignmentType.LEFT,
+  spacing: { after: 120, line: 340 },
+  children: [texto(t, { tamanho: 18, cor: MARCA.tinta600 })],
+})
+
 const blocosEstruturados = (t?: string | null): Paragraph[] => {
   const partes = emParagrafos(t)
   if (!partes.length) return blocos(t)
@@ -243,13 +270,17 @@ function celula(
     width: opcoes.larguraDxa ? { size: opcoes.larguraDxa, type: WidthType.DXA } : undefined,
     columnSpan: opcoes.columnSpan,
     margins: { top: 60, bottom: 60, left: 120, right: 120 },
-    children: opcoes.paragrafos ?? [
+    // Um parágrafo por linha: o quadro conclusivo da NR-16 lista os anexos
+    // observados dentro de uma célula só, e um `\n` cru dentro do TextRun
+    // sairia como espaço simples no Word — a lista viraria texto corrido, só
+    // no DOCX, enquanto PDF e tela mostravam item a item.
+    children: opcoes.paragrafos ?? conteudo.split('\n').map((linha) =>
       new Paragraph({
         keepNext: opcoes.manterComProxima,
         spacing: { after: 0 },
-        children: [texto(conteudo, { negrito: opcoes.cabecalho, tamanho: 20 })],
+        children: [texto(linha, { negrito: opcoes.cabecalho, tamanho: 20 })],
       }),
-    ],
+    ),
   })
 }
 
@@ -757,6 +788,13 @@ async function docParecer(
     const cabecalho = num.sub('NR-16 — Avaliação das Atividades e Operações Perigosas')
     const numero = cabecalho.split('. ')[0]
     filhos.push(h3(cabecalho), h4(`${numero}.1. Critério de Avaliação`), ...blocos(t.criterioAvaliacaoPericulosidade))
+    if (t.riscoAlegadoPericulosidade?.trim()) {
+      filhos.push(
+        h4(`${numero}.2. Risco de Periculosidade Alegado pela Parte Reclamante`),
+        ...blocosTranscricao(t.riscoAlegadoPericulosidade),
+        ...(t.fonteRiscoAlegado?.trim() ? [pFonte(`Fonte: ${t.fonteRiscoAlegado.trim()}`)] : []),
+      )
+    }
     adicionarAgentes(agentesNr16)
   }
   const temDivergencias = Boolean(
@@ -826,14 +864,7 @@ async function docParecer(
     lista.forEach((agente, indice) => {
       const apresentacao = montarApresentacaoAgente(agente)
       const identificado = agente.identificadoNaAtividade !== false
-      const protecoes = (agente.epis ?? []).map((epi, indiceEpi) => {
-        const cas = [
-          epi.caUnico?.trim() ? `CA ${epi.caUnico.trim()}` : '',
-          epi.caPecaFacial?.trim() ? `CA peça facial ${epi.caPecaFacial.trim()}` : '',
-          epi.caFiltroCartucho?.trim() ? `CA cartucho/filtro ${epi.caFiltroCartucho.trim()}` : '',
-        ].filter(Boolean).join(' / ')
-        return `Proteção ${indiceEpi + 1}: ${epi.modelo}${cas ? ` — ${cas}` : ''}`
-      }).join('\n')
+      const protecoes = resumoProtecoesAssociadas(agente.epis)
       filhos.push(
         h4(`${numeroAnalise}.${grupoAnalise}.${indice + 1}. ${apresentacao.titulo}`),
         ...(identificado ? [tabela([
@@ -853,8 +884,31 @@ async function docParecer(
     })
   }
 
+  /**
+   * O grupo da NR-16 não é uma lista de agentes: é a lista dos sete anexos,
+   * sempre inteira, com o quadro conclusivo em cada um que foi avaliado.
+   * Espelha `quadrosNr16DeAnalise` da prévia e `montarGrupoNr16` do PDF.
+   */
+  const adicionarQuadrosNr16 = (lista: typeof agentes) => {
+    if (!lista.length) return
+    grupoAnalise += 1
+    const prefixo = `${numeroAnalise}.${grupoAnalise}`
+    filhos.push(h3(`${prefixo}. NR-16 — Avaliação das Atividades e Operações Perigosas`))
+    for (const quadro of quadrosNr16DoItem10(lista, prefixo)) {
+      const apresentacao = quadro.agente && quadro.agente.identificadoNaAtividade !== false
+        ? montarApresentacaoAgente(quadro.agente, { conclusiva: true })
+        : null
+      filhos.push(
+        h4(`${quadro.numero}. ${quadro.titulo}`),
+        ...(apresentacao
+          ? [tabela(apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor)))]
+          : []),
+      )
+    }
+  }
+
   if (temInsalubridade) adicionarQuadrosDeAnalise(agentesNr15, 'NR-15 — Avaliação da Exposição Ocupacional')
-  if (temPericulosidade) adicionarQuadrosDeAnalise(agentesNr16, 'NR-16 — Avaliação das Atividades e Operações Perigosas')
+  if (temPericulosidade) adicionarQuadrosNr16(agentesNr16)
   if (temInsalubridade) filhos.push(h2(num.secao('NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr15))
   if (temPericulosidade) filhos.push(h2(num.secao('NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr16))
   if (t.respostasQuesitos?.trim()) filhos.push(h2(num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')), ...blocos(t.respostasQuesitos))

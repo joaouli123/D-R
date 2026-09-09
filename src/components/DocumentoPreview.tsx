@@ -7,11 +7,12 @@ import {
   qualificacaoParticipante,
   TEXTO_AUSENCIA_RECLAMANTE,
 } from '@/lib/participantes'
-import { montarApresentacaoAgente } from '@/lib/apresentacaoAgente'
+import { montarApresentacaoAgente, resumoProtecoesAssociadas } from '@/lib/apresentacaoAgente'
 import { agenteExibeConclusao } from '@/lib/conclusoesAgentes'
 import { intervaloDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
 import { dadosAssinatura } from '@/lib/assinaturaDocumento'
 import { objetivoPadraoDaPericia } from '@/content/textosPadrao'
+import { quadrosNr16DoItem10 } from '@/content/anexosNr16'
 import { horarioDaVistoria } from '@/lib/vistoria'
 import { atividadesDoPeriodo } from '@/lib/periodos'
 import { emParagrafos, linhasDoBloco } from '@/lib/listasDocumento'
@@ -54,6 +55,46 @@ function Paragrafos({ texto }: { texto?: string | null }) {
       ))}
     </>
   )
+}
+
+/**
+ * Transcrição literária de uma peça do processo — hoje, o risco que a parte
+ * Reclamante alegou na inicial.
+ *
+ * Vai entre aspas e em itálico porque não é texto do perito: o laudo precisa
+ * registrar o que foi alegado antes de examinar se procede, e o leitor tem de
+ * distinguir as duas vozes sem depender do contexto.
+ */
+function Transcricao({ texto }: { texto?: string | null }) {
+  const linhas = emParagrafos(texto)
+    .flatMap((parte) => parte.split('\n'))
+    .map((linha) => linha.trim())
+    .filter(Boolean)
+  if (!linhas.length) return null
+  return (
+    <>
+      {linhas.map((linha, indice) => (
+        <p key={indice} className="transcricao">
+          {indice === 0 ? '\u201c' : ''}{linha}{indice === linhas.length - 1 ? '\u201d' : ''}
+        </p>
+      ))}
+    </>
+  )
+}
+
+/**
+ * Valor de célula que pode ter mais de uma linha.
+ *
+ * O quadro conclusivo da NR-16 traz a lista dos anexos observados dentro de
+ * uma célula só. Enquanto isto era `{linha.valor}` puro, o `\n` virava espaço e
+ * a lista saía como parágrafo corrido — na tela, note-se, enquanto o PDF (que
+ * já troca `\n` por `<br>`) saía certo. Divergência entre o que o perito
+ * revisa e o que ele assina é exatamente o que não pode acontecer.
+ */
+function valorDeCelula(valor: string) {
+  const linhas = valor.split('\n')
+  if (linhas.length === 1) return valor
+  return linhas.map((linha, indice) => <div key={indice}>{linha || '\u00a0'}</div>)
 }
 
 function ConteudoEstruturado({ texto }: { texto?: string | null }) {
@@ -196,7 +237,10 @@ export function DocumentoPreview({
                 <thead><tr><th>Propriedade</th><th>Informação</th></tr></thead>
                 <tbody>
                   {apresentacao.linhas.map((linha) => (
-                    <tr key={linha.rotulo}><th>{linha.rotulo}</th><td>{linha.valor}</td></tr>
+                    <tr key={linha.rotulo}>
+                      <th>{linha.rotulo}</th>
+                      <td className={linha.destaque ? `resultado-${linha.destaque}` : ''}>{valorDeCelula(linha.valor)}</td>
+                    </tr>
                   ))}
                 </tbody>
               </table>}
@@ -218,14 +262,7 @@ export function DocumentoPreview({
         {agentes.map((agente, indice) => {
           const apresentacao = montarApresentacaoAgente(agente)
           const identificado = agente.identificadoNaAtividade !== false
-          const protecoesAssociadas = (agente.epis ?? []).map((epi, indiceEpi) => {
-            const cas = [
-              epi.caUnico?.trim() ? `CA ${epi.caUnico.trim()}` : '',
-              epi.caPecaFacial?.trim() ? `CA peça facial ${epi.caPecaFacial.trim()}` : '',
-              epi.caFiltroCartucho?.trim() ? `CA cartucho/filtro ${epi.caFiltroCartucho.trim()}` : '',
-            ].filter(Boolean).join(' / ')
-            return `Proteção ${indiceEpi + 1}: ${epi.modelo}${cas ? ` — ${cas}` : ''}`
-          })
+          const protecoesAssociadas = resumoProtecoesAssociadas(agente.epis)
 
           return (
             <section key={`analise-${agente.id}`} className="agente-bloco">
@@ -234,12 +271,15 @@ export function DocumentoPreview({
                 <thead><tr><th>Propriedade</th><th>Informação</th></tr></thead>
                 <tbody>
                   {apresentacao.linhas.map((linha) => (
-                    <tr key={linha.rotulo}><th>{linha.rotulo}</th><td>{linha.valor}</td></tr>
+                    <tr key={linha.rotulo}>
+                      <th>{linha.rotulo}</th>
+                      <td className={linha.destaque ? `resultado-${linha.destaque}` : ''}>{valorDeCelula(linha.valor)}</td>
+                    </tr>
                   ))}
-                  {identificado && protecoesAssociadas.length > 0 && (
+                  {identificado && protecoesAssociadas && (
                     <tr>
                       <th>Proteções associadas</th>
-                      <td>{protecoesAssociadas.map((linha) => <div key={linha}>{linha}</div>)}</td>
+                      <td>{valorDeCelula(protecoesAssociadas)}</td>
                     </tr>
                   )}
                 </tbody>
@@ -249,6 +289,41 @@ export function DocumentoPreview({
           )
         })}
       </div>
+    </section>
+  ) : null
+
+  /**
+   * Item 10 da NR-16: os sete anexos, na ordem deles, e o quadro de conclusão
+   * em cada um que foi efetivamente avaliado.
+   *
+   * Diferente do item 7 (que levanta) e do quadro da NR-15 (que descreve): a
+   * tabela daqui tem duas linhas — o que foi examinado e a que se concluiu.
+   */
+  const quadrosNr16DeAnalise = (prefixo: string | null) => prefixo && agentesNr16.length ? (
+    <section>
+      <h3>{prefixo}. NR-16 — Avaliação das Atividades e Operações Perigosas</h3>
+      {quadrosNr16DoItem10(agentesNr16, prefixo).map((quadro, indice) => {
+        const apresentacao = quadro.agente && quadro.agente.identificadoNaAtividade !== false
+          ? montarApresentacaoAgente(quadro.agente, { conclusiva: true })
+          : null
+        const chave = `nr16-${quadro.numero}-${indice}`
+        if (!apresentacao) return <h4 key={chave}>{quadro.numero}. {quadro.titulo}</h4>
+        return (
+          <section key={chave} className="agente-bloco">
+            <h4>{quadro.numero}. {quadro.titulo}</h4>
+            <table className="agente-propriedades">
+              <tbody>
+                {apresentacao.linhas.map((linha) => (
+                  <tr key={linha.rotulo}>
+                    <th>{linha.rotulo}</th>
+                    <td className={linha.destaque ? `resultado-${linha.destaque}` : ''}>{valorDeCelula(linha.valor)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )
+      })}
     </section>
   ) : null
 
@@ -444,6 +519,13 @@ export function DocumentoPreview({
         <h3>{numeroAvaliacaoNr16}. NR-16 — Avaliação das Atividades e Operações Perigosas</h3>
         <h4>{numeroAvaliacaoNr16}.1. Critério de Avaliação</h4>
         <Paragrafos texto={t.criterioAvaliacaoPericulosidade} />
+        {t.riscoAlegadoPericulosidade?.trim() && <>
+          <h4>{numeroAvaliacaoNr16}.2. Risco de Periculosidade Alegado pela Parte Reclamante</h4>
+          <Transcricao texto={t.riscoAlegadoPericulosidade} />
+          {t.fonteRiscoAlegado?.trim() && (
+            <p className="no-indent fonte-transcricao">Fonte: {t.fonteRiscoAlegado.trim()}</p>
+          )}
+        </>}
         {agentesSemProtecoes(agentesNr16)}
       </>}
       {numeroDivergencias && (
@@ -484,7 +566,7 @@ export function DocumentoPreview({
       <h2>10. {pericia.modalidade === 'insalubridade' ? 'Análise Técnica dos Agentes Identificados' : pericia.modalidade === 'periculosidade' ? 'Análise Técnica das Atividades e Riscos Identificados' : 'Análise Técnica dos Agentes, Atividades e Riscos Identificados'}</h2>
       <Paragrafos texto={t.analiseTecnica} />
       {quadrosDeAnalise(agentesNr15, numeroAnaliseNr15, 'NR-15 — Avaliação da Exposição Ocupacional')}
-      {quadrosDeAnalise(agentesNr16, numeroAnaliseNr16, 'NR-16 — Avaliação das Atividades e Operações Perigosas')}
+      {quadrosNr16DeAnalise(numeroAnaliseNr16)}
 
       {numeroConclusaoNr15 && <><h2>{numeroConclusaoNr15}. NR-15 — Conclusão e Fundamentação</h2><Paragrafos texto={conclusaoNr15} /></>}
       {numeroConclusaoNr16 && <><h2>{numeroConclusaoNr16}. NR-16 — Conclusão e Fundamentação</h2><Paragrafos texto={conclusaoNr16} /></>}

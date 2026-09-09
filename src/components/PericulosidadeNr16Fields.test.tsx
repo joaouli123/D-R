@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { PericulosidadeNr16Fields } from './PericulosidadeNr16Fields'
-import { NOME_PADRAO_SEM_ENQUADRAMENTO, anexoNr16PorId } from '@/content/anexosNr16'
+import { ANALISE_ANEXOS_NR16, NOME_PADRAO_SEM_ENQUADRAMENTO, anexoNr16PorId } from '@/content/anexosNr16'
 import type { AgenteAvaliado } from '@/types'
 
 afterEach(cleanup)
@@ -92,7 +92,7 @@ describe('PericulosidadeNr16Fields', () => {
     expect(atividades).toContain('Transporte de vasilhames com inflamável líquido em quantidade total igual ou superior a 200 litros')
   })
 
-  it('aplica os quatro textos padrão de ausência de enquadramento somente por ação do usuário', async () => {
+  it('aplica os textos padrão de ausência de enquadramento somente por ação do usuário', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
     render(<PericulosidadeNr16Fields
@@ -102,12 +102,33 @@ describe('PericulosidadeNr16Fields', () => {
 
     await user.click(screen.getByRole('button', { name: 'Aplicar texto padrão sem enquadramento' }))
 
+    // O quadro devolvido pelo perito não tem linha de área de risco: no
+    // cenário negativo não há área nenhuma a delimitar. O que faltava era
+    // dizer contra o que as atividades foram confrontadas — daí a análise
+    // dos anexos no lugar dela.
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
-      atividadeEnquadrada: 'Avaliada a atividade efetivamente desempenhada pelo trabalhador.',
-      areaRisco: 'Não identificada condição ou área de risco enquadrável na NR-16 e seus anexos.',
+      atividadeEnquadrada: 'Avaliada a atividade efetivamente desempenhada pela parte Reclamante.',
+      analiseAnexos: ANALISE_ANEXOS_NR16,
       exposicaoPericulosidade: 'nao_constatada',
       resultadoPericulosidade: 'nao_caracterizada',
     }))
+    expect(onChange).toHaveBeenLastCalledWith(expect.not.objectContaining({
+      areaRisco: expect.anything(),
+    }))
+  })
+
+  it('dá ao perito onde escrever a análise dos anexos e a observação do quadro', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<PericulosidadeNr16Fields avaliacao={avaliacao} onChange={onChange} />)
+
+    await user.type(screen.getByLabelText('Análise dos Anexos'), 'x')
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ analiseAnexos: 'x' }))
+
+    // A observação fecha o quadro do item 10; antes a periculosidade não
+    // tinha campo nenhum para ela, e o texto não tinha como chegar ao laudo.
+    await user.type(screen.getByLabelText('Observações complementares'), 'y')
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ observacao: 'y' }))
   })
 
   // ============================================================

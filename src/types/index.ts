@@ -221,6 +221,15 @@ export interface AgenteAvaliado {
   fonteRuido?: FonteRuido
   /** Condição ou delimitação da área de risco examinada na NR-16. */
   areaRisco?: string
+  /**
+   * O que o exame fez com os anexos da NR-16.
+   *
+   * Separado de `areaRisco` de propósito: um diz o que foi encontrado no
+   * local, o outro diz contra o que aquilo foi confrontado. É esta linha que
+   * sustenta a conclusão negativa — sem ela o laudo nega o enquadramento sem
+   * dizer o que examinou.
+   */
+  analiseAnexos?: string
   /** Frequência com que o trabalhador se expõe à condição perigosa. */
   exposicaoPericulosidade?: ExposicaoPericulosidade
   /** Resultado da avaliação do enquadramento na NR-16. */
@@ -274,6 +283,16 @@ export interface PreenchimentoTecnico {
   informacoesReclamada?: string
   consideracoesDivergencias?: string
   criterioAvaliacaoPericulosidade?: string
+  /**
+   * Item 7.3.2 — o risco que a parte Reclamante alegou, nas palavras dela.
+   *
+   * Transcrição da inicial, não texto do perito: o laudo precisa registrar o
+   * que foi alegado antes de examinar se procede. Por isso vem com a fonte
+   * ao lado, e por isso o sistema não sugere redação nenhuma aqui.
+   */
+  riscoAlegadoPericulosidade?: string
+  /** De onde saiu a transcrição acima. Ex.: "Inicial do processo — Fls.: 8". */
+  fonteRiscoAlegado?: string
   notaTecnicaEpis?: string
   protecoesColetivas?: string
   analiseTecnica: string

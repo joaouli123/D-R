@@ -19,10 +19,11 @@ import type {
 // AVALIAÇÃO DA NR-16 — os dois cenários que o perito descreveu
 //
 // Cenário 1 (negativo, "quando não tem nada"): ele não escolhe anexo, clica
-// em "Aplicar texto padrão sem enquadramento" e a tela preenche os quatro
-// textos de praxe. Daí só ajusta a redação se quiser. No documento a tabela
-// sai enxuta — sem a linha do adicional, que numa avaliação negativa só
-// confundia quem lê.
+// em "Aplicar texto padrão sem enquadramento" e a tela preenche os textos de
+// praxe. Daí só ajusta a redação se quiser. No item 7.3 a tabela sai enxuta:
+// o levantamento, sem conclusão — inclusive o adicional pretendido, que é o
+// que a parte pede, e não o que a perícia reconhece; por isso sai nos dois
+// cenários. A conclusão é do item 10.
 //
 // Cenário 2 (com agente): escolhido o anexo, a tela CARREGA os pontos que
 // aquele risco manda examinar, cada um com as opções típicas (inflamáveis
@@ -96,9 +97,6 @@ export function PericulosidadeNr16Fields({ avaliacao, onChange }: Periculosidade
   const campos = camposDoAnexoNr16(avaliacao.anexoNr16)
   const detalhes = new Map((avaliacao.detalhesNr16 ?? []).map((detalhe) => [detalhe.id, detalhe.valor]))
   const listaId = `atividades-${avaliacao.id}`
-  const semEnquadramento = avaliacao.resultadoPericulosidade === 'nao_caracterizada'
-    && !avaliacao.resultadoPericulosidadeTexto?.trim()
-
   return (
     <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3">
       <div className="grid gap-3 md:grid-cols-[minmax(260px,1.5fr)_minmax(180px,0.8fr)_minmax(120px,0.45fr)]">
@@ -120,13 +118,13 @@ export function PericulosidadeNr16Fields({ avaliacao, onChange }: Periculosidade
           placeholder={anexo?.risco ?? 'Descreva o risco examinado'}
           onChange={(evento) => onChange({ ...avaliacao, nome: evento.target.value })}
         />
+        {/* O que a parte pretende, não o que a perícia reconhece — por isso
+            sai na tabela mesmo na avaliação negativa. */}
         <Input
-          label="Adicional"
+          label="Adicional Pretendido"
           value="30%"
           readOnly
-          hint={semEnquadramento
-            ? 'Sem enquadramento, esta linha não sai na tabela.'
-            : 'Percentual fixo da NR-16.'}
+          hint="Percentual fixo da NR-16."
         />
       </div>
 
@@ -149,6 +147,20 @@ export function PericulosidadeNr16Fields({ avaliacao, onChange }: Periculosidade
           value={avaliacao.areaRisco ?? ''}
           placeholder="Descreva a condição encontrada e a delimitação da área de risco"
           onChange={(evento) => onChange({ ...avaliacao, areaRisco: evento.target.value })}
+        />
+      </div>
+
+      {/* O que o exame fez com os anexos. Sem esta linha, a tabela nega o
+          enquadramento sem dizer contra o que confrontou as atividades — e
+          era justamente o que faltava no quadro que o perito devolveu. */}
+      <div className="mt-3">
+        <Textarea
+          label="Análise dos Anexos"
+          rows={3}
+          value={avaliacao.analiseAnexos ?? ''}
+          placeholder="Descreva o exame dos anexos da NR-16 diante das atividades e condições encontradas"
+          hint="Sai como linha da tabela do item 7.3. O botão abaixo preenche o texto padrão."
+          onChange={(evento) => onChange({ ...avaliacao, analiseAnexos: evento.target.value })}
         />
       </div>
 
@@ -239,6 +251,19 @@ export function PericulosidadeNr16Fields({ avaliacao, onChange }: Periculosidade
             const { resultadoPericulosidadeTexto: _vazio, ...semTexto } = avaliacao
             onChange(semTexto)
           }}
+        />
+      </div>
+
+      {/* Vai para o quadro do item 10, logo abaixo da conclusão, separado por
+          uma linha em branco. É onde cabe a ressalva do caso concreto sem
+          alterar a redação da conclusão em si. */}
+      <div className="mt-3">
+        <Textarea
+          label="Observações complementares"
+          rows={3}
+          value={avaliacao.observacao ?? ''}
+          placeholder="Opcional. Complementa a conclusão no quadro do item 10."
+          onChange={(evento) => onChange({ ...avaliacao, observacao: evento.target.value })}
         />
       </div>
 

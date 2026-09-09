@@ -72,6 +72,7 @@ export const agenteSchema = z.object({
   origemMedicao: z.enum(['perito', 'empresa', 'nao_informado']).optional(),
   fonteRuido: z.enum(['maquinas', 'ruido_fundo', 'administrativa']).optional(),
   areaRisco: texto.optional(),
+  analiseAnexos: texto.optional(),
   exposicaoPericulosidade: z.enum(['permanente', 'intermitente', 'eventual', 'nao_constatada']).optional(),
   resultadoPericulosidade: z.enum(['caracterizada', 'nao_caracterizada', 'prejudicada']).optional(),
   // A redação própria e os pontos de verificação do anexo entram como
@@ -111,6 +112,8 @@ export const tecnicoSchema = z.object({
   informacoesReclamada: texto,
   consideracoesDivergencias: texto,
   criterioAvaliacaoPericulosidade: texto,
+  riscoAlegadoPericulosidade: texto,
+  fonteRiscoAlegado: texto,
   notaTecnicaEpis: texto,
   protecoesColetivas: texto,
   analiseTecnica: texto,

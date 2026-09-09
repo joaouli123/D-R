@@ -275,6 +275,72 @@ describe('DocumentoPreview', () => {
     expect(html).not.toContain('Ruído contínuo herdado')
     expect(html).not.toContain('Plug 3M 1100')
   })
+  it('fecha o item 10 com o quadro Sem Risco e a lista dos anexos em linhas', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={{
+          ...pericia,
+          modalidade: 'periculosidade',
+          tecnico: {
+            ...pericia.tecnico,
+            agentes: [{
+              id: 'nr16-sem-risco', nome: 'Sem risco', tipo: 'periculosidade',
+              criterio: 'qualitativo', resultadoPericulosidade: 'nao_caracterizada',
+            }] as never,
+          },
+        }}
+        empresas={[]}
+        titulo="Parecer de teste"
+      />,
+    )
+
+    expect(html).toContain('10.1.8. Sem Risco – Avaliação, Resultado e Conclusão')
+    expect(html).toContain('Condição / Atividades')
+    expect(html).toContain('Resultado técnico / Conclusão')
+    // Cada anexo em sua linha: a célula quebra o texto em <div>, não
+    // despeja tudo num parágrafo só.
+    expect(html).toContain('<div>• Anexo 1 – Explosivos;</div>')
+    expect(html).toContain('<div>• Anexo (*) – Radiações ionizantes ou substâncias radioativas;</div>')
+  })
+
+  it('transcreve no 7.3.2 o risco alegado pela parte, com a folha da inicial', () => {
+    // O 7.3.2 é transcrição: o que a parte alegou na inicial, palavra por
+    // palavra, e a folha de onde saiu. Vem depois do critério (7.3.1) e antes
+    // dos quadros — e só sai quando o perito escreveu alguma coisa.
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={{
+          ...pericia,
+          tecnico: {
+            ...pericia.tecnico,
+            criterioAvaliacaoPericulosidade: 'Critério qualitativo.',
+            riscoAlegadoPericulosidade: 'Sustenta a parte Reclamante que laborava no abastecimento de veículos.',
+            fonteRiscoAlegado: 'Inicial do processo - Fls.: 8',
+          },
+        }}
+        empresas={[]}
+        titulo="Parecer de teste"
+      />,
+    )
+
+    const posicoes = [
+      '7.3.1. Critério de Avaliação',
+      '7.3.2. Risco de Periculosidade Alegado pela Parte Reclamante',
+      'Sustenta a parte Reclamante que laborava no abastecimento de veículos.',
+      'Fonte: Inicial do processo - Fls.: 8',
+    ].map((trecho) => html.indexOf(trecho))
+    expect(posicoes.every((posicao) => posicao >= 0)).toBe(true)
+    expect(posicoes).toEqual([...posicoes].sort((a, b) => a - b))
+  })
+
+  it('não abre o 7.3.2 quando não há alegação transcrita', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={pericia} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    expect(html).not.toContain('Risco de Periculosidade Alegado pela Parte Reclamante')
+  })
+
   it('renderiza snapshots estruturados de medição e EPI sem reescrever dados históricos', () => {
     const html = renderToStaticMarkup(
       <DocumentoPreview pericia={pericia} empresas={[]} titulo="Parecer de teste" />,
