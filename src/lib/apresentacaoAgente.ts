@@ -44,6 +44,60 @@ export interface OpcoesApresentacaoAgente {
   conclusiva?: boolean
 }
 
+/**
+ * Agente pronto para impressão: o que está gravado, mais o rótulo da função.
+ *
+ * `funcaoPosto` NÃO é campo do agente. É derivado do período por
+ * `comFuncaoPosto`, uma vez por renderização. Gravar o rótulo faria o laudo
+ * mentir no dia em que o perito renomeasse a função no item 7.1 — e o laudo
+ * é peça assinada.
+ */
+export type AgenteApresentavel = AgenteAvaliado & { funcaoPosto?: string }
+
+/** O mínimo que `rotuloFuncaoPosto` precisa de um período do item 7.1. */
+export interface PeriodoDeAgente {
+  id: string
+  funcao?: string
+  setor?: string
+}
+
+/**
+ * "Operador de Prensa — Estamparia", ou só o que houver dos dois.
+ *
+ * Espelha server/src/services/documento-comum.ts — mudou aqui, muda lá.
+ */
+export function rotuloFuncaoPosto(periodo: PeriodoDeAgente | undefined): string {
+  const funcao = periodo?.funcao?.trim() ?? ''
+  const setor = periodo?.setor?.trim() ?? ''
+  if (funcao && setor) return `${funcao} — ${setor}`
+  return funcao || setor
+}
+
+/**
+ * Resolve o rótulo da função de cada agente, na entrada do renderizador.
+ *
+ * Um agente por função é o pedido do perito: quando o trabalhador teve dois
+ * postos no lapso avaliado, o mesmo ruído é lançado duas vezes, com medição
+ * e EPI próprios. Sem esta linha o laudo imprimia dois quadros de título
+ * idêntico e o leitor não tinha como saber qual era qual.
+ *
+ * Genérica de propósito: o agente atravessa `quadrosNr16DoItem10` e sai do
+ * outro lado ainda tipado. Agente sem vínculo — e toda perícia antiga é
+ * assim — sai sem a linha, e o documento fica igual ao que já era.
+ *
+ * Espelha server/src/services/documento-comum.ts — mudou aqui, muda lá.
+ */
+export function comFuncaoPosto<A extends { periodoId?: string }>(
+  agentes: A[],
+  periodos: PeriodoDeAgente[],
+): (A & { funcaoPosto?: string })[] {
+  return agentes.map((agente) => ({
+    ...agente,
+    funcaoPosto:
+      rotuloFuncaoPosto(periodos.find((periodo) => periodo.id === agente.periodoId)) || undefined,
+  }))
+}
+
 const CRITERIO: Record<string, string> = {
   qualitativo: 'Qualitativo', quantitativo: 'Quantitativo', nao_aplicavel: 'Não aplicável',
 }
@@ -181,7 +235,7 @@ function linhasProtecao(
 }
 
 export function montarApresentacaoAgente(
-  agente: AgenteAvaliado,
+  agente: AgenteApresentavel,
   opcoes: OpcoesApresentacaoAgente = {},
 ): ApresentacaoAgente {
   if (agente.tipo === 'periculosidade') {
@@ -242,6 +296,7 @@ export function montarApresentacaoAgente(
       return {
         titulo,
         linhas: [
+          ...(agente.funcaoPosto ? [{ rotulo: 'Função / Posto', valor: agente.funcaoPosto }] : []),
           {
             rotulo: 'Condição / Atividades',
             valor: [ANALISE_ATIVIDADES_NR16, LAPSO_TEMPORAL_NR16].join('\n'),
@@ -264,6 +319,7 @@ export function montarApresentacaoAgente(
     return {
       titulo,
       linhas: [
+        ...(agente.funcaoPosto ? [{ rotulo: 'Função / Posto', valor: agente.funcaoPosto }] : []),
         ...(agente.anexoNr16 ? [{ rotulo: 'Anexo NR-16', valor: labelAnexoNr16(agente.anexoNr16) }] : []),
         { rotulo: 'Natureza', valor: 'Periculosidade' },
         { rotulo: 'Critério', valor: CRITERIO_QUALITATIVO_NR16 },
@@ -295,6 +351,7 @@ export function montarApresentacaoAgente(
   const somenteRegistrosEmpresa =
     tipoMedicaoEmpresaDe(agente) === 'registros_processo' && !medicaoAdotada(agente).valor
   const linhas: LinhaAgente[] = [
+    ...(agente.funcaoPosto ? [{ rotulo: 'Função / Posto', valor: agente.funcaoPosto }] : []),
     ...(agente.anexoNr15 ? [{ rotulo: 'Anexo NR-15', valor: labelAnexoNr15(agente.anexoNr15) }] : []),
     { rotulo: 'Natureza', valor: NATUREZA[agente.tipo] ?? agente.tipo },
     { rotulo: 'Critério', valor: CRITERIO[agente.criterio] ?? agente.criterio },

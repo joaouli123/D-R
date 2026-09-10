@@ -260,11 +260,21 @@ export function Checkbox({
  * 2. O corpo continua MONTADO quando fechado; `hidden` só o esconde. Recolher
  *    uma avaliação não pode descartar rascunho de texto, aba aberta do
  *    seletor de EPIs nem resultado de busca de CA.
+ *
+ * 3. Quem passa `aberto` assume o controle e `abertoInicial` deixa de valer.
+ *    É o que o perito pediu depois: "insere o agente e a tela some; aí abre
+ *    de novo para inserir um novo". Isso é sanfona — só um cartão aberto por
+ *    vez —, e sanfona não cabe em estado interno, porque cada cartão
+ *    precisaria fechar por causa de outro. A decisão 1 continua de pé para
+ *    quem não controla: aqui quem fecha é um clique, nunca uma prop que
+ *    mudou de valor enquanto o perito digitava.
  */
 export function SecaoColapsavel({
   titulo,
   resumo,
   abertoInicial = true,
+  aberto: abertoControlado,
+  onAbertoChange,
   acoes,
   className,
   children,
@@ -272,11 +282,20 @@ export function SecaoColapsavel({
   titulo: React.ReactNode
   resumo?: React.ReactNode
   abertoInicial?: boolean
+  /** Modo controlado. Presente, manda; `abertoInicial` passa a ser ignorado. */
+  aberto?: boolean
+  onAbertoChange?: (aberto: boolean) => void
   acoes?: React.ReactNode
   className?: string
   children: React.ReactNode
 }) {
-  const [aberto, setAberto] = useState(abertoInicial)
+  const [abertoInterno, setAbertoInterno] = useState(abertoInicial)
+  const controlado = abertoControlado !== undefined
+  const aberto = controlado ? abertoControlado : abertoInterno
+  const alternar = () => {
+    if (!controlado) setAbertoInterno((v) => !v)
+    onAbertoChange?.(!aberto)
+  }
   const corpoId = React.useId()
 
   return (
@@ -284,7 +303,7 @@ export function SecaoColapsavel({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <button
           type="button"
-          onClick={() => setAberto((v) => !v)}
+          onClick={alternar}
           aria-expanded={aberto}
           aria-controls={corpoId}
           className="group -ml-1 flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-ink-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"

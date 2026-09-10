@@ -196,6 +196,23 @@ export interface AgenteAvaliado {
   id: UUID
   nome: string
   tipo: 'quimico' | 'fisico' | 'biologico' | 'periculosidade'
+  /**
+   * Período de trabalho — função e posto — em que este agente foi avaliado.
+   *
+   * O mesmo agente entra mais de uma vez na mesma perícia quando o
+   * trabalhador teve duas funções no lapso examinado: ruído na prensa e
+   * ruído na expedição são dois lançamentos, cada um com sua medição, seu
+   * EPI e sua conclusão. É este campo que os separa.
+   *
+   * Guarda o id do período, não o rótulo. Se o perito renomear a função no
+   * item 7.1, o laudo tem de acompanhar — é documento assinado, e um rótulo
+   * copiado envelheceria calado. Quem resolve o texto na hora de imprimir é
+   * `comFuncaoPosto`, em src/lib/apresentacaoAgente.ts.
+   *
+   * Opcional, e continua sendo: perícia de função única não escolhe nada, e
+   * registro antigo nenhum tem o campo.
+   */
+  periodoId?: string
   /** Ausente nos registros antigos equivale a true. */
   identificadoNaAtividade?: boolean
   cas?: string

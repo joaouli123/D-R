@@ -1,13 +1,22 @@
 import { describe, expect, it } from 'vitest'
 
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import {
   ANALISE_ATIVIDADES_NR16,
   LAPSO_TEMPORAL_NR16,
+  comFuncaoPosto,
   conclusaoSemRiscoNr16,
   montarApresentacaoAgente,
   quadrosNr16DoItem10,
+  rotuloFuncaoPosto,
 } from './documento-comum'
-import { montarApresentacaoAgente as montarNoFront } from '../../../src/lib/apresentacaoAgente'
+import {
+  comFuncaoPosto as comFuncaoPostoNoFront,
+  montarApresentacaoAgente as montarNoFront,
+  rotuloFuncaoPosto as rotuloNoFront,
+} from '../../../src/lib/apresentacaoAgente'
 import {
   PADRAO_NR16_SEM_ENQUADRAMENTO,
   quadrosNr16DoItem10 as quadrosNoFront,
@@ -27,7 +36,7 @@ import type { AgenteAvaliado } from '../../../src/types'
 // Mudou de um lado, tem de mudar do outro.
 // ============================================================
 
-const CASOS: { nome: string; agente: AgenteAvaliado }[] = [
+const CASOS: { nome: string; agente: AgenteAvaliado & { funcaoPosto?: string } }[] = [
   {
     nome: 'cenário negativo, sem anexo escolhido',
     agente: {
@@ -107,6 +116,23 @@ const CASOS: { nome: string; agente: AgenteAvaliado }[] = [
       nome: '',
       tipo: 'periculosidade',
       criterio: 'qualitativo',
+    },
+  },
+  {
+    // O mesmo risco lançado numa das duas funções do período examinado. O
+    // rótulo chega resolvido pelos renderizadores; aqui ele só tem de sair
+    // igual nos dois quadros e nas duas cópias.
+    nome: 'agente de uma função entre duas do período',
+    agente: {
+      id: 'nr16-por-funcao',
+      nome: 'Energia elétrica',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      anexoNr16: 'ANEXO_04',
+      periodoId: 'per-manutencao',
+      funcaoPosto: 'Eletricista de manutenção — Subestação',
+      exposicaoPericulosidade: 'permanente',
+      resultadoPericulosidade: 'caracterizada',
     },
   },
 ]
@@ -300,6 +326,51 @@ describe('tabela da NR-16 nos dois quadros', () => {
 
     expect(quadrosNr16DoItem10([inflamaveis], '10.2')[0]?.titulo)
       .toBe('Inflamáveis – Avaliação, Resultado e Conclusão')
+  })
+
+  it('a função avaliada abre os dois quadros, nas duas cópias', () => {
+    const agente = CASOS[CASOS.length - 1]!.agente
+    const primeiraLinha = { rotulo: 'Função / Posto', valor: 'Eletricista de manutenção — Subestação' }
+
+    expect(montarApresentacaoAgente(agente).linhas[0]).toEqual(primeiraLinha)
+    expect(montarNoFront(agente).linhas[0]).toEqual(primeiraLinha)
+    expect(montarApresentacaoAgente(agente, { conclusiva: true }).linhas[0]).toEqual(primeiraLinha)
+    expect(montarNoFront(agente, { conclusiva: true }).linhas[0]).toEqual(primeiraLinha)
+  })
+
+  it('as duas cópias resolvem função e posto do mesmo jeito', () => {
+    const periodos = [
+      { id: 'per-prensa', funcao: 'Prensista', setor: 'Estamparia' },
+      { id: 'per-expedicao', funcao: 'Auxiliar de expedição' },
+      { id: 'per-so-setor', funcao: '', setor: 'Almoxarifado' },
+    ]
+    for (const periodo of [...periodos, undefined]) {
+      expect(rotuloFuncaoPosto(periodo)).toBe(rotuloNoFront(periodo))
+    }
+
+    const agentes = [
+      { id: 'a1', periodoId: 'per-prensa' },
+      { id: 'a2', periodoId: 'per-expedicao' },
+      { id: 'a3', periodoId: 'per-so-setor' },
+      { id: 'a4', periodoId: 'per-apagado' },
+      { id: 'a5' },
+    ]
+    expect(comFuncaoPosto(agentes, periodos)).toEqual(comFuncaoPostoNoFront(agentes, periodos))
+    expect(comFuncaoPosto(agentes, periodos).map((agente) => agente.funcaoPosto)).toEqual([
+      'Prensista — Estamparia',
+      'Auxiliar de expedição',
+      'Almoxarifado',
+      undefined,
+      undefined,
+    ])
+  })
+
+  it('mantém o aviso de espelhamento nos dois arquivos', () => {
+    const caminho = (relativo: string) => fileURLToPath(new URL(relativo, import.meta.url))
+    expect(readFileSync(caminho('./documento-comum.ts'), 'utf8'))
+      .toContain('src/lib/apresentacaoAgente.ts')
+    expect(readFileSync(caminho('../../../src/lib/apresentacaoAgente.ts'), 'utf8'))
+      .toContain('server/src/services/documento-comum.ts')
   })
 
   it('agente com anexo fora da lista não some do item 10', () => {

@@ -32,6 +32,7 @@ import {
   type LinhaApresentacaoAgente,
   type TecnicoJson,
   atividadesDoPeriodo,
+  comFuncaoPosto,
   data,
   dadosAssinaturaDocumento,
   emParagrafos,
@@ -586,7 +587,9 @@ async function docParecer(
     return elementos
   }
 
-  const agentes = t.agentes ?? []
+  // Um agente por função: o rótulo é resolvido aqui, uma vez, a partir do
+  // período. Ver `comFuncaoPosto`.
+  const agentes = comFuncaoPosto(t.agentes ?? [], t.periodos ?? [])
   const agentesNr15 = agentes.filter((agente) => agente.tipo !== 'periculosidade')
   const agentesNr16 = agentes.filter((agente) => agente.tipo === 'periculosidade')
   const temInsalubridade = pericia.modalidade !== 'periculosidade'

@@ -14,6 +14,7 @@ import {
   data,
   dadosAssinaturaDocumento,
   atividadesDoPeriodo,
+  comFuncaoPosto,
   emParagrafos,
   extenso,
   fotosEmOrdemDeDocumento,
@@ -388,7 +389,9 @@ export async function htmlDoParecer(
       .map((item) => `<tr><th>${esc(item.rotulo)}</th><td${item.destaque ? ` class="resultado-${item.destaque}"` : ''}>${esc(item.valor).replace(/\n/g, '<br>')}</td></tr>`)
       .join('')}</tbody></table>`
 
-  const agentes = t.agentes ?? []
+  // Um agente por função: o rótulo é resolvido aqui, uma vez, a partir do
+  // período. Ver `comFuncaoPosto`.
+  const agentes = comFuncaoPosto(t.agentes ?? [], t.periodos ?? [])
   const agentesNr15 = agentes.filter((agente) => agente.tipo !== 'periculosidade')
   const agentesNr16 = agentes.filter((agente) => agente.tipo === 'periculosidade')
   const temInsalubridade = pericia.modalidade !== 'periculosidade'

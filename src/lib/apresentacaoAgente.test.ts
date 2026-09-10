@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { montarApresentacaoAgente } from './apresentacaoAgente'
+import { comFuncaoPosto, montarApresentacaoAgente, rotuloFuncaoPosto } from './apresentacaoAgente'
 import {
   ANALISE_ANEXOS_NR16,
   ANALISE_ATIVIDADES_NR16,
@@ -359,5 +359,83 @@ describe('montarApresentacaoAgente', () => {
       rotulo: 'Resultado técnico / Conclusão',
       valor: 'Caracterizada a periculosidade apenas de 2019 a 2022.',
     })
+  })
+})
+
+// ============================================================
+// O mesmo agente, uma vez por função.
+//
+// O trabalhador teve dois postos no lapso examinado: ruído na prensa e ruído
+// na expedição são dois lançamentos, com medição, EPI e conclusão próprios.
+// O agente guarda só o id do período; o rótulo é resolvido na hora de
+// imprimir, porque renomear a função no item 7.1 tem de alcançar o laudo.
+// ============================================================
+describe('função e posto do agente', () => {
+  const PERIODOS = [
+    { id: 'per-prensa', funcao: 'Prensista', setor: 'Estamparia' },
+    { id: 'per-expedicao', funcao: 'Auxiliar de expedição' },
+    { id: 'per-sem-funcao', funcao: '   ', setor: 'Almoxarifado' },
+    { id: 'per-vazio', funcao: '' },
+  ]
+
+  it('junta função e setor, e aceita ter só um dos dois', () => {
+    expect(rotuloFuncaoPosto(PERIODOS[0])).toBe('Prensista — Estamparia')
+    expect(rotuloFuncaoPosto(PERIODOS[1])).toBe('Auxiliar de expedição')
+    expect(rotuloFuncaoPosto(PERIODOS[2])).toBe('Almoxarifado')
+    expect(rotuloFuncaoPosto(PERIODOS[3])).toBe('')
+    expect(rotuloFuncaoPosto(undefined)).toBe('')
+  })
+
+  it('resolve o rótulo de cada agente pelo período vinculado', () => {
+    const [naPrensa, naExpedicao] = comFuncaoPosto(
+      [{ ...ruido, id: 'r1', periodoId: 'per-prensa' }, { ...ruido, id: 'r2', periodoId: 'per-expedicao' }],
+      PERIODOS,
+    )
+
+    expect(naPrensa?.funcaoPosto).toBe('Prensista — Estamparia')
+    expect(naExpedicao?.funcaoPosto).toBe('Auxiliar de expedição')
+  })
+
+  it('não inventa rótulo para agente sem vínculo nem para período apagado', () => {
+    const [semVinculo, orfao] = comFuncaoPosto(
+      [{ ...ruido, id: 'r1' }, { ...ruido, id: 'r2', periodoId: 'per-que-o-perito-apagou' }],
+      PERIODOS,
+    )
+
+    expect(semVinculo?.funcaoPosto).toBeUndefined()
+    expect(orfao?.funcaoPosto).toBeUndefined()
+  })
+
+  it('não grava o rótulo no agente — só o devolve resolvido', () => {
+    const agente = { ...ruido, periodoId: 'per-prensa' }
+    comFuncaoPosto([agente], PERIODOS)
+
+    expect(agente).not.toHaveProperty('funcaoPosto')
+  })
+
+  it('abre os três quadros pela função, e só quando há função', () => {
+    const nr16 = {
+      id: 'nr16', nome: 'Inflamáveis', tipo: 'periculosidade', criterio: 'qualitativo',
+      anexoNr16: 'ANEXO_02', resultadoPericulosidade: 'caracterizada',
+    } as const
+    const funcaoPosto = 'Prensista — Estamparia'
+    const primeiraLinha = { rotulo: 'Função / Posto', valor: funcaoPosto }
+
+    // NR-15, quadro do item 7.2.
+    expect(montarApresentacaoAgente({ ...ruido, funcaoPosto }).linhas[0]).toEqual(primeiraLinha)
+    // NR-16, levantamento do item 7.
+    expect(montarApresentacaoAgente({ ...nr16, funcaoPosto }).linhas[0]).toEqual(primeiraLinha)
+    // NR-16, quadro conclusivo do item 10.
+    expect(montarApresentacaoAgente({ ...nr16, funcaoPosto }, { conclusiva: true }).linhas[0])
+      .toEqual(primeiraLinha)
+  })
+
+  it('não muda nada no laudo de função única, que é toda perícia gravada até hoje', () => {
+    // A linha só existe quando há rótulo. Sem vínculo, o documento sai igual
+    // ao de antes — inclusive os registros antigos, que não têm o campo.
+    expect(montarApresentacaoAgente(ruido).linhas)
+      .toEqual(montarApresentacaoAgente({ ...ruido, funcaoPosto: undefined }).linhas)
+    expect(montarApresentacaoAgente(ruido).linhas)
+      .not.toContainEqual(expect.objectContaining({ rotulo: 'Função / Posto' }))
   })
 })

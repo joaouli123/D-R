@@ -7,7 +7,7 @@ import {
   qualificacaoParticipante,
   TEXTO_AUSENCIA_RECLAMANTE,
 } from '@/lib/participantes'
-import { montarApresentacaoAgente, resumoProtecoesAssociadas } from '@/lib/apresentacaoAgente'
+import { comFuncaoPosto, montarApresentacaoAgente, resumoProtecoesAssociadas } from '@/lib/apresentacaoAgente'
 import { agenteExibeConclusao } from '@/lib/conclusoesAgentes'
 import { intervaloDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
 import { dadosAssinatura } from '@/lib/assinaturaDocumento'
@@ -179,8 +179,12 @@ export function DocumentoPreview({
     )
   }
 
-  const agentesNr15 = t.agentes.filter((agente) => agente.tipo !== 'periculosidade')
-  const agentesNr16 = t.agentes.filter((agente) => agente.tipo === 'periculosidade')
+  // Um agente por função: o rótulo é resolvido aqui, uma vez, a partir do
+  // período. Ver `comFuncaoPosto`.
+  const agentes = comFuncaoPosto(t.agentes, t.periodos)
+  type AgenteDoLaudo = (typeof agentes)[number]
+  const agentesNr15 = agentes.filter((agente) => agente.tipo !== 'periculosidade')
+  const agentesNr16 = agentes.filter((agente) => agente.tipo === 'periculosidade')
   const temInsalubridade = pericia.modalidade !== 'periculosidade'
   const temPericulosidade = pericia.modalidade !== 'insalubridade'
   let indiceSubsecao7 = 1
@@ -215,14 +219,14 @@ export function DocumentoPreview({
   const encerramento = t.encerramento?.trim() || t.observacoesAdicionais
   const fecho = dadosAssinatura(pericia)
 
-  const rotuloNatureza = (tipo: (typeof t.agentes)[number]['tipo']) => ({
+  const rotuloNatureza = (tipo: AgenteDoLaudo['tipo']) => ({
     fisico: 'Agente Físico',
     quimico: 'Agente Químico',
     biologico: 'Agente Biológico',
     periculosidade: 'Atividade ou Operação Perigosa',
-  } as Record<(typeof t.agentes)[number]['tipo'], string>)[tipo]
+  } as Record<AgenteDoLaudo['tipo'], string>)[tipo]
 
-  const agentesSemProtecoes = (agentes: typeof t.agentes, prefixo?: string) =>
+  const agentesSemProtecoes = (agentes: AgenteDoLaudo[], prefixo?: string) =>
     agentes.length ? (
       <div className="space-y-4">
         {agentes.map((agente, indice) => {
@@ -252,7 +256,7 @@ export function DocumentoPreview({
     ) : null
 
   const quadrosDeAnalise = (
-    agentes: typeof t.agentes,
+    agentes: AgenteDoLaudo[],
     prefixo: string | null,
     tituloGrupo: string,
   ) => prefixo && agentes.length ? (
@@ -336,7 +340,7 @@ export function DocumentoPreview({
   // cadastro — agentes que nenhum outro item do laudo mencionava, porque a
   // modalidade já os tinha excluído. Ficavam proteções órfãs, atribuídas a
   // um agente que o leitor não encontrava em lugar nenhum.
-  const protecoes = t.agentes.filter((agente) =>
+  const protecoes = agentes.filter((agente) =>
     agente.identificadoNaAtividade !== false
     && (agente.tipo === 'periculosidade' ? temPericulosidade : temInsalubridade),
   ).flatMap((agente) => {

@@ -6,6 +6,7 @@ import {
   BookOpen,
   Building2,
   Camera,
+  Check,
   FileDown,
   FileText,
   ImagePlus,
@@ -40,6 +41,7 @@ import { DocumentoPreview } from '@/components/DocumentoPreview'
 import { AgenteNr15Fields } from '@/components/AgenteNr15Fields'
 import { PericulosidadeNr16Fields } from '@/components/PericulosidadeNr16Fields'
 import { agentesNr15SemConclusao } from '@/lib/conclusoesAgentes'
+import { rotuloFuncaoPosto } from '@/lib/apresentacaoAgente'
 import { EpiSelector } from '@/components/EpiSelector'
 import { empresaVazia, ModalEmpresa } from '@/components/ModalEmpresa'
 import { useApp } from '@/store/AppStore'
@@ -176,6 +178,59 @@ function resumoNr16(a: AgenteAvaliado): string {
 function nr16Completa(a: AgenteAvaliado): boolean {
   if (!a.resultadoPericulosidade) return false
   return a.resultadoPericulosidade === 'caracterizada' ? Boolean(a.anexoNr16) : true
+}
+
+/**
+ * O botão que faz o cartão sumir.
+ *
+ * Não grava nada — o editor já salva a cada tecla. É o gesto de "terminei
+ * este agente", que o perito reconhece do seletor de EPIs: insere, o campo
+ * fecha, e o próximo abre limpo. Os vizinhos ficam como estavam.
+ */
+function BotaoInserirNoLaudo({ onInserir }: { onInserir: () => void }) {
+  return (
+    <div className="mt-4 flex justify-end border-t border-ink-100 pt-3">
+      <Button size="sm" icon={<Check size={14} />} onClick={onInserir}>
+        Inserir no laudo
+      </Button>
+    </div>
+  )
+}
+
+/**
+ * Em qual função este agente foi avaliado.
+ *
+ * Só aparece quando há período cadastrado na etapa 1 — sem função nenhuma
+ * lançada não há o que escolher. Guarda o id, nunca o rótulo: ver
+ * `AgenteAvaliado.periodoId`.
+ */
+function SeletorFuncaoPosto({
+  agente,
+  periodos,
+  onChange,
+}: {
+  agente: AgenteAvaliado
+  periodos: PeriodoFuncao[]
+  onChange: (periodoId: string | undefined) => void
+}) {
+  if (!periodos.length) return null
+  return (
+    <div className="mb-3">
+      <Select
+        label="Função / Posto avaliado"
+        value={agente.periodoId ?? ''}
+        hint="Lance o mesmo agente uma vez por função quando houver mais de um posto no período. Em branco, o agente vale para todo o período avaliado."
+        onChange={(e) => onChange(e.target.value || undefined)}
+      >
+        <option value="">— todo o período avaliado —</option>
+        {periodos.map((periodo) => (
+          <option key={periodo.id} value={periodo.id}>
+            {rotuloFuncaoPosto(periodo) || 'Período sem função'}
+          </option>
+        ))}
+      </Select>
+    </div>
+  )
 }
 
 // Rótulo da modalidade impresso no título do documento. Espelha
@@ -332,12 +387,65 @@ export default function PericiaEditor() {
   const [empresaNova, setEmpresaNova] = useState<Empresa | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const fotoRef = useRef<HTMLInputElement>(null)
+  // ------------------------------------------------------------
+  // Aberto ou fechado, avaliação por avaliação.
+  //
+  // Pedido do perito, nestas palavras: "você insere o agente, ele fica na
+  // tela; vai inserir outro, a tela vai aumentando... acaba que a tela fica
+  // grande. Se desse para o agente sumir depois de inserido no laudo e abrir
+  // outra tela para o próximo, igual ao do EPI, aí vai ficar top."
+  //
+  // O que ele descreveu é o cartão que se recolhe sozinho ao ser inserido, e
+  // não sanfona: ele nunca pediu que abrir um feche os outros, e comparar
+  // duas avaliações lado a lado é rotina de perícia. Como cada cartão que
+  // termina se fecha, a tela para de crescer do mesmo jeito.
+  //
+  // O estado mora aqui, e não dentro de `SecaoColapsavel`, porque quem fecha
+  // é o botão "Inserir no laudo", que está no corpo do cartão. Por isso o
+  // componente ganhou modo controlado — ver a decisão 3 no cabeçalho dele.
+  //
+  // Fechado não é escondido: o cartão recolhido continua mostrando título,
+  // resumo, número do item e o aviso de pendência.
+  // ------------------------------------------------------------
+  const [aberturaAgentes, setAberturaAgentes] = useState<Record<string, boolean>>({})
+  const avaliacaoCompleta = (avaliacao: AgenteAvaliado) =>
+    avaliacao.tipo === 'periculosidade' ? nr16Completa(avaliacao) : nr15Completa(avaliacao)
+  const cartaoAberto = (avaliacao: AgenteAvaliado) =>
+    aberturaAgentes[avaliacao.id] ?? !avaliacaoCompleta(avaliacao)
+  const definirCartaoAberto = (idAgente: string, aberto: boolean) =>
+    setAberturaAgentes((atual) => ({ ...atual, [idAgente]: aberto }))
   const [secaoFotoAtual, setSecaoFotoAtual] = useState<SecaoFoto>('ambiente')
   const [consultandoCep, setConsultandoCep] = useState(false)
 
   useEffect(() => {
     if (original) setP(original)
   }, [original])
+
+  /**
+   * Grava o padrão de cada avaliação na primeira vez que ela aparece.
+   *
+   * O padrão é o de sempre: avaliação incompleta nasce aberta. Mas ele não
+   * pode continuar sendo recalculado, ou o cartão se fecharia na cara do
+   * perito no instante em que ele terminasse de digitar a conclusão — que é
+   * justamente o que torna a avaliação "completa". Congelado aqui, só um
+   * clique o muda daí em diante. É a decisão 1 de `SecaoColapsavel`, agora
+   * que quem guarda o estado é esta tela.
+   *
+   * Não reabre nada: id que já está no mapa passa intacto, inclusive depois
+   * de gravar, quando a resposta do servidor troca `p` inteiro.
+   */
+  useEffect(() => {
+    setAberturaAgentes((atual) => {
+      const novos = p.tecnico.agentes.filter((avaliacao) => !(avaliacao.id in atual))
+      if (!novos.length) return atual
+      return {
+        ...atual,
+        ...Object.fromEntries(novos.map((avaliacao) => [avaliacao.id, !avaliacaoCompleta(avaliacao)])),
+      }
+    })
+    // Depende só da lista de agentes: quem entra é id novo, e o resto do
+    // formulário mudando não tem por que reabrir cartão nenhum.
+  }, [p.tecnico.agentes])
 
   /**
    * Empresa vinda do atalho "usar em perícia" (Módulo B). Só entra depois
@@ -407,8 +515,12 @@ export default function PericiaEditor() {
     tecnico: { ...v.tecnico, agentes: transformar(v.tecnico.agentes) },
   }))
 
-  const adicionarAgente = (agente: AgenteAvaliado) =>
+  const adicionarAgente = (agente: AgenteAvaliado) => {
     transformarAgentes((agentes) => [...agentes, agente])
+    // A tela nova que o perito pediu. O padrão já abriria — está vazia, logo
+    // incompleta —, mas dizer aqui deixa a intenção escrita.
+    definirCartaoAberto(agente.id, true)
+  }
 
   const atualizarAgente = (
     idAgente: string,
@@ -417,8 +529,10 @@ export default function PericiaEditor() {
     agentes.map((agente) => agente.id === idAgente ? transformar(agente) : agente),
   )
 
-  const removerAgente = (idAgente: string) =>
+  const removerAgente = (idAgente: string) => {
     transformarAgentes((agentes) => agentes.filter((agente) => agente.id !== idAgente))
+    setAberturaAgentes(({ [idAgente]: _removido, ...resto }) => resto)
+  }
 
   const empresaPrincipal = useMemo(
     () => empresas.find((e) => e.id === p.reclamadas.find((r) => r.principal)?.empresaId),
@@ -479,6 +593,42 @@ export default function PericiaEditor() {
   // lista. Quem manda no crachá e no hint tem de ser este índice, ou o
   // editor promete um número que o arquivo assinado não usa.
   const agentesNr15Editor = p.tecnico.agentes.filter((avaliacao) => avaliacao.tipo !== 'periculosidade')
+  // ------------------------------------------------------------
+  // A lista da tela, quebrada por função quando há vínculo.
+  //
+  // O perito descreveu assim: "pego o ruído aqui como exemplo. Função tal,
+  // insiro o ruído, o valor que deu, o EPI; e aí depois tem que inserir o
+  // ruído de novo em outra função. Então ele teria que ficar dividido ali
+  // naquele campo de onde vão entrar os agentes."
+  //
+  // Agrupa só a TELA. O documento continua com uma lista corrida, porque a
+  // numeração do 7.2 é posicional nos três renderizadores — reagrupar lá
+  // renumeraria os subitens e o crachá do editor passaria a prometer um
+  // número que o arquivo assinado não usa.
+  //
+  // Sem nenhum agente vinculado — toda perícia até hoje — não há cabeçalho
+  // nenhum e a tela é exatamente a de antes.
+  // ------------------------------------------------------------
+  const periodosConhecidos = new Set(p.tecnico.periodos.map((periodo) => periodo.id))
+  const blocosDeAvaliacao: { rotulo: string | null; agentes: AgenteAvaliado[] }[] =
+    avaliacoesVisiveis.some((avaliacao) => avaliacao.periodoId)
+      ? [
+          ...p.tecnico.periodos
+            .map((periodo) => ({
+              rotulo: rotuloFuncaoPosto(periodo) || 'Período sem função',
+              agentes: avaliacoesVisiveis.filter((avaliacao) => avaliacao.periodoId === periodo.id),
+            }))
+            .filter((bloco) => bloco.agentes.length > 0),
+          // O período pode ter sido apagado na etapa 1 depois de vinculado.
+          // O agente órfão continua indo ao documento, então continua à vista.
+          ...(() => {
+            const soltos = avaliacoesVisiveis.filter(
+              (avaliacao) => !avaliacao.periodoId || !periodosConhecidos.has(avaliacao.periodoId),
+            )
+            return soltos.length ? [{ rotulo: 'Sem função vinculada', agentes: soltos }] : []
+          })(),
+        ]
+      : [{ rotulo: null, agentes: avaliacoesVisiveis }]
   const numeroNr16Editor = p.modalidade === 'ambas' ? '7.3' : '7.2'
   const numeroAnaliseNr16Editor = p.modalidade === 'ambas' ? '10.2' : '10.1'
   const numeroDivergenciasEditor = p.modalidade === 'ambas' ? '7.4' : '7.3'
@@ -1407,16 +1557,29 @@ export default function PericiaEditor() {
               }
             />
             <div className="space-y-3 p-5">
-              {avaliacoesVisiveis.map((a) => {
+              {blocosDeAvaliacao.map((bloco, indiceBloco) => (
+                <div key={`${indiceBloco}-${bloco.rotulo ?? ''}`} className="space-y-3">
+                {bloco.rotulo && (
+                  <h3 className="flex items-center gap-2 pt-1 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+                    <span className="h-px flex-1 bg-ink-200" aria-hidden="true" />
+                    {bloco.rotulo}
+                    <span className="h-px flex-1 bg-ink-200" aria-hidden="true" />
+                  </h3>
+                )}
+                {bloco.agentes.map((a) => {
                 if (a.tipo === 'periculosidade') {
                   return (
                     <div key={a.id} className="rounded-lg border border-ink-200 border-l-4 border-l-amber-500 p-3">
                       <SecaoColapsavel
                         titulo={a.nome?.trim() || 'Nova avaliação NR-16'}
                         resumo={resumoNr16(a)}
-                        abertoInicial={!nr16Completa(a)}
+                        aberto={cartaoAberto(a)}
+                        onAbertoChange={(aberto) => definirCartaoAberto(a.id, aberto)}
                         acoes={
                           <div className="flex items-center gap-2">
+                            {!cartaoAberto(a) && !nr16Completa(a) && (
+                              <Badge tone="amber">pendente</Badge>
+                            )}
                             {/* O quadro da avaliação NR-16 não tem número próprio:
                                 ele sai dentro da tabela do item 7 e como quadro do
                                 item 10. O ".2" daqui apontava para o 7.3.2, que é a
@@ -1435,10 +1598,16 @@ export default function PericiaEditor() {
                         <ol aria-label="Fluxo técnico da periculosidade" className="mb-3 mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                           <li className="text-amber-700">Risco</li><li aria-hidden="true">→</li><li>Enquadramento</li><li aria-hidden="true">→</li><li>Conclusão</li>
                         </ol>
+                        <SeletorFuncaoPosto
+                          agente={a}
+                          periodos={p.tecnico.periodos}
+                          onChange={(periodoId) => atualizarAgente(a.id, (atual) => ({ ...atual, periodoId }))}
+                        />
                         <PericulosidadeNr16Fields
                           avaliacao={a}
                           onChange={(avaliacaoAtualizada) => atualizarAgente(a.id, () => avaliacaoAtualizada)}
                         />
+                        <BotaoInserirNoLaudo onInserir={() => definirCartaoAberto(a.id, false)} />
                       </SecaoColapsavel>
                     </div>
                   )
@@ -1470,9 +1639,13 @@ export default function PericiaEditor() {
                   <SecaoColapsavel
                     titulo={a.nome?.trim() || regraAnexo?.agenteFixo || 'Novo agente NR-15'}
                     resumo={resumoNr15(a)}
-                    abertoInicial={!nr15Completa(a)}
+                    aberto={cartaoAberto(a)}
+                    onAbertoChange={(aberto) => definirCartaoAberto(a.id, aberto)}
                     acoes={
                       <div className="flex shrink-0 items-center gap-2">
+                        {!cartaoAberto(a) && !nr15Completa(a) && (
+                          <Badge tone="amber">pendente</Badge>
+                        )}
                         <Badge tone="navy">Item {numeroAvaliacao}</Badge>
                         <Button
                           variant="ghost"
@@ -1487,6 +1660,11 @@ export default function PericiaEditor() {
                   <ol aria-label="Fluxo técnico do agente" className="mb-3 mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                     <li className="text-navy-700">Agente</li><li aria-hidden="true">→</li><li>Medição</li><li aria-hidden="true">→</li><li>Proteção</li><li aria-hidden="true">→</li><li>Conclusão</li>
                   </ol>
+                  <SeletorFuncaoPosto
+                    agente={a}
+                    periodos={p.tecnico.periodos}
+                    onChange={(periodoId) => atualizarAgente(a.id, (atual) => ({ ...atual, periodoId }))}
+                  />
                   <div className={`grid gap-3 ${exibeCas
                     ? 'md:grid-cols-[minmax(220px,1.4fr)_minmax(120px,0.65fr)_minmax(230px,1fr)_minmax(130px,0.65fr)]'
                     : 'md:grid-cols-[minmax(240px,1.5fr)_minmax(240px,1fr)_minmax(150px,0.7fr)]'}`}>
@@ -1639,9 +1817,12 @@ export default function PericiaEditor() {
                       </p>
                     </div>
                   )}
+                  <BotaoInserirNoLaudo onInserir={() => definirCartaoAberto(a.id, false)} />
                   </SecaoColapsavel>
                 </div>
               )})}
+                </div>
+              ))}
               {avaliacoesVisiveis.length === 0 && (
                 <p className="text-sm text-ink-500">Nenhuma avaliação cadastrada para a modalidade selecionada.</p>
               )}
