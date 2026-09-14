@@ -192,6 +192,14 @@ export interface DetalheNr16 {
   valor: string
 }
 
+export type StatusVarredura = 'nao_avaliado' | 'sem_exposicao' | 'exposicao_identificada' | 'nao_aplicavel'
+
+export interface ItemVarreduraNormativa {
+  anexoId: string
+  status: StatusVarredura
+  conclusao?: string
+}
+
 export interface AgenteAvaliado {
   id: UUID
   nome: string
@@ -292,6 +300,8 @@ export interface PreenchimentoTecnico {
   atividadesFuncoes: string
   periodos: PeriodoFuncao[]
   agentes: AgenteAvaliado[]
+  varreduraNr15?: ItemVarreduraNormativa[]
+  varreduraNr16?: ItemVarreduraNormativa[]
   normasReferencias: string
   equipamentosAnalisados: string
   informacoesLevantadas: string

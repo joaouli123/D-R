@@ -488,6 +488,12 @@ export interface AgenteDocumento {
   observacao?: string
 }
 
+export interface ItemVarreduraDocumento {
+  anexoId: string
+  status: 'nao_avaliado' | 'sem_exposicao' | 'exposicao_identificada' | 'nao_aplicavel'
+  conclusao?: string
+}
+
 /**
  * Avaliações NR-15 sempre precisam levar sua conclusão individual ao documento.
  *
@@ -1200,6 +1206,8 @@ export interface TecnicoJson {
     descricaoAtividades?: string
   }[]
   agentes: AgenteDocumento[]
+  varreduraNr15?: ItemVarreduraDocumento[]
+  varreduraNr16?: ItemVarreduraDocumento[]
   normasReferencias: string
   equipamentosAnalisados: string
   informacoesLevantadas: string

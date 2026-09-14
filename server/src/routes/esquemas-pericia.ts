@@ -92,6 +92,12 @@ export const agenteSchema = z.object({
   observacao: texto.optional(),
 })
 
+export const itemVarreduraSchema = z.object({
+  anexoId: textoObrigatorio,
+  status: z.enum(['nao_avaliado', 'sem_exposicao', 'exposicao_identificada', 'nao_aplicavel']),
+  conclusao: texto.optional(),
+})
+
 export const tecnicoSchema = z.object({
   apresentacao: texto,
   enderecamento: texto,
@@ -104,6 +110,8 @@ export const tecnicoSchema = z.object({
   atividadesFuncoes: texto,
   periodos: z.array(periodoSchema).default([]),
   agentes: z.array(agenteSchema).default([]),
+  varreduraNr15: z.array(itemVarreduraSchema).default([]),
+  varreduraNr16: z.array(itemVarreduraSchema).default([]),
   normasReferencias: texto,
   equipamentosAnalisados: texto,
   informacoesLevantadas: texto,
