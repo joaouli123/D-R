@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { PreenchimentoTecnico } from '@/types'
-import { normalizarVarredura, pendenciasVarredura } from './varreduraNormativa'
+import { atualizarStatusVarredura, CATALOGO_VARREDURA_NR15, normalizarVarredura, pendenciasVarredura } from './varreduraNormativa'
 
 describe('varredura normativa da perícia', () => {
   it('lista literalmente os anexos 1 a 14 e fixa o Anexo 4 como revogado', () => {
@@ -63,5 +63,37 @@ describe('varredura normativa da perícia', () => {
     expect(pendencias).toContainEqual({ norma: 'NR-15', anexo: '1', motivo: 'sem avaliação detalhada' })
     expect(pendencias).toContainEqual({ norma: 'NR-16', anexo: '2', motivo: 'sem avaliação detalhada' })
     expect(pendencias).toContainEqual({ norma: 'NR-15', anexo: '2', motivo: 'não avaliado' })
+  })
+
+  it('grava uma decisão sem apagar agentes nem decisões dos outros anexos', () => {
+    const tecnico = {
+      agentes: [{ id: 'a1', nome: 'Frio', tipo: 'fisico' as const, anexoNr15: 'ANEXO_09', criterio: 'qualitativo' as const }],
+      varreduraNr15: [{ anexoId: 'ANEXO_01', status: 'sem_exposicao' as const }],
+    }
+
+    const atualizado = atualizarStatusVarredura(tecnico, 'NR-15', 'ANEXO_02', 'sem_exposicao')
+
+    expect(atualizado.agentes).toEqual(tecnico.agentes)
+    expect(atualizado.varreduraNr15).toEqual([
+      { anexoId: 'ANEXO_01', status: 'sem_exposicao' },
+      { anexoId: 'ANEXO_02', status: 'sem_exposicao' },
+    ])
+  })
+
+  it('cobra conclusão e eficácia de EPI nas avaliações positivas da NR-15', () => {
+    const tecnico = {
+      agentes: [{
+        id: 'a1', nome: 'Ruído', tipo: 'fisico' as const, criterio: 'quantitativo' as const,
+        anexoNr15: 'ANEXO_01', epis: [{ categoria: 'Protetor auditivo', modelo: 'Concha' }],
+      }],
+      varreduraNr15: CATALOGO_VARREDURA_NR15
+        .filter((item) => item.anexoId !== 'ANEXO_04')
+        .map((item) => ({ anexoId: item.anexoId, status: item.anexoId === 'ANEXO_01' ? 'exposicao_identificada' as const : 'sem_exposicao' as const })),
+    }
+
+    expect(pendenciasVarredura(tecnico, 'insalubridade')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ anexo: '1', motivo: 'sem conclusão individual' }),
+      expect.objectContaining({ anexo: '1', motivo: 'sem eficácia do EPI' }),
+    ]))
   })
 })

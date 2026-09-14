@@ -18,6 +18,7 @@ import { atividadesDoPeriodo } from '@/lib/periodos'
 import { emParagrafos, linhasDoBloco } from '@/lib/listasDocumento'
 import { fotosEmOrdemDeDocumento } from '@/lib/fotosDocumento'
 import { Logo } from '@/components/Logo'
+import { normalizarVarredura, type AnexoVarredura } from '@/lib/varreduraNormativa'
 
 // ============================================================
 // MÓDULO H — Prévia fiel do Parecer/Laudo.
@@ -117,6 +118,20 @@ function ConteudoEstruturado({ texto }: { texto?: string | null }) {
   )
 }
 
+function QuadroVarredura({ norma, itens }: { norma: string; itens: AnexoVarredura[] }) {
+  if (!itens.length) return null
+  const status = (item: AnexoVarredura) => item.status === 'sem_exposicao'
+    ? 'Sem exposição'
+    : item.status === 'exposicao_identificada'
+      ? 'Exposição identificada'
+      : item.status === 'nao_aplicavel' ? 'Não aplicável' : 'Pendente'
+  return (
+    <table className="varredura-normativa"><thead><tr><th>Anexo</th><th>Agente / risco avaliado</th><th>Resultado da varredura {norma}</th></tr></thead>
+      <tbody>{itens.map((item) => <tr key={item.anexoId}><td>{item.numero}</td><td>{item.tema}</td><td>{status(item)}</td></tr>)}</tbody>
+    </table>
+  )
+}
+
 export function DocumentoPreview({
   pericia,
   empresas,
@@ -185,6 +200,9 @@ export function DocumentoPreview({
   type AgenteDoLaudo = (typeof agentes)[number]
   const agentesNr15 = agentes.filter((agente) => agente.tipo !== 'periculosidade')
   const agentesNr16 = agentes.filter((agente) => agente.tipo === 'periculosidade')
+  const varredura = normalizarVarredura(t, pericia.modalidade)
+  const exibeVarreduraNr15 = Boolean(t.varreduraNr15?.length)
+  const exibeVarreduraNr16 = Boolean(t.varreduraNr16?.length)
   const temInsalubridade = pericia.modalidade !== 'periculosidade'
   const temPericulosidade = pericia.modalidade !== 'insalubridade'
   let indiceSubsecao7 = 1
@@ -521,9 +539,10 @@ export function DocumentoPreview({
           </tbody>
         </table>
       )}
-      {temInsalubridade && <><h3>{numeroAvaliacaoNr15}. NR-15 — Avaliação da Exposição Ocupacional</h3>{agentesSemProtecoes(agentesNr15, numeroAvaliacaoNr15 ?? undefined)}</>}
+      {temInsalubridade && <><h3>{numeroAvaliacaoNr15}. NR-15 — Avaliação da Exposição Ocupacional</h3>{exibeVarreduraNr15 && <QuadroVarredura norma="NR-15" itens={[...varredura.nr15, ...varredura.nr15Complementares]} />}{agentesSemProtecoes(agentesNr15, numeroAvaliacaoNr15 ?? undefined)}</>}
       {temPericulosidade && <>
         <h3>{numeroAvaliacaoNr16}. NR-16 — Avaliação das Atividades e Operações Perigosas</h3>
+        {exibeVarreduraNr16 && <QuadroVarredura norma="NR-16" itens={varredura.nr16} />}
         <h4>{numeroAvaliacaoNr16}.1. Critério de Avaliação</h4>
         <Paragrafos texto={t.criterioAvaliacaoPericulosidade} />
         {t.riscoAlegadoPericulosidade?.trim() && <>

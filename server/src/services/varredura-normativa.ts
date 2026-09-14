@@ -8,12 +8,13 @@ export interface AnexoVarreduraDocumento {
   tema: string
   status: StatusVarreduraDocumento
   conclusao: string
+  temAvaliacao: boolean
 }
 
 export interface PendenciaVarreduraDocumento {
   norma: 'NR-15' | 'NR-16'
   anexo: string
-  motivo: 'não avaliado' | 'sem avaliação detalhada'
+  motivo: 'não avaliado' | 'sem avaliação detalhada' | 'sem conclusão individual' | 'sem eficácia do EPI'
 }
 
 interface TecnicoVarreduraDocumento {
@@ -82,7 +83,7 @@ function montarItens(
       : agente.tipo === 'periculosidade' && agente.anexoNr16 === item.anexoId)
     const persistido = persistidos?.find((registro) => registro.anexoId === item.anexoId)
     const status = item.statusFixo ?? (temAgente ? 'exposicao_identificada' : persistido?.status ?? 'nao_avaliado')
-    return { ...item, status, conclusao: persistido?.conclusao?.trim() || conclusaoPadrao(norma, item, status) }
+    return { ...item, status, conclusao: persistido?.conclusao?.trim() || conclusaoPadrao(norma, item, status), temAvaliacao: temAgente }
   })
 }
 
@@ -106,12 +107,21 @@ export function pendenciasVarredura(tecnico: TecnicoVarreduraDocumento, modalida
     for (const item of itens) {
       if (item.status === 'nao_avaliado') pendencias.push({ norma, anexo: item.numero, motivo: 'não avaliado' })
       if (item.status === 'exposicao_identificada') {
-        const temDetalhe = (tecnico.agentes ?? []).some((agente) => norma === 'NR-15'
+        const avaliacoes = (tecnico.agentes ?? []).filter((agente) => norma === 'NR-15'
           ? agente.tipo !== 'periculosidade' && (item.anexoId === 'ANEXO_13A'
             ? agente.anexoNr15 === 'ANEXO_13A'
             : anexoLegalNr15(agente.anexoNr15) === item.anexoId)
           : agente.tipo === 'periculosidade' && agente.anexoNr16 === item.anexoId)
-        if (!temDetalhe) pendencias.push({ norma, anexo: item.numero, motivo: 'sem avaliação detalhada' })
+        if (!avaliacoes.length) {
+          pendencias.push({ norma, anexo: item.numero, motivo: 'sem avaliação detalhada' })
+          continue
+        }
+        if (norma === 'NR-15') {
+          if (avaliacoes.some((agente) => !agente.observacao?.trim())) pendencias.push({ norma, anexo: item.numero, motivo: 'sem conclusão individual' })
+          if (avaliacoes.some((agente) => agente.epis?.length && typeof agente.epiEficaz !== 'boolean')) pendencias.push({ norma, anexo: item.numero, motivo: 'sem eficácia do EPI' })
+        } else if (avaliacoes.some((agente) => !agente.resultadoPericulosidade && !agente.resultadoPericulosidadeTexto?.trim())) {
+          pendencias.push({ norma, anexo: item.numero, motivo: 'sem conclusão individual' })
+        }
       }
     }
   }

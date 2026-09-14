@@ -40,6 +40,16 @@ async function textoDoDocx(pericia: PericiaCompleta = periciaDeTeste()): Promise
 }
 
 describe('parecer em DOCX', () => {
+  it('imprime o quadro compacto da varredura normativa', async () => {
+    const pericia = periciaDeTeste()
+    ;(pericia.tecnico as unknown as { varreduraNr15: unknown[] }).varreduraNr15 = [
+      { anexoId: 'ANEXO_01', status: 'exposicao_identificada' },
+      { anexoId: 'ANEXO_02', status: 'sem_exposicao' },
+    ]
+
+    expect(await textoDoDocx(pericia)).toContain('Resultado da varredura NR-15')
+  })
+
   it('abre a seção 3 pelo 3.1, sem texto de nível 1', async () => {
     const texto = await textoDoDocx()
 

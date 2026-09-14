@@ -206,6 +206,25 @@ describe('PericiaEditor — inserir no laudo recolhe a avaliação', () => {
   })
 })
 
+describe('PericiaEditor — varredura obrigatória dos anexos', () => {
+  it('abre uma avaliação já enquadrada ao confirmar exposição no Anexo 1', () => {
+    prepararEditor({ agentes: [] })
+
+    expect(screen.getByText('1 de 14 anexos avaliados')).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: /^Anexo 1 —.*Exposição identificada/i }))
+
+    expect(alternadorDe('Ruído contínuo ou intermitente')).toBeDefined()
+    expect(screen.getByText('2 de 14 anexos avaliados')).toBeDefined()
+  })
+
+  it('mostra as duas varreduras quando a modalidade abrange ambas', () => {
+    prepararEditor({ agentes: [], modalidade: 'ambas' })
+
+    expect(screen.getByRole('region', { name: 'Varredura dos anexos da NR-15' })).toBeDefined()
+    expect(screen.getByRole('region', { name: 'Varredura dos anexos da NR-16' })).toBeDefined()
+  })
+})
+
 describe('PericiaEditor — o mesmo agente uma vez por função', () => {
   it('não oferece função nenhuma quando a etapa 1 não tem período', () => {
     prepararEditor({ agentes: [RUIDO_PENDENTE] })

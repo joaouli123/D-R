@@ -1,6 +1,7 @@
 import type { DocumentoGerado, Empresa, Usuario } from '@prisma/client'
 import type { PericiaCompleta } from '../mappers.js'
 import { marcaDoDocumento } from './logo-oficial.js'
+import { normalizarVarredura, type AnexoVarreduraDocumento } from './varredura-normativa.js'
 import {
   AGENTE_LABEL,
   agenteExibeConclusao,
@@ -313,6 +314,16 @@ export async function htmlDoParecer(
   titulo: string,
 ): Promise<string> {
   const t = pericia.tecnico as unknown as TecnicoJson
+  const varredura = normalizarVarredura(t, pericia.modalidade)
+  const quadroVarredura = (norma: string, itens: AnexoVarreduraDocumento[]) => {
+    const rotulo = (status: AnexoVarreduraDocumento['status']) => ({
+      sem_exposicao: 'Sem exposição',
+      exposicao_identificada: 'Exposição identificada',
+      nao_aplicavel: 'Não aplicável',
+      nao_avaliado: 'Pendente',
+    })[status]
+    return `<table class="varredura-normativa"><thead><tr><th>Anexo</th><th>Agente / risco avaliado</th><th>Resultado da varredura ${norma}</th></tr></thead><tbody>${itens.map((item) => `<tr><td>${esc(item.numero)}</td><td>${esc(item.tema)}</td><td>${esc(rotulo(item.status))}</td></tr>`).join('')}</tbody></table>`
+  }
   const fecho = dadosAssinaturaDocumento({ ...pericia, tecnico: t })
 
   const porId = new Map(empresas.map((e) => [e.id, e]))
@@ -617,7 +628,8 @@ export async function htmlDoParecer(
           ? (() => {
               const cabecalho = num.sub('NR-15 — Avaliação da Exposição Ocupacional')
               const numero = cabecalho.split('. ')[0]
-              return `<h3>${cabecalho}</h3>` + tabelaAgentes(agentesNr15, numero)
+              const resumo = t.varreduraNr15?.length ? quadroVarredura('NR-15', [...varredura.nr15, ...varredura.nr15Complementares]) : ''
+              return `<h3>${cabecalho}</h3>` + resumo + tabelaAgentes(agentesNr15, numero)
             })()
           : '') +
         (temPericulosidade
@@ -631,7 +643,8 @@ export async function htmlDoParecer(
                     ? `<p class="fonte-transcricao">Fonte: ${esc(t.fonteRiscoAlegado.trim())}</p>`
                     : '')
                 : ''
-              return `<h3>${cabecalho}</h3><h4>${numero}.1. Critério de Avaliação</h4>${paragrafos(t.criterioAvaliacaoPericulosidade)}${alegado}${tabelaAgentes(agentesNr16)}`
+              const resumo = t.varreduraNr16?.length ? quadroVarredura('NR-16', varredura.nr16) : ''
+              return `<h3>${cabecalho}</h3>${resumo}<h4>${numero}.1. Critério de Avaliação</h4>${paragrafos(t.criterioAvaliacaoPericulosidade)}${alegado}${tabelaAgentes(agentesNr16)}`
             })()
           : '') +
         blocoDivergencias() +

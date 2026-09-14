@@ -11,6 +11,7 @@ import { gerarDocx } from '../services/docx.js'
 import { agentesNr15SemConclusao, type TecnicoJson } from '../services/documento-comum.js'
 import { enviarDocumento } from '../services/email.js'
 import { concatenarPdf, gerarPdf } from '../services/pdf.js'
+import { pendenciasVarredura } from '../services/varredura-normativa.js'
 
 // ============================================================
 // MÓDULOS G/H/I/J — Documentos gerados: histórico, exportação
@@ -77,6 +78,17 @@ function exigirConclusoesNr15(
   pericia: PericiaCompleta | null,
 ): void {
   if (!pericia || (documento.tipo !== 'parecer' && documento.tipo !== 'laudo')) return
+  const pendenciasNormativas = pendenciasVarredura(
+    pericia.tecnico as unknown as TecnicoJson,
+    pericia.modalidade,
+  )
+  if (pendenciasNormativas.length) {
+    const resumo = pendenciasNormativas
+      .slice(0, 8)
+      .map((item) => `${item.norma}, Anexo ${item.anexo}: ${item.motivo}`)
+      .join('; ')
+    throw new ErroHttp(422, `Conclua a varredura obrigatória antes de emitir: ${resumo}.`)
+  }
   const pendentes = agentesNr15SemConclusao(
     pericia.tecnico as unknown as Pick<TecnicoJson, 'agentes'>,
     pericia.modalidade,

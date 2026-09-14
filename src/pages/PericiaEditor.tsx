@@ -40,6 +40,7 @@ import type { OrigemConsulta } from '@/components/BuscaCnpj'
 import { DocumentoPreview } from '@/components/DocumentoPreview'
 import { AgenteNr15Fields } from '@/components/AgenteNr15Fields'
 import { PericulosidadeNr16Fields } from '@/components/PericulosidadeNr16Fields'
+import { PainelVarreduraNormativa } from '@/components/PainelVarreduraNormativa'
 import { agentesNr15SemConclusao } from '@/lib/conclusoesAgentes'
 import { rotuloFuncaoPosto } from '@/lib/apresentacaoAgente'
 import { EpiSelector } from '@/components/EpiSelector'
@@ -56,9 +57,11 @@ import type {
   PeriodoFuncao,
   SecaoFoto,
   SecaoTexto,
+  StatusVarredura,
   Usuario,
 } from '@/types'
 import { ANEXOS_NR15 } from '@/content/anexosNr15'
+import { aplicarAnexoNr16 } from '@/content/anexosNr16'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
 import { CHAVE_BIBLIOTECA_POR_CAMPO } from '@/content/referenciasParecer'
 import {
@@ -89,6 +92,12 @@ import { intervaloDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvalia
 import { dadosAssinatura } from '@/lib/assinaturaDocumento'
 import { comEmpresaVinculada, empresasLivres, opcoesDaLinha } from '@/lib/reclamadas'
 import { uid } from '@/lib/utils'
+import {
+  anexoLegalNr15,
+  atualizarStatusVarredura,
+  normalizarVarredura,
+  pendenciasVarredura,
+} from '@/lib/varreduraNormativa'
 
 const ROTULOS_GRAU: Record<NonNullable<AgenteAvaliado['grau']>, string> = {
   minimo: 'Mínimo 10%',
@@ -522,6 +531,53 @@ export default function PericiaEditor() {
     definirCartaoAberto(agente.id, true)
   }
 
+  function marcarVarredura(
+    norma: 'NR-15' | 'NR-16',
+    anexoId: string,
+    status: StatusVarredura,
+  ) {
+    setP((atual) => ({
+      ...atual,
+      tecnico: atualizarStatusVarredura(atual.tecnico, norma, anexoId, status),
+    }))
+  }
+
+  function registrarExposicao(norma: 'NR-15' | 'NR-16', anexoId: string) {
+    marcarVarredura(norma, anexoId, 'exposicao_identificada')
+
+    const existente = p.tecnico.agentes.find((agente) => norma === 'NR-15'
+      ? agente.tipo !== 'periculosidade' && anexoLegalNr15(agente.anexoNr15) === anexoId
+      : agente.tipo === 'periculosidade' && agente.anexoNr16 === anexoId)
+    if (existente) {
+      definirCartaoAberto(existente.id, true)
+      return
+    }
+
+    const idAgente = uid(norma === 'NR-15' ? 'agn' : 'ris')
+    if (norma === 'NR-16') {
+      adicionarAgente(aplicarAnexoNr16({
+        id: idAgente,
+        nome: '',
+        tipo: 'periculosidade',
+        criterio: 'qualitativo',
+      } as AgenteAvaliado, anexoId))
+      return
+    }
+
+    // Os anexos 8 e 12 têm subtipos próprios. Neles, a avaliação abre
+    // deliberadamente sem subtipo para o perito escolher a opção correta.
+    const possuiOpcaoDireta = ANEXOS_NR15.some((anexo) => anexo.id === anexoId)
+    const base = {
+      id: idAgente,
+      nome: '',
+      tipo: anexoId === 'ANEXO_11' || anexoId === 'ANEXO_12' || anexoId === 'ANEXO_13'
+        ? 'quimico'
+        : anexoId === 'ANEXO_14' ? 'biologico' : 'fisico',
+      criterio: 'qualitativo',
+    } as AgenteAvaliado
+    adicionarAgente(possuiOpcaoDireta ? aplicarAnexo(base, anexoId) : base)
+  }
+
   const atualizarAgente = (
     idAgente: string,
     transformar: (agente: AgenteAvaliado) => AgenteAvaliado,
@@ -588,6 +644,7 @@ export default function PericiaEditor() {
         ? avaliacao.tipo === 'periculosidade'
         : avaliacao.tipo !== 'periculosidade',
   )
+  const varreduraNormativa = normalizarVarredura(p.tecnico, p.modalidade)
   // Os renderizadores filtram `t.agentes` inteiro por tipo, não a lista
   // visível do editor — e numeram os subitens do 7.2 pela POSIÇÃO nessa
   // lista. Quem manda no crachá e no hint tem de ser este índice, ou o
@@ -727,6 +784,17 @@ export default function PericiaEditor() {
 
   /** Grava (ou atualiza) o documento no histórico e devolve o id. */
   async function finalizarDocumento(silencioso = false): Promise<string | null> {
+    const pendenciasNormativas = pendenciasVarredura(p.tecnico, p.modalidade)
+    if (pendenciasNormativas.length) {
+      setPasso(2)
+      const resumo = pendenciasNormativas
+        .slice(0, 5)
+        .map((item) => `${item.norma}, Anexo ${item.anexo}: ${item.motivo}`)
+        .join('; ')
+      const restantes = pendenciasNormativas.length > 5 ? `; e mais ${pendenciasNormativas.length - 5}` : ''
+      toast(`Conclua a varredura obrigatória antes de emitir: ${resumo}${restantes}.`, 'error')
+      return null
+    }
     // A regra vem de src/lib/conclusoesAgentes.ts, a mesma que a API aplica
     // ao gerar o arquivo. Enquanto era calculada aqui, direto e sem a
     // modalidade, uma perícia só de periculosidade travava cobrando a
@@ -1557,6 +1625,22 @@ export default function PericiaEditor() {
               }
             />
             <div className="space-y-3 p-5">
+              {p.modalidade !== 'periculosidade' && (
+                <PainelVarreduraNormativa
+                  norma="NR-15"
+                  itens={varreduraNormativa.nr15}
+                  onStatusChange={(anexoId, status) => marcarVarredura('NR-15', anexoId, status)}
+                  onExposicao={(anexoId) => registrarExposicao('NR-15', anexoId)}
+                />
+              )}
+              {p.modalidade !== 'insalubridade' && (
+                <PainelVarreduraNormativa
+                  norma="NR-16"
+                  itens={varreduraNormativa.nr16}
+                  onStatusChange={(anexoId, status) => marcarVarredura('NR-16', anexoId, status)}
+                  onExposicao={(anexoId) => registrarExposicao('NR-16', anexoId)}
+                />
+              )}
               {blocosDeAvaliacao.map((bloco, indiceBloco) => (
                 <div key={`${indiceBloco}-${bloco.rotulo ?? ''}`} className="space-y-3">
                 {bloco.rotulo && (

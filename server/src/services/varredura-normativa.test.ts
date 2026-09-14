@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { normalizarVarredura, pendenciasVarredura } from './varredura-normativa'
+import { CATALOGO_VARREDURA_NR15, normalizarVarredura, pendenciasVarredura } from './varredura-normativa'
 
 describe('varredura normativa no servidor', () => {
   it('repete a sequência legal e a regra de compatibilidade usada pelo editor', () => {
@@ -25,5 +25,19 @@ describe('varredura normativa no servidor', () => {
 
     expect(pendenciasVarredura(tecnico, 'insalubridade').some((item) => item.norma === 'NR-16')).toBe(false)
     expect(pendenciasVarredura(tecnico, 'periculosidade').some((item) => item.norma === 'NR-15')).toBe(false)
+  })
+
+  it('recusa avaliação positiva sem conclusão e sem eficácia do EPI', () => {
+    const tecnico = {
+      agentes: [{ id: 'a1', nome: 'Ruído', tipo: 'fisico', anexoNr15: 'ANEXO_01', criterio: 'quantitativo', epis: [{ categoria: 'Protetor', modelo: 'Concha' }] }],
+      varreduraNr15: CATALOGO_VARREDURA_NR15
+        .filter((item) => item.anexoId !== 'ANEXO_04')
+        .map((item) => ({ anexoId: item.anexoId, status: item.anexoId === 'ANEXO_01' ? 'exposicao_identificada' as const : 'sem_exposicao' as const })),
+    }
+
+    expect(pendenciasVarredura(tecnico, 'insalubridade')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ anexo: '1', motivo: 'sem conclusão individual' }),
+      expect.objectContaining({ anexo: '1', motivo: 'sem eficácia do EPI' }),
+    ]))
   })
 })
