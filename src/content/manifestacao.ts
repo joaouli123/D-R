@@ -190,9 +190,9 @@ const CRITICAS: Record<AgenteManifestacao, { titulo: string; conteudo: string }[
         'A análise da exposição a energia elétrica não observou o Anexo 4 da NR-16 e o Decreto nº 93.412/86, deixando de considerar que as atividades eram executadas em proximidade ou sobre instalações integrantes do Sistema Elétrico de Potência, energizadas ou com possibilidade de energização acidental.',
     },
     {
-      titulo: 'Abastecimento de veículos analisado sem observância da OJ 385 do TST',
+      titulo: 'Abastecimento de veículos analisado sem observância do Anexo 2 da NR-16',
       conteudo:
-        'O laudo desconsiderou que o abastecimento de veículos realizado pelo próprio empregado, em bomba situada no interior do estabelecimento, caracteriza permanência em área de risco, nos termos do Anexo 2, item 3, "s", da NR-16 e da Orientação Jurisprudencial 385 da SDI-1 do TST.',
+        'O laudo desconsiderou que o abastecimento de veículos realizado pelo próprio empregado, em bomba situada no interior do estabelecimento, caracteriza permanência em área de risco, nos termos do Anexo 2, item 3, "q", da NR-16.',
     },
   ],
 }
