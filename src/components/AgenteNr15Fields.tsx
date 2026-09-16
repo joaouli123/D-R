@@ -103,6 +103,7 @@ function CampoNumerico({
   valor,
   hint,
   placeholder,
+  disabled,
   onConfirmar,
 }: {
   label: string
@@ -111,6 +112,7 @@ function CampoNumerico({
   valor?: string
   hint?: string
   placeholder?: string
+  disabled?: boolean
   onConfirmar: (normalizado: string | null) => void
 }) {
   const [texto, setTexto] = useState(valor ?? '')
@@ -143,6 +145,7 @@ function CampoNumerico({
       error={erro}
       hint={hint}
       placeholder={placeholder}
+      disabled={disabled}
       onChange={(evento) => { setTexto(evento.target.value); setErro('') }}
       onBlur={confirmar}
     />
@@ -222,7 +225,14 @@ function OrigemDaMedicao({
         <CampoNumerico
           label={`Medição em perícia${sufixo}`}
           valor={agente.valorMedido}
-          hint={origem === 'perito' ? 'Adotada no laudo.' : 'Registrada para comparação.'}
+          hint={
+            origem === 'nao_informado'
+              ? 'Não informada pelo perito.'
+              : origem === 'perito'
+                ? 'Adotada no laudo.'
+                : 'Registrada para comparação.'
+          }
+          disabled={origem === 'nao_informado'}
           onConfirmar={(normalizado) => definirNumero('valorMedido', normalizado)}
         />
 

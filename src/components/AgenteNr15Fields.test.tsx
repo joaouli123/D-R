@@ -147,6 +147,22 @@ describe('origem da medição', () => {
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ origemMedicao: 'nao_informado' }))
   })
 
+  it('bloqueia o campo de medição em perícia quando o perito não mediu', () => {
+    const { rerender } = render(<AgenteNr15Fields agente={RUIDO} onChange={() => undefined} />)
+
+    expect(
+      screen.getByRole('textbox', { name: 'Medição em perícia (dB(A))' }).getAttribute('disabled'),
+    ).toBeNull()
+
+    rerender(<AgenteNr15Fields agente={{ ...RUIDO, origemMedicao: 'nao_informado' }} onChange={() => undefined} />)
+
+    // Sem isso, o perito conseguia digitar um valor de medição própria mesmo
+    // tendo declarado que não mediu — e o laudo passava a exibir os dois.
+    expect(
+      screen.getByRole('textbox', { name: 'Medição em perícia (dB(A))' }).getAttribute('disabled'),
+    ).not.toBeNull()
+  })
+
   it('grava o topo da faixa da empresa sem apagar o início', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
