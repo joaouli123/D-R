@@ -45,11 +45,18 @@ export function rota<T extends Request>(
 
 export function tratarErros(
   erro: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction,
 ): void {
   if (erro instanceof ErroHttp) {
+    // Erros "esperados" (422, 401...) nunca precisaram de rastro. Mas 5xx e
+    // 429 escondiam falha real de dependência externa (ex.: DataJud fora do
+    // ar ou limitando taxa) atrás de uma resposta perfeitamente tratada —
+    // sem isso, get_logs voltava vazio mesmo quando a consulta falhava.
+    if (erro.status >= 500 || erro.status === 429) {
+      console.error(`[erro ${erro.status}]`, req.method, req.originalUrl, erro.message)
+    }
     res.status(erro.status).json({ erro: erro.message, detalhes: erro.detalhes })
     return
   }
