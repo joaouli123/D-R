@@ -1,3 +1,4 @@
+import type { NextFunction, Request, Response } from 'express'
 import { Router } from 'express'
 import { z } from 'zod'
 import { exigirSessao } from '../auth.js'
@@ -14,8 +15,28 @@ import { apagarUpload, uploadImagens } from '../services/armazenamento.js'
 // morria a cada reload.
 // ============================================================
 
+/**
+ * O POST desta rota pode carregar um multipart grande. Se a sessão for
+ * rejeitada aqui — antes do multer sequer começar a ler o corpo — e o
+ * servidor responder sem consumir o resto do envio, o SO costuma fechar o
+ * socket com RST em vez de FIN enquanto o navegador ainda está enviando
+ * bytes: o fetch() no perito via isso como falha de rede genérica, não como
+ * "sessão expirada". Drenar o corpo (sem processá-lo — nada chega a tocar o
+ * disco, o multer nunca roda) resolve isso sem abrir mão de checar a sessão
+ * antes do multer.
+ */
+export function exigirSessaoDrenandoUpload(req: Request, res: Response, next: NextFunction): void {
+  exigirSessao(req, res, (erro?: unknown) => {
+    if (erro) {
+      req.resume()
+      req.on('error', () => undefined)
+    }
+    next(erro)
+  })
+}
+
 export const fotosRouter = Router({ mergeParams: true })
-fotosRouter.use(exigirSessao)
+fotosRouter.use(exigirSessaoDrenandoUpload)
 
 const secoes = z.enum(['ambiente', 'atividades', 'equipamentos', 'epi', 'produtos', 'documentos'])
 
@@ -35,7 +56,16 @@ fotosRouter.post(
       throw naoEncontrado('Perícia')
     }
 
-    const secao = secoes.parse(req.body.secao ?? 'ambiente')
+    // safeParse, não parse: um front desatualizado pode mandar uma seção que
+    // não existe mais. Sem o cleanup abaixo, os arquivos que o multer já
+    // gravou no disco ficavam órfãos — o INSERT nunca chegava a rodar, então
+    // nenhuma foto no banco apontava pra eles, mas o volume nunca esvaziava.
+    const resultadoSecao = secoes.safeParse(req.body.secao ?? 'ambiente')
+    if (!resultadoSecao.success) {
+      await Promise.all(arquivos.map((a) => apagarUpload(a.filename)))
+      throw new ErroHttp(400, 'Seção de foto inválida.')
+    }
+    const secao = resultadoSecao.data
 
     // Contagem por PERÍCIA, não por seção: `ordem` é lida globalmente em
     // routes/pericias.ts e os três renderizadores numeram "Fotografia N" na
