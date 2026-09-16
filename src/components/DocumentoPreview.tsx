@@ -590,9 +590,9 @@ export function DocumentoPreview({
       <Paragrafos texto={t.protecoesColetivas} />
 
       <h2>10. {pericia.modalidade === 'insalubridade' ? 'Análise Técnica dos Agentes Identificados' : pericia.modalidade === 'periculosidade' ? 'Análise Técnica das Atividades e Riscos Identificados' : 'Análise Técnica dos Agentes, Atividades e Riscos Identificados'}</h2>
-      <Paragrafos texto={t.analiseTecnica} />
       {quadrosDeAnalise(agentesNr15, numeroAnaliseNr15, 'NR-15 — Avaliação da Exposição Ocupacional')}
       {quadrosNr16DeAnalise(numeroAnaliseNr16)}
+      <Paragrafos texto={t.analiseTecnica} />
 
       {numeroConclusaoNr15 && <><h2>{numeroConclusaoNr15}. NR-15 — Conclusão e Fundamentação</h2><Paragrafos texto={conclusaoNr15} /></>}
       {numeroConclusaoNr16 && <><h2>{numeroConclusaoNr16}. NR-16 — Conclusão e Fundamentação</h2><Paragrafos texto={conclusaoNr16} /></>}

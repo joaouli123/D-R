@@ -216,6 +216,35 @@ describe('DocumentoPreview', () => {
     expect(html).toMatch(/<table class="agente-propriedades">[\s\S]*?<\/table><h[34]>Conclusão<\/h[34]>[\s\S]*?Conclusão técnica exclusiva do agente frio\./)
   })
 
+  it('imprime a análise técnica depois dos quadros dos agentes, não antes', () => {
+    // Espelha documento-parecer.test.ts e docx-parecer.test.ts: o texto do item
+    // 10 é a CONCLUSÃO de cada agente avaliado, tem que sair depois dos
+    // quadros — antes saía colado no título da seção.
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={{
+          ...pericia,
+          modalidade: 'insalubridade',
+          tecnico: {
+            ...pericia.tecnico,
+            agentes: [{
+              id: 'fisico-presente', nome: 'Frio', tipo: 'fisico', criterio: 'qualitativo',
+              identificadoNaAtividade: true,
+            } as never],
+            analiseTecnica: 'Texto exclusivo de teste da análise técnica.',
+          },
+        }}
+        empresas={[]}
+        titulo="Parecer de teste"
+      />,
+    )
+
+    expect(html).toContain('Texto exclusivo de teste da análise técnica.')
+    expect(html.lastIndexOf('agente-propriedades')).toBeLessThan(
+      html.indexOf('Texto exclusivo de teste da análise técnica.'),
+    )
+  })
+
   it('omite o título "Conclusão" quando a avaliação NR-15 está sem texto', () => {
     // Um <h4>Conclusão</h4> seguido de nada — era o que o perito lia como
     // pendência dentro do documento já emitido.

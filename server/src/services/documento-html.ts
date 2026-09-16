@@ -655,7 +655,7 @@ export async function htmlDoParecer(
     `<h2>${num.secao('DAS PROTEÇÕES COLETIVAS')}</h2>`,
     blocoConteudo(paragrafos(t.protecoesColetivas)),
     `<h2>${num.secao(tituloAnalise)}</h2>`,
-    blocoConteudo(paragrafos(t.analiseTecnica) + quadrosAnalise),
+    blocoConteudo(quadrosAnalise + paragrafos(t.analiseTecnica)),
   ]
 
   if (temInsalubridade) partes.push(`<h2>${num.secao('NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')}</h2>`, blocoConteudo(paragrafos(conclusaoNr15)))

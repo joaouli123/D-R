@@ -892,7 +892,7 @@ async function docParecer(
 
   const cabecalhoAnalise = num.secao(tituloAnalise)
   const numeroAnalise = cabecalhoAnalise.split('. ')[0]
-  filhos.push(h2(cabecalhoAnalise), ...blocos(t.analiseTecnica))
+  filhos.push(h2(cabecalhoAnalise))
 
   // Mesma regra do PDF e da prévia: o número do grupo vem da modalidade,
   // não do tamanho da lista. Lista vazia continua suprimindo o bloco, mas
@@ -956,6 +956,7 @@ async function docParecer(
 
   adicionarQuadrosDeAnalise(agentesNr15, 'NR-15 — Avaliação da Exposição Ocupacional', numeroAnaliseNr15)
   adicionarQuadrosNr16(agentesNr16, numeroAnaliseNr16)
+  filhos.push(...blocos(t.analiseTecnica))
   if (temInsalubridade) filhos.push(h2(num.secao('NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr15))
   if (temPericulosidade) filhos.push(h2(num.secao('NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr16))
   if (t.respostasQuesitos?.trim()) filhos.push(h2(num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')), ...blocos(t.respostasQuesitos))

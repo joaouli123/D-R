@@ -203,6 +203,21 @@ describe('parecer em DOCX', () => {
     expect(semDestaque).not.toContain('<w:b/>')
   })
 
+  it('imprime a análise técnica depois dos quadros dos agentes, não antes', async () => {
+    // Espelha o mesmo caso em documento-parecer.test.ts: o texto do item 10 é
+    // a CONCLUSÃO de cada agente avaliado, tem que sair depois dos quadros.
+    const pericia = periciaDeTeste()
+    ;(pericia.tecnico as unknown as { analiseTecnica: string }).analiseTecnica =
+      'Texto exclusivo de teste da análise técnica.'
+
+    const texto = await textoDoDocx(pericia)
+
+    expect(texto).toContain('Texto exclusivo de teste da análise técnica.')
+    expect(texto.lastIndexOf('NR-15 — Avaliação da Exposição Ocupacional')).toBeLessThan(
+      texto.indexOf('Texto exclusivo de teste da análise técnica.'),
+    )
+  })
+
   it('abre a capa pela identificação das partes', async () => {
     const texto = await textoDoDocx()
 

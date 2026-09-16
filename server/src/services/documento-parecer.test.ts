@@ -188,6 +188,21 @@ describe('parecer em HTML (motor do PDF)', () => {
     expect(html).not.toContain('Radiações ionizantes ou substâncias radioativas')
   })
 
+  it('imprime a análise técnica depois dos quadros dos agentes, não antes', async () => {
+    // O texto do item 10 é a CONCLUSÃO de cada agente avaliado: tem que sair
+    // depois dos quadros, não colado no título da seção.
+    const pericia = periciaDeTeste()
+    ;(pericia.tecnico as unknown as { analiseTecnica: string }).analiseTecnica =
+      'Texto exclusivo de teste da análise técnica.'
+
+    const html = await gerar(pericia)
+
+    expect(html).toContain('Texto exclusivo de teste da análise técnica.')
+    expect(html.lastIndexOf('class="agente-bloco"')).toBeLessThan(
+      html.indexOf('Texto exclusivo de teste da análise técnica.'),
+    )
+  })
+
   it('abre a capa pela identificação das partes', async () => {
     const html = await gerar()
 
