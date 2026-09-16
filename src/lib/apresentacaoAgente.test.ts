@@ -363,6 +363,199 @@ describe('montarApresentacaoAgente', () => {
 })
 
 // ============================================================
+// O levantamento estruturado da NR-16: anexo → item → atividade → condição e
+// área → exposição, com tempo, frequência e relação.
+// ============================================================
+
+const postoDeCombustivel: AgenteAvaliado = {
+  id: 'nr16-posto',
+  nome: 'Inflamáveis',
+  tipo: 'periculosidade',
+  criterio: 'qualitativo',
+  anexoNr16: 'ANEXO_02',
+  enquadramentoNr16: 'NR-16, Anexo 2, item 1, alínea m',
+  atividadeEnquadrada: 'Abastecimento de veículos com óleo diesel',
+  situacaoAreaRisco: 'dentro',
+  presencaAreaRisco: 'permanencia',
+  delimitacaoAreaRisco: 'Círculo com raio de 7,5 metros com centro no ponto de abastecimento',
+  distanciaAreaRisco: '3',
+  areaRisco: 'Bomba no pátio de manobras',
+  analiseAnexos: 'Análise do perito.',
+  exposicaoPericulosidade: 'intermitente',
+  tempoExposicaoNr16: '40',
+  unidadeTempoExposicaoNr16: 'minutos_dia',
+  frequenciaOperacionalNr16: '3',
+  periodicidadeOperacionalNr16: 'semana',
+  relacaoAtividadeNr16: 'principal',
+  resultadoPericulosidade: 'caracterizada',
+}
+
+describe('levantamento estruturado da NR-16', () => {
+  it('imprime cada dado numa linha, na ordem do raciocínio pericial', () => {
+    expect(montarApresentacaoAgente(postoDeCombustivel).linhas).toEqual([
+      { rotulo: 'Anexo NR-16', valor: 'Anexo 2 — Atividades e Operações Perigosas com Inflamáveis' },
+      { rotulo: 'Natureza', valor: 'Periculosidade' },
+      { rotulo: 'Critério', valor: CRITERIO_QUALITATIVO_NR16 },
+      { rotulo: 'Lapso temporal', valor: LAPSO_TEMPORAL_NR16 },
+      { rotulo: 'Adicional Pretendido', valor: '30%' },
+      { rotulo: 'Enquadramento normativo', valor: 'NR-16, Anexo 2, item 1, alínea m' },
+      { rotulo: 'Atividade ou operação avaliada', valor: 'Abastecimento de veículos com óleo diesel' },
+      {
+        rotulo: 'Condição ou área de risco',
+        valor: [
+          'Atividade exercida dentro da área de risco, com permanência.',
+          'Área de risco: Círculo com raio de 7,5 metros com centro no ponto de abastecimento',
+          'Distância verificada: 3 metros',
+          'Bomba no pátio de manobras',
+        ].join('\n'),
+      },
+      { rotulo: 'Análise dos Anexos', valor: 'Análise do perito.' },
+      { rotulo: 'Exposição', valor: 'Intermitente' },
+      { rotulo: 'Tempo médio de exposição', valor: '40 minutos por dia' },
+      { rotulo: 'Frequência operacional', valor: '3 vezes por semana' },
+      { rotulo: 'Relação com a atividade', valor: 'Atividade principal' },
+    ])
+  })
+
+  it('não cria linha para o que ficou em branco — o laudo antigo sai como antes', () => {
+    const rotulos = montarApresentacaoAgente({
+      ...postoDeCombustivel,
+      enquadramentoNr16: '  ',
+      situacaoAreaRisco: undefined,
+      presencaAreaRisco: undefined,
+      delimitacaoAreaRisco: undefined,
+      distanciaAreaRisco: '',
+      areaRisco: undefined,
+      tempoExposicaoNr16: undefined,
+      frequenciaOperacionalNr16: '',
+      relacaoAtividadeNr16: undefined,
+    }).linhas.map((linha) => linha.rotulo)
+
+    for (const rotulo of [
+      'Enquadramento normativo', 'Condição ou área de risco', 'Tempo médio de exposição',
+      'Frequência operacional', 'Relação com a atividade',
+    ]) {
+      expect(rotulos).not.toContain(rotulo)
+    }
+  })
+
+  it('“Sem enquadramento em Anexo” não imprime linha de anexo e conclui com o rol dos anexos', () => {
+    const semEnquadramento: AgenteAvaliado = {
+      id: 'nr16-sem',
+      nome: 'Ausência de atividade ou operação perigosa enquadrável na NR-16',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      anexoNr16: 'SEM_ENQUADRAMENTO',
+      exposicaoPericulosidade: 'nao_constatada',
+      resultadoPericulosidade: 'nao_caracterizada',
+    }
+
+    expect(montarApresentacaoAgente(semEnquadramento).linhas)
+      .not.toContainEqual(expect.objectContaining({ rotulo: 'Anexo NR-16' }))
+    expect(montarApresentacaoAgente(semEnquadramento, { conclusiva: true }).linhas[1]).toEqual({
+      rotulo: 'Resultado técnico / Conclusão',
+      valor: conclusaoSemRiscoNr16(),
+      destaque: 'positivo',
+    })
+  })
+
+  it('cita o enquadramento na conclusão, e o período na caracterização parcial', () => {
+    const conclusao = (agente: AgenteAvaliado) =>
+      montarApresentacaoAgente(agente, { conclusiva: true }).linhas[1]
+
+    expect(conclusao(postoDeCombustivel)).toEqual({
+      rotulo: 'Resultado técnico / Conclusão',
+      valor: 'Periculosidade caracterizada (NR-16, Anexo 2, item 1, alínea m)',
+      destaque: 'negativo',
+    })
+    expect(conclusao({
+      ...postoDeCombustivel,
+      resultadoPericulosidade: 'caracterizada_parcial',
+      periodoCaracterizacaoNr16: 'de 03/2021 a 06/2022',
+    })).toEqual({
+      rotulo: 'Resultado técnico / Conclusão',
+      valor: 'Periculosidade caracterizada parcialmente (NR-16, Anexo 2, item 1, alínea m) — de 03/2021 a 06/2022',
+      destaque: 'negativo',
+    })
+    // O período não imprime fora da parcial, mesmo que tenha ficado gravado.
+    expect(conclusao({ ...postoDeCombustivel, periodoCaracterizacaoNr16: 'de 03/2021 a 06/2022' })?.valor)
+      .toBe('Periculosidade caracterizada (NR-16, Anexo 2, item 1, alínea m)')
+    expect(conclusao({ ...postoDeCombustivel, resultadoPericulosidade: 'prejudicada' })).toEqual({
+      rotulo: 'Resultado técnico / Conclusão',
+      valor: 'Não foi possível caracterizar a periculosidade, por insuficiência de elementos técnicos.',
+      destaque: 'aviso',
+    })
+  })
+
+  it('dá unidade ao número digitado sozinho e respeita o texto livre', () => {
+    const linha = (agente: Partial<AgenteAvaliado>, rotulo: string) =>
+      montarApresentacaoAgente({ ...postoDeCombustivel, ...agente }).linhas
+        .find((item) => item.rotulo === rotulo)?.valor
+
+    expect(linha({ distanciaAreaRisco: '7.5' }, 'Condição ou área de risco')).toContain('Distância verificada: 7,5 metros')
+    expect(linha({ distanciaAreaRisco: '1' }, 'Condição ou área de risco')).toContain('Distância verificada: 1 metro')
+    // Ponto de milhar não vira decimal: 1.100 metros não são 1,1 metro.
+    expect(linha({ distanciaAreaRisco: '1.100' }, 'Condição ou área de risco')).toContain('Distância verificada: 1.100 metros')
+    expect(linha({ distanciaAreaRisco: '1.000' }, 'Condição ou área de risco')).toContain('Distância verificada: 1.000 metros')
+    expect(linha({ distanciaAreaRisco: '1.000,5' }, 'Condição ou área de risco'))
+      .toContain('Distância verificada: 1.000,5 metros')
+    expect(linha({ tempoExposicaoNr16: '1.000,5', unidadeTempoExposicaoNr16: 'minutos_dia' }, 'Tempo médio de exposição'))
+      .toBe('1.000,5 minutos por dia')
+    expect(linha({ frequenciaOperacionalNr16: '1.000', periodicidadeOperacionalNr16: 'mes' }, 'Frequência operacional'))
+      .toBe('1.000 vezes por mês')
+    expect(linha({ distanciaAreaRisco: 'junto ao bocal' }, 'Condição ou área de risco'))
+      .toContain('Distância verificada: junto ao bocal')
+
+    expect(linha({ tempoExposicaoNr16: '1', unidadeTempoExposicaoNr16: 'horas_dia' }, 'Tempo médio de exposição'))
+      .toBe('1 hora por dia')
+    expect(linha({ tempoExposicaoNr16: '2 a 3', unidadeTempoExposicaoNr16: 'horas_dia' }, 'Tempo médio de exposição'))
+      .toBe('2 a 3 horas por dia')
+    // Sem unidade escolhida, o número sai como foi digitado — não se adivinha.
+    expect(linha({ tempoExposicaoNr16: '40', unidadeTempoExposicaoNr16: undefined }, 'Tempo médio de exposição'))
+      .toBe('40')
+    expect(linha({ tempoExposicaoNr16: 'entre 10 e 15 minutos', unidadeTempoExposicaoNr16: 'minutos_dia' }, 'Tempo médio de exposição'))
+      .toBe('entre 10 e 15 minutos')
+
+    expect(linha({ frequenciaOperacionalNr16: '1', periodicidadeOperacionalNr16: 'mes' }, 'Frequência operacional'))
+      .toBe('1 vez por mês')
+    expect(linha({ frequenciaOperacionalNr16: '2', periodicidadeOperacionalNr16: undefined }, 'Frequência operacional'))
+      .toBe('2 vezes')
+    expect(linha({ frequenciaOperacionalNr16: 'diariamente', periodicidadeOperacionalNr16: 'semana' }, 'Frequência operacional'))
+      .toBe('diariamente')
+  })
+
+  it('só descreve a presença quando a atividade toca a área de risco', () => {
+    const condicao = (agente: Partial<AgenteAvaliado>) =>
+      montarApresentacaoAgente({
+        ...postoDeCombustivel,
+        delimitacaoAreaRisco: undefined,
+        distanciaAreaRisco: undefined,
+        areaRisco: undefined,
+        ...agente,
+      }).linhas.find((item) => item.rotulo === 'Condição ou área de risco')?.valor
+
+    expect(condicao({ situacaoAreaRisco: 'fora', presencaAreaRisco: 'permanencia' }))
+      .toBe('Atividade exercida fora da área de risco.')
+    expect(condicao({ situacaoAreaRisco: 'nao_caracterizada', presencaAreaRisco: 'circulacao' }))
+      .toBe('Área de risco não caracterizada.')
+    expect(condicao({ situacaoAreaRisco: 'parcialmente_dentro', presencaAreaRisco: 'circulacao' }))
+      .toBe('Atividade exercida parcialmente dentro da área de risco, em circulação.')
+    expect(condicao({ situacaoAreaRisco: undefined, presencaAreaRisco: 'acesso_eventual' }))
+      .toBe('Acesso eventual à área de risco.')
+  })
+
+  it('separa as duas hipóteses da Súmula 364 e mantém o texto dos laudos antigos', () => {
+    const exposicao = (exposicaoPericulosidade: AgenteAvaliado['exposicaoPericulosidade']) =>
+      montarApresentacaoAgente({ ...postoDeCombustivel, exposicaoPericulosidade }).linhas
+        .find((item) => item.rotulo === 'Exposição')?.valor
+
+    expect(exposicao('fortuita')).toBe('Eventual, assim considerado o contato fortuito')
+    expect(exposicao('tempo_extremamente_reduzido')).toBe('Habitual, por tempo extremamente reduzido')
+    expect(exposicao('eventual')).toBe('Eventual ou por tempo extremamente reduzido')
+  })
+})
+
+// ============================================================
 // O mesmo agente, uma vez por função.
 //
 // O trabalhador teve dois postos no lapso examinado: ruído na prensa e ruído

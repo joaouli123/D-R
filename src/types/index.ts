@@ -176,8 +176,30 @@ export type TipoMedicaoEmpresa = 'valor' | 'faixa' | 'registros_processo'
  * e a conclusão sobre habitualidade depende justamente dessa diferença.
  */
 export type FonteRuido = 'maquinas' | 'ruido_fundo' | 'administrativa'
-export type ExposicaoPericulosidade = 'permanente' | 'intermitente' | 'eventual' | 'nao_constatada'
-export type ResultadoPericulosidade = 'caracterizada' | 'nao_caracterizada' | 'prejudicada'
+/**
+ * Frequência da exposição à condição perigosa.
+ *
+ * `fortuita` e `tempo_extremamente_reduzido` são as duas hipóteses da Súmula
+ * 364 do TST que afastam o adicional, e por isso são opções separadas.
+ * `eventual` é o valor antigo, que juntava as duas numa só; continua aceito
+ * para não reescrever laudo já gravado, mas a tela não o oferece mais.
+ */
+export type ExposicaoPericulosidade =
+  | 'permanente'
+  | 'intermitente'
+  | 'fortuita'
+  | 'tempo_extremamente_reduzido'
+  | 'eventual'
+  | 'nao_constatada'
+export type ResultadoPericulosidade = 'caracterizada' | 'caracterizada_parcial' | 'nao_caracterizada' | 'prejudicada'
+/** Onde o trabalhador estava em relação à área de risco delimitada pela norma. */
+export type SituacaoAreaRisco = 'dentro' | 'parcialmente_dentro' | 'fora' | 'nao_caracterizada'
+/** Como o trabalhador ocupa a área de risco, quando está nela. */
+export type PresencaAreaRisco = 'permanencia' | 'circulacao' | 'acesso_eventual'
+export type UnidadeTempoExposicaoNr16 = 'minutos_dia' | 'horas_dia'
+export type PeriodicidadeOperacionalNr16 = 'dia' | 'semana' | 'mes'
+/** Peso da atividade perigosa na rotina da função. */
+export type RelacaoAtividadeNr16 = 'principal' | 'secundaria' | 'complementar'
 
 /**
  * Um ponto de verificação do anexo da NR-16, do jeito que foi respondido.
@@ -269,6 +291,30 @@ export interface AgenteAvaliado {
   resultadoPericulosidadeTexto?: string
   /** Pontos de verificação do anexo da NR-16, na ordem em que serão impressos. */
   detalhesNr16?: DetalheNr16[]
+  /**
+   * Dispositivo da NR-16 em que a atividade se enquadra, por extenso.
+   * Ex.: "NR-16, Anexo 2, item 1, alínea m". Texto livre porque a citação
+   * sugerida pelo catálogo é só ponto de partida — o perito a ajusta.
+   */
+  enquadramentoNr16?: string
+  situacaoAreaRisco?: SituacaoAreaRisco
+  presencaAreaRisco?: PresencaAreaRisco
+  /** Área de risco adotada, como a norma a descreve. */
+  delimitacaoAreaRisco?: string
+  /** Distância medida ou estimada até a fonte de risco. Ex.: "4,5 m do bico". */
+  distanciaAreaRisco?: string
+  /** Tempo médio de exposição, só o número (ou faixa) digitado pelo perito. */
+  tempoExposicaoNr16?: string
+  unidadeTempoExposicaoNr16?: UnidadeTempoExposicaoNr16
+  /** Quantas vezes a operação perigosa acontece por período. */
+  frequenciaOperacionalNr16?: string
+  periodicidadeOperacionalNr16?: PeriodicidadeOperacionalNr16
+  relacaoAtividadeNr16?: RelacaoAtividadeNr16
+  /**
+   * Período ou atividade a que se restringe a caracterização parcial.
+   * Só é impresso quando o resultado é `caracterizada_parcial`.
+   */
+  periodoCaracterizacaoNr16?: string
   /** Qual das duas o laudo adota. Ausente = perito, como sempre foi. */
   origemMedicao?: OrigemMedicao
   unidadeMedicao?: UnidadeMedicao

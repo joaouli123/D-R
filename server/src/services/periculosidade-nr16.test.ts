@@ -119,6 +119,115 @@ const CASOS: { nome: string; agente: AgenteAvaliado & { funcaoPosto?: string } }
     },
   },
   {
+    // O levantamento inteiro da tela nova: cada dado estruturado vira uma
+    // linha ou uma frase, e as duas cópias têm de escrevê-las igual.
+    nome: 'levantamento estruturado, com enquadramento, área e exposição',
+    agente: {
+      id: 'nr16-estruturado',
+      nome: 'Inflamáveis',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      anexoNr16: 'ANEXO_02',
+      enquadramentoNr16: 'NR-16, Anexo 2, item 1, alínea m',
+      atividadeEnquadrada: 'Abastecimento de veículos com óleo diesel',
+      situacaoAreaRisco: 'dentro',
+      presencaAreaRisco: 'permanencia',
+      delimitacaoAreaRisco: 'Círculo com raio de 7,5 metros com centro no ponto de abastecimento',
+      distanciaAreaRisco: '7.5',
+      areaRisco: 'Bomba no pátio de manobras',
+      analiseAnexos: 'Análise do perito.',
+      exposicaoPericulosidade: 'intermitente',
+      tempoExposicaoNr16: '40',
+      unidadeTempoExposicaoNr16: 'minutos_dia',
+      frequenciaOperacionalNr16: '3',
+      periodicidadeOperacionalNr16: 'semana',
+      relacaoAtividadeNr16: 'secundaria',
+      resultadoPericulosidade: 'caracterizada',
+    },
+  },
+  {
+    nome: 'caracterização parcial, restrita a um período',
+    agente: {
+      id: 'nr16-parcial',
+      nome: 'Energia elétrica',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      anexoNr16: 'ANEXO_04',
+      enquadramentoNr16: 'NR-16, Anexo 4, item 1, alínea d',
+      situacaoAreaRisco: 'parcialmente_dentro',
+      presencaAreaRisco: 'circulacao',
+      tempoExposicaoNr16: '1',
+      unidadeTempoExposicaoNr16: 'horas_dia',
+      frequenciaOperacionalNr16: '1',
+      periodicidadeOperacionalNr16: 'mes',
+      resultadoPericulosidade: 'caracterizada_parcial',
+      periodoCaracterizacaoNr16: 'de 03/2021 a 06/2022',
+    },
+  },
+  {
+    // Texto livre nos campos que aceitam número: sai como foi escrito. E a
+    // presença gravada antes de a situação virar "fora" não imprime.
+    nome: 'fora da área, com texto livre e exposição fortuita',
+    agente: {
+      id: 'nr16-fora',
+      nome: 'Inflamáveis',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      anexoNr16: 'ANEXO_02',
+      situacaoAreaRisco: 'fora',
+      presencaAreaRisco: 'permanencia',
+      distanciaAreaRisco: 'cerca de vinte metros do tanque',
+      tempoExposicaoNr16: 'entre 10 e 15 minutos',
+      unidadeTempoExposicaoNr16: 'minutos_dia',
+      frequenciaOperacionalNr16: 'diariamente',
+      periodicidadeOperacionalNr16: 'semana',
+      exposicaoPericulosidade: 'fortuita',
+      resultadoPericulosidade: 'nao_caracterizada',
+    },
+  },
+  {
+    // Ponto de milhar: os dois lados têm de ler 1.100 metros, e não 1,1.
+    nome: 'números com ponto de milhar',
+    agente: {
+      id: 'nr16-milhar',
+      nome: 'Explosivos',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      anexoNr16: 'ANEXO_01',
+      situacaoAreaRisco: 'dentro',
+      distanciaAreaRisco: '1.100',
+      tempoExposicaoNr16: '1.000,5',
+      unidadeTempoExposicaoNr16: 'minutos_dia',
+      frequenciaOperacionalNr16: '1.000',
+      periodicidadeOperacionalNr16: 'mes',
+      resultadoPericulosidade: 'caracterizada',
+    },
+  },
+  {
+    nome: '“Sem enquadramento em Anexo” escolhido no seletor',
+    agente: {
+      id: 'nr16-sentinela',
+      nome: 'Ausência de atividade ou operação perigosa enquadrável na NR-16',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      ...PADRAO_NR16_SEM_ENQUADRAMENTO,
+      anexoNr16: 'SEM_ENQUADRAMENTO',
+    },
+  },
+  {
+    nome: 'não foi possível caracterizar',
+    agente: {
+      id: 'nr16-prejudicada',
+      nome: 'Radiações',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      anexoNr16: 'ANEXO_RADIACOES',
+      presencaAreaRisco: 'acesso_eventual',
+      exposicaoPericulosidade: 'tempo_extremamente_reduzido',
+      resultadoPericulosidade: 'prejudicada',
+    },
+  },
+  {
     // O mesmo risco lançado numa das duas funções do período examinado. O
     // rótulo chega resolvido pelos renderizadores; aqui ele só tem de sair
     // igual nos dois quadros e nas duas cópias.
@@ -235,6 +344,11 @@ describe('tabela da NR-16 nos dois quadros', () => {
       ],
       // O anexo sem número, que é o único a passar pelo ramo do "(*)".
       [{ id: 'rad', nome: 'Radiações', anexoNr16: 'ANEXO_RADIACOES' }],
+      // "Sem enquadramento em Anexo" escolhido no seletor, ao lado de um anexo.
+      [
+        { id: 'sem', nome: 'Sem risco', anexoNr16: 'SEM_ENQUADRAMENTO' },
+        { id: 'inf', nome: 'Inflamáveis', anexoNr16: 'ANEXO_02' },
+      ],
     ]) {
       expect(quadrosNr16DoItem10(agentes, '10.2')).toEqual(quadrosNoFront(agentes, '10.2'))
     }
@@ -255,6 +369,17 @@ describe('tabela da NR-16 nos dois quadros', () => {
     expect(conclusaoSemRiscoNr16()).toContain('• Anexo 1 – Explosivos;')
     expect(conclusaoSemRiscoNr16())
       .toContain('• Anexo (*) – Radiações ionizantes ou substâncias radioativas;')
+  })
+
+  it('“Sem enquadramento em Anexo” vai para o quadro Sem Risco, e por último', () => {
+    const sentinela = { id: 'sem', nome: 'Sem risco', anexoNr16: 'SEM_ENQUADRAMENTO' }
+    const inflamaveis = { id: 'inf', nome: 'Inflamáveis', anexoNr16: 'ANEXO_02' }
+
+    expect(quadrosNr16DoItem10([sentinela, inflamaveis], '10.2')
+      .map((quadro) => `${quadro.numero}. ${quadro.titulo}`)).toEqual([
+      '10.2.1. Inflamáveis – Avaliação, Resultado e Conclusão',
+      '10.2.2. Sem Risco – Avaliação, Resultado e Conclusão',
+    ])
   })
 
   it('numera os quadros em sequência, sem buraco de anexo não avaliado', () => {

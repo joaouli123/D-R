@@ -1,4 +1,13 @@
-import type { AgenteAvaliado } from '@/types'
+import type {
+  AgenteAvaliado,
+  ExposicaoPericulosidade,
+  PeriodicidadeOperacionalNr16,
+  PresencaAreaRisco,
+  RelacaoAtividadeNr16,
+  ResultadoPericulosidade,
+  SituacaoAreaRisco,
+  UnidadeTempoExposicaoNr16,
+} from '@/types'
 
 /**
  * Matriz vigente da NR-16.
@@ -15,7 +24,6 @@ export interface AnexoNr16Info {
   /** Nome curto do assunto, o que nomeia o subitem do item 10. */
   assunto: string
   risco: string
-  atividadesSugeridas: string[]
 }
 
 /**
@@ -60,6 +68,127 @@ export const PADRAO_NR16_SEM_ENQUADRAMENTO = {
   resultadoPericulosidade: 'nao_caracterizada' as const,
 }
 
+/**
+ * A opção "Sem enquadramento em Anexo" do seletor de anexo.
+ *
+ * Fica FORA de `ANEXOS_NR16` de propósito. Aquela lista é o rol da norma:
+ * `conclusaoSemRiscoNr16` a imprime como "todos os anexos foram observados",
+ * `quadrosNr16DoItem10` a percorre para dar título aos quadros e o índice da
+ * Biblioteca conta com o tamanho dela. Gravado no agente, este valor não casa
+ * com anexo nenhum — e o quadro cai, como deve, no "Sem Risco".
+ */
+export const SEM_ENQUADRAMENTO_NR16 = 'SEM_ENQUADRAMENTO'
+export const LABEL_SEM_ENQUADRAMENTO_NR16 = 'Sem enquadramento em Anexo da NR-16'
+
+// ------------------------------------------------------------
+// Opções dos seletores. O rótulo é o da TELA — curto, para decidir rápido.
+// O texto que vai ao laudo é outro e mora nos renderizadores
+// (src/lib/apresentacaoAgente.ts e o espelho do servidor).
+// ------------------------------------------------------------
+
+export interface OpcaoNr16<T extends string> {
+  value: T
+  label: string
+}
+
+/**
+ * A Súmula 364 do TST separa duas hipóteses que a tela antiga juntava numa
+ * opção só ("eventual ou por tempo extremamente reduzido"): o contato
+ * fortuito e o habitual por tempo extremamente reduzido. As duas afastam o
+ * adicional, mas por razões diferentes, e o laudo precisa dizer qual.
+ */
+export const OPCOES_EXPOSICAO_NR16: readonly OpcaoNr16<ExposicaoPericulosidade>[] = [
+  { value: 'permanente', label: 'Permanente — durante toda a jornada' },
+  { value: 'intermitente', label: 'Intermitente — habitual, em parte da jornada' },
+  { value: 'fortuita', label: 'Eventual — contato fortuito, fora da rotina' },
+  { value: 'tempo_extremamente_reduzido', label: 'Habitual, por tempo extremamente reduzido' },
+  { value: 'nao_constatada', label: 'Não constatada exposição que atenda aos critérios normativos' },
+]
+
+/** Só aparece na lista quando a perícia já gravou esse valor. */
+export const OPCAO_EXPOSICAO_LEGADA_NR16: OpcaoNr16<ExposicaoPericulosidade> = {
+  value: 'eventual',
+  label: 'Eventual ou por tempo extremamente reduzido (registro anterior)',
+}
+
+export const OPCOES_RESULTADO_NR16: readonly OpcaoNr16<ResultadoPericulosidade>[] = [
+  { value: 'caracterizada', label: 'Caracterizada a periculosidade' },
+  { value: 'caracterizada_parcial', label: 'Caracterização parcial — restrita a período ou atividade' },
+  { value: 'nao_caracterizada', label: 'Não caracterizada a periculosidade' },
+  { value: 'prejudicada', label: 'Não foi possível caracterizar — elementos insuficientes' },
+]
+
+export const OPCOES_SITUACAO_AREA_NR16: readonly OpcaoNr16<SituacaoAreaRisco>[] = [
+  { value: 'dentro', label: 'Dentro da área de risco' },
+  { value: 'parcialmente_dentro', label: 'Parcialmente dentro da área de risco' },
+  { value: 'fora', label: 'Fora da área de risco' },
+  { value: 'nao_caracterizada', label: 'Área de risco não caracterizada' },
+]
+
+export const OPCOES_PRESENCA_AREA_NR16: readonly OpcaoNr16<PresencaAreaRisco>[] = [
+  { value: 'permanencia', label: 'Permanência' },
+  { value: 'circulacao', label: 'Circulação' },
+  { value: 'acesso_eventual', label: 'Acesso eventual' },
+]
+
+export const OPCOES_RELACAO_ATIVIDADE_NR16: readonly OpcaoNr16<RelacaoAtividadeNr16>[] = [
+  { value: 'principal', label: 'Atividade principal' },
+  { value: 'secundaria', label: 'Atividade secundária' },
+  { value: 'complementar', label: 'Atividade complementar' },
+]
+
+export const OPCOES_UNIDADE_TEMPO_NR16: readonly OpcaoNr16<UnidadeTempoExposicaoNr16>[] = [
+  { value: 'minutos_dia', label: 'min/dia' },
+  { value: 'horas_dia', label: 'h/dia' },
+]
+
+export const OPCOES_PERIODICIDADE_NR16: readonly OpcaoNr16<PeriodicidadeOperacionalNr16>[] = [
+  { value: 'dia', label: 'por dia' },
+  { value: 'semana', label: 'por semana' },
+  { value: 'mes', label: 'por mês' },
+]
+
+/**
+ * Observações de uso frequente, oferecidas como atalho.
+ *
+ * As nove primeiras são as do modelo que o cliente enviou, na redação dele.
+ * As duas últimas registram as regras que o mesmo modelo pede que a tela
+ * respeite — EPI não afasta a periculosidade e cargo não é critério —, para
+ * que possam constar do laudo quando o caso as puser em discussão.
+ */
+export const OBSERVACOES_PADRAO_NR16: readonly string[] = [
+  'Atividade realizada fora da área de risco.',
+  'Acesso eventual à área de risco.',
+  'Não houve permanência habitual.',
+  'Condição de risco não estava presente durante a atividade.',
+  'Área de risco devidamente delimitada.',
+  'Atividade não corresponde às operações previstas no Anexo avaliado.',
+  'Condição observada não atende ao critério de enquadramento.',
+  'Avaliação restrita ao período informado.',
+  'Avaliação restrita ao setor informado.',
+  'O fornecimento e o uso de EPI não afastam, por si só, a condição de risco que caracteriza a periculosidade.',
+  'O enquadramento considerou a atividade efetivamente exercida, e não a denominação do cargo.',
+]
+
+/**
+ * Liga ou desliga uma observação padrão no texto, uma por linha.
+ *
+ * Compara a linha inteira: o perito pode ter escrito em volta, e só a linha
+ * idêntica à do atalho é do atalho para tirar.
+ */
+export function alternarObservacaoNr16(observacao: string | undefined, frase: string): string {
+  const linhas = (observacao ?? '').split('\n')
+  if (linhas.some((linha) => linha.trim() === frase)) {
+    return linhas.filter((linha) => linha.trim() !== frase).join('\n').trim()
+  }
+  const atual = (observacao ?? '').trimEnd()
+  return atual ? `${atual}\n${frase}` : frase
+}
+
+export function temObservacaoNr16(observacao: string | undefined, frase: string): boolean {
+  return (observacao ?? '').split('\n').some((linha) => linha.trim() === frase)
+}
+
 export const ANEXOS_NR16: AnexoNr16Info[] = [
   {
     id: 'ANEXO_01',
@@ -67,16 +196,6 @@ export const ANEXOS_NR16: AnexoNr16Info[] = [
     assunto: 'Explosivos',
     label: 'Anexo 1 — Atividades e Operações Perigosas com Explosivos',
     risco: 'Explosivos',
-    atividadesSugeridas: [
-      'Armazenamento de explosivos',
-      'Transporte de explosivos',
-      'Operação de escorva de cartuchos',
-      'Carregamento de explosivos',
-      'Detonação',
-      'Verificação de detonações falhadas',
-      'Queima e destruição de explosivos deteriorados',
-      'Manuseio de explosivos',
-    ],
   },
   {
     id: 'ANEXO_02',
@@ -84,20 +203,6 @@ export const ANEXOS_NR16: AnexoNr16Info[] = [
     assunto: 'Inflamáveis',
     label: 'Anexo 2 — Atividades e Operações Perigosas com Inflamáveis',
     risco: 'Inflamáveis',
-    atividadesSugeridas: [
-      'Produção, transporte, processamento e armazenamento de gás liquefeito',
-      'Transporte e armazenagem de inflamáveis líquidos e gasosos liquefeitos e de vasilhames vazios não desgaseificados ou decantados',
-      'Reabastecimento de aeronaves',
-      'Carregamento de navios-tanques, vagões-tanques, caminhões-tanques e enchimento de vasilhames com inflamáveis',
-      'Descarga de navios-tanques, vagões-tanques, caminhões-tanques e vasilhames com inflamáveis',
-      'Operação e manutenção de navios-tanques, vagões-tanques, caminhões-tanques, bombas e vasilhames com inflamáveis',
-      'Desgaseificação, decantação e reparos de vasilhames não desgaseificados ou decantados',
-      'Teste de aparelhos de consumo de gás e seus equipamentos',
-      'Transporte de inflamáveis líquidos e gasosos liquefeitos em caminhão-tanque',
-      'Transporte de vasilhames com inflamável líquido em quantidade total igual ou superior a 200 litros',
-      'Transporte de vasilhames com inflamáveis gasosos liquefeitos em quantidade total igual ou superior a 135 quilos',
-      'Operação em postos de serviço e bombas de abastecimento de inflamáveis líquidos',
-    ],
   },
   {
     id: 'ANEXO_03',
@@ -105,17 +210,6 @@ export const ANEXOS_NR16: AnexoNr16Info[] = [
     assunto: 'Segurança pessoal ou patrimonial',
     label: 'Anexo 3 — Segurança Pessoal ou Patrimonial',
     risco: 'Roubos ou outras espécies de violência física',
-    atividadesSugeridas: [
-      'Vigilância patrimonial',
-      'Segurança de eventos',
-      'Segurança nos transportes coletivos',
-      'Segurança ambiental e florestal',
-      'Transporte de valores',
-      'Escolta armada',
-      'Segurança pessoal',
-      'Supervisão ou fiscalização operacional',
-      'Telemonitoramento ou telecontrole',
-    ],
   },
   {
     id: 'ANEXO_04',
@@ -123,12 +217,6 @@ export const ANEXOS_NR16: AnexoNr16Info[] = [
     assunto: 'Energia elétrica',
     label: 'Anexo 4 — Atividades e Operações Perigosas com Energia Elétrica',
     risco: 'Energia elétrica',
-    atividadesSugeridas: [
-      'Trabalho em instalações ou equipamentos energizados em alta tensão',
-      'Trabalho em proximidade, conforme a NR-10',
-      'Trabalho em baixa tensão no SEC sem atendimento ao item 10.2.8 da NR-10',
-      'Atividade em instalações ou equipamentos integrantes do SEP',
-    ],
   },
   {
     id: 'ANEXO_05',
@@ -136,9 +224,6 @@ export const ANEXOS_NR16: AnexoNr16Info[] = [
     assunto: 'Motocicleta',
     label: 'Anexo 5 — Atividades Perigosas em Motocicleta',
     risco: 'Motocicleta',
-    atividadesSugeridas: [
-      'Deslocamento laboral em motocicleta por vias abertas à circulação pública',
-    ],
   },
   {
     id: 'ANEXO_06',
@@ -146,9 +231,6 @@ export const ANEXOS_NR16: AnexoNr16Info[] = [
     assunto: 'Agentes das autoridades de trânsito',
     label: 'Anexo 6 — Agentes das Autoridades de Trânsito',
     risco: 'Colisões, atropelamentos ou outras espécies de acidentes ou violências',
-    atividadesSugeridas: [
-      'Atividade profissional de agente da autoridade de trânsito com exposição ao risco',
-    ],
   },
   {
     id: 'ANEXO_RADIACOES',
@@ -156,10 +238,6 @@ export const ANEXOS_NR16: AnexoNr16Info[] = [
     assunto: 'Radiações ionizantes ou substâncias radioativas',
     label: 'Anexo sem número — Radiações Ionizantes ou Substâncias Radioativas',
     risco: 'Radiações ionizantes ou substâncias radioativas',
-    atividadesSugeridas: [
-      'Produção, utilização, processamento, transporte, guarda, estocagem ou manuseio de material radioativo',
-      'Operação ou manutenção em área sujeita a risco por radiações ionizantes',
-    ],
   },
 ]
 
@@ -193,11 +271,11 @@ const CAMPOS_POR_ANEXO_NR16: Record<string, readonly CampoAnexoNr16[]> = {
       id: 'produto',
       rotulo: 'Explosivo ou acessório manuseado',
       opcoes: [
-        'Explosivo iniciador (espoleta, estopim)',
+        'Explosivo iniciador (espoleta)',
         'Explosivo de ruptura (dinamite, emulsão, ANFO)',
         'Pólvora ou propelente',
         'Fogos de artifício',
-        'Acessório de detonação (cordel detonante, retardo)',
+        'Acessório de detonação (estopim, cordel detonante, retardo)',
       ],
     },
     {
@@ -288,6 +366,16 @@ const CAMPOS_POR_ANEXO_NR16: Record<string, readonly CampoAnexoNr16[]> = {
       ],
     },
     {
+      id: 'recipiente',
+      rotulo: 'Condição do recipiente',
+      opcoes: [
+        'Cheio',
+        'Em uso',
+        'Vazio não desgaseificado ou não decantado',
+        'Vazio desgaseificado ou decantado',
+      ],
+    },
+    {
       id: 'local',
       rotulo: 'Local da operação',
       opcoes: [
@@ -306,10 +394,12 @@ const CAMPOS_POR_ANEXO_NR16: Record<string, readonly CampoAnexoNr16[]> = {
       rotulo: 'Atividade de segurança exercida',
       opcoes: [
         'Vigilância patrimonial',
-        'Segurança pessoal',
+        'Segurança de eventos',
+        'Segurança nos transportes coletivos',
+        'Segurança ambiental e florestal',
         'Transporte de valores',
         'Escolta armada',
-        'Segurança de eventos',
+        'Segurança pessoal',
         'Supervisão ou fiscalização operacional',
         'Telemonitoramento ou telecontrole',
       ],
@@ -317,10 +407,14 @@ const CAMPOS_POR_ANEXO_NR16: Record<string, readonly CampoAnexoNr16[]> = {
     {
       id: 'vinculo',
       rotulo: 'Forma de contratação',
+      // As duas condições do item 2 do Anexo 3 — sem uma delas, o quadro do
+      // item 3 não se aplica. A última opção registra o caso que o processo
+      // costuma discutir: vigia ou porteiro, contratado para outra função.
       opcoes: [
-        'Empregado de empresa de segurança privada',
-        'Empregado de empresa com serviço orgânico de segurança',
-        'Contratado para outra função, com atribuições de segurança',
+        'Empregado de empresa prestadora de serviço de segurança privada (item 2, alínea a)',
+        'Empregado de serviço orgânico de segurança privada (item 2, alínea a)',
+        'Contratado diretamente pela administração pública para segurança de instalações metroviárias, ferroviárias, portuárias, rodoviárias, aeroportuárias ou de bens públicos (item 2, alínea b)',
+        'Contratado para outra função (vigia, porteiro, controlador de acesso)',
       ],
     },
     {
@@ -346,9 +440,12 @@ const CAMPOS_POR_ANEXO_NR16: Record<string, readonly CampoAnexoNr16[]> = {
     {
       id: 'tensao',
       rotulo: 'Tensão das instalações',
+      // Faixas do glossário da NR-10. A extra-baixa tensão entra porque o
+      // item 2, alínea b, do Anexo 4 a exclui do adicional.
       opcoes: [
-        'Alta tensão — acima de 1.000 volts em corrente alternada',
-        'Baixa tensão — até 1.000 volts em corrente alternada',
+        'Alta tensão — superior a 1.000 V em corrente alternada ou 1.500 V em corrente contínua',
+        'Baixa tensão — superior a 50 V e até 1.000 V em corrente alternada, ou superior a 120 V e até 1.500 V em corrente contínua',
+        'Extra-baixa tensão — até 50 V em corrente alternada ou 120 V em corrente contínua',
         'Alta e baixa tensão',
       ],
     },
@@ -358,7 +455,9 @@ const CAMPOS_POR_ANEXO_NR16: Record<string, readonly CampoAnexoNr16[]> = {
       opcoes: [
         'Instalações ou equipamentos energizados',
         'Trabalho em proximidade, conforme a NR-10',
-        'Instalações desenergizadas com bloqueio e impedimento de reenergização',
+        'Desenergizadas e liberadas para o trabalho, sem possibilidade de energização acidental (item 2, alínea a)',
+        'Desenergizadas, com possibilidade de energização acidental',
+        'Operações elementares em baixa tensão — uso de equipamentos energizados, ligar e desligar circuitos (item 2, alínea c)',
       ],
     },
     {
@@ -385,10 +484,31 @@ const CAMPOS_POR_ANEXO_NR16: Record<string, readonly CampoAnexoNr16[]> = {
     {
       id: 'via',
       rotulo: 'Via percorrida',
+      // Itens 3.1 e 3.2, alíneas a a c, na redação da Portaria MTE nº 2.021/2025.
       opcoes: [
-        'Vias públicas abertas à circulação',
-        'Área interna do estabelecimento',
-        'Deslocamento residência-trabalho-residência',
+        'Vias abertas à circulação pública',
+        'Exclusivamente locais privados, vias internas ou vias não abertas à circulação pública',
+        'Exclusivamente estradas locais destinadas principalmente a dar acesso a propriedades lindeiras ou caminhos que ligam povoações contíguas',
+        'Somente o percurso residência-trabalho-residência',
+      ],
+    },
+    {
+      id: 'finalidade',
+      rotulo: 'Finalidade do deslocamento',
+      opcoes: [
+        'Entrega de mercadorias ou documentos',
+        'Coleta de mercadorias ou documentos',
+        'Atendimento externo a clientes',
+        'Deslocamento entre unidades ou locais de serviço',
+      ],
+    },
+    {
+      id: 'veiculo',
+      rotulo: 'Veículo utilizado',
+      opcoes: [
+        'Motocicleta',
+        'Motoneta',
+        'Veículo que dispensa emplacamento ou habilitação (item 2.3)',
       ],
     },
     {
@@ -396,7 +516,8 @@ const CAMPOS_POR_ANEXO_NR16: Record<string, readonly CampoAnexoNr16[]> = {
       rotulo: 'Habitualidade do deslocamento',
       opcoes: [
         'Deslocamento em todos os dias trabalhados',
-        'Deslocamento eventual',
+        'Deslocamento habitual, por tempo extremamente reduzido',
+        'Deslocamento eventual (fortuito)',
         'Não constatado deslocamento laboral em motocicleta',
       ],
     },
@@ -411,9 +532,25 @@ const CAMPOS_POR_ANEXO_NR16: Record<string, readonly CampoAnexoNr16[]> = {
       ],
     },
     {
+      id: 'atividadeTransito',
+      rotulo: 'Atividade exercida',
+      opcoes: [
+        'Fiscalização de trânsito',
+        'Operação de trânsito',
+        'Patrulhamento viário',
+        'Escolta',
+        'Atividade administrativa interna',
+      ],
+    },
+    {
       id: 'local',
       rotulo: 'Local do exercício',
+      // O item 3.2.1 manda analisar a exposição "independentemente do local":
+      // o local é registro de fato, não critério de exclusão.
       opcoes: [
+        'Via urbana',
+        'Rodovia',
+        'Trecho em obras',
         'Via pública, em operação de trânsito',
         'Atividade administrativa interna',
       ],
@@ -427,6 +564,7 @@ const CAMPOS_POR_ANEXO_NR16: Record<string, readonly CampoAnexoNr16[]> = {
         'Fonte selada',
         'Fonte não selada',
         'Equipamento emissor de raios X',
+        'Equipamento móvel de raios X para diagnóstico médico',
         'Material radioativo em transporte',
       ],
     },
@@ -474,6 +612,7 @@ export function anexoNr16PorId(id?: string): AnexoNr16Info | undefined {
 
 export function labelAnexoNr16(id?: string): string {
   if (!id) return ''
+  if (id === SEM_ENQUADRAMENTO_NR16) return LABEL_SEM_ENQUADRAMENTO_NR16
   return anexoNr16PorId(id)?.label ?? id
 }
 
@@ -576,10 +715,23 @@ export function quadrosNr16DoItem10<A extends { nome?: string; anexoNr16?: strin
   return avaliados.map((quadro, indice) => ({ numero: `${prefixo}.${indice + 1}`, ...quadro }))
 }
 
+/**
+ * Troca o anexo da avaliação.
+ *
+ * Tudo o que foi escrito para o anexo anterior sai — hipótese, área,
+ * exposição, pontos de verificação, redação própria —, porque nada disso vale
+ * para outro risco. Ficam o vínculo com a função e a observação do perito.
+ *
+ * A opção vazia (ou um valor que não é anexo) REMOVE o anexo: antes ela
+ * deixava o anterior gravado, e a tela mostrava "— selecione —" para um agente
+ * que o documento ainda imprimia como Inflamáveis. "Sem enquadramento" já sai
+ * com os textos padrão do cenário negativo.
+ */
 export function aplicarAnexoNr16(agente: AgenteAvaliado, id: string): AgenteAvaliado {
   const anexo = anexoNr16PorId(id)
   const {
     anexoNr15: _anexoNr15,
+    anexoNr16: _anexoNr16,
     cas: _cas,
     referenciaNormativaId: _referencia,
     unidadeLimite: _unidadeLimite,
@@ -604,8 +756,30 @@ export function aplicarAnexoNr16(agente: AgenteAvaliado, id: string): AgenteAval
     exposicaoPericulosidadeTexto: _exposicaoTexto,
     resultadoPericulosidadeTexto: _resultadoTexto,
     detalhesNr16: _detalhes,
+    enquadramentoNr16: _enquadramento,
+    situacaoAreaRisco: _situacao,
+    presencaAreaRisco: _presenca,
+    delimitacaoAreaRisco: _delimitacao,
+    distanciaAreaRisco: _distancia,
+    tempoExposicaoNr16: _tempo,
+    unidadeTempoExposicaoNr16: _unidadeTempo,
+    frequenciaOperacionalNr16: _frequencia,
+    periodicidadeOperacionalNr16: _periodicidade,
+    relacaoAtividadeNr16: _relacao,
+    periodoCaracterizacaoNr16: _periodoCaracterizacao,
     ...base
   } = agente
+
+  if (id === SEM_ENQUADRAMENTO_NR16) {
+    return {
+      ...base,
+      nome: NOME_PADRAO_SEM_ENQUADRAMENTO,
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      anexoNr16: SEM_ENQUADRAMENTO_NR16,
+      ...PADRAO_NR16_SEM_ENQUADRAMENTO,
+    }
+  }
 
   return {
     ...base,

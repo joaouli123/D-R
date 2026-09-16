@@ -1,10 +1,19 @@
 import { labelAnexoNr15 } from '@/content/anexosNr15'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
-import type { AgenteAvaliado, EpiSelecionado } from '@/types'
+import type {
+  AgenteAvaliado,
+  EpiSelecionado,
+  ExposicaoPericulosidade,
+  PeriodicidadeOperacionalNr16,
+  PresencaAreaRisco,
+  RelacaoAtividadeNr16,
+  SituacaoAreaRisco,
+} from '@/types'
 import {
   ANALISE_ATIVIDADES_NR16,
   CRITERIO_QUALITATIVO_NR16,
   LAPSO_TEMPORAL_NR16,
+  SEM_ENQUADRAMENTO_NR16,
   conclusaoSemRiscoNr16,
   labelAnexoNr16,
   temAnexoNr16Valido,
@@ -108,21 +117,173 @@ const NATUREZA: Record<string, string> = {
   quimico: 'Químico', fisico: 'Físico', biologico: 'Biológico', periculosidade: 'Periculosidade',
 }
 
-const EXPOSICAO_PERICULOSIDADE = {
+/**
+ * `fortuita` e `tempo_extremamente_reduzido` usam as palavras da Súmula 364 do
+ * TST. `eventual` é o valor dos laudos gravados antes da separação e mantém o
+ * texto com que foram emitidos.
+ */
+export const EXPOSICAO_PERICULOSIDADE: Record<ExposicaoPericulosidade, string> = {
   permanente: 'Permanente',
   intermitente: 'Intermitente',
+  fortuita: 'Eventual, assim considerado o contato fortuito',
+  tempo_extremamente_reduzido: 'Habitual, por tempo extremamente reduzido',
   eventual: 'Eventual ou por tempo extremamente reduzido',
   nao_constatada: 'Não constatada exposição a condição de risco que atenda aos critérios normativos de caracterização.',
-} as const
+}
 
 const RESULTADO_PERICULOSIDADE = {
-  caracterizada: { valor: 'Periculosidade caracterizada', destaque: 'negativo' as const },
   nao_caracterizada: {
     valor: 'Não caracterizada periculosidade, por ausência de enquadramento nos critérios técnicos e normativos aplicáveis.',
     destaque: 'positivo' as const,
   },
-  prejudicada: { valor: 'Avaliação prejudicada por insuficiência de elementos', destaque: 'aviso' as const },
+  prejudicada: { valor: 'Não foi possível caracterizar a periculosidade, por insuficiência de elementos técnicos.', destaque: 'aviso' as const },
 } as const
+
+/**
+ * O resultado escolhido no seletor, por extenso.
+ *
+ * Quando há enquadramento registrado, a caracterização o cita — é o que torna
+ * a conclusão rastreável até o item da norma. A parcial diz ainda a que
+ * período ou atividade ficou restrita.
+ */
+function resultadoPericulosidade(
+  agente: AgenteAvaliado,
+): { valor: string; destaque: 'positivo' | 'negativo' | 'aviso' } | undefined {
+  const enquadramento = agente.enquadramentoNr16?.trim()
+  const citacao = enquadramento ? ` (${enquadramento})` : ''
+  switch (agente.resultadoPericulosidade) {
+    case 'caracterizada':
+      return { valor: `Periculosidade caracterizada${citacao}`, destaque: 'negativo' }
+    case 'caracterizada_parcial': {
+      const periodo = agente.periodoCaracterizacaoNr16?.trim()
+      return {
+        valor: `Periculosidade caracterizada parcialmente${citacao}${periodo ? ` — ${periodo}` : ''}`,
+        destaque: 'negativo',
+      }
+    }
+    case 'nao_caracterizada':
+    case 'prejudicada':
+      return RESULTADO_PERICULOSIDADE[agente.resultadoPericulosidade]
+    default:
+      return undefined
+  }
+}
+
+// ------------------------------------------------------------
+// O levantamento da NR-16 em frases.
+//
+// Cada dado estruturado da tela vira uma frase do laudo. Número digitado
+// sozinho ganha a unidade ("15" → "15 metros"); texto livre sai como foi
+// escrito, porque o perito pode ter registrado "entre 10 e 15 minutos" e a
+// unidade repetida estragaria a frase.
+//
+// Espelha server/src/services/documento-comum.ts — mudou aqui, muda lá. A análise
+// automática (src/content/nr16/analise.ts) usa as mesmas frases.
+// ------------------------------------------------------------
+
+const SITUACAO_AREA_RISCO: Record<SituacaoAreaRisco, string> = {
+  dentro: 'Atividade exercida dentro da área de risco',
+  parcialmente_dentro: 'Atividade exercida parcialmente dentro da área de risco',
+  fora: 'Atividade exercida fora da área de risco',
+  nao_caracterizada: 'Área de risco não caracterizada',
+}
+
+/** A presença como complemento da situação: "…dentro da área de risco, com permanência." */
+const PRESENCA_AREA_RISCO: Record<PresencaAreaRisco, string> = {
+  permanencia: 'com permanência',
+  circulacao: 'em circulação',
+  acesso_eventual: 'com acesso eventual',
+}
+
+/** A presença registrada sem a situação. */
+const PRESENCA_AREA_RISCO_ISOLADA: Record<PresencaAreaRisco, string> = {
+  permanencia: 'Permanência na área de risco.',
+  circulacao: 'Circulação pela área de risco.',
+  acesso_eventual: 'Acesso eventual à área de risco.',
+}
+
+const PERIODICIDADE_OPERACIONAL: Record<PeriodicidadeOperacionalNr16, string> = {
+  dia: 'dia',
+  semana: 'semana',
+  mes: 'mês',
+}
+
+const RELACAO_ATIVIDADE: Record<RelacaoAtividadeNr16, string> = {
+  principal: 'Atividade principal',
+  secundaria: 'Atividade secundária',
+  complementar: 'Atividade complementar',
+}
+
+/** "15", "7,5", "2 a 3", "2-3" — número digitado sem unidade. */
+const SO_NUMERO_NR16 = /^\d+(?:[.,]\d+)?(?:\s*(?:a|-)\s*\d+(?:[.,]\d+)?)?$/
+/** "1.100", "1.000,5" — milhar com ponto, à brasileira. Nunca é um só. */
+const MILHAR_NR16 = /^\d{1,3}(?:\.\d{3})+(?:,\d+)?$/
+
+function soNumeroNr16(valor: string): boolean {
+  return MILHAR_NR16.test(valor) || SO_NUMERO_NR16.test(valor)
+}
+function quantidadeNr16(valor: string, singular: string, plural: string): string {
+  // Antes do teste de número com decimal: "1.100" não é 1,1 metro.
+  if (MILHAR_NR16.test(valor)) return `${valor} ${plural}`
+  if (!SO_NUMERO_NR16.test(valor)) return valor
+  const numero = valor.replace(/\./g, ',')
+  return `${numero} ${Number(valor.replace(',', '.')) === 1 ? singular : plural}`
+}
+
+export function fraseSituacaoAreaRiscoNr16(agente: AgenteAvaliado): string {
+  const situacao = agente.situacaoAreaRisco ? SITUACAO_AREA_RISCO[agente.situacaoAreaRisco] : undefined
+  // Fora da área, ou sem área caracterizada, não há presença a descrever.
+  const cabePresenca = agente.situacaoAreaRisco !== 'fora' && agente.situacaoAreaRisco !== 'nao_caracterizada'
+  const presenca = cabePresenca && agente.presencaAreaRisco ? agente.presencaAreaRisco : undefined
+  if (situacao && presenca) return `${situacao}, ${PRESENCA_AREA_RISCO[presenca]}.`
+  if (situacao) return `${situacao}.`
+  return presenca ? PRESENCA_AREA_RISCO_ISOLADA[presenca] ?? '' : ''
+}
+
+export function textoDistanciaAreaRiscoNr16(agente: AgenteAvaliado): string {
+  const distancia = agente.distanciaAreaRisco?.trim()
+  return distancia ? quantidadeNr16(distancia, 'metro', 'metros') : ''
+}
+
+export function textoTempoExposicaoNr16(agente: AgenteAvaliado): string {
+  const tempo = agente.tempoExposicaoNr16?.trim()
+  if (!tempo) return ''
+  if (!agente.unidadeTempoExposicaoNr16 || !soNumeroNr16(tempo)) return tempo
+  const [singular, plural] = agente.unidadeTempoExposicaoNr16 === 'horas_dia'
+    ? ['hora', 'horas']
+    : ['minuto', 'minutos']
+  return `${quantidadeNr16(tempo, singular, plural)} por dia`
+}
+
+export function textoFrequenciaOperacionalNr16(agente: AgenteAvaliado): string {
+  const frequencia = agente.frequenciaOperacionalNr16?.trim()
+  if (!frequencia) return ''
+  if (!soNumeroNr16(frequencia)) return frequencia
+  const periodo = agente.periodicidadeOperacionalNr16
+    ? ` por ${PERIODICIDADE_OPERACIONAL[agente.periodicidadeOperacionalNr16]}`
+    : ''
+  return `${quantidadeNr16(frequencia, 'vez', 'vezes')}${periodo}`
+}
+
+export function textoRelacaoAtividadeNr16(agente: AgenteAvaliado): string {
+  return agente.relacaoAtividadeNr16 ? RELACAO_ATIVIDADE[agente.relacaoAtividadeNr16] ?? '' : ''
+}
+
+/**
+ * A célula "Condição ou área de risco": onde o trabalhador estava, qual é a
+ * área que a norma delimita, a que distância dela, e o texto livre do perito.
+ * Uma informação por linha, nessa ordem.
+ */
+export function textoCondicaoAreaRiscoNr16(agente: AgenteAvaliado): string {
+  const delimitacao = agente.delimitacaoAreaRisco?.trim()
+  const distancia = textoDistanciaAreaRiscoNr16(agente)
+  return [
+    fraseSituacaoAreaRiscoNr16(agente),
+    delimitacao ? `Área de risco: ${delimitacao}` : '',
+    distancia ? `Distância verificada: ${distancia}` : '',
+    agente.areaRisco?.trim() ?? '',
+  ].filter(Boolean).join('\n')
+}
 
 function numeroDocumento(valor: number | string): string {
   return String(valor).replace('.', ',')
@@ -259,9 +420,7 @@ export function montarApresentacaoAgente(
     // seletor: a lista fechada resolve o caso comum, o texto livre resolve o
     // que ela não previu.
     // ------------------------------------------------------------
-    const resultado = agente.resultadoPericulosidade
-      ? RESULTADO_PERICULOSIDADE[agente.resultadoPericulosidade]
-      : undefined
+    const resultado = resultadoPericulosidade(agente)
     const exposicaoTexto = agente.exposicaoPericulosidadeTexto?.trim()
     const resultadoTexto = agente.resultadoPericulosidadeTexto?.trim()
     const semEnquadramento =
@@ -316,21 +475,33 @@ export function montarApresentacaoAgente(
       }
     }
 
+    // A ordem é a do raciocínio pericial: anexo, item da norma, atividade,
+    // condição e área, e por fim a exposição com tempo e frequência. O
+    // resultado não entra — é do item 10.
+    //
+    // "Sem enquadramento" não imprime a linha do anexo: o quadro sai igual ao
+    // do cenário negativo que o perito aprovou, em que ela não existia.
+    const enquadramento = agente.enquadramentoNr16?.trim()
+    const condicaoArea = textoCondicaoAreaRiscoNr16(agente)
+    const tempo = textoTempoExposicaoNr16(agente)
+    const frequencia = textoFrequenciaOperacionalNr16(agente)
+    const relacao = textoRelacaoAtividadeNr16(agente)
     return {
       titulo,
       linhas: [
         ...(agente.funcaoPosto ? [{ rotulo: 'Função / Posto', valor: agente.funcaoPosto }] : []),
-        ...(agente.anexoNr16 ? [{ rotulo: 'Anexo NR-16', valor: labelAnexoNr16(agente.anexoNr16) }] : []),
+        ...(agente.anexoNr16 && agente.anexoNr16 !== SEM_ENQUADRAMENTO_NR16
+          ? [{ rotulo: 'Anexo NR-16', valor: labelAnexoNr16(agente.anexoNr16) }]
+          : []),
         { rotulo: 'Natureza', valor: 'Periculosidade' },
         { rotulo: 'Critério', valor: CRITERIO_QUALITATIVO_NR16 },
         { rotulo: 'Lapso temporal', valor: LAPSO_TEMPORAL_NR16 },
         { rotulo: 'Adicional Pretendido', valor: '30%' },
+        ...(enquadramento ? [{ rotulo: 'Enquadramento normativo', valor: enquadramento }] : []),
         ...(agente.atividadeEnquadrada?.trim()
           ? [{ rotulo: 'Atividade ou operação avaliada', valor: agente.atividadeEnquadrada.trim() }]
           : []),
-        ...(agente.areaRisco?.trim()
-          ? [{ rotulo: 'Condição ou área de risco', valor: agente.areaRisco.trim() }]
-          : []),
+        ...(condicaoArea ? [{ rotulo: 'Condição ou área de risco', valor: condicaoArea }] : []),
         ...(agente.analiseAnexos?.trim()
           ? [{ rotulo: 'Análise dos Anexos', valor: agente.analiseAnexos.trim() }]
           : []),
@@ -342,6 +513,9 @@ export function montarApresentacaoAgente(
           : agente.exposicaoPericulosidade
             ? [{ rotulo: 'Exposição', valor: EXPOSICAO_PERICULOSIDADE[agente.exposicaoPericulosidade] }]
             : []),
+        ...(tempo ? [{ rotulo: 'Tempo médio de exposição', valor: tempo }] : []),
+        ...(frequencia ? [{ rotulo: 'Frequência operacional', valor: frequencia }] : []),
+        ...(relacao ? [{ rotulo: 'Relação com a atividade', valor: relacao }] : []),
       ],
       protecoes: [],
     }

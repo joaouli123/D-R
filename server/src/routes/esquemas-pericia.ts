@@ -73,14 +73,29 @@ export const agenteSchema = z.object({
   fonteRuido: z.enum(['maquinas', 'ruido_fundo', 'administrativa']).optional(),
   areaRisco: texto.optional(),
   analiseAnexos: texto.optional(),
-  exposicaoPericulosidade: z.enum(['permanente', 'intermitente', 'eventual', 'nao_constatada']).optional(),
-  resultadoPericulosidade: z.enum(['caracterizada', 'nao_caracterizada', 'prejudicada']).optional(),
+  // 'eventual' continua aceito: é o valor dos laudos gravados antes de a tela
+  // separar as duas hipóteses da Súmula 364 (fortuita e tempo reduzido).
+  exposicaoPericulosidade: z.enum([
+    'permanente', 'intermitente', 'fortuita', 'tempo_extremamente_reduzido', 'eventual', 'nao_constatada',
+  ]).optional(),
+  resultadoPericulosidade: z.enum(['caracterizada', 'caracterizada_parcial', 'nao_caracterizada', 'prejudicada']).optional(),
   // A redação própria e os pontos de verificação do anexo entram como
   // opcionais de propósito: perícias já gravadas não os têm e precisam
   // continuar validando na hora de salvar.
   exposicaoPericulosidadeTexto: texto.optional(),
   resultadoPericulosidadeTexto: texto.optional(),
   detalhesNr16: z.array(z.object({ id: texto, rotulo: texto, valor: texto })).max(20).optional(),
+  enquadramentoNr16: texto.optional(),
+  situacaoAreaRisco: z.enum(['dentro', 'parcialmente_dentro', 'fora', 'nao_caracterizada']).optional(),
+  presencaAreaRisco: z.enum(['permanencia', 'circulacao', 'acesso_eventual']).optional(),
+  delimitacaoAreaRisco: texto.optional(),
+  distanciaAreaRisco: texto.optional(),
+  tempoExposicaoNr16: texto.optional(),
+  unidadeTempoExposicaoNr16: z.enum(['minutos_dia', 'horas_dia']).optional(),
+  frequenciaOperacionalNr16: texto.optional(),
+  periodicidadeOperacionalNr16: z.enum(['dia', 'semana', 'mes']).optional(),
+  relacaoAtividadeNr16: z.enum(['principal', 'secundaria', 'complementar']).optional(),
+  periodoCaracterizacaoNr16: texto.optional(),
   unidadeMedicao: z.enum([
     'ppm', 'mg/m³', '% O₂ em volume', 'dB(A)', 'dB(C)', 'dB(Linear)',
     'IBUTG °C', 'mSv/ano', 'm/s²', 'm/s¹·⁷⁵', 'fibras/cm³',

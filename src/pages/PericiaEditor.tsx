@@ -61,7 +61,7 @@ import type {
   Usuario,
 } from '@/types'
 import { ANEXOS_NR15 } from '@/content/anexosNr15'
-import { aplicarAnexoNr16 } from '@/content/anexosNr16'
+import { aplicarAnexoNr16, temAnexoNr16Valido } from '@/content/anexosNr16'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
 import { CHAVE_BIBLIOTECA_POR_CAMPO } from '@/content/referenciasParecer'
 import {
@@ -144,8 +144,9 @@ const PASSOS = [
 
 const RESUMO_RESULTADO_NR16: Record<string, string> = {
   caracterizada: 'periculosidade caracterizada',
+  caracterizada_parcial: 'caracterização parcial',
   nao_caracterizada: 'não caracterizada',
-  prejudicada: 'avaliação prejudicada',
+  prejudicada: 'não foi possível caracterizar',
 }
 
 /** Uma linha que responde, com a avaliação NR-15 fechada: o que falta aqui? */
@@ -170,23 +171,30 @@ function resumoNr16(a: AgenteAvaliado): string {
     a.atividadeEnquadrada?.trim() || a.areaRisco?.trim() || null,
     a.resultadoPericulosidade
       ? RESUMO_RESULTADO_NR16[a.resultadoPericulosidade]
-      : 'resultado pendente',
+      : a.resultadoPericulosidadeTexto?.trim()
+        ? 'resultado em redação própria'
+        : 'resultado pendente',
   ]
     .filter(Boolean)
     .join(' · ')
 }
 
 /**
- * Avaliação NR-16 fechada: tem resultado — e tem anexo quando o resultado
- * afirma o enquadramento.
+ * Avaliação NR-16 fechada: tem resultado (opção ou redação própria) — e tem
+ * anexo da norma quando o resultado afirma o enquadramento, no todo ou em
+ * parte.
  *
- * O cenário negativo não escolhe anexo nenhum: é o próprio "quando não tem
- * nada". Exigir um deixava a avaliação padrão eternamente aberta como
- * pendência na tela, que foi o que o perito reclamou.
+ * O cenário negativo não precisa de anexo: é o próprio "quando não tem nada".
+ * Exigir um deixava a avaliação padrão eternamente aberta como pendência na
+ * tela, que foi o que o perito reclamou. Já "Sem enquadramento em Anexo" não
+ * conta como anexo para um resultado positivo — caracterizar sem anexo é
+ * justamente a contradição que a tela aponta.
  */
 function nr16Completa(a: AgenteAvaliado): boolean {
-  if (!a.resultadoPericulosidade) return false
-  return a.resultadoPericulosidade === 'caracterizada' ? Boolean(a.anexoNr16) : true
+  if (!a.resultadoPericulosidade && !a.resultadoPericulosidadeTexto?.trim()) return false
+  const caracteriza = a.resultadoPericulosidade === 'caracterizada'
+    || a.resultadoPericulosidade === 'caracterizada_parcial'
+  return caracteriza ? temAnexoNr16Valido(a) : true
 }
 
 /**
@@ -1679,9 +1687,6 @@ export default function PericiaEditor() {
                           </div>
                         }
                       >
-                        <ol aria-label="Fluxo técnico da periculosidade" className="mb-3 mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
-                          <li className="text-amber-700">Risco</li><li aria-hidden="true">→</li><li>Enquadramento</li><li aria-hidden="true">→</li><li>Conclusão</li>
-                        </ol>
                         <SeletorFuncaoPosto
                           agente={a}
                           periodos={p.tecnico.periodos}
