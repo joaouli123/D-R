@@ -191,7 +191,7 @@ describe('DocumentoPreview', () => {
 
     expect(html).toContain('Não foi constatada exposição habitual a agentes biológicos.')
     expect(html).not.toContain('<th>Propriedade</th><th>Informação</th>')
-    expect(html).toMatch(/Agentes biológicos[\s\S]*?<h[34]>Conclusão<\/h[34]>/)
+    expect(html).toMatch(/Agentes biológicos[\s\S]*?Conclusão: Não foi constatada exposição habitual a agentes biológicos\./)
   })
 
   it('mostra a conclusão logo após a tabela de cada agente identificado', () => {
@@ -213,7 +213,7 @@ describe('DocumentoPreview', () => {
       />,
     )
 
-    expect(html).toMatch(/<table class="agente-propriedades">[\s\S]*?<\/table><h[34]>Conclusão<\/h[34]>[\s\S]*?Conclusão técnica exclusiva do agente frio\./)
+    expect(html).toMatch(/<table class="agente-propriedades">[\s\S]*?<\/table><p>Conclusão: Conclusão técnica exclusiva do agente frio\.<\/p>/)
   })
 
   it('imprime a análise técnica depois dos quadros dos agentes, não antes', () => {
@@ -245,9 +245,9 @@ describe('DocumentoPreview', () => {
     )
   })
 
-  it('omite o título "Conclusão" quando a avaliação NR-15 está sem texto', () => {
-    // Um <h4>Conclusão</h4> seguido de nada — era o que o perito lia como
-    // pendência dentro do documento já emitido.
+  it('omite a linha "Conclusão:" quando a avaliação NR-15 está sem texto', () => {
+    // "Conclusão: " seguido de nada — era o que o perito lia como pendência
+    // dentro do documento já emitido.
     const html = renderToStaticMarkup(
       <DocumentoPreview
         pericia={{
@@ -266,7 +266,7 @@ describe('DocumentoPreview', () => {
     )
 
     expect(html).toContain('Calor')
-    expect(html).not.toMatch(/<h[34]>Conclusão<\/h[34]>/)
+    expect(html).not.toContain('Conclusão:')
   })
 
   it('tira da seção de EPIs os agentes que a modalidade excluiu', () => {
@@ -393,10 +393,12 @@ describe('DocumentoPreview', () => {
     expect(html).toContain('10.2.1. Inflamáveis – Avaliação, Resultado e Conclusão')
   })
 
-  it('transcreve no 7.3.2 o risco alegado pela parte, com a folha da inicial', () => {
+  it('transcreve no 7.3.2 o risco alegado pela parte', () => {
     // O 7.3.2 é transcrição: o que a parte alegou na inicial, palavra por
-    // palavra, e a folha de onde saiu. Vem depois do critério (7.3.1) e antes
-    // dos quadros — e só sai quando o perito escreveu alguma coisa.
+    // palavra. Vem depois do critério (7.3.1) e antes dos quadros — e só sai
+    // quando o perito escreveu alguma coisa. A fonte da transcrição (ex.:
+    // "Inicial do processo - Fls.: 8") deixou de ter campo próprio — quem
+    // quiser registrá-la escreve junto no próprio texto do risco alegado.
     const html = renderToStaticMarkup(
       <DocumentoPreview
         pericia={{
@@ -405,7 +407,6 @@ describe('DocumentoPreview', () => {
             ...pericia.tecnico,
             criterioAvaliacaoPericulosidade: 'Critério qualitativo.',
             riscoAlegadoPericulosidade: 'Sustenta a parte Reclamante que laborava no abastecimento de veículos.',
-            fonteRiscoAlegado: 'Inicial do processo - Fls.: 8',
           },
         }}
         empresas={[]}
@@ -417,7 +418,6 @@ describe('DocumentoPreview', () => {
       '7.3.1. Critério de Avaliação',
       '7.3.2. Risco de Periculosidade Alegado pela Parte Reclamante',
       'Sustenta a parte Reclamante que laborava no abastecimento de veículos.',
-      'Fonte: Inicial do processo - Fls.: 8',
     ].map((trecho) => html.indexOf(trecho))
     expect(posicoes.every((posicao) => posicao >= 0)).toBe(true)
     expect(posicoes).toEqual([...posicoes].sort((a, b) => a - b))
@@ -485,7 +485,14 @@ describe('DocumentoPreview', () => {
     expect(secaoEpis).toContain('CA da peça facial')
     expect(secaoEpis).toContain('90 - 17 = 73 dB(A)')
     expect(secaoEpis).toMatch(/Eficácia comprovada<\/th><td[^>]*>Sim/)
-    expect(secaoEpis).toContain('EPI reconhecido na diligência')
+    // A foto marcada 'epi' saiu do item 8 (agora sem fotos) e passou a sair
+    // junto das evidências do 6.3 — não pode duplicar nas duas seções.
+    expect(secaoEpis).not.toContain('EPI reconhecido na diligência')
+    const secaoVistoria = html.slice(
+      html.indexOf('6.3. Constatações da Vistoria Pericial'),
+      html.indexOf('6.4. Produtos Utilizados Habitualmente nas Atividades'),
+    )
+    expect(secaoVistoria).toContain('EPI reconhecido na diligência')
   })
 
   // Espelha server/src/services/documento-parecer.test.ts (PDF) e
@@ -525,8 +532,9 @@ describe('DocumentoPreview', () => {
       <DocumentoPreview pericia={pericia} empresas={[]} titulo="Parecer de teste" />,
     )
 
-    // A foto de "Ambiente" sai no item 3.1 e a de "EPIs" só no item 8, ainda
-    // que as duas tenham sido gravadas com ordem 1.
+    // A foto de "Ambiente" sai no item 3.1 e a de "EPIs" só no item 6.3
+    // (evidências constatadas em perícia), ainda que as duas tenham sido
+    // gravadas com ordem 1.
     expect(html.indexOf('Fotografia 1 – Vista geral do galpão')).toBeLessThan(
       html.indexOf('Fotografia 2 – EPI reconhecido na diligência'),
     )

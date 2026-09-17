@@ -51,7 +51,7 @@ export async function encerrarBrowser(): Promise<void> {
 const RODAPE = `
   <div style="width:100%;font-family:Arial,sans-serif;font-size:8pt;color:#656155;padding:0 2cm;
               display:flex;justify-content:space-between;align-items:center;">
-    <span>D&amp;R Perícia — Plataforma Inteligente de Perícia Trabalhista</span>
+    <span>© D&amp;R Perícia Trabalhista — Propriedade intelectual exclusiva e protegida.</span>
     <span>Página <span class="pageNumber"></span> de <span class="totalPages"></span></span>
   </div>`
 

@@ -99,11 +99,11 @@ describe('parecer em HTML (motor do PDF)', () => {
     expect(html.indexOf('Fotografia 1')).toBeLessThan(html.indexOf('Fotografia 2'))
   })
 
-  it('não imprime o título "Conclusão" quando a avaliação está sem texto', async () => {
+  it('não imprime a linha "Conclusão:" quando a avaliação está sem texto', async () => {
     // O agente da fixture não tem `observacao`. Antes, o quadro fechava com um
     // <h4>Conclusão</h4> seguido de nada — o que o perito leu como defeito do
     // gerador dentro do documento pronto.
-    expect(await gerar()).not.toContain('<h4>Conclusão</h4>')
+    expect(await gerar()).not.toContain('Conclusão:')
   })
 
   it('imprime a conclusão da avaliação quando ela existe', async () => {
@@ -113,8 +113,7 @@ describe('parecer em HTML (motor do PDF)', () => {
 
     const html = await gerar(pericia)
 
-    expect(html).toContain('<h4>Conclusão</h4>')
-    expect(html).toContain('A exposição é habitual e permanente.')
+    expect(html).toContain('Conclusão: A exposição é habitual e permanente.')
   })
 
   it('tira da seção de EPIs os agentes que a modalidade excluiu', async () => {
@@ -133,7 +132,7 @@ describe('parecer em HTML (motor do PDF)', () => {
     expect(html).not.toContain('Plug 3M 1100')
   })
 
-  it('transcreve no 7.3.2 o risco alegado pela parte, com a folha da inicial', async () => {
+  it('transcreve no 7.3.2 o risco alegado pela parte', async () => {
     const pericia = periciaDeTeste()
     // Com as duas modalidades a NR-16 é a terceira subseção do item 7 — é o
     // 7.3 do modelo que o perito mandou.
@@ -141,7 +140,6 @@ describe('parecer em HTML (motor do PDF)', () => {
     Object.assign(pericia.tecnico as object, {
       criterioAvaliacaoPericulosidade: 'Critério qualitativo.',
       riscoAlegadoPericulosidade: 'Sustenta a parte Reclamante que laborava no abastecimento de veículos.',
-      fonteRiscoAlegado: 'Inicial do processo - Fls.: 8',
     })
 
     const html = await gerar(pericia)
@@ -150,7 +148,6 @@ describe('parecer em HTML (motor do PDF)', () => {
       '7.3.1. Critério de Avaliação',
       '7.3.2. Risco de Periculosidade Alegado pela Parte Reclamante',
       'Sustenta a parte Reclamante que laborava no abastecimento de veículos.',
-      'Fonte: Inicial do processo - Fls.: 8',
     ].map((trecho) => html.indexOf(trecho))
     expect(posicoes.every((posicao) => posicao >= 0)).toBe(true)
     expect(posicoes).toEqual([...posicoes].sort((a, b) => a - b))

@@ -82,14 +82,10 @@
     text-indent: 0;
     margin-left: 1.25cm;
   }
-  /* Transcrição da inicial no item 7.3.2: itálico marca a voz da parte, e a
-     fonte vem logo abaixo, menor. Espelha p.transcricao / p.fonte-transcricao
-     de server/src/services/documento-html.ts. */
+  /* Transcrição da inicial no item 7.3.2: itálico marca a voz da parte.
+     Espelha p.transcricao de server/src/services/documento-html.ts. */
   .doc-sheet p.transcricao {
     @apply mb-1 italic;
-  }
-  .doc-sheet p.fonte-transcricao {
-    @apply mb-3 text-[9pt] text-ink-600;
   }
   .doc-sheet table {
     @apply w-full border-collapse my-3 text-[10pt];

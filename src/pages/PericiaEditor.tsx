@@ -289,13 +289,16 @@ const FOTOS_POR_LOTE = 6
 // Na ordem em que as fotos saem no documento, com o item entre parênteses:
 // é assim que o perito confere se subiu na seção certa. Espelha
 // ORDEM_SECAO_FOTO de src/lib/fotosDocumento.ts.
+//
+// 'epi' não é mais oferecida aqui (pedido do cliente: ficou redundante com
+// "Evidências constatadas em perícia"), mas continua em SecaoFoto — fotos já
+// enviadas àquela seção seguem aparecendo agrupadas em 'documentos', abaixo.
 const SECOES_FOTO: { value: SecaoFoto; label: string }[] = [
   { value: 'ambiente', label: 'Ambiente de trabalho (item 3.1)' },
   { value: 'atividades', label: 'Atividades desenvolvidas (item 6.1)' },
   { value: 'equipamentos', label: 'Equipamentos e máquinas (item 6.2)' },
   { value: 'produtos', label: 'Produtos químicos (item 6.4)' },
-  { value: 'documentos', label: 'Documentos apresentados (final do item 7)' },
-  { value: 'epi', label: 'EPIs utilizados (item 8)' },
+  { value: 'documentos', label: 'Evidências constatadas em perícia (item 6.3)' },
 ]
 
 function novaPericia(responsavelId: string): Pericia {
@@ -2110,7 +2113,11 @@ export default function PericiaEditor() {
             />
             <div className="space-y-6 p-5">
               {SECOES_FOTO.map((s) => {
-                const fotos = p.fotos.filter((f) => f.secao === s.value)
+                // 'epi' não é mais selecionável (dobrada em 'documentos'),
+                // mas fotos legadas enviadas lá continuam visíveis aqui.
+                const fotos = p.fotos.filter((f) =>
+                  f.secao === s.value || (s.value === 'documentos' && f.secao === 'epi'),
+                )
                 return (
                   <div key={s.value}>
                     <div className="mb-2 flex items-center gap-2">
@@ -2173,7 +2180,6 @@ export default function PericiaEditor() {
               // texto padrão nem sugestão: o que vai aqui é a palavra da parte,
               // e o sistema não escreve pela parte.
               { campo: 'riscoAlegadoPericulosidade', secao: 'analise', referencia: `${numeroNr16Editor}.2`, label: `${numeroNr16Editor}.2. NR-16 — Risco de Periculosidade Alegado pela Parte Reclamante`, rows: 5 },
-              { campo: 'fonteRiscoAlegado', secao: 'analise', referencia: `${numeroNr16Editor}.2`, label: `${numeroNr16Editor}.2. Fonte da transcrição (ex.: Inicial do processo - Fls.: 8)`, rows: 2 },
               { campo: 'notaTecnicaEpis', secao: 'analise', referencia: '8', label: '8. Dos Equipamentos de Proteção Individual (NR-06)', rows: 7 },
               { campo: 'protecoesColetivas', secao: 'analise', referencia: '9', label: '9. Das Proteções Coletivas', rows: 5 },
               {
@@ -2200,8 +2206,7 @@ export default function PericiaEditor() {
             // perícia só de insalubridade o card virava um "7.2.1" que colide
             // com o 7.2 da NR-15 e nunca chega ao documento.
             (f.campo !== 'criterioAvaliacaoPericulosidade' || p.modalidade !== 'insalubridade') &&
-            (f.campo !== 'riscoAlegadoPericulosidade' || p.modalidade !== 'insalubridade') &&
-            (f.campo !== 'fonteRiscoAlegado' || p.modalidade !== 'insalubridade'),
+            (f.campo !== 'riscoAlegadoPericulosidade' || p.modalidade !== 'insalubridade'),
           ).map((f) => {
             const campoPadrao = campoPadraoDe(f.campo)
             return (

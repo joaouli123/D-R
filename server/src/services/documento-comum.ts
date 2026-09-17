@@ -99,20 +99,25 @@ export const GRAU: Record<string, string> = {
   nao_caracterizado: 'Não caracterizado',
 }
 
-// Ordem em que as secoes de fotografia aparecem NO DOCUMENTO.
-// Espelha src/lib/fotosDocumento.ts: os dois precisam mudar juntos, senao a
-// previa numera as fotos diferente do PDF e do DOCX.
+// Ordem em que as secoes de fotografia aparecem NO DOCUMENTO: ambiente (3.1),
+// atividades (6.1), equipamentos (6.2), documentos (6.3) e produtos (6.4).
 //
-// Atencao: nao e a ordem de SECOES_FOTO do editor (src/pages/PericiaEditor.tsx),
-// que lista 'epi' antes de 'produtos'. Aqui 'produtos' sai no item 6.4 e 'epi'
-// so no item 8.
+// 'epi' nao e mais oferecida no editor (dobrada em 'documentos', pedido do
+// cliente), mas compartilha o mesmo numero aqui: fotos ja gravadas naquela
+// secao continuam saindo junto das evidencias do 6.3, em vez de sumir do
+// documento.
+//
+// Espelha src/lib/fotosDocumento.ts: os dois precisam mudar juntos, senao a
+// previa numera as fotos diferente do PDF e do DOCX. Nao e a ordem de
+// SECOES_FOTO do editor (src/pages/PericiaEditor.tsx), que agrupa por
+// afinidade para quem esta enviando as fotos.
 export const ORDEM_SECAO_FOTO: Record<string, number> = {
   ambiente: 0,
   atividades: 1,
   equipamentos: 2,
-  produtos: 3,
-  documentos: 4,
-  epi: 5,
+  documentos: 3,
+  epi: 3,
+  produtos: 4,
 }
 
 export const SECAO_FOTO: Record<string, string> = {

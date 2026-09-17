@@ -40,12 +40,16 @@ describe('ordenação das fotografias no documento', () => {
     ])
   })
 
-  it('põe produtos (item 6.4) antes de EPIs (item 8)', () => {
-    expect(ORDEM_SECAO_FOTO.produtos).toBeLessThan(ORDEM_SECAO_FOTO.epi as number)
+  it('põe evidências (documentos/EPIs, item 6.3) antes de produtos (item 6.4)', () => {
+    // 'epi' saiu das opções do editor (dobrada em 'documentos'), mas fotos já
+    // gravadas naquela seção continuam saindo junto das evidências do 6.3 —
+    // por isso as duas chaves compartilham a mesma posição aqui.
+    expect(ORDEM_SECAO_FOTO.documentos).toBe(ORDEM_SECAO_FOTO.epi)
+    expect(ORDEM_SECAO_FOTO.documentos).toBeLessThan(ORDEM_SECAO_FOTO.produtos as number)
     expect(fotosEmOrdemDeDocumento([
-      foto('f-epi', 'epi', 1),
-      foto('f-prod', 'produtos', 9),
-    ]).map((f) => f.id)).toEqual(['f-prod', 'f-epi'])
+      foto('f-prod', 'produtos', 1),
+      foto('f-epi', 'epi', 9),
+    ]).map((f) => f.id)).toEqual(['f-epi', 'f-prod'])
   })
 
   it('desempata pelo id para o resultado não depender do banco', () => {

@@ -38,7 +38,11 @@ export function exigirSessaoDrenandoUpload(req: Request, res: Response, next: Ne
 export const fotosRouter = Router({ mergeParams: true })
 fotosRouter.use(exigirSessaoDrenandoUpload)
 
-const secoes = z.enum(['ambiente', 'atividades', 'equipamentos', 'epi', 'produtos', 'documentos'])
+// 'epi' saiu das opções (pedido do cliente: ficou redundante com
+// 'documentos'), mas continua reconhecida em SecaoFoto para não invalidar
+// fotos já gravadas — só não é mais um destino válido de novo envio. Um front
+// desatualizado que ainda a ofereça cai no safeParse abaixo.
+const secoes = z.enum(['ambiente', 'atividades', 'equipamentos', 'produtos', 'documentos'])
 
 /** POST /pericias/:periciaId/fotos — multipart, campo "fotos". */
 fotosRouter.post(

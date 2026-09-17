@@ -78,8 +78,6 @@ describe('referências da biblioteca do parecer', () => {
     expect(titulo(CHAVE_BIBLIOTECA_POR_CAMPO.criterioAvaliacaoPericulosidade)).toBe('Critério de Avaliação')
     expect(titulo(CHAVE_BIBLIOTECA_POR_CAMPO.riscoAlegadoPericulosidade))
       .toBe('Risco de Periculosidade Alegado pela Parte Reclamante')
-    expect(titulo(CHAVE_BIBLIOTECA_POR_CAMPO.fonteRiscoAlegado))
-      .toBe('Risco de Periculosidade Alegado pela Parte Reclamante')
     expect(titulo(CHAVE_BIBLIOTECA_POR_CAMPO.conclusaoPericulosidade)).toBe('NR-16 — Conclusão e Fundamentação')
     expect(titulo(CHAVE_BIBLIOTECA_POR_CAMPO.alegacoesReclamante)).toBe('Alegações do Reclamante')
     expect(titulo(CHAVE_BIBLIOTECA_POR_CAMPO.respostasQuesitos)).toBe('Respostas aos Quesitos Técnicos')

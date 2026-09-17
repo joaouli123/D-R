@@ -95,8 +95,8 @@ describe('parecer em DOCX', () => {
     )
   })
 
-  it('não imprime o título "Conclusão" quando a avaliação está sem texto', async () => {
-    expect(await textoDoDocx()).not.toContain('Conclusão')
+  it('não imprime a linha "Conclusão:" quando a avaliação está sem texto', async () => {
+    expect(await textoDoDocx()).not.toContain('Conclusão:')
   })
 
   it('imprime a conclusão da avaliação quando ela existe', async () => {
@@ -106,8 +106,7 @@ describe('parecer em DOCX', () => {
 
     const texto = await textoDoDocx(pericia)
 
-    expect(texto).toContain('Conclusão')
-    expect(texto).toContain('A exposição é habitual e permanente.')
+    expect(texto).toContain('Conclusão: A exposição é habitual e permanente.')
   })
 
   it('tira da seção de EPIs os agentes que a modalidade excluiu', async () => {
@@ -119,7 +118,7 @@ describe('parecer em DOCX', () => {
     expect(texto).not.toContain('Plug 3M 1100')
   })
 
-  it('transcreve no 7.3.2 o risco alegado pela parte, com a folha da inicial', async () => {
+  it('transcreve no 7.3.2 o risco alegado pela parte', async () => {
     const pericia = periciaDeTeste()
     // Com as duas modalidades a NR-16 é a terceira subseção do item 7 — é o
     // 7.3 do modelo que o perito mandou.
@@ -127,7 +126,6 @@ describe('parecer em DOCX', () => {
     Object.assign(pericia.tecnico as object, {
       criterioAvaliacaoPericulosidade: 'Critério qualitativo.',
       riscoAlegadoPericulosidade: 'Sustenta a parte Reclamante que laborava no abastecimento de veículos.',
-      fonteRiscoAlegado: 'Inicial do processo - Fls.: 8',
     })
 
     const texto = await textoDoDocx(pericia)
@@ -136,7 +134,6 @@ describe('parecer em DOCX', () => {
       '7.3.1. Critério de Avaliação',
       '7.3.2. Risco de Periculosidade Alegado pela Parte Reclamante',
       'Sustenta a parte Reclamante que laborava no abastecimento de veículos.',
-      'Fonte: Inicial do processo - Fls.: 8',
     ].map((trecho) => texto.indexOf(trecho))
     expect(posicoes.every((posicao) => posicao >= 0)).toBe(true)
     expect(posicoes).toEqual([...posicoes].sort((a, b) => a - b))

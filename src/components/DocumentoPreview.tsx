@@ -265,7 +265,9 @@ export function DocumentoPreview({
                   ))}
                 </tbody>
               </table>}
-              {agenteExibeConclusao(agente) && <><h4>Conclusão</h4><Paragrafos texto={agente.observacao} /></>}
+              {agenteExibeConclusao(agente) && (
+                <Paragrafos texto={`Conclusão: ${(agente.observacao ?? '').trim()}`} />
+              )}
             </section>
           )
         })}
@@ -305,7 +307,9 @@ export function DocumentoPreview({
                   )}
                 </tbody>
               </table>}
-              {agenteExibeConclusao(agente) && <><h4>Conclusão</h4><Paragrafos texto={agente.observacao} /></>}
+              {agenteExibeConclusao(agente) && (
+                <Paragrafos texto={`Conclusão: ${(agente.observacao ?? '').trim()}`} />
+              )}
             </section>
           )
         })}
@@ -504,6 +508,7 @@ export function DocumentoPreview({
       {fotosDasSecoes(['equipamentos'])}
       <h3>6.3. Constatações da Vistoria Pericial</h3>
       <Paragrafos texto={t.informacoesLevantadas} />
+      {fotosDasSecoes(['documentos', 'epi'])}
       <h3>6.4. Produtos Utilizados Habitualmente nas Atividades</h3>
       <Paragrafos texto={t.produtosUtilizados} />
       {fotosDasSecoes(['produtos'])}
@@ -547,9 +552,6 @@ export function DocumentoPreview({
         {t.riscoAlegadoPericulosidade?.trim() && <>
           <h4>{numeroAvaliacaoNr16}.2. Risco de Periculosidade Alegado pela Parte Reclamante</h4>
           <Transcricao texto={t.riscoAlegadoPericulosidade} />
-          {t.fonteRiscoAlegado?.trim() && (
-            <p className="no-indent fonte-transcricao">Fonte: {t.fonteRiscoAlegado.trim()}</p>
-          )}
         </>}
         {agentesSemProtecoes(agentesNr16)}
       </>}
@@ -566,7 +568,6 @@ export function DocumentoPreview({
         </>
       )}
       {numeroConsideracoes && <><h3>{numeroConsideracoes}. Considerações sobre as divergências fáticas</h3><Paragrafos texto={t.consideracoesDivergencias} /></>}
-      {fotosDasSecoes(['documentos'])}
 
       <h2>8. Dos Equipamentos de Proteção Individual (NR-06)</h2>
       <Paragrafos texto={t.notaTecnicaEpis} />
@@ -583,7 +584,6 @@ export function DocumentoPreview({
           ))}
         </section>
       )) : null}
-      {fotosDasSecoes(['epi'])}
 
       <h2>9. Das Proteções Coletivas</h2>
       <Paragrafos texto={t.protecoesColetivas} />

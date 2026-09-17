@@ -229,13 +229,6 @@ const blocosTranscricao = (t?: string | null): Paragraph[] => {
   }))
 }
 
-/** A folha de onde a transcrição acima foi tirada. */
-const pFonte = (t: string) => new Paragraph({
-  alignment: AlignmentType.LEFT,
-  spacing: { after: 120, line: 340 },
-  children: [texto(t, { tamanho: 18, cor: MARCA.tinta600 })],
-})
-
 const blocosEstruturados = (t?: string | null): Paragraph[] => {
   const partes = emParagrafos(t)
   if (!partes.length) return blocos(t)
@@ -698,9 +691,9 @@ async function docParecer(
   filhos.push(...(await fotosDasSecoes(['atividades'])))
   filhos.push(h3(num.sub('Máquinas, Ferramentas e Equipamentos Utilizados')), ...blocos(t.maquinasFerramentas))
   filhos.push(...(await fotosDasSecoes(['equipamentos'])))
+  filhos.push(h3(num.sub('Constatações da Vistoria Pericial')), ...blocos(t.informacoesLevantadas))
+  filhos.push(...(await fotosDasSecoes(['documentos', 'epi'])))
   filhos.push(
-    h3(num.sub('Constatações da Vistoria Pericial')),
-    ...blocos(t.informacoesLevantadas),
     h3(num.sub('Produtos Utilizados Habitualmente nas Atividades')),
     ...blocos(t.produtosUtilizados),
   )
@@ -794,7 +787,7 @@ async function docParecer(
           }),
           ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor, false, item.destaque)),
         ])] : []),
-        ...(agenteExibeConclusao(agente) ? [h4('Conclusão'), ...blocos(agente.observacao)] : []),
+        ...(agenteExibeConclusao(agente) ? blocos(`Conclusão: ${(agente.observacao ?? '').trim()}`) : []),
       )
     }
   }
@@ -832,7 +825,6 @@ async function docParecer(
       filhos.push(
         h4(`${numero}.2. Risco de Periculosidade Alegado pela Parte Reclamante`),
         ...blocosTranscricao(t.riscoAlegadoPericulosidade),
-        ...(t.fonteRiscoAlegado?.trim() ? [pFonte(`Fonte: ${t.fonteRiscoAlegado.trim()}`)] : []),
       )
     }
     adicionarAgentes(agentesNr16)
@@ -858,7 +850,6 @@ async function docParecer(
       filhos.push(h3(num.sub('Considerações sobre as divergências fáticas')), ...blocos(t.consideracoesDivergencias))
     }
   }
-  filhos.push(...(await fotosDasSecoes(['documentos'])))
 
   filhos.push(h2(num.secao('DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)')))
   filhos.push(...blocos(t.notaTecnicaEpis))
@@ -885,7 +876,6 @@ async function docParecer(
       )
     }
   }
-  filhos.push(...(await fotosDasSecoes(['epi'])))
 
   filhos.push(
     h2(num.secao('DAS PROTEÇÕES COLETIVAS')),
@@ -928,7 +918,7 @@ async function docParecer(
           ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor, false, item.destaque)),
           ...(protecoes ? [fichaLinha('Proteções associadas', protecoes)] : []),
         ])] : []),
-        ...(agenteExibeConclusao(agente) ? [h4('Conclusão'), ...blocos(agente.observacao)] : []),
+        ...(agenteExibeConclusao(agente) ? blocos(`Conclusão: ${(agente.observacao ?? '').trim()}`) : []),
       )
     })
   }

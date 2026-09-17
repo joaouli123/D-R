@@ -160,9 +160,8 @@ const CSS = `
   p { margin: 0 0 8px; text-indent: 1.25cm; }
   p.sem-recuo { text-indent: 0; }
   p.vazio { font-style: italic; color: ${css(MARCA.tinta400)}; text-indent: 0; }
-  /* Espelha .doc-sheet p.transcricao / p.fonte-transcricao de src/index.css. */
+  /* Espelha .doc-sheet p.transcricao de src/index.css. */
   p.transcricao { font-style: italic; margin-bottom: 4px; }
-  p.fonte-transcricao { font-size: 9pt; color: ${css(MARCA.tinta600)}; text-indent: 0; }
   /* Listas da matriz do perito: marcador em 1,25cm, texto em 2,25cm.
      O glifo vem do ::before para o texto alinhar tambem na primeira linha. */
   p.item-lista { text-align: left; text-indent: 0; margin: 0 0 2px 2.25cm; position: relative; }
@@ -231,8 +230,8 @@ const CSS = `
     margin: 0 auto;
   }
   figcaption { font-size: 9pt; font-style: italic; color: ${css(MARCA.tinta600)}; margin-top: 4px; }
-  .local-data { text-align: center; text-indent: 0; margin-top: 14px; }
-  .assinatura { margin-top: 14px; margin-bottom: 12px; text-align: center; page-break-inside: avoid; }
+  .local-data { text-align: center; text-indent: 0; margin-top: 20px; }
+  .assinatura { margin-top: 24px; margin-bottom: 12px; text-align: center; page-break-inside: avoid; }
   .assinatura .traco { width: 280px; margin: 0 auto; border-top: 1px solid ${css(MARCA.tinta800)}; padding-top: 6px; }
   .assinatura p { text-indent: 0; margin: 0; }
   .assinatura .nome { font-weight: 700; }
@@ -428,7 +427,9 @@ export async function htmlDoParecer(
         const titulo = prefixo
           ? `${prefixo}.${indice + 1}. ${rotuloNatureza(agente.tipo)} — ${apresentacao.titulo}`
           : apresentacao.titulo
-        const conclusao = agenteExibeConclusao(agente) ? `<h4>Conclusão</h4>${paragrafos(agente.observacao)}` : ''
+        const conclusao = agenteExibeConclusao(agente)
+          ? paragrafos(`Conclusão: ${(agente.observacao ?? '').trim()}`)
+          : ''
         return `<section class="agente-bloco"><div class="agente-resumo"><h3 class="agente-titulo">${esc(titulo)}</h3>${identificado ? tabelaLinhasAgente(apresentacao.linhas, true) : ''}</div>${conclusao}</section>`
       }).join('')
     : ''
@@ -490,8 +491,7 @@ export async function htmlDoParecer(
   const fotosAtividades = await fotosDasSecoes(['atividades'])
   const fotosEquipamentos = await fotosDasSecoes(['equipamentos'])
   const fotosProdutos = await fotosDasSecoes(['produtos'])
-  const fotosDocumentos = await fotosDasSecoes(['documentos'])
-  const fotosEpis = await fotosDasSecoes(['epi'])
+  const fotosEvidencias = await fotosDasSecoes(['documentos', 'epi'])
   const conclusaoNr15 =
     t.conclusaoInsalubridade?.trim() ||
     (pericia.modalidade === 'insalubridade' || !t.conclusaoPericulosidade?.trim() ? t.conclusao : '')
@@ -518,7 +518,9 @@ export async function htmlDoParecer(
         const linhas = protecoes
           ? [...apresentacao.linhas, { rotulo: 'Proteções associadas', valor: protecoes }]
           : apresentacao.linhas
-        const conclusao = agenteExibeConclusao(agente) ? `<h4>Conclusão</h4>${paragrafos(agente.observacao)}` : ''
+        const conclusao = agenteExibeConclusao(agente)
+          ? paragrafos(`Conclusão: ${(agente.observacao ?? '').trim()}`)
+          : ''
         return `<section class="agente-bloco"><h4>${prefixo}.${indice + 1}. ${esc(apresentacao.titulo)}</h4>${identificado ? tabelaLinhasAgente(linhas, true) : ''}${conclusao}</section>`
       }).join('')
       return `<h3>${prefixo}. ${esc(tituloGrupo)}</h3>${quadros}`
@@ -612,6 +614,7 @@ export async function htmlDoParecer(
         fotosEquipamentos +
         `<h3>${num.sub('Constatações da Vistoria Pericial')}</h3>` +
         paragrafos(t.informacoesLevantadas) +
+        fotosEvidencias +
         `<h3>${num.sub('Produtos Utilizados Habitualmente nas Atividades')}</h3>` +
         paragrafos(t.produtosUtilizados) +
         fotosProdutos,
@@ -640,19 +643,15 @@ export async function htmlDoParecer(
               const alegado = t.riscoAlegadoPericulosidade?.trim()
                 ? `<h4>${numero}.2. Risco de Periculosidade Alegado pela Parte Reclamante</h4>`
                   + transcricao(t.riscoAlegadoPericulosidade)
-                  + (t.fonteRiscoAlegado?.trim()
-                    ? `<p class="fonte-transcricao">Fonte: ${esc(t.fonteRiscoAlegado.trim())}</p>`
-                    : '')
                 : ''
               const resumo = exibeVarredura.nr16 ? quadroVarredura('NR-16', varredura.nr16) : ''
               return `<h3>${cabecalho}</h3>${resumo}<h4>${numero}.1. Critério de Avaliação</h4>${paragrafos(t.criterioAvaliacaoPericulosidade)}${alegado}${tabelaAgentes(agentesNr16)}`
             })()
           : '') +
-        blocoDivergencias() +
-        fotosDocumentos,
+        blocoDivergencias(),
     ),
     `<h2>${num.secao('DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)')}</h2>`,
-    blocoConteudo(paragrafos(t.notaTecnicaEpis) + blocoProtecoes + fotosEpis),
+    blocoConteudo(paragrafos(t.notaTecnicaEpis) + blocoProtecoes),
     `<h2>${num.secao('DAS PROTEÇÕES COLETIVAS')}</h2>`,
     blocoConteudo(paragrafos(t.protecoesColetivas)),
     `<h2>${num.secao(tituloAnalise)}</h2>`,

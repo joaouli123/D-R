@@ -112,7 +112,6 @@ export const CHAVE_BIBLIOTECA_POR_CAMPO: Partial<Record<keyof Pericia['tecnico']
   consideracoesDivergencias: '7.5',
   criterioAvaliacaoPericulosidade: '7.3.1',
   riscoAlegadoPericulosidade: '7.3.2',
-  fonteRiscoAlegado: '7.3.2',
   conclusaoPericulosidade: '12',
   respostasQuesitos: '13',
   encerramento: '14',

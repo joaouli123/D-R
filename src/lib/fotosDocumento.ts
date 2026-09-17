@@ -9,8 +9,13 @@
 
 /**
  * Ordem em que as seções de fotografia aparecem NO DOCUMENTO:
- * ambiente (3.1), atividades (6.1), equipamentos (6.2), produtos (6.4),
- * documentos (fim do 7) e epi (8).
+ * ambiente (3.1), atividades (6.1), equipamentos (6.2), documentos (6.3) e
+ * produtos (6.4).
+ *
+ * 'epi' não é mais oferecida no editor (dobrada em 'documentos', pedido do
+ * cliente), mas compartilha o mesmo número aqui: fotos já gravadas naquela
+ * seção continuam saindo junto das evidências do 6.3, em vez de sumir do
+ * documento.
  *
  * Não é a ordem de SECOES_FOTO do editor (src/pages/PericiaEditor.tsx), que
  * agrupa por afinidade para quem está enviando as fotos.
@@ -19,9 +24,9 @@ export const ORDEM_SECAO_FOTO: Record<string, number> = {
   ambiente: 0,
   atividades: 1,
   equipamentos: 2,
-  produtos: 3,
-  documentos: 4,
-  epi: 5,
+  documentos: 3,
+  epi: 3,
+  produtos: 4,
 }
 
 /**
