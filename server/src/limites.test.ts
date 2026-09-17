@@ -3,12 +3,14 @@ import {
   LIMITE_IMAGEM_BYTES as BYTES_NO_FRONT,
   LIMITE_FOTOS_POR_ENVIO as FOTOS_NO_FRONT,
   LIMITE_IMAGEM_MB as MB_NO_FRONT,
+  TIPOS_IMAGEM_ACEITOS as TIPOS_NO_FRONT,
 } from '../../src/lib/limitesUpload'
 import {
   LIMITE_FOTOS_POR_ENVIO,
   LIMITE_IMAGEM_BYTES,
   LIMITE_IMAGEM_MB,
   LIMITE_MULTER_BYTES,
+  TIPOS_IMAGEM_ACEITOS,
 } from './limites.js'
 
 // ============================================================
@@ -45,5 +47,10 @@ describe('limite de imagem', () => {
   it('o teto de fotos por envio também vale nos dois lados', () => {
     expect(FOTOS_NO_FRONT).toBe(LIMITE_FOTOS_POR_ENVIO)
     expect(LIMITE_FOTOS_POR_ENVIO).toBe(30)
+  })
+
+  it('os formatos aceitos são os mesmos — o navegador converte o resto para JPEG', () => {
+    expect([...TIPOS_NO_FRONT]).toEqual([...TIPOS_IMAGEM_ACEITOS])
+    expect(TIPOS_IMAGEM_ACEITOS).toContain('image/jpeg')
   })
 })

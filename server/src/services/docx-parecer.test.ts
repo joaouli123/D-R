@@ -179,7 +179,19 @@ describe('parecer em DOCX', () => {
 
     expect(texto).toContain('10.1.1. Inflamáveis – Avaliação, Resultado e Conclusão')
     expect(texto).not.toContain('10.1.1. Explosivos;')
-    expect(texto).not.toContain('Radiações ionizantes ou substâncias radioativas')
+    // O rol dos sete anexos cabe no quadro da varredura, no item 7 — não no 10.
+    const item10 = texto.slice(texto.indexOf('10.1. NR-16'))
+    expect(item10).not.toContain('Radiações ionizantes ou substâncias radioativas')
+  })
+
+  it('imprime o quadro da varredura NR-16 a partir das avaliações, sem afirmar a exposição', async () => {
+    const texto = await textoDoDocx(periciaSoPericulosidade())
+    const item7 = texto.slice(0, texto.indexOf('10.1. NR-16'))
+
+    expect(item7).toContain('Resultado da varredura NR-16')
+    expect(item7).toContain('Avaliação da suposta exposição')
+    expect(item7).toContain('Radiações ionizantes ou substâncias radioativas')
+    expect(texto).not.toMatch(/Exposição identificada/i)
   })
 
   it('mantém em negrito, no Word, a linha de resultado do quadro do item 10', async () => {

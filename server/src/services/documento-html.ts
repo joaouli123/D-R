@@ -1,7 +1,7 @@
 import type { DocumentoGerado, Empresa, Usuario } from '@prisma/client'
 import type { PericiaCompleta } from '../mappers.js'
 import { marcaDoDocumento } from './logo-oficial.js'
-import { normalizarVarredura, type AnexoVarreduraDocumento } from './varredura-normativa.js'
+import { exibirQuadroVarredura, normalizarVarredura, type AnexoVarreduraDocumento } from './varredura-normativa.js'
 import {
   AGENTE_LABEL,
   agenteExibeConclusao,
@@ -315,10 +315,11 @@ export async function htmlDoParecer(
 ): Promise<string> {
   const t = pericia.tecnico as unknown as TecnicoJson
   const varredura = normalizarVarredura(t, pericia.modalidade)
+  const exibeVarredura = exibirQuadroVarredura(t)
   const quadroVarredura = (norma: string, itens: AnexoVarreduraDocumento[]) => {
     const rotulo = (status: AnexoVarreduraDocumento['status']) => ({
       sem_exposicao: 'Sem exposição',
-      exposicao_identificada: 'Exposição identificada',
+      exposicao_identificada: 'Avaliação da suposta exposição',
       nao_aplicavel: 'Não aplicável',
       nao_avaliado: 'Pendente',
     })[status]
@@ -628,7 +629,7 @@ export async function htmlDoParecer(
           ? (() => {
               const cabecalho = num.sub('NR-15 — Avaliação da Exposição Ocupacional')
               const numero = cabecalho.split('. ')[0]
-              const resumo = t.varreduraNr15?.length ? quadroVarredura('NR-15', [...varredura.nr15, ...varredura.nr15Complementares]) : ''
+              const resumo = exibeVarredura.nr15 ? quadroVarredura('NR-15', [...varredura.nr15, ...varredura.nr15Complementares]) : ''
               return `<h3>${cabecalho}</h3>` + resumo + tabelaAgentes(agentesNr15, numero)
             })()
           : '') +
@@ -643,7 +644,7 @@ export async function htmlDoParecer(
                     ? `<p class="fonte-transcricao">Fonte: ${esc(t.fonteRiscoAlegado.trim())}</p>`
                     : '')
                 : ''
-              const resumo = t.varreduraNr16?.length ? quadroVarredura('NR-16', varredura.nr16) : ''
+              const resumo = exibeVarredura.nr16 ? quadroVarredura('NR-16', varredura.nr16) : ''
               return `<h3>${cabecalho}</h3>${resumo}<h4>${numero}.1. Critério de Avaliação</h4>${paragrafos(t.criterioAvaliacaoPericulosidade)}${alegado}${tabelaAgentes(agentesNr16)}`
             })()
           : '') +

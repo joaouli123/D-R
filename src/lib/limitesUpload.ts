@@ -15,6 +15,12 @@ export const LIMITE_IMAGEM_BYTES = LIMITE_IMAGEM_MB * 1024 * 1024
 
 export const LIMITE_FOTOS_POR_ENVIO = 30
 
+/**
+ * Formatos de imagem que o servidor grava. Fora desta lista o multer
+ * devolve 415 — por isso o navegador converte para JPEG antes de enviar.
+ */
+export const TIPOS_IMAGEM_ACEITOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'] as const
+
 /** O que interessa de um `File` — o teste não precisa de um File de verdade. */
 export interface ArquivoEscolhido {
   name: string

@@ -185,7 +185,23 @@ describe('parecer em HTML (motor do PDF)', () => {
     expect(html).toContain('10.1. NR-16 — Avaliação das Atividades e Operações Perigosas')
     expect(html).toContain('10.1.1. Inflamáveis – Avaliação, Resultado e Conclusão')
     expect(html).not.toContain('10.1.1. Explosivos;')
-    expect(html).not.toContain('Radiações ionizantes ou substâncias radioativas')
+    // O rol dos sete anexos cabe no quadro da varredura, no item 7 — não no 10.
+    const item10 = html.slice(html.indexOf('10.1. NR-16 — Avaliação das Atividades e Operações Perigosas'))
+    expect(item10).not.toContain('Radiações ionizantes ou substâncias radioativas')
+  })
+
+  it('imprime o quadro da varredura NR-16 a partir das avaliações, sem afirmar a exposição', async () => {
+    // O painel manual da NR-16 saiu do editor: o quadro sai das avaliações,
+    // mesmo sem registro gravado. E "Exposição identificada" virou
+    // "Avaliação da suposta exposição", a pedido do perito.
+    const html = await gerar(periciaSoPericulosidade())
+    const item7 = html.slice(0, html.indexOf('10.1. NR-16 — Avaliação das Atividades e Operações Perigosas'))
+
+    expect(item7).toContain('Resultado da varredura NR-16')
+    expect(item7).toContain('Avaliação da suposta exposição')
+    expect(item7).toContain('Radiações ionizantes ou substâncias radioativas')
+    expect(html).not.toMatch(/Exposição identificada/i)
+    expect(html).not.toContain('>Pendente<')
   })
 
   it('imprime a análise técnica depois dos quadros dos agentes, não antes', async () => {

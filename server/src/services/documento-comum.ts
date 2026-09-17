@@ -547,6 +547,70 @@ export function agenteExibeConclusao(agente: Pick<AgenteDocumento, 'tipo' | 'obs
   return agente.tipo !== 'periculosidade' && Boolean(agente.observacao?.trim())
 }
 
+/**
+ * O que falta em UMA avaliação para ela poder ir ao documento.
+ *
+ * Espelha `CampoPendenteAgente`, `exigeEficaciaEpi` e `camposPendentesAgente`
+ * de src/lib/conclusoesAgentes.ts — a tela cobra, esta cópia recusa a
+ * emissão. A paridade é travada em conclusoes-agentes.test.ts.
+ *
+ * Origem: a emissão travou em "NR-15, Anexo 1: sem eficácia do EPI". No ruído
+ * a eficácia sai da conta medição − NRRsf e a tela nem faz a pergunta — o
+ * servidor cobrava um campo que o perito não tinha onde preencher.
+ */
+export type CampoPendenteAgente = 'observacao' | 'epiEficaz' | 'resultadoPericulosidade' | 'anexoNr16'
+
+export type AgenteComPendenciasDocumento = Pick<
+  AgenteDocumento,
+  | 'nome'
+  | 'tipo'
+  | 'observacao'
+  | 'anexoNr15'
+  | 'anexoNr16'
+  | 'identificadoNaAtividade'
+  | 'epis'
+  | 'epiEficaz'
+  | 'resultadoPericulosidade'
+  | 'resultadoPericulosidadeTexto'
+>
+
+export function exigeEficaciaEpi(agente: AgenteComPendenciasDocumento): boolean {
+  if (agente.tipo === 'periculosidade') return false
+  if (!agente.epis?.length) return false
+  if (agente.identificadoNaAtividade === false) return false
+  return !usaAtenuacaoRuidoDocumento(agente)
+}
+
+/**
+ * Espelha `faltaAnexoNr16` do front. Sem anexo, o quadro da NR-16 derivado
+ * das avaliações diria "Sem exposição" em todos os anexos — inclusive ao lado
+ * de uma redação própria que caracteriza a periculosidade.
+ */
+function faltaAnexoNr16(agente: AgenteComPendenciasDocumento): boolean {
+  if (temAnexoNr16ValidoDocumento(agente)) return false
+  const caracteriza = agente.resultadoPericulosidade === 'caracterizada'
+    || agente.resultadoPericulosidade === 'caracterizada_parcial'
+  if (caracteriza) return true
+  if (agente.anexoNr16 === SEM_ENQUADRAMENTO_NR16_DOCUMENTO) return false
+  // "Prejudicada" também não é "Sem risco": sem o anexo examinado, o quadro
+  // imprimiria "Sem exposição" em todos os anexos.
+  return agente.resultadoPericulosidade === 'prejudicada' || Boolean(agente.resultadoPericulosidadeTexto?.trim())
+}
+
+export function camposPendentesAgente(agente: AgenteComPendenciasDocumento): CampoPendenteAgente[] {
+  const campos: CampoPendenteAgente[] = []
+  if (agente.tipo === 'periculosidade') {
+    if (!agente.resultadoPericulosidade && !agente.resultadoPericulosidadeTexto?.trim()) {
+      campos.push('resultadoPericulosidade')
+    }
+    if (faltaAnexoNr16(agente)) campos.push('anexoNr16')
+    return campos
+  }
+  if (!agente.observacao?.trim()) campos.push('observacao')
+  if (exigeEficaciaEpi(agente) && typeof agente.epiEficaz !== 'boolean') campos.push('epiEficaz')
+  return campos
+}
+
 export const TEXTO_AUSENCIA_RECLAMANTE =
   'A parte reclamante não compareceu para a apresentação de suas alegações.'
 
@@ -1030,6 +1094,10 @@ function textoCondicaoAreaRiscoNr16(agente: AgenteDocumento): string {
  */
 const ANEXOS_RUIDO = new Set(['ANEXO_01', 'ANEXO_02'])
 
+export function usaAtenuacaoRuidoDocumento(agente: Pick<AgenteDocumento, 'anexoNr15'>): boolean {
+  return ANEXOS_RUIDO.has(agente.anexoNr15 ?? '')
+}
+
 /**
  * O limite vem da unidade: 85 dB(A) no Anexo 1; no Anexo 2, 130 dB(C)
  * na resposta Impacto ou 120 dB(Linear) na resposta Fast.
@@ -1062,7 +1130,7 @@ function protecaoDocumento(
     ].filter((linha): linha is LinhaApresentacaoAgente => Boolean(linha)),
   ].filter((linha): linha is LinhaApresentacaoAgente => Boolean(linha))
 
-  if (ANEXOS_RUIDO.has(agente.anexoNr15 ?? '')) {
+  if (usaAtenuacaoRuidoDocumento(agente)) {
     const unidade = unidadeRuido(agente.unidadeMedicao)
     const limite = LIMITE_RUIDO_POR_UNIDADE[unidade]
     const adotada = medicaoAdotadaDocumento(agente).valor
@@ -1088,7 +1156,13 @@ function protecaoDocumento(
       )
     }
   } else {
-    linhas.push({ rotulo: 'Eficácia comprovada', valor: agente.epiEficaz ? 'Sim' : 'Não', destaque: agente.epiEficaz ? 'positivo' : 'negativo' })
+    // Sem resposta não é "Não": a emissão já cobra a resposta, mas o
+    // rascunho pré-visualizado não pode afirmar ineficácia que ninguém atestou.
+    linhas.push(
+      typeof agente.epiEficaz === 'boolean'
+        ? { rotulo: 'Eficácia comprovada', valor: agente.epiEficaz ? 'Sim' : 'Não', destaque: agente.epiEficaz ? 'positivo' : 'negativo' }
+        : { rotulo: 'Eficácia comprovada', valor: 'Não informada', destaque: 'aviso' },
+    )
   }
 
   return { titulo: `Proteção ${indice + 1}`, linhas }
@@ -1250,7 +1324,7 @@ export function montarApresentacaoAgente(
     }
   }
 
-  const ruido = ANEXOS_RUIDO.has(agente.anexoNr15 ?? '')
+  const ruido = usaAtenuacaoRuidoDocumento(agente)
   const qualitativo = agente.criterio === 'qualitativo'
   const somenteRegistrosEmpresa =
     tipoMedicaoEmpresaDe(agente) === 'registros_processo' && !medicaoAdotadaDocumento(agente).valor

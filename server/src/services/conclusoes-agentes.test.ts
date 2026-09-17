@@ -2,10 +2,12 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-import { agenteExibeConclusao, agentesNr15SemConclusao } from './documento-comum'
+import { agenteExibeConclusao, agentesNr15SemConclusao, camposPendentesAgente, exigeEficaciaEpi } from './documento-comum'
 import {
   agenteExibeConclusao as exibeConclusaoFront,
   agentesNr15SemConclusao as semConclusaoFront,
+  camposPendentesAgente as camposPendentesFront,
+  exigeEficaciaEpi as exigeEficaciaFront,
 } from '../../../src/lib/conclusoesAgentes'
 
 describe('conclusões individuais das avaliações NR-15', () => {
@@ -114,5 +116,47 @@ describe('título "Conclusão" dentro do quadro da avaliação', () => {
 
   it.each(AGENTES)('decide igual no front: $nome', ({ agente }) => {
     expect(agenteExibeConclusao(agente)).toBe(exibeConclusaoFront(agente))
+  })
+})
+
+// ============================================================
+// O que cada avaliação ainda deve para a emissão. A regra da eficácia do EPI
+// divergia do que a tela pergunta: no ruído a pergunta não aparece (a
+// eficácia sai do NRRsf), e a emissão cobrava mesmo assim.
+// ============================================================
+
+const EPI = [{ categoria: 'Luva', modelo: 'Nitrílica' }]
+
+const PENDENTES: { nome: string; agente: Record<string, unknown>; campos: string[]; exigeEficacia: boolean }[] = [
+  { nome: 'ruído (Anexo 1) com EPI', agente: { tipo: 'fisico', anexoNr15: 'ANEXO_01', epis: EPI, observacao: 'Ok.' }, campos: [], exigeEficacia: false },
+  { nome: 'ruído de impacto (Anexo 2) com EPI', agente: { tipo: 'fisico', anexoNr15: 'ANEXO_02', epis: EPI }, campos: ['observacao'], exigeEficacia: false },
+  { nome: 'químico com EPI sem resposta', agente: { tipo: 'quimico', anexoNr15: 'ANEXO_13', epis: EPI, observacao: 'Ok.' }, campos: ['epiEficaz'], exigeEficacia: true },
+  { nome: 'químico com EPI respondido "Não"', agente: { tipo: 'quimico', anexoNr15: 'ANEXO_13', epis: EPI, epiEficaz: false, observacao: 'Ok.' }, campos: [], exigeEficacia: true },
+  { nome: 'químico sem EPI', agente: { tipo: 'quimico', anexoNr15: 'ANEXO_13', epis: [] }, campos: ['observacao'], exigeEficacia: false },
+  { nome: 'agente ausente da atividade', agente: { tipo: 'fisico', anexoNr15: 'ANEXO_09', epis: EPI, identificadoNaAtividade: false }, campos: ['observacao'], exigeEficacia: false },
+  { nome: 'agente sem anexo com EPI', agente: { tipo: 'biologico', epis: EPI }, campos: ['observacao', 'epiEficaz'], exigeEficacia: true },
+  { nome: 'periculosidade sem resultado', agente: { tipo: 'periculosidade', anexoNr16: 'ANEXO_02', epis: EPI }, campos: ['resultadoPericulosidade'], exigeEficacia: false },
+  // A redação própria vence o resultado no documento. Sem anexo, o quadro da
+  // NR-16 diria "Sem exposição" em todos os anexos ao lado de "Caracterizada".
+  { nome: 'periculosidade com resultado só em texto e sem anexo', agente: { tipo: 'periculosidade', resultadoPericulosidadeTexto: 'Caracterizada.' }, campos: ['anexoNr16'], exigeEficacia: false },
+  { nome: 'periculosidade com resultado em texto e anexo antigo', agente: { tipo: 'periculosidade', resultadoPericulosidadeTexto: 'Caracterizada.', anexoNr16: 'Anexo 2' }, campos: ['anexoNr16'], exigeEficacia: false },
+  { nome: 'periculosidade com resultado em texto e anexo', agente: { tipo: 'periculosidade', resultadoPericulosidadeTexto: 'Caracterizada.', anexoNr16: 'ANEXO_02' }, campos: [], exigeEficacia: false },
+  { nome: 'periculosidade com resultado em texto sem enquadramento', agente: { tipo: 'periculosidade', resultadoPericulosidadeTexto: 'Não caracterizada.', anexoNr16: 'SEM_ENQUADRAMENTO' }, campos: [], exigeEficacia: false },
+  { nome: 'periculosidade não caracterizada com redação própria e sem anexo', agente: { tipo: 'periculosidade', resultadoPericulosidade: 'nao_caracterizada', resultadoPericulosidadeTexto: 'Caracterizada.' }, campos: ['anexoNr16'], exigeEficacia: false },
+  { nome: 'periculosidade caracterizada sem anexo', agente: { tipo: 'periculosidade', resultadoPericulosidade: 'caracterizada' }, campos: ['anexoNr16'], exigeEficacia: false },
+  { nome: 'periculosidade parcial com anexo antigo', agente: { tipo: 'periculosidade', resultadoPericulosidade: 'caracterizada_parcial', anexoNr16: 'ANEXO_07' }, campos: ['anexoNr16'], exigeEficacia: false },
+  { nome: 'periculosidade não caracterizada sem anexo', agente: { tipo: 'periculosidade', resultadoPericulosidade: 'nao_caracterizada' }, campos: [], exigeEficacia: false },
+  { nome: 'periculosidade prejudicada sem anexo', agente: { tipo: 'periculosidade', resultadoPericulosidade: 'prejudicada' }, campos: ['anexoNr16'], exigeEficacia: false },
+  { nome: 'periculosidade prejudicada com anexo antigo', agente: { tipo: 'periculosidade', resultadoPericulosidade: 'prejudicada', anexoNr16: 'Anexo 2' }, campos: ['anexoNr16'], exigeEficacia: false },
+  { nome: 'periculosidade prejudicada com anexo', agente: { tipo: 'periculosidade', resultadoPericulosidade: 'prejudicada', anexoNr16: 'ANEXO_02' }, campos: [], exigeEficacia: false },
+  { nome: 'periculosidade prejudicada sem enquadramento', agente: { tipo: 'periculosidade', resultadoPericulosidade: 'prejudicada', anexoNr16: 'SEM_ENQUADRAMENTO' }, campos: [], exigeEficacia: false },
+]
+
+describe('campos que a emissão cobra de cada avaliação', () => {
+  it.each(PENDENTES)('$nome', ({ agente, campos, exigeEficacia }) => {
+    expect(camposPendentesAgente(agente as never)).toEqual(campos)
+    expect(camposPendentesFront(agente as never)).toEqual(campos)
+    expect(exigeEficaciaEpi(agente as never)).toBe(exigeEficacia)
+    expect(exigeEficaciaFront(agente as never)).toBe(exigeEficacia)
   })
 })

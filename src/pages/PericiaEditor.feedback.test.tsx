@@ -1,16 +1,22 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { useState } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import PericiaEditor from './PericiaEditor'
 import { ToastProvider } from '@/components/ui'
+import { prepararFotosParaEnvio } from '@/lib/prepararFotos'
 import * as api from '@/services/api'
 import { useApp } from '@/store/AppStore'
 import type { Empresa, Pericia } from '@/types'
 
 vi.mock('@/store/AppStore', () => ({ useApp: vi.fn() }))
+vi.mock('@/lib/prepararFotos', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/lib/prepararFotos')>()
+  return { ...original, prepararFotosParaEnvio: vi.fn(original.prepararFotosParaEnvio) }
+})
 vi.mock('@/components/layout/AppLayout', () => ({
   PageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
 }))
@@ -129,6 +135,72 @@ function prepararEditor(opcoes: { perfil?: 'admin' | 'perito' | 'assistente'; va
   )
 
   return { salvarPericia, ...renderizado }
+}
+
+/**
+ * Um store que muda de verdade, com a mesma sequência do `upsert` do
+ * AppStore: troca a perícia da lista no envio, de novo na resposta, e volta a
+ * lista de antes se a gravação falhar. Com a lista estática do mock acima, a
+ * tela nunca via `pericias` mudar durante uma gravação — e era aí que o
+ * editor desfazia o que o perito digitava.
+ */
+function prepararEditorComLoja(valor: Pericia = pericia) {
+  const persistir = vi.fn(async (item: Pericia): Promise<Pericia> => ({ ...item }))
+
+  function Loja() {
+    const [pericias, setPericias] = useState([valor])
+    const lista = pericias
+    const salvarPericia = async (item: Pericia): Promise<Pericia> => {
+      const anterior = lista
+      setPericias((atual) => atual.map((x) => (x.id === item.id ? item : x)))
+      try {
+        const salvo = await persistir(item)
+        setPericias((atual) => atual.map((x) => (x.id === item.id ? salvo : x)))
+        return salvo
+      } catch (e) {
+        setPericias(anterior)
+        throw e
+      }
+    }
+    vi.mocked(useApp).mockReturnValue({
+      usuario: { id: 'usuario-1', nome: 'Perito responsável', perfil: 'perito' },
+      empresas,
+      pericias,
+      documentos: [],
+      textos: [],
+      quesitos: [],
+      salvarPericia,
+      salvarDocumento: vi.fn(),
+    } as unknown as ReturnType<typeof useApp>)
+
+    return (
+      <MemoryRouter initialEntries={['/pericias/pericia-feedback']}>
+        <ToastProvider>
+          <Routes>
+            <Route path="/pericias/:id" element={<PericiaEditor />} />
+          </Routes>
+        </ToastProvider>
+      </MemoryRouter>
+    )
+  }
+
+  return { persistir, ...render(<Loja />) }
+}
+
+/** Segura a próxima gravação até o teste mandar responder (ou falhar). */
+function segurarGravacao(persistir: ReturnType<typeof prepararEditorComLoja>['persistir']) {
+  const controle: { responder: () => void; falhar: (erro: Error) => void } = { responder: () => {}, falhar: () => {} }
+  persistir.mockImplementationOnce((item) => new Promise<Pericia>((resolve, reject) => {
+    controle.responder = () => resolve({ ...item })
+    controle.falhar = reject
+  }))
+  return controle
+}
+
+function enviarFotoComLegenda(id: string, legenda: string) {
+  vi.spyOn(api.fotos, 'enviar').mockResolvedValue([
+    { id, secao: 'ambiente', url: `https://arquivos.example/${id}.jpg`, legenda, ordem: 1 },
+  ])
 }
 
 describe('PericiaEditor — feedback noturno de 28/08', () => {
@@ -298,4 +370,189 @@ describe('PericiaEditor — feedback noturno de 28/08', () => {
     expect(salvarPericia.mock.calls[1]?.[0].fotos).toEqual([foto])
     expect(await screen.findByAltText('Local avaliado')).toBeDefined()
   })
+
+  it('envia as fotos mesmo quando o navegador esvazia o FileList ao zerar o input (Chromium)', async () => {
+    // O bug que o cliente viu em produção: nenhuma foto subia. O Chromium
+    // esvazia o FileList no próprio objeto quando o input é zerado, e a tela
+    // lia a lista só depois de salvar o rascunho. O jsdom não reproduz isso
+    // sozinho — este input imita o comportamento do Chrome.
+    const enviar = vi.spyOn(api.fotos, 'enviar').mockImplementation(async (_id, secao, arquivos) =>
+      arquivos.map((arquivo, i) => ({
+        id: `foto-${arquivo.name}`,
+        secao,
+        url: `https://arquivos.example/${arquivo.name}`,
+        legenda: arquivo.name,
+        ordem: i + 1,
+      })),
+    )
+    const { salvarPericia, container } = prepararEditor()
+    fireEvent.click(screen.getByRole('button', { name: /Fotografias/ }))
+
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!
+    escolherComoNoChromium(input, [
+      new File(['um'], 'um.jpg', { type: 'image/jpeg' }),
+      new File(['dois'], 'dois.jpg', { type: 'image/jpeg' }),
+    ])
+
+    await waitFor(() => expect(salvarPericia).toHaveBeenCalledTimes(2))
+    expect(enviar).toHaveBeenCalledTimes(1)
+    expect(enviar.mock.calls[0]?.[2].map((arquivo) => arquivo.name)).toEqual(['um.jpg', 'dois.jpg'])
+    expect(salvarPericia.mock.calls[1]?.[0].fotos.map((f) => f.id)).toEqual(['foto-um.jpg', 'foto-dois.jpg'])
+    expect(await screen.findByText('2 foto(s) adicionada(s) em "Ambiente de trabalho (item 3.1)".')).toBeDefined()
+  })
+
+  it('envia um lote grande em partes e mantém o que já subiu quando uma parte falha', async () => {
+    let chamada = 0
+    const enviar = vi.spyOn(api.fotos, 'enviar').mockImplementation(async (_id, secao, arquivos) => {
+      chamada += 1
+      if (chamada === 2) throw new Error('A conexão caiu.')
+      return arquivos.map((arquivo, i) => ({
+        id: `foto-${arquivo.name}`,
+        secao,
+        url: `https://arquivos.example/${arquivo.name}`,
+        legenda: arquivo.name,
+        ordem: i + 1,
+      }))
+    })
+    const { salvarPericia, container } = prepararEditor()
+    fireEvent.click(screen.getByRole('button', { name: /Fotografias/ }))
+
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!
+    escolherComoNoChromium(
+      input,
+      Array.from({ length: 8 }, (_, i) => new File(['x'], `f${i + 1}.jpg`, { type: 'image/jpeg' })),
+    )
+
+    await waitFor(() => expect(salvarPericia).toHaveBeenCalledTimes(2))
+    expect(enviar.mock.calls.map((c) => c[2].length)).toEqual([6, 2])
+    expect(salvarPericia.mock.calls[1]?.[0].fotos).toHaveLength(6)
+    expect(await screen.findByText(/6 de 8 foto\(s\) enviada\(s\).*A conexão caiu\./)).toBeDefined()
+    expect(screen.queryByText(/foto\(s\) adicionada\(s\)/)).toBeNull()
+  })
+
+  it('não desfaz a legenda editada enquanto a foto é preparada e o rascunho é salvo', async () => {
+    // A foto grande espera a redução no navegador; o rascunho era salvo com a
+    // perícia de ANTES dessa espera, e a legenda digitada nesse meio voltava.
+    const existente = { id: 'foto-antiga', secao: 'ambiente' as const, url: 'https://arquivos.example/a.jpg', legenda: 'Legenda antiga', ordem: 1 }
+    const nova = { id: 'foto-nova', secao: 'ambiente' as const, url: 'https://arquivos.example/b.jpg', legenda: 'b', ordem: 2 }
+    vi.spyOn(api.fotos, 'enviar').mockResolvedValue([nova])
+
+    let terminarPreparo!: () => void
+    const { prepararFotosParaEnvio: original } = await vi.importActual<typeof import('@/lib/prepararFotos')>('@/lib/prepararFotos')
+    vi.mocked(prepararFotosParaEnvio).mockImplementationOnce(async (arquivos) => {
+      await new Promise<void>((resolve) => { terminarPreparo = resolve })
+      return original(arquivos)
+    })
+
+    const { salvarPericia, container } = prepararEditor({ valor: { ...pericia, fotos: [existente] } })
+    let terminarRascunho!: () => void
+    salvarPericia.mockImplementationOnce(async (valor: Pericia) => {
+      await new Promise<void>((resolve) => { terminarRascunho = resolve })
+      return valor
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Fotografias/ }))
+
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!
+    escolherComoNoChromium(input, [new File(['b'], 'b.jpg', { type: 'image/jpeg' })])
+    await waitFor(() => expect(terminarPreparo).toBeTypeOf('function'))
+
+    fireEvent.change(screen.getByDisplayValue('Legenda antiga'), { target: { value: 'Legenda nova' } })
+    await act(async () => terminarPreparo())
+
+    await waitFor(() => expect(salvarPericia).toHaveBeenCalledTimes(1))
+    expect(salvarPericia.mock.calls[0]?.[0].fotos[0]?.legenda).toBe('Legenda nova')
+
+    fireEvent.change(screen.getByDisplayValue('Legenda nova'), { target: { value: 'Legenda final' } })
+    await act(async () => terminarRascunho())
+
+    await waitFor(() => expect(salvarPericia).toHaveBeenCalledTimes(2))
+    expect(salvarPericia.mock.calls[1]?.[0].fotos.map((f) => [f.id, f.legenda])).toEqual([
+      ['foto-antiga', 'Legenda final'],
+      ['foto-nova', 'b'],
+    ])
+    expect(screen.getByDisplayValue('Legenda final')).toBeDefined()
+  })
+
+  it('não desfaz a legenda digitada enquanto a lista de fotos é gravada (store real)', async () => {
+    enviarFotoComLegenda('foto-enviada', 'Foto enviada')
+    const { persistir, container } = prepararEditorComLoja()
+    // 1ª gravação (rascunho) responde na hora; a 2ª (lista de fotos) espera.
+    persistir.mockImplementationOnce(async (item) => ({ ...item }))
+    const sincronizacao = segurarGravacao(persistir)
+    fireEvent.click(screen.getByRole('button', { name: /Fotografias/ }))
+
+    escolherComoNoChromium(container.querySelector<HTMLInputElement>('input[type="file"]')!, [
+      new File(['x'], 'local.jpg', { type: 'image/jpeg' }),
+    ])
+    await waitFor(() => expect(persistir).toHaveBeenCalledTimes(2))
+    fireEvent.change(await screen.findByDisplayValue('Foto enviada'), { target: { value: 'Legenda digitada' } })
+
+    // A resposta chega e o store troca a perícia da lista.
+    await act(async () => sincronizacao.responder())
+
+    expect(screen.getByDisplayValue('Legenda digitada')).toBeDefined()
+    expect(screen.queryByDisplayValue('Foto enviada')).toBeNull()
+  })
+
+  it('mantém a foto e a legenda na tela quando a gravação da lista falha (store real)', async () => {
+    enviarFotoComLegenda('foto-enviada', 'Foto enviada')
+    const { persistir, container } = prepararEditorComLoja()
+    persistir.mockImplementationOnce(async (item) => ({ ...item }))
+    const sincronizacao = segurarGravacao(persistir)
+    fireEvent.click(screen.getByRole('button', { name: /Fotografias/ }))
+
+    escolherComoNoChromium(container.querySelector<HTMLInputElement>('input[type="file"]')!, [
+      new File(['x'], 'local.jpg', { type: 'image/jpeg' }),
+    ])
+    await waitFor(() => expect(persistir).toHaveBeenCalledTimes(2))
+    fireEvent.change(await screen.findByDisplayValue('Foto enviada'), { target: { value: 'Legenda digitada' } })
+
+    // Falhou: o store volta a lista de ANTES das fotos. A tela não pode ir junto.
+    await act(async () => sincronizacao.falhar(new Error('Conexão perdida.')))
+
+    expect(await screen.findByText(/As fotos foram gravadas, mas a lista da perícia não foi atualizada/)).toBeDefined()
+    expect(screen.getByDisplayValue('Legenda digitada')).toBeDefined()
+
+    // O "salve o rascunho" do aviso leva a foto e a legenda — não a versão velha.
+    enviarFotoComLegenda('foto-segunda', 'Segunda')
+    escolherComoNoChromium(container.querySelector<HTMLInputElement>('input[type="file"]')!, [
+      new File(['y'], 'segunda.jpg', { type: 'image/jpeg' }),
+    ])
+    await waitFor(() => expect(persistir).toHaveBeenCalledTimes(4))
+    expect(persistir.mock.calls[2]?.[0].fotos.map((f) => [f.id, f.legenda])).toEqual([['foto-enviada', 'Legenda digitada']])
+    expect(persistir.mock.calls[3]?.[0].fotos.map((f) => [f.id, f.legenda])).toEqual([
+      ['foto-enviada', 'Legenda digitada'],
+      ['foto-segunda', 'Segunda'],
+    ])
+  })
+
+  it('nunca anuncia sucesso quando nenhuma foto foi gravada', async () => {
+    vi.spyOn(api.fotos, 'enviar').mockRejectedValue(new Error('Servidor fora do ar.'))
+    const { salvarPericia, container } = prepararEditor()
+    fireEvent.click(screen.getByRole('button', { name: /Fotografias/ }))
+
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!
+    escolherComoNoChromium(input, [new File(['x'], 'a.jpg', { type: 'image/jpeg' })])
+
+    expect(await screen.findByText('Servidor fora do ar.')).toBeDefined()
+    expect(salvarPericia).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText(/adicionada/)).toBeNull()
+  })
 })
+
+/**
+ * Imita o `<input type="file">` do Chrome: `files` é um objeto vivo que se
+ * esvazia quando `value` recebe ''. É o que zerar o input faz de verdade.
+ */
+function escolherComoNoChromium(input: HTMLInputElement, arquivos: File[]) {
+  const lista: File[] = [...arquivos]
+  Object.defineProperty(input, 'files', { configurable: true, get: () => lista })
+  Object.defineProperty(input, 'value', {
+    configurable: true,
+    get: () => (lista.length ? `C:\\fakepath\\${lista[0]!.name}` : ''),
+    set: (valor: string) => {
+      if (valor === '') lista.length = 0
+    },
+  })
+  fireEvent.change(input)
+}

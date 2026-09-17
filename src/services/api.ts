@@ -731,9 +731,13 @@ export const fotos = {
    * Envia as imagens ao servidor e devolve as fotos já persistidas.
    * No modo mock cai em blob URLs, que não sobrevivem ao reload.
    */
-  async enviar(periciaId: string, secao: SecaoFoto, arquivos: FileList | File[]): Promise<Foto[]> {
-    const lista = Array.from(arquivos)
-    if (!lista.length) return []
+  async enviar(periciaId: string, secao: SecaoFoto, arquivos: File[]): Promise<Foto[]> {
+    // Recebe um array, nunca o FileList do <input>: o Chromium esvazia o
+    // FileList no próprio objeto quando o input é zerado, e a lista chegava
+    // aqui vazia depois do primeiro await. Lista vazia é erro, não sucesso —
+    // devolver [] em silêncio mostrou "0 foto(s) adicionada(s)" em verde.
+    const lista = [...arquivos]
+    if (!lista.length) throw new Error('Nenhuma imagem chegou ao envio. Escolha as fotos de novo.')
 
     if (!ehRest) {
       return delay(

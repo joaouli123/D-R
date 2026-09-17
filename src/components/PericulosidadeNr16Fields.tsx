@@ -247,7 +247,14 @@ export function PericulosidadeNr16Fields({ avaliacao, onChange }: Periculosidade
     : OPCOES_EXPOSICAO_NR16
   const gruposHipoteses = [...new Set(catalogo?.hipoteses.map((item) => item.grupo) ?? [])]
 
-  const hintAnexo = semEnquadramento
+  // Perícias antigas gravavam o rótulo ("Anexo 2") onde hoje vai o id. O
+  // seletor não achava opção para esse valor e parecia vazio — e a emissão
+  // cobrava um anexo que a tela dizia não ter.
+  const anexoLegado = avaliacao.anexoNr16 && !anexo && !semEnquadramento ? avaliacao.anexoNr16 : null
+
+  const hintAnexo = anexoLegado
+    ? `Registro antigo (“${anexoLegado}”): escolha o anexo na lista para que ele conte no enquadramento.`
+    : semEnquadramento
     ? 'Cenário negativo: o item 10 registra que todos os anexos foram observados, sem enquadramento.'
     : catalogo?.vigencia
       ?? 'Escolha o anexo que a atividade pode enquadrar — ou “Sem enquadramento em Anexo”, que já traz os textos padrão.'
@@ -324,12 +331,14 @@ export function PericulosidadeNr16Fields({ avaliacao, onChange }: Periculosidade
       >
         <div className="grid gap-3 md:grid-cols-[minmax(260px,1.5fr)_minmax(180px,0.8fr)_minmax(150px,0.5fr)]">
           <Select
+            id={`agente-${avaliacao.id}-anexoNr16`}
             label="Anexo NR-16"
             value={avaliacao.anexoNr16 ?? ''}
             onChange={(evento) => onChange(aplicarAnexoNr16(avaliacao, evento.target.value))}
             hint={hintAnexo}
           >
             <option value="">— selecione —</option>
+            {anexoLegado && <option value={anexoLegado}>{anexoLegado} (registro antigo)</option>}
             <option value={SEM_ENQUADRAMENTO_NR16}>{LABEL_SEM_ENQUADRAMENTO_NR16}</option>
             <optgroup label="Anexos da NR-16">
               {ANEXOS_NR16.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
@@ -634,6 +643,7 @@ export function PericulosidadeNr16Fields({ avaliacao, onChange }: Periculosidade
 
         <div className="grid gap-3 md:grid-cols-2">
           <Select
+            id={`agente-${avaliacao.id}-resultadoPericulosidade`}
             label="Resultado técnico"
             value={avaliacao.resultadoPericulosidade ?? ''}
             onChange={(evento) => escolherResultado(evento.target.value)}

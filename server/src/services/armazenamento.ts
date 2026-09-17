@@ -1,10 +1,19 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import express from 'express'
 import multer from 'multer'
 import { env } from '../env.js'
 import { ErroHttp } from '../erros.js'
-import { LIMITE_FOTOS_POR_ENVIO, LIMITE_MULTER_BYTES } from '../limites.js'
+import { LIMITE_FOTOS_POR_ENVIO, LIMITE_MULTER_BYTES, TIPOS_IMAGEM_ACEITOS } from '../limites.js'
+
+// O multer 2 repassa `defParamCharset` ao busboy; o @types/multer ainda não
+// declara a opção.
+declare module 'multer' {
+  interface Options {
+    defParamCharset?: string
+  }
+}
 
 // ============================================================
 // Armazenamento local dos uploads (fotos da vistoria e anexos
@@ -79,22 +88,75 @@ export async function estadoDosUploads(): Promise<EstadoDosUploads> {
   }
 }
 
-/** Nome opaco: preserva só a extensão, descarta o nome original. */
-function nomeSeguro(originalname: string): string {
-  const ext = path.extname(originalname).toLowerCase().slice(0, 10)
-  const seguro = /^\.[a-z0-9]+$/.test(ext) ? ext : ''
-  return `${crypto.randomUUID()}${seguro}`
+/**
+ * A extensão sai do tipo que o filtro aceitou, nunca do nome enviado.
+ *
+ * A pasta é servida estaticamente, e o servidor estático escolhe o
+ * Content-Type pela extensão: um "foto.html" declarado como image/png
+ * passava no filtro e voltava como página HTML, executando no domínio do
+ * sistema. Com a extensão presa ao tipo validado, o que foi aceito como
+ * imagem só sai como imagem.
+ */
+const EXTENSAO_DO_TIPO: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'image/avif': '.avif',
+  'application/pdf': '.pdf',
+}
+
+/** Nome opaco: um UUID e a extensão do tipo aceito; o nome original fica de fora. */
+function nomeSeguro(mimetype: string): string {
+  return `${crypto.randomUUID()}${EXTENSAO_DO_TIPO[mimetype] ?? ''}`
 }
 
 const armazenamento = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, PASTA_UPLOADS),
-  filename: (_req, file, cb) => cb(null, nomeSeguro(file.originalname)),
+  filename: (_req, file, cb) => cb(null, nomeSeguro(file.mimetype)),
 })
 
-const IMAGENS = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'])
+/**
+ * Nome do arquivo em UTF-8. O padrão do multer é latin1, e o navegador manda
+ * UTF-8: "Área de produção.jpg" virava "Ãrea de produÃ§Ã£o" na legenda
+ * da foto e no nome do anexo em PDF.
+ */
+const CHARSET_DO_NOME = 'utf8'
+
+/** O que a pasta serve para ser aberto no navegador; `.jpeg` vem dos nomes antigos. */
+const EXTENSOES_EXIBIVEIS = new Set([...Object.values(EXTENSAO_DO_TIPO), '.jpeg'])
+
+/**
+ * A pasta de uploads servida ao navegador. Cache longo: o nome do arquivo é
+ * um UUID, então o conteúdo nunca muda. `nosniff` impede o navegador de
+ * adivinhar outro tipo pelo conteúdo — o Content-Type da extensão vale.
+ *
+ * Arquivos gravados antes de a extensão sair do tipo podem ter qualquer
+ * extensão (`.html`, `.svg`): esses saem como download, nunca como página.
+ * O `<img>` de uma foto antiga sem extensão continua igual — já saía como
+ * application/octet-stream.
+ */
+export function servirUploads() {
+  return express.static(PASTA_UPLOADS, {
+    maxAge: '30d',
+    immutable: true,
+    index: false,
+    dotfiles: 'deny',
+    setHeaders: (res, caminho) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff')
+      if (!EXTENSOES_EXIBIVEIS.has(path.extname(caminho).toLowerCase())) {
+        res.setHeader('Content-Type', 'application/octet-stream')
+        res.setHeader('Content-Disposition', 'attachment')
+      }
+    },
+  })
+}
+
+const IMAGENS = new Set<string>(TIPOS_IMAGEM_ACEITOS)
 
 export const uploadImagens = multer({
   storage: armazenamento,
+  defParamCharset: CHARSET_DO_NOME,
   // Toda imagem para em LIMITE_IMAGEM_MB, e não em UPLOAD_MAX_MB: o
   // navegador confere o mesmo número antes de enviar, e ele não lê o .env.
   limits: { fileSize: LIMITE_MULTER_BYTES, files: LIMITE_FOTOS_POR_ENVIO },
@@ -129,6 +191,7 @@ export const uploadImagens = multer({
  */
 export const uploadLogo = multer({
   storage: armazenamento,
+  defParamCharset: CHARSET_DO_NOME,
   limits: { fileSize: LIMITE_MULTER_BYTES, files: 1 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype !== 'image/png' && file.mimetype !== 'image/jpeg') {
@@ -141,6 +204,7 @@ export const uploadLogo = multer({
 
 export const uploadPdf = multer({
   storage: armazenamento,
+  defParamCharset: CHARSET_DO_NOME,
   // De propósito fora do teto das imagens: um processo digitalizado passa
   // longe de 3 MB, e recusar o anexo inteiro seria pior que a doença.
   limits: { fileSize: env.UPLOAD_MAX_MB * 4 * 1024 * 1024, files: 1 },

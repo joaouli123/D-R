@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { mensagemDeErro, urlDeUpload } from './api'
+import { fotos, mensagemDeErro, urlDeUpload } from './api'
 
 // ============================================================
 // O caminho da foto ate a tela.
@@ -43,5 +43,11 @@ describe('mensagemDeErro', () => {
 
   it('usa a mensagem de um Error comum', () => {
     expect(mensagemDeErro(new Error('sem rede'), 'padrao')).toBe('sem rede')
+  })
+})
+
+describe('fotos.enviar', () => {
+  it('recusa lista vazia em vez de devolver [] — era o "0 foto(s) adicionada(s)" em verde', async () => {
+    await expect(fotos.enviar('pericia-1', 'ambiente', [])).rejects.toThrow(/Nenhuma imagem chegou ao envio/)
   })
 })

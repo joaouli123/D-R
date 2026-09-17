@@ -54,7 +54,7 @@ import {
   hoje,
   ATUACAO,
 } from './documento-comum.js'
-import { normalizarVarredura, type AnexoVarreduraDocumento } from './varredura-normativa.js'
+import { exibirQuadroVarredura, normalizarVarredura, type AnexoVarreduraDocumento } from './varredura-normativa.js'
 
 // ============================================================
 // MÓDULO H — Exportação em formato editável (.docx).
@@ -571,6 +571,7 @@ async function docParecer(
 ): Promise<(Paragraph | Table)[]> {
   const t = pericia.tecnico as unknown as TecnicoJson
   const varredura = normalizarVarredura(t, pericia.modalidade)
+  const exibeVarredura = exibirQuadroVarredura(t)
   const fecho = dadosAssinaturaDocumento({ ...pericia, tecnico: t })
   const porId = new Map(empresas.map((e) => [e.id, e]))
   const principal = porId.get(pericia.reclamadas.find((r) => r.principal)?.empresaId ?? '')
@@ -800,7 +801,7 @@ async function docParecer(
 
   const adicionarVarredura = (norma: string, itens: AnexoVarreduraDocumento[]) => {
     const rotulo = (status: AnexoVarreduraDocumento['status']) => ({
-      sem_exposicao: 'Sem exposição', exposicao_identificada: 'Exposição identificada',
+      sem_exposicao: 'Sem exposição', exposicao_identificada: 'Avaliação da suposta exposição',
       nao_aplicavel: 'Não aplicável', nao_avaliado: 'Pendente',
     })[status]
     filhos.push(tabela([
@@ -818,14 +819,15 @@ async function docParecer(
     const cabecalho = num.sub('NR-15 — Avaliação da Exposição Ocupacional')
     const numero = cabecalho.split('. ')[0]
     filhos.push(h3(cabecalho))
-    if (t.varreduraNr15?.length) adicionarVarredura('NR-15', [...varredura.nr15, ...varredura.nr15Complementares])
+    if (exibeVarredura.nr15) adicionarVarredura('NR-15', [...varredura.nr15, ...varredura.nr15Complementares])
     adicionarAgentes(agentesNr15, numero)
   }
   if (temPericulosidade) {
     const cabecalho = num.sub('NR-16 — Avaliação das Atividades e Operações Perigosas')
     const numero = cabecalho.split('. ')[0]
-    filhos.push(h3(cabecalho), h4(`${numero}.1. Critério de Avaliação`), ...blocos(t.criterioAvaliacaoPericulosidade))
-    if (t.varreduraNr16?.length) adicionarVarredura('NR-16', varredura.nr16)
+    filhos.push(h3(cabecalho))
+    if (exibeVarredura.nr16) adicionarVarredura('NR-16', varredura.nr16)
+    filhos.push(h4(`${numero}.1. Critério de Avaliação`), ...blocos(t.criterioAvaliacaoPericulosidade))
     if (t.riscoAlegadoPericulosidade?.trim()) {
       filhos.push(
         h4(`${numero}.2. Risco de Periculosidade Alegado pela Parte Reclamante`),

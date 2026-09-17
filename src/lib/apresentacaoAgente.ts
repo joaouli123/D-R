@@ -385,11 +385,13 @@ function linhasProtecao(
       linhas.push({ rotulo: 'Cálculo', valor: 'Medição registrada não informada', destaque: 'aviso' })
     }
   } else {
-    linhas.push({
-      rotulo: 'Eficácia comprovada',
-      valor: agente.epiEficaz ? 'Sim' : 'Não',
-      destaque: agente.epiEficaz ? 'positivo' : 'negativo',
-    })
+    // Sem resposta não é "Não": a emissão já cobra a resposta, mas o
+    // rascunho pré-visualizado não pode afirmar ineficácia que ninguém atestou.
+    linhas.push(
+      typeof agente.epiEficaz === 'boolean'
+        ? { rotulo: 'Eficácia comprovada', valor: agente.epiEficaz ? 'Sim' : 'Não', destaque: agente.epiEficaz ? 'positivo' : 'negativo' }
+        : { rotulo: 'Eficácia comprovada', valor: 'Não informada', destaque: 'aviso' },
+    )
   }
 
   return { titulo: `Proteção ${indice + 1}`, linhas }

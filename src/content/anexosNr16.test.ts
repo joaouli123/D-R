@@ -71,6 +71,40 @@ describe('aplicarAnexoNr16', () => {
     }
   })
 
+  it('sem anexo anterior (vazio ou antigo), grava o anexo e guarda a avaliação escrita', () => {
+    // É o caminho da pendência "sem anexo da NR-16": o perito chega ao seletor
+    // com o resultado e a redação prontos, e a escolha não pode apagá-los.
+    const { anexoNr16: _anexo, ...semAnexo } = preenchido
+    for (const anterior of [semAnexo, { ...preenchido, anexoNr16: 'Anexo 2' }]) {
+      expect(aplicarAnexoNr16(anterior, 'ANEXO_02')).toEqual({ ...preenchido, anexoNr16: 'ANEXO_02' })
+    }
+
+    // Nome vazio recebe o do anexo; nome escrito fica.
+    expect(aplicarAnexoNr16({ ...semAnexo, nome: '' }, 'ANEXO_04').nome).toBe('Energia elétrica')
+    expect(aplicarAnexoNr16(semAnexo, 'ANEXO_04').nome).toBe('Inflamáveis')
+  })
+
+  it('sem anexo anterior, “Sem enquadramento” só preenche o que está vazio', () => {
+    const escrito: AgenteAvaliado = {
+      id: 'nr16-2', nome: '', tipo: 'periculosidade', criterio: 'qualitativo',
+      atividadeEnquadrada: 'Operava a empilhadeira.', resultadoPericulosidadeTexto: 'Não caracterizada, porque...',
+    }
+    const enquadrado = aplicarAnexoNr16(escrito, SEM_ENQUADRAMENTO_NR16)
+
+    expect(enquadrado).toMatchObject({
+      nome: NOME_PADRAO_SEM_ENQUADRAMENTO,
+      anexoNr16: SEM_ENQUADRAMENTO_NR16,
+      atividadeEnquadrada: 'Operava a empilhadeira.',
+      resultadoPericulosidadeTexto: 'Não caracterizada, porque...',
+      analiseAnexos: PADRAO_NR16_SEM_ENQUADRAMENTO.analiseAnexos,
+      exposicaoPericulosidade: PADRAO_NR16_SEM_ENQUADRAMENTO.exposicaoPericulosidade,
+    })
+    // A redação própria já decide: o resultado padrão não entra por baixo.
+    expect(enquadrado).not.toHaveProperty('resultadoPericulosidade')
+    expect(aplicarAnexoNr16({ ...escrito, resultadoPericulosidadeTexto: undefined }, SEM_ENQUADRAMENTO_NR16).resultadoPericulosidade)
+      .toBe('nao_caracterizada')
+  })
+
   it('“Sem enquadramento” chega com os textos padrão do cenário negativo', () => {
     expect(aplicarAnexoNr16(preenchido, SEM_ENQUADRAMENTO_NR16)).toEqual({
       id: 'nr16-1',

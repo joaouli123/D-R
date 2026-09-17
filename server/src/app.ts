@@ -14,7 +14,7 @@ import { periciasRouter } from './routes/pericias.js'
 import { quesitosRouter } from './routes/quesitos.js'
 import { textosRouter } from './routes/textos.js'
 import { usuariosRouter } from './routes/usuarios.js'
-import { PASTA_UPLOADS, estadoDosUploads } from './services/armazenamento.js'
+import { estadoDosUploads, servirUploads } from './services/armazenamento.js'
 import { emailDisponivel } from './services/email.js'
 
 // ============================================================
@@ -42,17 +42,8 @@ export function criarApp(): Express {
   app.use(express.json({ limit: '2mb' }))
   app.use(cookieParser())
 
-  // Fotos da vistoria. Cache longo: o nome do arquivo é um UUID,
-  // então o conteúdo nunca muda.
-  app.use(
-    '/uploads',
-    express.static(PASTA_UPLOADS, {
-      maxAge: '30d',
-      immutable: true,
-      index: false,
-      dotfiles: 'deny',
-    }),
-  )
+  // Fotos da vistoria e anexos. Ver servirUploads.
+  app.use('/uploads', servirUploads())
 
   // `uploads` esta aqui para ser lido de fora, com um curl, sem entrar no
   // servidor: e a resposta para "o perito diz que a foto nao sobe".

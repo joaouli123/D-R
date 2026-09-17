@@ -18,7 +18,7 @@ import { atividadesDoPeriodo } from '@/lib/periodos'
 import { emParagrafos, linhasDoBloco } from '@/lib/listasDocumento'
 import { fotosEmOrdemDeDocumento } from '@/lib/fotosDocumento'
 import { Logo } from '@/components/Logo'
-import { normalizarVarredura, type AnexoVarredura } from '@/lib/varreduraNormativa'
+import { exibirQuadroVarredura, normalizarVarredura, type AnexoVarredura } from '@/lib/varreduraNormativa'
 
 // ============================================================
 // MÓDULO H — Prévia fiel do Parecer/Laudo.
@@ -123,7 +123,7 @@ function QuadroVarredura({ norma, itens }: { norma: string; itens: AnexoVarredur
   const status = (item: AnexoVarredura) => item.status === 'sem_exposicao'
     ? 'Sem exposição'
     : item.status === 'exposicao_identificada'
-      ? 'Exposição identificada'
+      ? 'Avaliação da suposta exposição'
       : item.status === 'nao_aplicavel' ? 'Não aplicável' : 'Pendente'
   return (
     <table className="varredura-normativa"><thead><tr><th>Anexo</th><th>Agente / risco avaliado</th><th>Resultado da varredura {norma}</th></tr></thead>
@@ -201,8 +201,7 @@ export function DocumentoPreview({
   const agentesNr15 = agentes.filter((agente) => agente.tipo !== 'periculosidade')
   const agentesNr16 = agentes.filter((agente) => agente.tipo === 'periculosidade')
   const varredura = normalizarVarredura(t, pericia.modalidade)
-  const exibeVarreduraNr15 = Boolean(t.varreduraNr15?.length)
-  const exibeVarreduraNr16 = Boolean(t.varreduraNr16?.length)
+  const { nr15: exibeVarreduraNr15, nr16: exibeVarreduraNr16 } = exibirQuadroVarredura(t)
   const temInsalubridade = pericia.modalidade !== 'periculosidade'
   const temPericulosidade = pericia.modalidade !== 'insalubridade'
   let indiceSubsecao7 = 1

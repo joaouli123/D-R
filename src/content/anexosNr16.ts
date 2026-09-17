@@ -726,12 +726,18 @@ export function quadrosNr16DoItem10<A extends { nome?: string; anexoNr16?: strin
  * deixava o anterior gravado, e a tela mostrava "— selecione —" para um agente
  * que o documento ainda imprimia como Inflamáveis. "Sem enquadramento" já sai
  * com os textos padrão do cenário negativo.
+ *
+ * Sem anexo anterior (vazio ou registro antigo, como "Anexo 2"), não há o que
+ * descartar: o que está escrito É a avaliação que faltava enquadrar. É o caso
+ * da pendência "sem anexo da NR-16", que leva o perito a este seletor — apagar
+ * ali o resultado e a redação própria custaria a avaliação inteira.
  */
 export function aplicarAnexoNr16(agente: AgenteAvaliado, id: string): AgenteAvaliado {
   const anexo = anexoNr16PorId(id)
+  // Campos da NR-15 saem sempre: limite, CAS, grau e medição não existem na
+  // NR-16, e o quadro da periculosidade os imprimiria como lixo.
   const {
     anexoNr15: _anexoNr15,
-    anexoNr16: _anexoNr16,
     cas: _cas,
     referenciaNormativaId: _referencia,
     unidadeLimite: _unidadeLimite,
@@ -748,6 +754,16 @@ export function aplicarAnexoNr16(agente: AgenteAvaliado, id: string): AgenteAval
     grau: _grau,
     epiEficaz: _epiEficaz,
     epis: _epis,
+    ...semNr15
+  } = agente
+
+  const semAnexoAnterior = !temAnexoNr16Valido(agente) && agente.anexoNr16 !== SEM_ENQUADRAMENTO_NR16
+  if (semAnexoAnterior && (anexo || id === SEM_ENQUADRAMENTO_NR16)) {
+    return enquadrarSemDescartar(semNr15, id)
+  }
+
+  const {
+    anexoNr16: _anexoNr16,
     atividadeEnquadrada: _atividade,
     areaRisco: _area,
     analiseAnexos: _analiseAnexos,
@@ -768,7 +784,7 @@ export function aplicarAnexoNr16(agente: AgenteAvaliado, id: string): AgenteAval
     relacaoAtividadeNr16: _relacao,
     periodoCaracterizacaoNr16: _periodoCaracterizacao,
     ...base
-  } = agente
+  } = semNr15
 
   if (id === SEM_ENQUADRAMENTO_NR16) {
     return {
@@ -787,5 +803,35 @@ export function aplicarAnexoNr16(agente: AgenteAvaliado, id: string): AgenteAval
     tipo: 'periculosidade',
     criterio: 'qualitativo',
     ...(anexo ? { anexoNr16: anexo.id } : {}),
+  }
+}
+
+/**
+ * Grava o anexo numa avaliação que ainda não tinha um, sem tocar no que já foi
+ * escrito. O nome do risco e os textos padrão do "Sem enquadramento" só
+ * preenchem o que está vazio.
+ */
+function enquadrarSemDescartar(agente: Omit<AgenteAvaliado, 'epis'>, id: string): AgenteAvaliado {
+  const semEnquadramento = id === SEM_ENQUADRAMENTO_NR16
+  const nome = agente.nome?.trim()
+    ? agente.nome
+    : semEnquadramento ? NOME_PADRAO_SEM_ENQUADRAMENTO : anexoNr16PorId(id)?.risco ?? ''
+  const padrao: Partial<AgenteAvaliado> = {}
+  if (semEnquadramento) {
+    for (const [campo, valor] of Object.entries(PADRAO_NR16_SEM_ENQUADRAMENTO)) {
+      const atual = agente[campo as keyof typeof PADRAO_NR16_SEM_ENQUADRAMENTO]
+      if (!atual?.trim()) Object.assign(padrao, { [campo]: valor })
+    }
+    // A redação própria vence o resultado escolhido: se ela existe, o
+    // "Não caracterizada" padrão não entra por baixo para contradizê-la.
+    if (agente.resultadoPericulosidadeTexto?.trim()) delete padrao.resultadoPericulosidade
+  }
+  return {
+    ...agente,
+    ...padrao,
+    nome,
+    tipo: 'periculosidade',
+    criterio: 'qualitativo',
+    anexoNr16: id,
   }
 }

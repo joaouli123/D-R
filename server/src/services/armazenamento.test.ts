@@ -1,6 +1,9 @@
+import { once } from 'node:events'
 import fs from 'node:fs/promises'
+import type { AddressInfo } from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
+import express from 'express'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LIMITE_FOTOS_POR_ENVIO } from '../limites.js'
 
@@ -113,5 +116,59 @@ describe('estadoDosUploads', () => {
     expect(String(registrado.mock.calls[0]?.[0])).toContain('/app/uploads')
 
     registrado.mockRestore()
+  })
+})
+
+describe('o arquivo enviado e o arquivo servido', () => {
+  it('grava com a extensão do tipo aceito, guarda o nome acentuado e serve com nosniff', async () => {
+    const dir = path.join(raiz, 'http')
+    const { prepararArmazenamento, servirUploads, uploadImagens } = await carregar(dir)
+    await prepararArmazenamento()
+
+    let recebido: { originalname: string; filename: string } | undefined
+    const app = express()
+    app.post('/fotos', uploadImagens.array('fotos'), (req, res) => {
+      recebido = (req.files as { originalname: string; filename: string }[])[0]
+      res.json({ ok: true })
+    })
+    app.use('/uploads', servirUploads())
+    const servidor = app.listen(0, '127.0.0.1')
+    await once(servidor, 'listening')
+    const base = `http://127.0.0.1:${(servidor.address() as AddressInfo).port}`
+
+    try {
+      // HTML declarado como PNG: o filtro olha só o tipo declarado. Antes, a
+      // extensão vinha do nome e o arquivo voltava como text/html — um
+      // script rodando no domínio do sistema.
+      const corpo = new FormData()
+      corpo.append('fotos', new Blob(['<script>alert(1)</script>'], { type: 'image/png' }), 'Área de produção.html')
+      const envio = await fetch(`${base}/fotos`, { method: 'POST', body: corpo })
+      expect(envio.status).toBe(200)
+
+      // A legenda da foto sai do nome: em latin1 virava "Ãrea de produÃ§Ã£o".
+      expect(recebido?.originalname).toBe('Área de produção.html')
+      expect(recebido?.filename).toMatch(/^[0-9a-f-]{36}\.png$/)
+
+      const servido = await fetch(`${base}/uploads/${recebido?.filename}`)
+      expect(servido.status).toBe(200)
+      expect(servido.headers.get('content-type')).toBe('image/png')
+      expect(servido.headers.get('x-content-type-options')).toBe('nosniff')
+      expect(servido.headers.get('content-disposition')).toBeNull()
+
+      // Gravado antes da correção, com a extensão do nome: vira download.
+      await fs.writeFile(path.join(dir, 'antigo.html'), '<script>alert(1)</script>')
+      const antigo = await fetch(`${base}/uploads/antigo.html`)
+      expect(antigo.headers.get('content-type')).toBe('application/octet-stream')
+      expect(antigo.headers.get('content-disposition')).toBe('attachment')
+      expect(antigo.headers.get('x-content-type-options')).toBe('nosniff')
+
+      // Foto antiga com a extensão do nome continua abrindo na tela.
+      await fs.writeFile(path.join(dir, 'antiga.jpeg'), 'x')
+      const fotoAntiga = await fetch(`${base}/uploads/antiga.jpeg`)
+      expect(fotoAntiga.headers.get('content-type')).toBe('image/jpeg')
+      expect(fotoAntiga.headers.get('content-disposition')).toBeNull()
+    } finally {
+      servidor.close()
+    }
   })
 })

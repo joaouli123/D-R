@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import PericiaEditor from './PericiaEditor'
 import { ToastProvider } from '@/components/ui'
+import { CATALOGO_VARREDURA_NR15 } from '@/lib/varreduraNormativa'
 import { useApp } from '@/store/AppStore'
-import type { AgenteAvaliado, Pericia, PeriodoFuncao } from '@/types'
+import type { AgenteAvaliado, Pericia, PeriodoFuncao, PreenchimentoTecnico } from '@/types'
 
 vi.mock('@/store/AppStore', () => ({ useApp: vi.fn() }))
 vi.mock('@/components/layout/AppLayout', () => ({
@@ -104,20 +105,24 @@ function prepararEditor({
   agentes,
   periodos = [],
   modalidade = 'insalubridade',
+  tecnico = {},
 }: {
   agentes: AgenteAvaliado[]
   periodos?: PeriodoFuncao[]
   modalidade?: Pericia['modalidade']
+  tecnico?: Partial<PreenchimentoTecnico>
 }) {
+  const salvarPericia = vi.fn(async (valor: Pericia) => valor)
+  const salvarDocumento = vi.fn(async (valor: { id: string }) => valor)
   vi.mocked(useApp).mockReturnValue({
     usuario: { id: 'usuario-1', nome: 'Perito responsável', perfil: 'perito' },
     empresas: [],
-    pericias: [{ ...base, modalidade, tecnico: { ...base.tecnico, periodos, agentes } }],
+    pericias: [{ ...base, modalidade, tecnico: { ...base.tecnico, ...tecnico, periodos, agentes } }],
     documentos: [],
     textos: [],
     quesitos: [],
-    salvarPericia: vi.fn(async (valor: Pericia) => valor),
-    salvarDocumento: vi.fn(),
+    salvarPericia,
+    salvarDocumento,
   } as unknown as ReturnType<typeof useApp>)
 
   render(
@@ -131,6 +136,7 @@ function prepararEditor({
   )
 
   fireEvent.click(screen.getByRole('button', { name: /Avaliações e EPIs/ }))
+  return { salvarPericia, salvarDocumento }
 }
 
 /**
@@ -211,7 +217,7 @@ describe('PericiaEditor — varredura obrigatória dos anexos', () => {
     prepararEditor({ agentes: [] })
 
     expect(screen.getByText('1 de 14 anexos avaliados')).toBeDefined()
-    fireEvent.click(screen.getByRole('button', { name: /^Anexo 1 —.*Exposição identificada/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Anexo 1 —.*Avaliação da suposta exposição/i }))
 
     expect(alternadorDe('Ruído contínuo ou intermitente')).toBeDefined()
     expect(screen.getByText('2 de 14 anexos avaliados')).toBeDefined()
@@ -222,6 +228,172 @@ describe('PericiaEditor — varredura obrigatória dos anexos', () => {
 
     expect(screen.getByRole('region', { name: 'Varredura dos anexos da NR-15' })).toBeDefined()
     expect(screen.getByRole('region', { name: 'Varredura dos anexos da NR-16' })).toBeDefined()
+  })
+
+  it('tem um painel de periculosidade só: o quadro da NR-16 não se marca à mão', () => {
+    // "Aparentemente existem dois painéis de periculosidade: um com a versão
+    // atualizada e outro que ainda apresenta os textos anteriores."
+    prepararEditor({ agentes: [], modalidade: 'periculosidade' })
+
+    const quadro = screen.getByRole('region', { name: 'Varredura dos anexos da NR-16' })
+    expect(within(quadro).queryByRole('button', { name: /Sem exposição/ })).toBeNull()
+    expect(within(quadro).queryByRole('button', { name: /suposta exposição|Exposição identificada/i })).toBeNull()
+    expect(screen.queryByText(/Exposição identificada/i)).toBeNull()
+
+    fireEvent.click(within(quadro).getByRole('button', { name: 'Registrar avaliação NR-16' }))
+
+    const nova = screen
+      .getAllByRole('button', { name: /^Nova avaliação NR-16/ })
+      .find((botao) => botao.hasAttribute('aria-expanded'))
+    expect(nova && estaAberto(nova)).toBe(true)
+    expect(document.activeElement?.id).toMatch(/^agente-ris/)
+    expect(within(quadro).queryByRole('button', { name: 'Registrar avaliação NR-16' })).toBeNull()
+  })
+})
+
+// ============================================================
+// "Durante o teste, ainda tive dificuldade para concluir essa etapa."
+// A emissão travou em "NR-15, Anexo 1: sem eficácia do EPI", cobrança de um
+// campo que a tela nem mostra no ruído. Estes testes fazem o caminho dele:
+// ver o que falta, ir até o campo, responder e emitir.
+// ============================================================
+
+const EPI_AUDITIVO = [{ categoria: 'Proteção auditiva', modelo: 'Concha' }]
+const EPI_LUVA = [{ categoria: 'Luva', modelo: 'Nitrílica' }]
+
+const ALCALIS_SEM_EFICACIA = {
+  id: 'agn-alcalis', nome: 'Álcalis', tipo: 'quimico', criterio: 'qualitativo', grau: 'medio',
+  anexoNr15: 'ANEXO_13', epis: EPI_LUVA, observacao: 'Contato habitual com álcalis cáusticos.',
+} as AgenteAvaliado
+
+/** Todos os anexos decididos; os de `exposicao` com avaliação, o resto sem exposição. */
+const varreduraDecidida = (exposicao: string[]) => CATALOGO_VARREDURA_NR15
+  .filter((item) => item.anexoId !== 'ANEXO_04')
+  .map((item) => ({
+    anexoId: item.anexoId,
+    status: exposicao.includes(item.anexoId) ? 'exposicao_identificada' as const : 'sem_exposicao' as const,
+  }))
+
+const irParaODocumento = () => fireEvent.click(screen.getByRole('button', { name: /^6\s*Documento$/ }))
+
+describe('PericiaEditor — concluir a etapa das avaliações', () => {
+  it('não cobra eficácia do EPI no ruído: a etapa fica sem pendência e o documento sai', async () => {
+    const { salvarDocumento } = prepararEditor({
+      agentes: [{
+        id: 'agn-ruido-epi', nome: 'Ruído contínuo ou intermitente', tipo: 'fisico', criterio: 'quantitativo',
+        grau: 'medio', anexoNr15: 'ANEXO_01', epis: EPI_AUDITIVO, observacao: 'Abaixo do limite com o protetor.',
+      } as AgenteAvaliado],
+      tecnico: { varreduraNr15: varreduraDecidida(['ANEXO_01']) },
+    })
+
+    expect(screen.getByText(/Nenhuma pendência nesta etapa/)).toBeDefined()
+    expect(screen.queryByRole('region', { name: 'Pendências para emitir' })).toBeNull()
+
+    irParaODocumento()
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizar documento' }))
+
+    await vi.waitFor(() => expect(salvarDocumento).toHaveBeenCalled())
+    expect(screen.queryByText(/Há pendências para emitir/)).toBeNull()
+  })
+
+  it('leva ao campo da eficácia do EPI, reabre o cartão recolhido e aceita "Não" como resposta', () => {
+    prepararEditor({
+      agentes: [ALCALIS_SEM_EFICACIA],
+      tecnico: { varreduraNr15: varreduraDecidida(['ANEXO_13']) },
+    })
+
+    const pendencias = screen.getByRole('region', { name: 'Pendências para emitir' })
+    expect(within(pendencias).getByText('Falta 1 item para emitir o documento')).toBeDefined()
+    expect(within(pendencias).getByText('NR-15, Álcalis (Anexo 13): informe se o EPI é eficaz')).toBeDefined()
+
+    // O perito recolheu o cartão: o botão da lista tem de reabri-lo.
+    fireEvent.click(screen.getByRole('button', { name: 'Inserir no laudo' }))
+    expect(estaAberto(alternadorDe('Álcalis'))).toBe(false)
+
+    fireEvent.click(within(pendencias).getByRole('button', { name: 'Ir ao campo' }))
+
+    expect(estaAberto(alternadorDe('Álcalis'))).toBe(true)
+    expect(document.activeElement?.id).toBe('agente-agn-alcalis-epiEficaz')
+
+    fireEvent.click(screen.getByRole('radio', { name: /^Não/ }))
+
+    expect(screen.queryByRole('region', { name: 'Pendências para emitir' })).toBeNull()
+    expect(screen.getByText(/Nenhuma pendência nesta etapa/)).toBeDefined()
+  })
+
+  it('leva ao campo da conclusão que falta', () => {
+    prepararEditor({
+      agentes: [{ ...RUIDO_PENDENTE, anexoNr15: 'ANEXO_01' }],
+      tecnico: { varreduraNr15: varreduraDecidida(['ANEXO_01']) },
+    })
+
+    const pendencias = screen.getByRole('region', { name: 'Pendências para emitir' })
+    fireEvent.click(within(pendencias).getByRole('button', { name: 'Ir ao campo' }))
+
+    expect(document.activeElement).toBe(screen.getByLabelText(/Conclusão da avaliação/))
+  })
+
+  it('fecha os anexos restantes de uma vez, depois de confirmar', () => {
+    prepararEditor({ agentes: [] })
+
+    expect(screen.getByText('1 de 14 anexos avaliados')).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar pendentes como sem exposição (13)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+
+    expect(screen.getByText('14 de 14 anexos avaliados')).toBeDefined()
+    expect(screen.getByText(/Nenhuma pendência nesta etapa/)).toBeDefined()
+  })
+
+  it('no Anexo 8, leva à escolha do subtipo sem criar uma avaliação em branco a cada clique', () => {
+    prepararEditor({ agentes: [], tecnico: { varreduraNr15: varreduraDecidida(['ANEXO_08']) } })
+
+    const pendencias = screen.getByRole('region', { name: 'Pendências para emitir' })
+    expect(within(pendencias).getByText(/^NR-15, Anexo 8 \(Vibrações\): escolha o tipo de vibração/)).toBeDefined()
+    const camposDeAnexo = () => document.querySelectorAll('select[id$="-anexoNr15"]')
+
+    fireEvent.click(within(pendencias).getByRole('button', { name: 'Escolher subtipo' }))
+    expect(camposDeAnexo()).toHaveLength(1)
+    const campo = camposDeAnexo()[0] as HTMLSelectElement
+    expect(document.activeElement).toBe(campo)
+
+    // O subtipo ainda não foi escolhido: a pendência continua, e o segundo
+    // clique volta ao mesmo campo em vez de empilhar outra avaliação.
+    ;(document.activeElement as HTMLElement).blur()
+    fireEvent.click(within(pendencias).getByRole('button', { name: 'Escolher subtipo' }))
+    expect(camposDeAnexo()).toHaveLength(1)
+    expect(document.activeElement).toBe(campo)
+
+    fireEvent.change(campo, { target: { value: 'ANEXO_08_VMB' } })
+    expect(screen.queryByText(/escolha o tipo de vibração/)).toBeNull()
+    expect(within(screen.getByRole('region', { name: 'Pendências para emitir' }))
+      .getByText(/Anexo 8\): preencha a conclusão da avaliação/)).toBeDefined()
+  })
+
+  it('leva à linha do anexo ainda sem decisão', () => {
+    prepararEditor({ agentes: [] })
+
+    const pendencias = screen.getByRole('region', { name: 'Pendências para emitir' })
+    expect(within(pendencias).getByText(/^NR-15: 13 anexos sem decisão \(1, 2, 3, 5,/)).toBeDefined()
+    fireEvent.click(within(pendencias).getByRole('button', { name: 'Ir ao anexo' }))
+
+    expect(document.activeElement?.id).toBe('varredura-NR-15-ANEXO_01')
+  })
+
+  it('ao finalizar com pendência, volta à etapa com a lista do que falta em foco', async () => {
+    const { salvarDocumento } = prepararEditor({
+      agentes: [ALCALIS_SEM_EFICACIA],
+      tecnico: { varreduraNr15: varreduraDecidida(['ANEXO_13']) },
+    })
+
+    irParaODocumento()
+    expect(screen.queryByRole('region', { name: 'Pendências para emitir' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Finalizar documento' }))
+
+    expect(await screen.findByText(
+      'Há pendências para emitir o documento: NR-15, Álcalis (Anexo 13): informe se o EPI é eficaz.',
+    )).toBeDefined()
+    expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Pendências para emitir' }))
+    expect(salvarDocumento).not.toHaveBeenCalled()
   })
 })
 

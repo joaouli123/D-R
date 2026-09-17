@@ -8,10 +8,10 @@ import { prisma } from '../prisma.js'
 import { apagarUpload, lerUpload, uploadPdf } from '../services/armazenamento.js'
 import { montarHtml } from '../services/documento-html.js'
 import { gerarDocx } from '../services/docx.js'
-import { agentesNr15SemConclusao, type TecnicoJson } from '../services/documento-comum.js'
+import { type TecnicoJson } from '../services/documento-comum.js'
 import { enviarDocumento } from '../services/email.js'
 import { concatenarPdf, gerarPdf } from '../services/pdf.js'
-import { pendenciasVarredura } from '../services/varredura-normativa.js'
+import { mensagemPendencias, pendenciasVarredura } from '../services/varredura-normativa.js'
 
 // ============================================================
 // MÓDULOS G/H/I/J — Documentos gerados: histórico, exportação
@@ -78,26 +78,15 @@ function exigirConclusoesNr15(
   pericia: PericiaCompleta | null,
 ): void {
   if (!pericia || (documento.tipo !== 'parecer' && documento.tipo !== 'laudo')) return
-  const pendenciasNormativas = pendenciasVarredura(
+  // Uma recusa só, com a mesma frase que a tela mostra. A conclusão
+  // individual de cada avaliação NR-15 já é cobrada aqui dentro — antes
+  // vinha numa segunda recusa, depois de o perito resolver a primeira.
+  const pendencias = pendenciasVarredura(
     pericia.tecnico as unknown as TecnicoJson,
     pericia.modalidade,
   )
-  if (pendenciasNormativas.length) {
-    const resumo = pendenciasNormativas
-      .slice(0, 8)
-      .map((item) => `${item.norma}, Anexo ${item.anexo}: ${item.motivo}`)
-      .join('; ')
-    throw new ErroHttp(422, `Conclua a varredura obrigatória antes de emitir: ${resumo}.`)
-  }
-  const pendentes = agentesNr15SemConclusao(
-    pericia.tecnico as unknown as Pick<TecnicoJson, 'agentes'>,
-    pericia.modalidade,
-  )
-  if (!pendentes.length) return
-  throw new ErroHttp(
-    422,
-    `Informe a conclusão individual antes de emitir o documento: ${pendentes.join(', ')}.`,
-  )
+  if (!pendencias.length) return
+  throw new ErroHttp(422, mensagemPendencias(pendencias))
 }
 
 /** GET /documentos */

@@ -50,3 +50,10 @@ export const LIMITE_MULTER_BYTES = LIMITE_IMAGEM_BYTES + 1
  * descobre o limite depois da subida inteira.
  */
 export const LIMITE_FOTOS_POR_ENVIO = 30
+
+/**
+ * Formatos de imagem gravados no volume. O navegador converte para JPEG o
+ * que estiver fora da lista antes de enviar, então os dois lados precisam
+ * concordar — a paridade é travada em limites.test.ts.
+ */
+export const TIPOS_IMAGEM_ACEITOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'] as const

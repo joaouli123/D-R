@@ -40,8 +40,14 @@ import type { OrigemConsulta } from '@/components/BuscaCnpj'
 import { DocumentoPreview } from '@/components/DocumentoPreview'
 import { AgenteNr15Fields } from '@/components/AgenteNr15Fields'
 import { PericulosidadeNr16Fields } from '@/components/PericulosidadeNr16Fields'
-import { PainelVarreduraNormativa } from '@/components/PainelVarreduraNormativa'
-import { agentesNr15SemConclusao } from '@/lib/conclusoesAgentes'
+import {
+  idLinhaVarredura,
+  PainelVarreduraNormativa,
+  ResumoVarreduraNr16,
+} from '@/components/PainelVarreduraNormativa'
+import { EficaciaEpiCampo, idCampoEficaciaEpi } from '@/components/EficaciaEpiCampo'
+import { ID_PENDENCIAS_EMISSAO, PendenciasEmissao } from '@/components/PendenciasEmissao'
+import { camposPendentesAgente, type CampoPendenteAgente } from '@/lib/conclusoesAgentes'
 import { rotuloFuncaoPosto } from '@/lib/apresentacaoAgente'
 import { EpiSelector } from '@/components/EpiSelector'
 import { empresaVazia, ModalEmpresa } from '@/components/ModalEmpresa'
@@ -61,7 +67,6 @@ import type {
   Usuario,
 } from '@/types'
 import { ANEXOS_NR15 } from '@/content/anexosNr15'
-import { aplicarAnexoNr16, temAnexoNr16Valido } from '@/content/anexosNr16'
 import { obterRegraAnexo } from '@/content/nr15/regrasAnexos'
 import { CHAVE_BIBLIOTECA_POR_CAMPO } from '@/content/referenciasParecer'
 import {
@@ -74,11 +79,11 @@ import { erroCas } from '@/lib/cas'
 import { patchDoProcesso } from '@/lib/consultas'
 import {
   LIMITE_FOTOS_POR_ENVIO,
-  LIMITE_IMAGEM_MB,
   recusaPorQuantidade,
   recusaPorTamanho,
 } from '@/lib/limitesUpload'
-import { aplicarAnexo, referenciaNr15PorId, usaAtenuacaoRuido } from '@/lib/nr15'
+import { prepararFotosParaEnvio } from '@/lib/prepararFotos'
+import { aplicarAnexo, referenciaNr15PorId } from '@/lib/nr15'
 import {
   dadosPapel,
   grupoDoParticipante,
@@ -95,8 +100,10 @@ import { uid } from '@/lib/utils'
 import {
   anexoLegalNr15,
   atualizarStatusVarredura,
+  mensagemPendencias,
   normalizarVarredura,
   pendenciasVarredura,
+  type PendenciaVarredura,
 } from '@/lib/varreduraNormativa'
 
 const ROTULOS_GRAU: Record<NonNullable<AgenteAvaliado['grau']>, string> = {
@@ -152,18 +159,24 @@ const RESUMO_RESULTADO_NR16: Record<string, string> = {
 /** Uma linha que responde, com a avaliação NR-15 fechada: o que falta aqui? */
 function resumoNr15(a: AgenteAvaliado): string {
   const epis = a.epis?.length ?? 0
+  const pendentes = camposPendentesAgente(a)
   return [
     a.grau ? ROTULOS_GRAU[a.grau] : null,
     epis ? `${epis} EPI${epis > 1 ? 's' : ''}` : null,
-    a.observacao?.trim() ? null : 'conclusão pendente',
+    pendentes.includes('observacao') ? 'conclusão pendente' : null,
+    pendentes.includes('epiEficaz') ? 'eficácia do EPI pendente' : null,
   ]
     .filter(Boolean)
     .join(' · ')
 }
 
-/** Avaliação NR-15 que já pode ir ao documento — nasce recolhida. */
+/**
+ * Avaliação NR-15 que já pode ir ao documento — nasce recolhida. A regra do
+ * que falta é a mesma da emissão (`camposPendentesAgente`): o cartão não pode
+ * se dizer pronto e a emissão cobrar a eficácia do EPI dele.
+ */
 function nr15Completa(a: AgenteAvaliado): boolean {
-  return Boolean(a.nome?.trim()) && Boolean(a.observacao?.trim())
+  return Boolean(a.nome?.trim()) && camposPendentesAgente(a).length === 0
 }
 
 function resumoNr16(a: AgenteAvaliado): string {
@@ -174,6 +187,7 @@ function resumoNr16(a: AgenteAvaliado): string {
       : a.resultadoPericulosidadeTexto?.trim()
         ? 'resultado em redação própria'
         : 'resultado pendente',
+    camposPendentesAgente(a).includes('anexoNr16') ? 'anexo da NR-16 pendente' : null,
   ]
     .filter(Boolean)
     .join(' · ')
@@ -189,12 +203,20 @@ function resumoNr16(a: AgenteAvaliado): string {
  * tela, que foi o que o perito reclamou. Já "Sem enquadramento em Anexo" não
  * conta como anexo para um resultado positivo — caracterizar sem anexo é
  * justamente a contradição que a tela aponta.
+ *
+ * A regra mora em `camposPendentesAgente`, a mesma que a emissão cobra.
  */
 function nr16Completa(a: AgenteAvaliado): boolean {
-  if (!a.resultadoPericulosidade && !a.resultadoPericulosidadeTexto?.trim()) return false
-  const caracteriza = a.resultadoPericulosidade === 'caracterizada'
-    || a.resultadoPericulosidade === 'caracterizada_parcial'
-  return caracteriza ? temAnexoNr16Valido(a) : true
+  return camposPendentesAgente(a).length === 0
+}
+
+/** O campo da tela que resolve a pendência — é para ele que "Ir ao campo" leva. */
+function idCampoPendente(agenteId: string, campo: CampoPendenteAgente): string {
+  return campo === 'epiEficaz' ? idCampoEficaciaEpi(agenteId) : `agente-${agenteId}-${campo}`
+}
+
+function idCartaoAgente(agenteId: string): string {
+  return `agente-${agenteId}`
 }
 
 /**
@@ -260,6 +282,9 @@ const MODALIDADE_TITULO: Record<Pericia['modalidade'], string> = {
   periculosidade: 'Periculosidade',
   ambas: 'Insalubridade e Periculosidade',
 }
+
+/** Fotos por requisição. Pequeno o bastante para uma rede móvel lenta não cortar o POST. */
+const FOTOS_POR_LOTE = 6
 
 // Na ordem em que as fotos saem no documento, com o item entre parênteses:
 // é assim que o perito confere se subiu na seção certa. Espelha
@@ -380,6 +405,9 @@ export default function PericiaEditor() {
   const original = id ? pericias.find((p) => p.id === id) : undefined
 
   const [p, setP] = useState<Pericia>(() => original ?? novaPericia(usuario?.id ?? 'usr-1'))
+  /** Sempre a versão mais recente — quem espera um upload não pode usar a de antes. */
+  const pRef = useRef(p)
+  pRef.current = p
   const [passo, setPasso] = useState(0)
   const [titulo, setTitulo] = useState(
     tipoDoc === 'laudo' ? 'Laudo Técnico Pericial' : 'Parecer Técnico da Reclamada',
@@ -397,6 +425,8 @@ export default function PericiaEditor() {
   const [enviando, setEnviando] = useState(false)
   const [exportando, setExportando] = useState<'pdf' | 'docx' | null>(null)
   const [enviandoFotos, setEnviandoFotos] = useState(false)
+  /** Texto do botão durante o envio: "Preparando…", "Enviando 7 de 20…". */
+  const [progressoFotos, setProgressoFotos] = useState<string | null>(null)
   /** Documento já emitido para esta perícia — reemitir atualiza, não duplica. */
   const [documentoId, setDocumentoId] = useState<string | null>(null)
   const [anexo, setAnexo] = useState<string | undefined>()
@@ -431,12 +461,35 @@ export default function PericiaEditor() {
     aberturaAgentes[avaliacao.id] ?? !avaliacaoCompleta(avaliacao)
   const definirCartaoAberto = (idAgente: string, aberto: boolean) =>
     setAberturaAgentes((atual) => ({ ...atual, [idAgente]: aberto }))
+  /**
+   * Para onde levar o perito depois que a tela redesenhar. Não dá para focar
+   * na hora do clique: o cartão pode estar fechado, a etapa pode ser outra e a
+   * avaliação pode nem existir ainda.
+   */
+  const [alvoFoco, setAlvoFoco] = useState<string | null>(null)
   const [secaoFotoAtual, setSecaoFotoAtual] = useState<SecaoFoto>('ambiente')
   const [consultandoCep, setConsultandoCep] = useState(false)
 
+  // A perícia do store entra na tela ao carregar e ao trocar de perícia pela
+  // rota — depois disso, quem manda é a tela. Adotar TODA mudança do store
+  // desfazia o que o perito digitava enquanto uma gravação corria: o upsert
+  // troca a perícia da lista na hora do envio e de novo na resposta, e o
+  // rollback de uma falha trazia de volta a versão de antes das fotos.
+  const adotada = useRef(original?.id)
   useEffect(() => {
-    if (original) setP(original)
+    if (!original || adotada.current === original.id) return
+    adotada.current = original.id
+    setP(original)
   }, [original])
+
+  useEffect(() => {
+    if (!alvoFoco || passo !== 2) return
+    setAlvoFoco(null)
+    const elemento = document.getElementById(alvoFoco)
+    if (!elemento) return
+    elemento.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+    elemento.focus({ preventScroll: true })
+  }, [alvoFoco, passo])
 
   /**
    * Grava o padrão de cada avaliação na primeira vez que ela aparece.
@@ -539,51 +592,90 @@ export default function PericiaEditor() {
     definirCartaoAberto(agente.id, true)
   }
 
-  function marcarVarredura(
-    norma: 'NR-15' | 'NR-16',
-    anexoId: string,
-    status: StatusVarredura,
-  ) {
+  function marcarVarredura(anexoId: string, status: StatusVarredura) {
     setP((atual) => ({
       ...atual,
-      tecnico: atualizarStatusVarredura(atual.tecnico, norma, anexoId, status),
+      tecnico: atualizarStatusVarredura(atual.tecnico, 'NR-15', anexoId, status),
     }))
   }
 
-  function registrarExposicao(norma: 'NR-15' | 'NR-16', anexoId: string) {
-    marcarVarredura(norma, anexoId, 'exposicao_identificada')
+  /** "Marcar pendentes como sem exposição": uma gravação só para todos os anexos. */
+  function marcarSemExposicao(anexoIds: string[]) {
+    setP((atual) => ({
+      ...atual,
+      tecnico: anexoIds.reduce(
+        (tecnico, anexoId) => atualizarStatusVarredura(tecnico, 'NR-15', anexoId, 'sem_exposicao'),
+        atual.tecnico,
+      ),
+    }))
+  }
 
-    const existente = p.tecnico.agentes.find((agente) => norma === 'NR-15'
-      ? agente.tipo !== 'periculosidade' && anexoLegalNr15(agente.anexoNr15) === anexoId
-      : agente.tipo === 'periculosidade' && agente.anexoNr16 === anexoId)
+  /**
+   * "Avaliação da suposta exposição" num anexo da NR-15: abre a avaliação
+   * dele — a que já existe ou uma nova — e devolve o id do que focar, para a
+   * tela levar o perito até lá. A NR-16 não passa mais por aqui: o quadro dela
+   * sai das próprias avaliações.
+   */
+  function registrarExposicao(anexoId: string): string {
+    marcarVarredura(anexoId, 'exposicao_identificada')
+
+    const existente = p.tecnico.agentes.find((agente) => agente.tipo !== 'periculosidade' && (
+      anexoId === 'ANEXO_13A'
+        ? agente.anexoNr15 === 'ANEXO_13A'
+        : anexoLegalNr15(agente.anexoNr15) === anexoId
+    ))
     if (existente) {
       definirCartaoAberto(existente.id, true)
-      return
+      return idCartaoAgente(existente.id)
     }
 
-    const idAgente = uid(norma === 'NR-15' ? 'agn' : 'ris')
-    if (norma === 'NR-16') {
-      adicionarAgente(aplicarAnexoNr16({
-        id: idAgente,
-        nome: '',
-        tipo: 'periculosidade',
-        criterio: 'qualitativo',
-      } as AgenteAvaliado, anexoId))
-      return
+    const tipo = anexoId === 'ANEXO_11' || anexoId === 'ANEXO_12' || anexoId === 'ANEXO_13' || anexoId === 'ANEXO_13A'
+      ? 'quimico'
+      : anexoId === 'ANEXO_14' ? 'biologico' : 'fisico'
+    if (ANEXOS_NR15.some((anexo) => anexo.id === anexoId)) {
+      const nova = aplicarAnexo({ id: uid('agn'), nome: '', tipo, criterio: 'qualitativo' } as AgenteAvaliado, anexoId)
+      adicionarAgente(nova)
+      return idCartaoAgente(nova.id)
     }
 
-    // Os anexos 8 e 12 têm subtipos próprios. Neles, a avaliação abre
-    // deliberadamente sem subtipo para o perito escolher a opção correta.
-    const possuiOpcaoDireta = ANEXOS_NR15.some((anexo) => anexo.id === anexoId)
-    const base = {
-      id: idAgente,
-      nome: '',
-      tipo: anexoId === 'ANEXO_11' || anexoId === 'ANEXO_12' || anexoId === 'ANEXO_13'
-        ? 'quimico'
-        : anexoId === 'ANEXO_14' ? 'biologico' : 'fisico',
-      criterio: 'qualitativo',
-    } as AgenteAvaliado
-    adicionarAgente(possuiOpcaoDireta ? aplicarAnexo(base, anexoId) : base)
+    // Os anexos 8 e 12 só existem na lista pelos subtipos (VMB/VCI; asbesto,
+    // manganês, sílica): a avaliação nasce sem anexo e o perito escolhe. Até
+    // lá o anexo segue pendente — e cada clique criava mais uma avaliação em
+    // branco. Agora reaproveita a que está esperando a escolha e leva o
+    // perito direto ao campo.
+    const emBranco = p.tecnico.agentes.find((agente) =>
+      agente.tipo === tipo && !agente.anexoNr15 && !agente.nome?.trim())
+    const idAvaliacao = emBranco?.id ?? uid('agn')
+    if (emBranco) definirCartaoAberto(emBranco.id, true)
+    else adicionarAgente({ id: idAvaliacao, nome: '', tipo, criterio: 'qualitativo' } as AgenteAvaliado)
+    return `agente-${idAvaliacao}-anexoNr15`
+  }
+
+  function novaAvaliacaoNr16(): string {
+    const idAvaliacao = uid('ris')
+    adicionarAgente({
+      id: idAvaliacao, nome: '', tipo: 'periculosidade', criterio: 'qualitativo',
+    } as AgenteAvaliado)
+    return idAvaliacao
+  }
+
+  /** O botão de cada linha da lista de pendências: leva ao lugar que a resolve. */
+  function irParaPendencia(pendencia: PendenciaVarredura) {
+    setPasso(2)
+    if (pendencia.agenteId && pendencia.campo) {
+      definirCartaoAberto(pendencia.agenteId, true)
+      setAlvoFoco(idCampoPendente(pendencia.agenteId, pendencia.campo))
+      return
+    }
+    if (pendencia.motivo === 'sem avaliação registrada') {
+      setAlvoFoco(idCartaoAgente(novaAvaliacaoNr16()))
+      return
+    }
+    if (pendencia.motivo === 'sem avaliação detalhada' && pendencia.norma === 'NR-15' && pendencia.anexoId) {
+      setAlvoFoco(registrarExposicao(pendencia.anexoId))
+      return
+    }
+    if (pendencia.anexoId) setAlvoFoco(idLinhaVarredura(pendencia.norma, pendencia.anexoId))
   }
 
   const atualizarAgente = (
@@ -653,6 +745,7 @@ export default function PericiaEditor() {
         : avaliacao.tipo !== 'periculosidade',
   )
   const varreduraNormativa = normalizarVarredura(p.tecnico, p.modalidade)
+  const pendenciasNormativas = pendenciasVarredura(p.tecnico, p.modalidade)
   // Os renderizadores filtram `t.agentes` inteiro por tipo, não a lista
   // visível do editor — e numeram os subitens do 7.2 pela POSIÇÃO nessa
   // lista. Quem manda no crachá e no hint tem de ser este índice, ou o
@@ -749,18 +842,23 @@ export default function PericiaEditor() {
   }, [docsDaPericia, documentoId, tipoDoc])
 
   async function salvarRascunho(silencioso = false): Promise<Pericia | null> {
-    const agentes = p.tecnico.agentes.map((agente) => {
+    // A versão mais recente, não a do render que chamou: as fotos salvam
+    // depois de esperar a redução no navegador, e a perícia daquele render
+    // desfazia a legenda digitada durante o "Preparando…".
+    const base = pRef.current
+    const agentes = base.tecnico.agentes.map((agente) => {
       const nomeFixo = obterRegraAnexo(agente.anexoNr15)?.agenteFixo
       return nomeFixo ? { ...agente, nome: nomeFixo } : agente
     })
     const atualizado = {
-      ...p,
-      tecnico: { ...p.tecnico, agentes },
+      ...base,
+      tecnico: { ...base.tecnico, agentes },
       atualizadoEm: new Date().toISOString().slice(0, 10),
     }
     try {
       const salva = await salvarPericia(atualizado)
-      setP(salva)
+      // Editou enquanto gravava: fica a edição, que o próximo salvar leva.
+      setP((atual) => (atual === base ? salva : atual))
       if (!silencioso) toast('Rascunho salvo. Você pode continuar depois.')
       return salva
     } catch (e) {
@@ -783,7 +881,10 @@ export default function PericiaEditor() {
   async function concluirPericia(salva: Pericia): Promise<void> {
     if (salva.status !== 'rascunho' && salva.status !== 'em_andamento') return
     try {
-      setP(await salvarPericia({ ...salva, status: 'concluida' }))
+      const concluida = await salvarPericia({ ...salva, status: 'concluida' })
+      // Editou enquanto gravava: fica a edição, já com o status novo — senão
+      // o próximo salvar devolvia a perícia a "rascunho".
+      setP((atual) => (atual === salva ? concluida : { ...atual, status: concluida.status }))
     } catch {
       // Falhar aqui não pode derrubar a geração do documento, que é o que o
       // perito pediu. O status volta a ser tentado na próxima gravação.
@@ -792,27 +893,15 @@ export default function PericiaEditor() {
 
   /** Grava (ou atualiza) o documento no histórico e devolve o id. */
   async function finalizarDocumento(silencioso = false): Promise<string | null> {
-    const pendenciasNormativas = pendenciasVarredura(p.tecnico, p.modalidade)
-    if (pendenciasNormativas.length) {
+    // A mesma regra que a API aplica ao gerar o arquivo (src/lib/varreduraNormativa.ts).
+    // O aviso sozinho não bastava — o perito leu o que faltava e ainda não
+    // achou onde resolver. Por isso a tela volta à etapa, na lista de
+    // pendências, com um botão por item.
+    const pendencias = pendenciasVarredura(p.tecnico, p.modalidade)
+    if (pendencias.length) {
       setPasso(2)
-      const resumo = pendenciasNormativas
-        .slice(0, 5)
-        .map((item) => `${item.norma}, Anexo ${item.anexo}: ${item.motivo}`)
-        .join('; ')
-      const restantes = pendenciasNormativas.length > 5 ? `; e mais ${pendenciasNormativas.length - 5}` : ''
-      toast(`Conclua a varredura obrigatória antes de emitir: ${resumo}${restantes}.`, 'error')
-      return null
-    }
-    // A regra vem de src/lib/conclusoesAgentes.ts, a mesma que a API aplica
-    // ao gerar o arquivo. Enquanto era calculada aqui, direto e sem a
-    // modalidade, uma perícia só de periculosidade travava cobrando a
-    // conclusão de um agente NR-15 herdado — que o filtro da tela tinha
-    // escondido. O perito não conseguia fechar o documento e não tinha
-    // como descobrir por quê.
-    const semConclusao = agentesNr15SemConclusao(p.tecnico, p.modalidade)
-    if (semConclusao.length) {
-      setPasso(2)
-      toast(`Preencha a conclusão da avaliação: ${semConclusao.join(', ')}.`, 'error')
+      toast(mensagemPendencias(pendencias), 'error')
+      setAlvoFoco(ID_PENDENCIAS_EMISSAO)
       return null
     }
     const salva = await salvarRascunho(true)
@@ -883,43 +972,101 @@ export default function PericiaEditor() {
   }
 
   // ---------- Fotos (Módulo E) ----------
-  async function adicionarFotos(files: FileList | null) {
-    if (!files?.length) return
-    const rotulo = SECOES_FOTO.find((s) => s.value === secaoFotoAtual)?.label
+  /**
+   * Recebe um array copiado do <input>, nunca o FileList: o Chromium esvazia
+   * o FileList no próprio objeto quando o input é zerado, e a lista chegava
+   * vazia ao envio depois do primeiro await — nenhuma foto subia, e a tela
+   * ainda dizia "0 foto(s) adicionada(s)" em verde.
+   */
+  async function adicionarFotos(arquivos: File[]) {
+    if (!arquivos.length) return
+    const secao = secaoFotoAtual
+    const rotulo = SECOES_FOTO.find((s) => s.value === secao)?.label
 
-    // Confere ANTES de enviar. Um lote com uma foto grande demais falhava
-    // inteiro depois de subir tudo — e, com corpo grande, o 413 costuma
-    // chegar ao navegador como falha de rede, sem dizer o motivo. Vale para
-    // a quantidade também: o subtítulo do cartão promete um teto que o
-    // <input multiple> não impõe sozinho.
-    const recusa = recusaPorQuantidade(files) ?? recusaPorTamanho(Array.from(files))
-    if (recusa) {
-      toast(recusa, 'error')
+    // A quantidade confere ANTES de tudo: a tela anuncia o teto, e o
+    // <input multiple> não o impõe sozinho.
+    const recusaQuantidade = recusaPorQuantidade(arquivos)
+    if (recusaQuantidade) {
+      toast(recusaQuantidade, 'error')
       return
     }
 
     setEnviandoFotos(true)
+    setProgressoFotos('Preparando…')
     try {
+      // Foto grande é reduzida e HEIC/BMP vira JPEG aqui mesmo, no
+      // navegador. Só o arquivo que não abre é recusado — e sozinho, sem
+      // derrubar o lote.
+      const { prontos, recusas } = await prepararFotosParaEnvio(arquivos)
+      recusas.forEach((recusa) => toast(recusa, 'error'))
+      // Garantia de paridade com o multer: nada acima do teto segue adiante.
+      const recusaTamanho = recusaPorTamanho(prontos)
+      if (recusaTamanho) {
+        toast(recusaTamanho, 'error')
+        return
+      }
+      if (!prontos.length) return
+
       // A perícia precisa existir no banco antes de receber fotos.
       const salva = await salvarRascunho(true)
       if (!salva) return
 
-      const novas = await api.fotos.enviar(salva.id, secaoFotoAtual, files)
-      // O upload persiste o arquivo, mas o POST da perícia é quem mantém
-      // a lista de fotos. Sincronizar agora impede que o próximo salvar
-      // interprete a imagem recém-enviada como removida.
+      // Lotes pequenos: um POST de 30 fotos numa rede móvel lenta pode ser
+      // cortado pelo proxy, e aí nenhuma foto sobe. Em lotes, o que já subiu
+      // fica, e o perito vê o andamento.
+      const novas: Foto[] = []
+      let falha: unknown
+      for (let inicio = 0; inicio < prontos.length; inicio += FOTOS_POR_LOTE) {
+        const lote = prontos.slice(inicio, inicio + FOTOS_POR_LOTE)
+        setProgressoFotos(`Enviando ${inicio + lote.length} de ${prontos.length}…`)
+        try {
+          novas.push(...(await api.fotos.enviar(salva.id, secao, lote)))
+        } catch (e) {
+          falha = e
+          break
+        }
+      }
+
+      if (!novas.length) {
+        toast(api.mensagemDeErro(falha, 'Nenhuma foto foi gravada. Tente de novo.'), 'error')
+        return
+      }
+
+      // O upload persiste o arquivo, mas o POST da perícia é quem mantém a
+      // lista de fotos. Sincronizar agora impede que o próximo salvar
+      // interprete a imagem recém-enviada como removida. A base é o estado
+      // MAIS RECENTE, não o snapshot de antes do envio: uma legenda editada
+      // enquanto as fotos subiam não pode ser desfeita.
+      const atual = pRef.current.id === salva.id ? pRef.current : salva
+      const idsExistentes = new Set(atual.fotos.map((f) => f.id))
       const comFotos = {
-        ...salva,
-        fotos: [...salva.fotos, ...novas],
+        ...atual,
+        fotos: [...atual.fotos, ...novas.filter((f) => !idsExistentes.has(f.id))],
       }
       setP(comFotos)
-      const sincronizada = await salvarPericia(comFotos)
-      setP(sincronizada)
-      toast(`${novas.length} foto(s) adicionada(s) em "${rotulo}".`)
+
+      if (falha) {
+        toast(
+          `${novas.length} de ${prontos.length} foto(s) enviada(s) em "${rotulo}". ${api.mensagemDeErro(falha, 'As demais falharam.')}`,
+          'error',
+        )
+      } else {
+        toast(`${novas.length} foto(s) adicionada(s) em "${rotulo}".`)
+      }
+
+      try {
+        const sincronizada = await salvarPericia(comFotos)
+        setP((atual) => (atual === comFotos ? sincronizada : atual))
+      } catch {
+        // As fotos JÁ estão gravadas. Dizer "falha ao enviar" aqui faria o
+        // perito reenviar e duplicar as imagens.
+        toast('As fotos foram gravadas, mas a lista da perícia não foi atualizada. Salve o rascunho antes de sair.', 'error')
+      }
     } catch (e) {
       toast(api.mensagemDeErro(e, 'Falha ao enviar as fotos.'), 'error')
     } finally {
       setEnviandoFotos(false)
+      setProgressoFotos(null)
     }
   }
 
@@ -1622,9 +1769,7 @@ export default function PericiaEditor() {
                       size="sm"
                       variant="outline"
                       icon={<Plus size={14} />}
-                      onClick={() => adicionarAgente({
-                        id: uid('ris'), nome: '', tipo: 'periculosidade', criterio: 'qualitativo',
-                      } as AgenteAvaliado)}
+                      onClick={() => novaAvaliacaoNr16()}
                     >
                       Nova avaliação NR-16
                     </Button>
@@ -1633,20 +1778,23 @@ export default function PericiaEditor() {
               }
             />
             <div className="space-y-3 p-5">
+              <PendenciasEmissao pendencias={pendenciasNormativas} onIr={irParaPendencia} />
               {p.modalidade !== 'periculosidade' && (
                 <PainelVarreduraNormativa
                   norma="NR-15"
                   itens={varreduraNormativa.nr15}
-                  onStatusChange={(anexoId, status) => marcarVarredura('NR-15', anexoId, status)}
-                  onExposicao={(anexoId) => registrarExposicao('NR-15', anexoId)}
+                  pendencias={pendenciasNormativas}
+                  onStatusChange={(anexoId, status) => marcarVarredura(anexoId, status)}
+                  onExposicao={(anexoId) => setAlvoFoco(registrarExposicao(anexoId))}
+                  onMarcarSemExposicao={marcarSemExposicao}
                 />
               )}
               {p.modalidade !== 'insalubridade' && (
-                <PainelVarreduraNormativa
-                  norma="NR-16"
+                <ResumoVarreduraNr16
                   itens={varreduraNormativa.nr16}
-                  onStatusChange={(anexoId, status) => marcarVarredura('NR-16', anexoId, status)}
-                  onExposicao={(anexoId) => registrarExposicao('NR-16', anexoId)}
+                  onRegistrarAvaliacao={p.tecnico.agentes.some((avaliacao) => avaliacao.tipo === 'periculosidade')
+                    ? undefined
+                    : () => setAlvoFoco(idCartaoAgente(novaAvaliacaoNr16()))}
                 />
               )}
               {blocosDeAvaliacao.map((bloco, indiceBloco) => (
@@ -1661,7 +1809,12 @@ export default function PericiaEditor() {
                 {bloco.agentes.map((a) => {
                 if (a.tipo === 'periculosidade') {
                   return (
-                    <div key={a.id} className="rounded-lg border border-ink-200 border-l-4 border-l-amber-500 p-3">
+                    <div
+                      key={a.id}
+                      id={idCartaoAgente(a.id)}
+                      tabIndex={-1}
+                      className="rounded-lg border border-ink-200 border-l-4 border-l-amber-500 p-3 outline-none focus:ring-2 focus:ring-amber-400"
+                    >
                       <SecaoColapsavel
                         titulo={a.nome?.trim() || 'Nova avaliação NR-16'}
                         resumo={resumoNr16(a)}
@@ -1724,7 +1877,12 @@ export default function PericiaEditor() {
                     ? '7.2.2'
                     : '7.2.1'
                 return (
-                <div key={a.id} className="rounded-lg border border-ink-200 border-l-4 border-l-navy-700 p-3">
+                <div
+                  key={a.id}
+                  id={idCartaoAgente(a.id)}
+                  tabIndex={-1}
+                  className="rounded-lg border border-ink-200 border-l-4 border-l-navy-700 p-3 outline-none focus:ring-2 focus:ring-amber-400"
+                >
                   <SecaoColapsavel
                     titulo={a.nome?.trim() || regraAnexo?.agenteFixo || 'Novo agente NR-15'}
                     resumo={resumoNr15(a)}
@@ -1771,6 +1929,7 @@ export default function PericiaEditor() {
                       onChange={(e) => atualizarAgente(a.id, (atual) => ({ ...atual, cas: e.target.value }))}
                     />}
                     <Select
+                      id={`agente-${a.id}-anexoNr15`}
                       label="Anexo NR-15"
                       value={a.anexoNr15 ?? ''}
                       onChange={(e) => atualizarAgente(a.id, (atual) => aplicarAnexo(atual, e.target.value))}
@@ -1807,6 +1966,7 @@ export default function PericiaEditor() {
                       como obrigatória. */}
                   <div className="mt-3 rounded-lg border border-brand-200 bg-brand-50/40 p-3">
                     <Textarea
+                      id={idCampoPendente(a.id, 'observacao')}
                       label="Conclusão da avaliação"
                       required
                       rows={4}
@@ -1883,29 +2043,12 @@ export default function PericiaEditor() {
                     dataReferencia={p.dataVistoria}
                     onChange={(agenteAtualizado) => atualizarAgente(a.id, () => agenteAtualizado)}
                   />
-                  {/* No ruído a conclusão sai do cálculo, não de um
-                      checkbox — vale para o Anexo 1 e para o 2. */}
-                  {!usaAtenuacaoRuido(a) && (
-                    <div className="mt-3">
-                      <Checkbox
-                        className="rounded-md px-1 py-1 focus-within:ring-2 focus-within:ring-brand-600"
-                        label="EPI comprovadamente eficaz para este agente"
-                        description="Adicionar equipamento não altera automaticamente esta conclusão técnica."
-                        checked={a.epiEficaz ?? false}
-                        onChange={(e) => atualizarAgente(a.id, (atual) => ({ ...atual, epiEficaz: e.target.checked }))}
-                      />
-                      {/* O enquadramento destes anexos é por atividade, e há
-                          quem sustente que aí o EPI não conta. A lei permite
-                          contar; quem decide é o perito, então a base fica à
-                          vista de quem marca. */}
-                      <p className="mt-1.5 rounded-md border border-ink-200 bg-ink-50/70 px-2.5 py-2 text-[11px] leading-4 text-ink-600">
-                        NR-15, item 15.4.1: a insalubridade é eliminada ou neutralizada “a) com a
-                        adoção de medidas de ordem geral que conservem o ambiente de trabalho dentro
-                        dos limites de tolerância; b) com a utilização de equipamento de proteção
-                        individual”. No mesmo sentido, o art. 191, I e II, da CLT.
-                      </p>
-                    </div>
-                  )}
+                  {/* Sim ou Não, sem resposta pronta: a caixa de marcar não
+                      distinguia "não é eficaz" de "ainda não respondi". */}
+                  <EficaciaEpiCampo
+                    agente={a}
+                    onChange={(epiEficaz) => atualizarAgente(a.id, (atual) => ({ ...atual, epiEficaz }))}
+                  />
                   <BotaoInserirNoLaudo onInserir={() => definirCartaoAberto(a.id, false)} />
                   </SecaoColapsavel>
                 </div>
@@ -1926,7 +2069,7 @@ export default function PericiaEditor() {
           <Card>
             <CardHeader
               title="5.1.3. Registro fotográfico e evidências"
-              subtitle={`Organizadas dentro das seções do documento. Até ${LIMITE_IMAGEM_MB} MB por foto, ${LIMITE_FOTOS_POR_ENVIO} por vez.`}
+              subtitle={`Organizadas dentro das seções do documento. Até ${LIMITE_FOTOS_POR_ENVIO} por vez; fotos grandes são reduzidas automaticamente.`}
               icon={<Camera size={18} />}
               action={
                 <div className="flex gap-2">
@@ -1947,7 +2090,7 @@ export default function PericiaEditor() {
                     loading={enviandoFotos}
                     onClick={() => fotoRef.current?.click()}
                   >
-                    Adicionar
+                    {progressoFotos ?? 'Adicionar'}
                   </Button>
                 </div>
               }
@@ -1959,8 +2102,10 @@ export default function PericiaEditor() {
               multiple
               className="hidden"
               onChange={(e) => {
-                void adicionarFotos(e.target.files)
+                // Copiar ANTES de zerar: zerar o input esvazia o FileList.
+                const arquivos = Array.from(e.target.files ?? [])
                 e.target.value = ''
+                void adicionarFotos(arquivos)
               }}
             />
             <div className="space-y-6 p-5">
