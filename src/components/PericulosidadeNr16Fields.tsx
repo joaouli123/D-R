@@ -10,6 +10,7 @@ import {
   OPCAO_EXPOSICAO_LEGADA_NR16,
   OPCOES_EXPOSICAO_NR16,
   OPCOES_PERIODICIDADE_NR16,
+  OPCOES_PRESENCA_AREA_FORA_NR16,
   OPCOES_PRESENCA_AREA_NR16,
   OPCOES_RELACAO_ATIVIDADE_NR16,
   OPCOES_RESULTADO_NR16,
@@ -93,7 +94,32 @@ function comCampoNr16(avaliacao: AgenteAvaliado, campo: CampoOpcionalNr16, valor
 
 /** Situações em que não há presença na área a registrar. */
 function semPresencaNaArea(situacao?: string): boolean {
-  return situacao === 'fora' || situacao === 'nao_caracterizada'
+  return situacao === 'nao_caracterizada'
+}
+
+/**
+ * As quatro opções novas descrevem por que a atividade ficou fora da área
+ * (ou o acesso indevido a ela) — só cabem quando a situação é 'fora'. As
+ * três antigas descrevem como o trabalhador ocupava a área por dentro, e só
+ * cabem quando a situação é 'dentro' ou 'parcialmente_dentro' (inclusive
+ * ainda não escolhida).
+ */
+const PRESENCA_AREA_FORA_NR16 = new Set<string>([
+  'fora_sem_procedimento',
+  'fora_com_procedimento',
+  'acesso_nao_autorizado_sem_procedimento',
+  'acesso_nao_autorizado_com_procedimento',
+])
+
+function opcoesPresencaNaArea(situacao?: string) {
+  return situacao === 'fora' ? OPCOES_PRESENCA_AREA_FORA_NR16 : OPCOES_PRESENCA_AREA_NR16
+}
+
+/** A presença gravada deixa de caber quando a situação muda de grupo. */
+function presencaIncompativelComSituacao(situacao?: string, presenca?: string): boolean {
+  if (!presenca) return false
+  if (semPresencaNaArea(situacao)) return true
+  return (situacao === 'fora') !== PRESENCA_AREA_FORA_NR16.has(presenca)
 }
 
 /**
@@ -290,7 +316,9 @@ export function PericulosidadeNr16Fields({ avaliacao, onChange }: Periculosidade
 
   function escolherSituacao(situacao: string) {
     const atualizada = comCampoNr16(avaliacao, 'situacaoAreaRisco', situacao)
-    onChange(semPresencaNaArea(situacao) ? comCampoNr16(atualizada, 'presencaAreaRisco', '') : atualizada)
+    onChange(presencaIncompativelComSituacao(situacao, avaliacao.presencaAreaRisco)
+      ? comCampoNr16(atualizada, 'presencaAreaRisco', '')
+      : atualizada)
   }
 
   function escolherResultado(resultado: string) {
@@ -436,7 +464,7 @@ export function PericulosidadeNr16Fields({ avaliacao, onChange }: Periculosidade
               onChange={(evento) => onChange(comCampoNr16(avaliacao, 'presencaAreaRisco', evento.target.value))}
             >
               <option value="">— selecione —</option>
-              {OPCOES_PRESENCA_AREA_NR16.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+              {opcoesPresencaNaArea(avaliacao.situacaoAreaRisco).map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
             </Select>
           )}
         </div>

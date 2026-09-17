@@ -87,7 +87,11 @@ export const agenteSchema = z.object({
   detalhesNr16: z.array(z.object({ id: texto, rotulo: texto, valor: texto })).max(20).optional(),
   enquadramentoNr16: texto.optional(),
   situacaoAreaRisco: z.enum(['dentro', 'parcialmente_dentro', 'fora', 'nao_caracterizada']).optional(),
-  presencaAreaRisco: z.enum(['permanencia', 'circulacao', 'acesso_eventual']).optional(),
+  presencaAreaRisco: z.enum([
+    'permanencia', 'circulacao', 'acesso_eventual',
+    'fora_sem_procedimento', 'fora_com_procedimento',
+    'acesso_nao_autorizado_sem_procedimento', 'acesso_nao_autorizado_com_procedimento',
+  ]).optional(),
   delimitacaoAreaRisco: texto.optional(),
   distanciaAreaRisco: texto.optional(),
   tempoExposicaoNr16: texto.optional(),

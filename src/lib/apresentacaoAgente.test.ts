@@ -544,6 +544,33 @@ describe('levantamento estruturado da NR-16', () => {
       .toBe('Acesso eventual à área de risco.')
   })
 
+  it('descreve as quatro novas justificativas de presença, só quando a situação é "fora"', () => {
+    const condicao = (agente: Partial<AgenteAvaliado>) =>
+      montarApresentacaoAgente({
+        ...postoDeCombustivel,
+        delimitacaoAreaRisco: undefined,
+        distanciaAreaRisco: undefined,
+        areaRisco: undefined,
+        ...agente,
+      }).linhas.find((item) => item.rotulo === 'Condição ou área de risco')?.valor
+
+    expect(condicao({ situacaoAreaRisco: 'fora', presencaAreaRisco: 'fora_sem_procedimento' }))
+      .toBe('Atividade exercida fora da área de risco, mesmo sem procedimento formal.')
+    expect(condicao({ situacaoAreaRisco: 'fora', presencaAreaRisco: 'fora_com_procedimento' }))
+      .toBe('Atividade exercida fora da área de risco, conforme procedimento formal.')
+    expect(condicao({ situacaoAreaRisco: 'fora', presencaAreaRisco: 'acesso_nao_autorizado_sem_procedimento' }))
+      .toBe('Atividade exercida fora da área de risco, com acesso não autorizado mesmo sem procedimento formal.')
+    expect(condicao({ situacaoAreaRisco: 'fora', presencaAreaRisco: 'acesso_nao_autorizado_com_procedimento' }))
+      .toBe('Atividade exercida fora da área de risco, com acesso não autorizado, conforme procedimento formal.')
+
+    // Um valor novo não cabe fora do grupo 'fora': a presença é ignorada.
+    expect(condicao({ situacaoAreaRisco: 'dentro', presencaAreaRisco: 'fora_sem_procedimento' }))
+      .toBe('Atividade exercida dentro da área de risco.')
+    // E um valor novo não cabe sem situação (só é válido complementando 'fora').
+    expect(condicao({ situacaoAreaRisco: undefined, presencaAreaRisco: 'fora_com_procedimento' }))
+      .toBeUndefined()
+  })
+
   it('separa as duas hipóteses da Súmula 364 e mantém o texto dos laudos antigos', () => {
     const exposicao = (exposicaoPericulosidade: AgenteAvaliado['exposicaoPericulosidade']) =>
       montarApresentacaoAgente({ ...postoDeCombustivel, exposicaoPericulosidade }).linhas

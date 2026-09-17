@@ -186,6 +186,22 @@ const CASOS: { nome: string; agente: AgenteAvaliado & { funcaoPosto?: string } }
     },
   },
   {
+    // As quatro justificativas novas do grupo 'fora': só cabem com a
+    // situação 'fora', e a frase não repete "fora da área de risco" duas vezes.
+    nome: 'fora da área, com acesso não autorizado e procedimento formal',
+    agente: {
+      id: 'nr16-fora-acesso-nao-autorizado',
+      nome: 'Inflamáveis',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
+      anexoNr16: 'ANEXO_02',
+      situacaoAreaRisco: 'fora',
+      presencaAreaRisco: 'acesso_nao_autorizado_com_procedimento',
+      exposicaoPericulosidade: 'eventual',
+      resultadoPericulosidade: 'nao_caracterizada',
+    },
+  },
+  {
     // Ponto de milhar: os dois lados têm de ler 1.100 metros, e não 1,1.
     nome: 'números com ponto de milhar',
     agente: {

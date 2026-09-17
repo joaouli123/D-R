@@ -125,10 +125,19 @@ export const OPCOES_SITUACAO_AREA_NR16: readonly OpcaoNr16<SituacaoAreaRisco>[] 
   { value: 'nao_caracterizada', label: 'Área de risco não caracterizada' },
 ]
 
+/** Como o trabalhador ocupava a área, para quando a situação é 'dentro' ou 'parcialmente_dentro'. */
 export const OPCOES_PRESENCA_AREA_NR16: readonly OpcaoNr16<PresencaAreaRisco>[] = [
   { value: 'permanencia', label: 'Permanência' },
   { value: 'circulacao', label: 'Circulação' },
   { value: 'acesso_eventual', label: 'Acesso eventual' },
+]
+
+/** Por que a atividade ficou fora da área de risco, para quando a situação é 'fora'. */
+export const OPCOES_PRESENCA_AREA_FORA_NR16: readonly OpcaoNr16<PresencaAreaRisco>[] = [
+  { value: 'fora_sem_procedimento', label: 'Fora da área de risco, mesmo sem procedimento formal' },
+  { value: 'fora_com_procedimento', label: 'Fora da área de risco, conforme procedimento formal' },
+  { value: 'acesso_nao_autorizado_sem_procedimento', label: 'Acesso não autorizado mesmo sem procedimento formal' },
+  { value: 'acesso_nao_autorizado_com_procedimento', label: 'Acesso não autorizado, conforme procedimento formal' },
 ]
 
 export const OPCOES_RELACAO_ATIVIDADE_NR16: readonly OpcaoNr16<RelacaoAtividadeNr16>[] = [

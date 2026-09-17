@@ -194,8 +194,18 @@ export type ExposicaoPericulosidade =
 export type ResultadoPericulosidade = 'caracterizada' | 'caracterizada_parcial' | 'nao_caracterizada' | 'prejudicada'
 /** Onde o trabalhador estava em relação à área de risco delimitada pela norma. */
 export type SituacaoAreaRisco = 'dentro' | 'parcialmente_dentro' | 'fora' | 'nao_caracterizada'
-/** Como o trabalhador ocupa a área de risco, quando está nela. */
-export type PresencaAreaRisco = 'permanencia' | 'circulacao' | 'acesso_eventual'
+/**
+ * Como o trabalhador ocupa a área de risco (quando está nela), ou como se
+ * justifica não estar (quando a situação é 'fora').
+ */
+export type PresencaAreaRisco =
+  | 'permanencia'
+  | 'circulacao'
+  | 'acesso_eventual'
+  | 'fora_sem_procedimento'
+  | 'fora_com_procedimento'
+  | 'acesso_nao_autorizado_sem_procedimento'
+  | 'acesso_nao_autorizado_com_procedimento'
 export type UnidadeTempoExposicaoNr16 = 'minutos_dia' | 'horas_dia'
 export type PeriodicidadeOperacionalNr16 = 'dia' | 'semana' | 'mes'
 /** Peso da atividade perigosa na rotina da função. */

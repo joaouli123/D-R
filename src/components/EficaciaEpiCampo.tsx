@@ -88,13 +88,17 @@ export function EficaciaEpiCampo({ agente, onChange }: Props) {
       )}
       {/* O enquadramento destes anexos é por atividade, e há quem sustente
           que aí o EPI não conta. A lei permite contar; quem decide é o
-          perito, então a base fica à vista de quem responde. */}
-      <p className="mt-2 rounded-md border border-ink-200 bg-white/80 px-2.5 py-2 text-[11px] leading-4 text-ink-600">
-        NR-15, item 15.4.1: a insalubridade é eliminada ou neutralizada “a) com a
-        adoção de medidas de ordem geral que conservem o ambiente de trabalho dentro
-        dos limites de tolerância; b) com a utilização de equipamento de proteção
-        individual”. No mesmo sentido, o art. 191, I e II, da CLT.
-      </p>
+          perito, então a base fica ao alcance de quem responde — mas
+          recolhida por padrão, para não pesar a tela a cada agente. */}
+      <details className="mt-2 rounded-md border border-ink-200 bg-white/80 px-2.5 py-1.5 text-[11px] leading-4 text-ink-600">
+        <summary className="cursor-pointer select-none font-medium text-ink-700">Base legal</summary>
+        <p className="mt-1.5">
+          NR-15, item 15.4.1: a insalubridade é eliminada ou neutralizada “a) com a
+          adoção de medidas de ordem geral que conservem o ambiente de trabalho dentro
+          dos limites de tolerância; b) com a utilização de equipamento de proteção
+          individual”. No mesmo sentido, o art. 191, I e II, da CLT.
+        </p>
+      </details>
     </fieldset>
   )
 }

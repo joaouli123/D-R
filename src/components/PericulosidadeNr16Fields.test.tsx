@@ -440,23 +440,51 @@ describe('PericulosidadeNr16Fields — etapas', () => {
     expect(screen.getByText(/A norma não delimita área de risco para esta hipótese/)).toBeTruthy()
   })
 
-  it('esconde e descarta a presença na área quando a atividade é fora dela', async () => {
+  it('esconde a presença só quando a área não está caracterizada, e descarta o valor gravado ao trocar de grupo', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
     const dentro: AgenteAvaliado = { ...INFLAMAVEIS, situacaoAreaRisco: 'dentro', presencaAreaRisco: 'permanencia' }
     const { rerender } = render(<PericulosidadeNr16Fields avaliacao={dentro} onChange={onChange} />)
 
+    // 'fora' troca de grupo: o valor antigo ('permanencia') não cabe mais, mas
+    // o seletor continua visível — agora com as quatro justificativas novas.
     await user.selectOptions(screen.getByRole('combobox', { name: 'Situação em relação à área de risco' }), 'fora')
     expect(ultimaChamada(onChange).situacaoAreaRisco).toBe('fora')
     expect(ultimaChamada(onChange)).not.toHaveProperty('presencaAreaRisco')
 
     rerender(<PericulosidadeNr16Fields avaliacao={ultimaChamada(onChange)} onChange={onChange} />)
-    expect(screen.queryByRole('combobox', { name: 'Presença na área de risco' })).toBeNull()
+    const presenca = screen.getByRole('combobox', { name: 'Presença na área de risco' })
+    expect(within(presenca).queryByText('Permanência')).toBeNull()
+    expect(within(presenca).getByText('Fora da área de risco, mesmo sem procedimento formal')).toBeTruthy()
 
+    await user.selectOptions(presenca, 'acesso_nao_autorizado_com_procedimento')
+    expect(ultimaChamada(onChange)).toMatchObject({
+      situacaoAreaRisco: 'fora',
+      presencaAreaRisco: 'acesso_nao_autorizado_com_procedimento',
+    })
+
+    // Voltando para 'parcialmente_dentro', o valor novo tampouco cabe: some, e
+    // o seletor volta a mostrar as três opções antigas.
+    rerender(<PericulosidadeNr16Fields avaliacao={ultimaChamada(onChange)} onChange={onChange} />)
     await user.selectOptions(screen.getByRole('combobox', { name: 'Situação em relação à área de risco' }), 'parcialmente_dentro')
+    expect(ultimaChamada(onChange)).not.toHaveProperty('presencaAreaRisco')
+
     rerender(<PericulosidadeNr16Fields avaliacao={ultimaChamada(onChange)} onChange={onChange} />)
     await user.selectOptions(screen.getByRole('combobox', { name: 'Presença na área de risco' }), 'circulacao')
     expect(ultimaChamada(onChange)).toMatchObject({ situacaoAreaRisco: 'parcialmente_dentro', presencaAreaRisco: 'circulacao' })
+  })
+
+  it('esconde a presença quando a área de risco não está caracterizada', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    const dentro: AgenteAvaliado = { ...INFLAMAVEIS, situacaoAreaRisco: 'dentro', presencaAreaRisco: 'permanencia' }
+    const { rerender } = render(<PericulosidadeNr16Fields avaliacao={dentro} onChange={onChange} />)
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Situação em relação à área de risco' }), 'nao_caracterizada')
+    expect(ultimaChamada(onChange)).not.toHaveProperty('presencaAreaRisco')
+
+    rerender(<PericulosidadeNr16Fields avaliacao={ultimaChamada(onChange)} onChange={onChange} />)
+    expect(screen.queryByRole('combobox', { name: 'Presença na área de risco' })).toBeNull()
   })
 
   it('grava área, distância, tempo e frequência — e tira a chave do campo esvaziado', async () => {

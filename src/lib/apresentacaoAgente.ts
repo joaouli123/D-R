@@ -193,6 +193,10 @@ const PRESENCA_AREA_RISCO: Record<PresencaAreaRisco, string> = {
   permanencia: 'com permanência',
   circulacao: 'em circulação',
   acesso_eventual: 'com acesso eventual',
+  fora_sem_procedimento: 'mesmo sem procedimento formal',
+  fora_com_procedimento: 'conforme procedimento formal',
+  acesso_nao_autorizado_sem_procedimento: 'com acesso não autorizado mesmo sem procedimento formal',
+  acesso_nao_autorizado_com_procedimento: 'com acesso não autorizado, conforme procedimento formal',
 }
 
 /** A presença registrada sem a situação. */
@@ -200,6 +204,30 @@ const PRESENCA_AREA_RISCO_ISOLADA: Record<PresencaAreaRisco, string> = {
   permanencia: 'Permanência na área de risco.',
   circulacao: 'Circulação pela área de risco.',
   acesso_eventual: 'Acesso eventual à área de risco.',
+  fora_sem_procedimento: 'Fora da área de risco, mesmo sem procedimento formal.',
+  fora_com_procedimento: 'Fora da área de risco, conforme procedimento formal.',
+  acesso_nao_autorizado_sem_procedimento: 'Acesso não autorizado mesmo sem procedimento formal.',
+  acesso_nao_autorizado_com_procedimento: 'Acesso não autorizado, conforme procedimento formal.',
+}
+
+/**
+ * As quatro opções novas descrevem por que a atividade ficou fora da área (ou
+ * o acesso indevido a ela) — só cabem quando a situação é 'fora'. As três
+ * antigas descrevem como o trabalhador ocupava a área por dentro, e só cabem
+ * quando a situação é 'dentro' ou 'parcialmente_dentro' (inclusive ainda não
+ * escolhida).
+ */
+const PRESENCA_NOVA = new Set<PresencaAreaRisco>([
+  'fora_sem_procedimento',
+  'fora_com_procedimento',
+  'acesso_nao_autorizado_sem_procedimento',
+  'acesso_nao_autorizado_com_procedimento',
+])
+
+function presencaCabeNaSituacao(situacao: SituacaoAreaRisco | undefined, presenca: PresencaAreaRisco): boolean {
+  if (situacao === 'nao_caracterizada') return false
+  const nova = PRESENCA_NOVA.has(presenca)
+  return situacao === 'fora' ? nova : !nova
 }
 
 const PERIODICIDADE_OPERACIONAL: Record<PeriodicidadeOperacionalNr16, string> = {
@@ -232,9 +260,10 @@ function quantidadeNr16(valor: string, singular: string, plural: string): string
 
 export function fraseSituacaoAreaRiscoNr16(agente: AgenteAvaliado): string {
   const situacao = agente.situacaoAreaRisco ? SITUACAO_AREA_RISCO[agente.situacaoAreaRisco] : undefined
-  // Fora da área, ou sem área caracterizada, não há presença a descrever.
-  const cabePresenca = agente.situacaoAreaRisco !== 'fora' && agente.situacaoAreaRisco !== 'nao_caracterizada'
-  const presenca = cabePresenca && agente.presencaAreaRisco ? agente.presencaAreaRisco : undefined
+  const presenca =
+    agente.presencaAreaRisco && presencaCabeNaSituacao(agente.situacaoAreaRisco, agente.presencaAreaRisco)
+      ? agente.presencaAreaRisco
+      : undefined
   if (situacao && presenca) return `${situacao}, ${PRESENCA_AREA_RISCO[presenca]}.`
   if (situacao) return `${situacao}.`
   return presenca ? PRESENCA_AREA_RISCO_ISOLADA[presenca] ?? '' : ''
