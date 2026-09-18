@@ -85,18 +85,54 @@ async function lancarErro(res: Response): Promise<never> {
   )
 }
 
+/**
+ * Teto de espera de uma requisição.
+ *
+ * `fetch` sem sinal de aborto espera PARA SEMPRE: se a conexão fica pendurada
+ * (celular trocando de rede, proxy que segura o corpo), a tela roda o spinner
+ * indefinidamente e o `finally` que o desliga nunca chega. Foi o que o perito
+ * relatou no envio da assinatura em 18/09 — "fica processando infinitamente".
+ * Com o teto, a espera vira um erro que a tela sabe mostrar.
+ *
+ * O envio de arquivo tem um teto maior: subir uma foto por 4G é lento, e
+ * derrubar o upload de quem está no meio dele seria pior que esperar.
+ */
+const TEMPO_LIMITE_MS = 45_000
+const TEMPO_LIMITE_ENVIO_MS = 150_000
+
+function comTempoLimite(ms: number, init?: RequestInit): RequestInit {
+  // Respeita um sinal que já venha de fora, e sai de lado onde
+  // `AbortSignal.timeout` não existe (jsdom dos testes, navegador antigo).
+  if (init?.signal || typeof AbortSignal?.timeout !== 'function') return init ?? {}
+  return { ...init, signal: AbortSignal.timeout(ms) }
+}
+
+/** Distingue "demorou demais" de "a rede caiu" — a saída do perito é outra. */
+function ehEsperaEstourada(erro: unknown): boolean {
+  return erro instanceof DOMException && (erro.name === 'TimeoutError' || erro.name === 'AbortError')
+}
+
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response
+  const envioDeArquivo = init?.body instanceof FormData
   try {
     res = await fetch(`${BASE_URL}${path}`, {
       credentials: 'include',
-      ...init,
+      ...comTempoLimite(envioDeArquivo ? TEMPO_LIMITE_ENVIO_MS : TEMPO_LIMITE_MS, init),
       headers: {
-        ...(init?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+        ...(envioDeArquivo ? {} : { 'Content-Type': 'application/json' }),
         ...(init?.headers ?? {}),
       },
     })
-  } catch {
+  } catch (erro) {
+    if (ehEsperaEstourada(erro)) {
+      throw new ErroApi(
+        0,
+        envioDeArquivo
+          ? 'O envio demorou demais e foi interrompido. Verifique a conexão e tente de novo — se a foto for muito grande, use uma mais leve.'
+          : 'O servidor demorou demais para responder. Tente de novo em instantes.',
+      )
+    }
     // fetch só rejeita quando a rede falha ou o CORS bloqueia.
     throw new ErroApi(0, 'Não foi possível falar com o servidor. Verifique sua conexão.')
   }
