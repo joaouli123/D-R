@@ -6,10 +6,17 @@ import { empresa, periciaAmbasSoNr16, periciaDeTeste, periciaSoPericulosidade, p
 // O renderizador carrega o armazenamento sob demanda, só quando há foto para
 // embutir. Aqui o disco não existe: devolvendo `null`, a figura sai com o
 // espaço reservado e a LEGENDA — que é o que este teste mede — continua igual.
-vi.mock('./armazenamento.js', () => ({
-  comoDataUri: async () => null,
-  lerUpload: async () => Buffer.alloc(0),
-}))
+// A única exceção é 'assinatura.png', a assinatura manuscrita do perito.
+vi.mock('./armazenamento.js', async () => {
+  const { default: sharp } = await import('sharp')
+  const assinatura = await sharp({
+    create: { width: 600, height: 200, channels: 4, background: { r: 20, g: 30, b: 90, alpha: 1 } },
+  }).png().toBuffer()
+  return {
+    comoDataUri: async () => null,
+    lerUpload: async (arquivo: string) => (arquivo === 'assinatura.png' ? assinatura : Buffer.alloc(0)),
+  }
+})
 
 const { htmlDoParecer } = await import('./documento-html.js')
 
@@ -106,14 +113,33 @@ describe('parecer em HTML (motor do PDF)', () => {
     expect(await gerar()).not.toContain('Conclusão:')
   })
 
-  it('imprime a conclusão da avaliação quando ela existe', async () => {
+  it('imprime a conclusão como última linha da tabela do agente, nos itens 7 e 10', async () => {
     const pericia = periciaDeTeste()
     ;(pericia.tecnico as unknown as { agentes: { observacao?: string }[] }).agentes[0]!.observacao =
       'A exposição é habitual e permanente.'
 
     const html = await gerar(pericia)
 
-    expect(html).toContain('Conclusão: A exposição é habitual e permanente.')
+    // Uma linha só, na largura toda, dentro da tabela (pedido do perito) — e
+    // não mais um parágrafo solto depois dela.
+    const linha =
+      '<tr class="conclusao-agente"><td colspan="2"><strong>Conclusão:</strong> A exposição é habitual e permanente.</td></tr></tbody></table>'
+    expect(html.split(linha).length - 1).toBe(2)
+    expect(html).not.toContain('<p>Conclusão:')
+  })
+
+  it('imprime a conclusão de agente não identificado numa tabela de uma linha', async () => {
+    const pericia = periciaDeTeste()
+    Object.assign((pericia.tecnico as unknown as { agentes: object[] }).agentes[0]!, {
+      identificadoNaAtividade: false,
+      observacao: 'Agente não identificado na atividade.',
+    })
+
+    const html = await gerar(pericia)
+
+    expect(html).toContain(
+      '<table class="tabela-conclusao"><tbody><tr class="conclusao-agente"><td colspan="2"><strong>Conclusão:</strong> Agente não identificado na atividade.</td></tr></tbody></table>',
+    )
   })
 
   it('tira da seção de EPIs os agentes que a modalidade excluiu', async () => {
@@ -201,19 +227,19 @@ describe('parecer em HTML (motor do PDF)', () => {
     expect(html).not.toContain('>Pendente<')
   })
 
-  it('imprime a análise técnica depois dos quadros dos agentes, não antes', async () => {
-    // O texto do item 10 é a CONCLUSÃO de cada agente avaliado: tem que sair
-    // depois dos quadros, não colado no título da seção.
+  it('não imprime mais o texto livre da análise técnica no item 10', async () => {
+    // O campo saiu do formulário (pedido do perito): as conclusões já estão
+    // nas tabelas. Perícias antigas ainda têm o texto gravado — e ele não
+    // pode voltar a aparecer no documento.
     const pericia = periciaDeTeste()
     ;(pericia.tecnico as unknown as { analiseTecnica: string }).analiseTecnica =
       'Texto exclusivo de teste da análise técnica.'
 
     const html = await gerar(pericia)
 
-    expect(html).toContain('Texto exclusivo de teste da análise técnica.')
-    expect(html.lastIndexOf('class="agente-bloco"')).toBeLessThan(
-      html.indexOf('Texto exclusivo de teste da análise técnica.'),
-    )
+    expect(html).toContain('10. ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS')
+    expect(html).toContain('10.1. NR-15')
+    expect(html).not.toContain('Texto exclusivo de teste da análise técnica.')
   })
 
   it('abre a capa pela identificação das partes', async () => {
@@ -224,5 +250,50 @@ describe('parecer em HTML (motor do PDF)', () => {
     )
     expect(posicoes.every((p) => p >= 0)).toBe(true)
     expect(posicoes).toEqual([...posicoes].sort((a, b) => a - b))
+  })
+
+  it('monta a folha de rosto e começa o item 1 na folha 2', async () => {
+    const html = await gerar()
+    const capa = html.slice(html.indexOf('<section class="capa">'), html.indexOf('</section>'))
+
+    // A logo, o endereçamento, o espaço elástico, a identificação, o título e
+    // a apresentação ficam na capa; a capa quebra a página (CSS .capa).
+    expect(capa).toContain('EXCELENTÍSSIMO')
+    expect(capa.indexOf('EXCELENTÍSSIMO')).toBeLessThan(capa.indexOf('class="espaco-capa"'))
+    expect(capa.indexOf('class="espaco-capa"')).toBeLessThan(capa.indexOf('IDENTIFICAÇÃO DAS PARTES'))
+    expect(capa).toContain('APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA')
+    expect(capa).not.toContain('OBJETO DA PERÍCIA')
+    expect(html.indexOf('</section>')).toBeLessThan(html.indexOf('1. OBJETO DA PERÍCIA E DADOS CONTRATUAIS'))
+    expect(html).toMatch(/\.capa \{[^}]*break-after: page/)
+  })
+
+  it('prende data e assinatura num bloco só, com o espaço do parecer', async () => {
+    const html = await gerar()
+    const fecho = html.slice(html.indexOf('<div class="fecho fecho-parecer">'))
+
+    expect(fecho).toContain('class="local-data"')
+    expect(fecho).toContain('class="assinatura"')
+    expect(fecho).toContain('Dinoel Ribeiro da Silva')
+    // Não se parte, e quando desce de folha leva junto o último parágrafo —
+    // nunca uma folha só com a data e a assinatura.
+    expect(html).toMatch(
+      /\.fecho \{ break-inside: avoid; page-break-inside: avoid; break-before: avoid; page-break-before: avoid; \}/,
+    )
+    // Sem assinatura cadastrada, a linha fica em branco para assinar à mão.
+    expect(html).not.toContain('<img class="assinatura-imagem"')
+  })
+
+  it('pousa a assinatura manuscrita do perito sobre a linha', async () => {
+    const html = await htmlDoParecer(
+      periciaDeTeste(),
+      [empresa],
+      { ...perito, assinaturaArquivo: 'assinatura.png' },
+      'Parecer Técnico da Reclamada — Insalubridade',
+    )
+
+    const fecho = html.slice(html.indexOf('<div class="fecho fecho-parecer">'))
+    expect(fecho).toContain('<div class="assinatura com-imagem">')
+    expect(fecho).toMatch(/<img class="assinatura-imagem" src="data:image\/png;base64,[^"]+" alt="Assinatura de Dinoel Ribeiro da Silva">/)
+    expect(fecho.indexOf('<img class="assinatura-imagem"')).toBeLessThan(fecho.indexOf('class="traco"'))
   })
 })

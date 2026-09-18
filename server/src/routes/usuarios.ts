@@ -5,7 +5,8 @@ import { exigirPerfil, exigirSessao, sessaoDe } from '../auth.js'
 import { ErroHttp, naoEncontrado, parametro, rota, semPermissao } from '../erros.js'
 import { usuarioParaApi } from '../mappers.js'
 import { prisma } from '../prisma.js'
-import { apagarUpload, uploadLogo } from '../services/armazenamento.js'
+import { apagarUpload, gravarUpload, uploadAssinatura, uploadLogo } from '../services/armazenamento.js'
+import { processarAssinatura } from '../services/assinatura-perito.js'
 
 export const usuariosRouter = Router()
 usuariosRouter.use(exigirSessao)
@@ -134,11 +135,11 @@ usuariosRouter.post(
  * pessoa é assinar com a marca dela. Vale a mesma regra do cadastro: cada um
  * cuida da própria, o administrador cuida de todas.
  */
-async function usuarioQuePodeEditar(req: Parameters<typeof exigirSessao>[0]) {
+async function usuarioQuePodeEditar(req: Parameters<typeof exigirSessao>[0], oQue = 'a logo') {
   const id = parametro(req, 'id')
   const sessao = sessaoDe(req)
   if (sessao.perfil !== 'admin' && sessao.id !== id) {
-    throw semPermissao('Somente o administrador pode trocar a logo de outro usuário.')
+    throw semPermissao(`Somente o administrador pode trocar ${oQue} de outro usuário.`)
   }
   const usuario = await prisma.usuario.findUnique({ where: { id } })
   if (!usuario) throw naoEncontrado('Usuário')
@@ -188,6 +189,62 @@ usuariosRouter.delete(
       data: { logoArquivo: null },
     })
     await apagarUpload(usuario.logoArquivo)
+
+    res.json(usuarioParaApi(atualizado))
+  }),
+)
+
+// ---------------- assinatura manuscrita do perito ----------------
+
+/**
+ * POST /usuarios/:id/assinatura — multipart, campo "assinatura".
+ *
+ * Recebe a FOTO da assinatura feita em papel e grava só o PNG tratado
+ * (recortado, fundo transparente). A foto original fica na memória e morre
+ * com a requisição. Assinatura é mais sensível que a logo: a mesma regra de
+ * quem pode editar, e nenhuma cópia a mais no disco.
+ */
+usuariosRouter.post(
+  '/:id/assinatura',
+  uploadAssinatura.single('assinatura'),
+  rota(async (req, res) => {
+    const arquivo = req.file
+    if (!arquivo?.buffer?.length) throw new ErroHttp(400, 'Nenhuma imagem enviada.')
+
+    const usuario = await usuarioQuePodeEditar(req, 'a assinatura')
+    const png = await processarAssinatura(arquivo.buffer)
+    const nome = await gravarUpload(png, 'image/png')
+
+    const anterior = usuario.assinaturaArquivo
+    let atualizado
+    try {
+      atualizado = await prisma.usuario.update({
+        where: { id: usuario.id },
+        data: { assinaturaArquivo: nome },
+      })
+    } catch (e) {
+      await apagarUpload(nome)
+      throw e
+    }
+
+    // Só depois de o banco confirmar, como na logo.
+    await apagarUpload(anterior)
+
+    res.status(201).json(usuarioParaApi(atualizado))
+  }),
+)
+
+/** DELETE /usuarios/:id/assinatura — o documento volta a sair só com a linha. */
+usuariosRouter.delete(
+  '/:id/assinatura',
+  rota(async (req, res) => {
+    const usuario = await usuarioQuePodeEditar(req, 'a assinatura')
+
+    const atualizado = await prisma.usuario.update({
+      where: { id: usuario.id },
+      data: { assinaturaArquivo: null },
+    })
+    await apagarUpload(usuario.assinaturaArquivo)
 
     res.json(usuarioParaApi(atualizado))
   }),

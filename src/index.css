@@ -132,6 +132,57 @@
   .doc-sheet .resultado-positivo,
   .doc-sheet .resultado-negativo,
   .doc-sheet .resultado-aviso { @apply font-bold; }
+  /* Conclusão do agente: última linha da tabela, na largura toda, em
+     cinza-azulado (MARCA.tinta100). Espelha tr.conclusao-agente do PDF. */
+  .doc-sheet tr.conclusao-agente td {
+    background: #eef1f5;
+    padding: 8px 10px;
+  }
+  .doc-sheet tr.conclusao-agente strong {
+    color: #2c3e50;
+  }
+  /* Folha de rosto: o espaço que desce a identificação das partes (no PDF é
+     elástico, até 62 mm) e a marca de onde começa a folha 2. */
+  .doc-sheet .espaco-capa {
+    height: 48mm;
+  }
+  .doc-sheet .quebra-folha {
+    @apply relative my-10 border-t border-dashed border-ink-300;
+  }
+  .doc-sheet .quebra-folha span {
+    @apply absolute left-1/2 -top-2.5 -translate-x-1/2 bg-white px-2 text-[9pt] text-ink-400;
+  }
+  /* Fecho: data e assinatura num bloco só, que ao descer de folha leva junto
+     o último parágrafo. Mesmos vãos de .fecho, .local-data e .assinatura em
+     server/src/services/documento-html.ts. */
+  .doc-sheet .fecho {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    break-before: avoid;
+    page-break-before: avoid;
+  }
+  .doc-sheet .fecho .local-data { margin: 20px 0 0; }
+  .doc-sheet .fecho .assinatura { margin: 24px 0 12px; text-align: center; }
+  .doc-sheet .fecho-parecer .local-data { margin-top: 44px; }
+  .doc-sheet .fecho-parecer .assinatura { margin-top: 56px; }
+  .doc-sheet .fecho .assinatura.com-imagem { margin-top: 12px; }
+  .doc-sheet .fecho-parecer .assinatura.com-imagem { margin-top: 20px; }
+  .doc-sheet .assinatura-imagem {
+    position: relative;
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 220px;
+    max-height: 64px;
+    margin: 0 auto -10px;
+  }
+  .doc-sheet .assinatura .traco {
+    @apply mx-auto border-t border-ink-800 pt-1.5;
+    width: 280px;
+  }
+  .doc-sheet .assinatura .traco p {
+    @apply mb-0;
+  }
 }
 
 /* Scrollbar discreta */
@@ -160,6 +211,8 @@
     padding: 0 !important;
   }
   .doc-sheet .agente-bloco { break-inside: avoid; page-break-inside: avoid; }
+  .doc-sheet .quebra-folha { border: 0; margin: 0; break-after: page; page-break-after: always; }
+  .doc-sheet .quebra-folha span { display: none; }
   @page {
     size: A4;
     margin: 2.5cm 2cm 2cm 3cm;

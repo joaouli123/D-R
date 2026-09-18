@@ -2182,17 +2182,9 @@ export default function PericiaEditor() {
               { campo: 'riscoAlegadoPericulosidade', secao: 'analise', referencia: `${numeroNr16Editor}.2`, label: `${numeroNr16Editor}.2. NR-16 — Risco de Periculosidade Alegado pela Parte Reclamante`, rows: 5 },
               { campo: 'notaTecnicaEpis', secao: 'analise', referencia: '8', label: '8. Dos Equipamentos de Proteção Individual (NR-06)', rows: 7 },
               { campo: 'protecoesColetivas', secao: 'analise', referencia: '9', label: '9. Das Proteções Coletivas', rows: 5 },
-              {
-                campo: 'analiseTecnica',
-                secao: 'analise',
-                referencia: '10',
-                label: p.modalidade === 'insalubridade'
-                  ? '10. Análise Técnica dos Agentes'
-                  : p.modalidade === 'periculosidade'
-                    ? '10. Análise Técnica das Atividades e Riscos'
-                    : '10. Análise Técnica dos Agentes, Atividades e Riscos',
-                rows: 8,
-              },
+              // O item 10 não tem mais caixa de texto (pedido do perito,
+              // 17/09/2026): ele é montado só com as tabelas dos agentes, e a
+              // conclusão de cada um já fecha a tabela dele.
               { campo: 'conclusaoInsalubridade', secao: 'conclusao', referencia: '11', label: '11. NR-15 — Conclusão e Fundamentação', rows: 6 },
               { campo: 'conclusaoPericulosidade', secao: 'conclusao', referencia: p.modalidade === 'ambas' ? '12' : '11', label: p.modalidade === 'ambas' ? '12. NR-16 — Conclusão e Fundamentação' : '11. NR-16 — Conclusão e Fundamentação', rows: 6 },
               { campo: 'respostasQuesitos', secao: 'conclusao', referencia: p.modalidade === 'ambas' ? '13' : '12', label: p.modalidade === 'ambas' ? '13. Respostas aos Quesitos Técnicos' : '12. Respostas aos Quesitos Técnicos', rows: 8 },

@@ -46,6 +46,9 @@ model Usuario {
   /// Nome do arquivo da logo no volume de uploads (white-label: cada perito
   /// usa a própria marca no app e nos documentos). NULL = usa a arte embutida.
   logoArquivo          String?
+  /// PNG da assinatura manuscrita, já recortado e com fundo transparente
+  /// (services/assinatura-perito.ts). NULL = o documento sai só com a linha.
+  assinaturaArquivo    String?
   ativo                Boolean   @default(true)
   ultimoAcesso         DateTime?
   criadoEm             DateTime  @default(now())

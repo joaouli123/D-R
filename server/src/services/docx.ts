@@ -10,15 +10,18 @@ import {
   PageNumber,
   Packer,
   Paragraph,
+  Tab,
   Table,
   TableCell,
   TableLayoutType,
   TableRow,
+  TabStopType,
   TextRun,
   WidthType,
 } from 'docx'
 import sharp from 'sharp'
 import type { PericiaCompleta } from '../mappers.js'
+import { type AssinaturaDoDocumento, assinaturaDoDocumento } from './assinatura-perito.js'
 import { type MarcaDoDocumento, marcaDoDocumento } from './logo-oficial.js'
 import {
   AGENTE_LABEL,
@@ -178,21 +181,23 @@ const h1 = (t: string, centralizado = false, quebrarNoTravessao = false, espacoA
   })
 }
 
-const h2 = (t: string) =>
+/** `abreFolha`: o título começa uma folha nova (o item 1, depois da capa). */
+const h2 = (t: string, abreFolha = false) =>
   new Paragraph({
     heading: HeadingLevel.HEADING_1,
     keepNext: true,
     keepLines: true,
-    spacing: { before: 320, after: 140 },
+    pageBreakBefore: abreFolha || undefined,
+    spacing: { before: abreFolha ? 0 : 320, after: 140 },
     children: [texto(t.toUpperCase(), { negrito: true, tamanho: 28, cor: MARCA.documentoSecao })],
   })
 
-const h3 = (t: string) =>
+const h3 = (t: string, espacoAntes = 220) =>
   new Paragraph({
     heading: HeadingLevel.HEADING_2,
     keepNext: true,
     keepLines: true,
-    spacing: { before: 220, after: 100 },
+    spacing: { before: espacoAntes, after: 100 },
     children: [texto(t, { negrito: true, tamanho: CORPO, cor: MARCA.documentoSecao })],
   })
 
@@ -247,6 +252,17 @@ const blocosComProximo = (t?: string | null): Paragraph[] => {
   return partes.flatMap((parte) => linhasEmParagrafos(parte, true))
 }
 
+/**
+ * Como `blocos`, mas o último parágrafo vai preso ao fecho (`keepNext`):
+ * quando data e assinatura não cabem e descem de folha, levam junto o fim
+ * do texto — nunca sai uma folha só com a assinatura. Espelha o
+ * `break-before: avoid` do `.fecho` em documento-html.ts.
+ */
+const blocosAteOFecho = (t?: string | null): Paragraph[] => {
+  const partes = emParagrafos(t)
+  return partes.flatMap((parte, indice) => linhasEmParagrafos(parte, indice === partes.length - 1))
+}
+
 const borda = { style: BorderStyle.SINGLE, size: 4, color: MARCA.documentoBorda }
 const BORDAS = { top: borda, bottom: borda, left: borda, right: borda }
 
@@ -296,6 +312,35 @@ const tabela = (linhas: TableRow[], larguras: readonly number[] = COLUNAS_FICHA)
     columnWidths: larguras,
     layout: TableLayoutType.FIXED,
     rows: linhas,
+  })
+
+/**
+ * Conclusão do agente como última linha da tabela dele: uma célula na
+ * largura toda, fundo cinza-azulado e "Conclusão:" em negrito (pedido do
+ * perito). Espelha `tr.conclusao-agente` do PDF e `LinhaConclusaoAgente` da
+ * prévia. Um parágrafo por linha, como em `celula`.
+ */
+const linhaConclusaoAgente = (observacao: string) =>
+  new TableRow({
+    cantSplit: true,
+    children: [
+      new TableCell({
+        borders: BORDAS,
+        shading: { fill: MARCA.tinta100 },
+        width: { size: LARGURA_TABELA_DXA, type: WidthType.DXA },
+        columnSpan: 2,
+        margins: { top: 100, bottom: 100, left: 120, right: 120 },
+        children: observacao.trim().split('\n').map((linha, indice) =>
+          new Paragraph({
+            spacing: { after: 0 },
+            children: [
+              ...(indice === 0 ? [texto('Conclusão: ', { negrito: true, tamanho: 20, cor: MARCA.documentoTitulo })] : []),
+              texto(linha, { tamanho: 20 }),
+            ],
+          }),
+        ),
+      }),
+    ],
   })
 
 /** Tabela rótulo/valor, como as fichas de identificação do parecer. */
@@ -407,24 +452,65 @@ async function figuraDocx(
   }
 }
 
+/**
+ * Recuo de cada lado da linha de assinatura: o fio mede ~7,4cm, como os
+ * 280px do `.traco` no PDF, em vez de atravessar a largura toda do texto.
+ */
+const RECUO_LINHA_ASSINATURA = Math.round((LARGURA_UTIL_DXA - 4200) / 2)
+
+/**
+ * Local, data e assinatura. Todos os parágrafos vão presos ao seguinte
+ * (`keepNext`): a data nunca fica sozinha no pé de uma folha com a
+ * assinatura na outra.
+ *
+ * `espacado` é o fecho do parecer/laudo, com mais ar acima da data e da
+ * linha — a impugnação continua compacta para caber numa folha. Com a
+ * assinatura manuscrita cadastrada, a imagem entra logo acima da linha.
+ */
 function assinatura(
   perito: Usuario | null,
+  manuscrita: AssinaturaDoDocumento | null,
   cidade?: string | null,
   dataAssinatura: string = hoje(),
+  opcoes: { espacado?: boolean } = {},
 ): Paragraph[] {
   const titulos = (perito?.titulo ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean)
   const registros = (perito?.registroProfissional ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean)
+  const espacoAposData = manuscrita
+    ? (opcoes.espacado ? 240 : 120)
+    : (opcoes.espacado ? 1000 : 360)
   return [
     new Paragraph({
       alignment: AlignmentType.CENTER,
       keepNext: true,
-      spacing: { before: 360, after: 360 },
+      spacing: { before: opcoes.espacado ? 720 : 360, after: espacoAposData },
       children: [texto(`${cidade || 'São Paulo/SP'}, ${extenso(dataAssinatura)}.`)],
     }),
+    ...(manuscrita
+      ? [new Paragraph({
+          alignment: AlignmentType.CENTER,
+          keepNext: true,
+          keepLines: true,
+          spacing: { before: 0, after: 0 },
+          children: [
+            new ImageRun({
+              type: 'png',
+              data: manuscrita.dados,
+              transformation: { width: manuscrita.largura, height: manuscrita.altura },
+              altText: {
+                title: 'Assinatura',
+                description: `Assinatura de ${perito?.nome ?? 'perito'}`,
+                name: 'Assinatura',
+              },
+            }),
+          ],
+        })]
+      : []),
     new Paragraph({
       alignment: AlignmentType.CENTER,
       keepNext: true,
-      border: { top: { style: BorderStyle.SINGLE, size: 6, color: MARCA.tinta800 } },
+      indent: { left: RECUO_LINHA_ASSINATURA, right: RECUO_LINHA_ASSINATURA },
+      border: { top: { style: BorderStyle.SINGLE, size: 6, color: MARCA.tinta800, space: 4 } },
       spacing: { after: 0 },
       children: [texto(perito?.nome ?? '—', { negrito: true })],
     }),
@@ -464,15 +550,21 @@ const enderecamentoDoParecer = (
   )
 }
 
+/**
+ * Mesmo rodapé do PDF (RODAPE em pdf.ts): o aviso de propriedade à
+ * esquerda e a paginação encostada na margem direita.
+ */
 function rodape(): Footer {
   return new Footer({
     children: [
       new Paragraph({
-        alignment: AlignmentType.CENTER,
+        alignment: AlignmentType.LEFT,
+        tabStops: [{ type: TabStopType.RIGHT, position: LARGURA_UTIL_DXA }],
         border: { top: { style: BorderStyle.SINGLE, size: 6, color: MARCA.documentoTitulo } },
         spacing: { before: 80 },
         children: [
-          texto('D&R Perícia — Página ', { tamanho: 16 }),
+          texto('© D&R Perícia Trabalhista — Propriedade intelectual exclusiva e protegida.', { tamanho: 16 }),
+          new TextRun({ children: [new Tab(), 'Página '], color: MARCA.documentoTexto, font: FONTE, size: 16 }),
           new TextRun({ children: [PageNumber.CURRENT], font: FONTE, size: 16 }),
           texto(' de ', { tamanho: 16 }),
           new TextRun({ children: [PageNumber.TOTAL_PAGES], font: FONTE, size: 16 }),
@@ -556,11 +648,52 @@ function montarDocumento(filhos: (Paragraph | Table)[], marca: MarcaDoDocumento)
 
 // ---------------- parecer / laudo ----------------
 
+/** Altura útil da folha A4 com as margens de `montarDocumento`, em twips. */
+const ALTURA_UTIL_TWIPS = 16838 - 1417 - 1701
+
+/** Teto do espaço acima da identificação na capa: ~6,2cm, o `max-height` do `.espaco-capa` no PDF. */
+const ESPACO_MAXIMO_CAPA = 3515
+
+/** Linhas que um texto ocupa, a tantos caracteres por linha. */
+const linhasDe = (textoLinha: string, porLinha: number) => Math.max(1, Math.ceil(textoLinha.length / porLinha))
+
+/**
+ * Espaço acima de "IDENTIFICAÇÃO DAS PARTES" na folha de rosto do DOCX.
+ *
+ * No PDF quem resolve é o flex (`.capa`): o espaço estica até o teto e
+ * encolhe quando a apresentação é longa. O Word não tem isso, então aqui ele
+ * é estimado: a folha útil menos o que a capa ocupa. A estimativa é
+ * pessimista de propósito (poucos caracteres por linha, folga no fim): se a
+ * capa transbordasse, o item 1 — que abre folha nova — iria para a folha 3.
+ */
+function espacoDaCapa(pericia: PericiaCompleta, marca: MarcaDoDocumento, fichas: string[], titulo: string): number {
+  const LINHA_CORPO = 360 // 11pt com o entrelinhas 340 do corpo
+  const logo = marca.altura * 15 + 380
+  const enderecamentoCapa = linhasDe(
+    `EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA ${[pericia.vara, pericia.comarca].filter(Boolean).join(' — ')}`,
+    58,
+  ) * LINHA_CORPO + 290
+  const subtitulos = 2 * 600
+  const ficha = fichas.reduce((total, valor) => total + 140 + linhasDe(valor, 52) * 250, 0)
+  const tituloCapa = 510 + linhasDe(titulo, 30) * 440 + 380
+  const t = pericia.tecnico as unknown as TecnicoJson
+  const apresentacao = (t.apresentacao ?? '')
+    .split('\n')
+    .map((linha) => linha.trim())
+    .filter(Boolean)
+    .reduce((total, linha) => total + linhasDe(linha, 78) * LINHA_CORPO + 120, 0)
+  const folga = 700
+  const livre = ALTURA_UTIL_TWIPS - (logo + enderecamentoCapa + subtitulos + ficha + tituloCapa + apresentacao + folga)
+  return Math.max(220, Math.min(ESPACO_MAXIMO_CAPA, livre))
+}
+
 async function docParecer(
   pericia: PericiaCompleta,
   empresas: Empresa[],
   perito: Usuario | null,
   titulo: string,
+  marca: MarcaDoDocumento,
+  manuscrita: AssinaturaDoDocumento | null,
 ): Promise<(Paragraph | Table)[]> {
   const t = pericia.tecnico as unknown as TecnicoJson
   const varredura = normalizarVarredura(t, pericia.modalidade)
@@ -610,25 +743,23 @@ async function docParecer(
   // janela chutada no laudo é pior do que janela nenhuma.
   const periodo = periodoAvaliacaoDocumento(pericia)
 
+  const fichasDaCapa: [string, string][] = [
+    ['Processo nº', pericia.numeroProcesso],
+    ['Reclamante', `${pericia.reclamante}${pericia.cpfReclamante ? ` — CPF: ${mascaraCpf(pericia.cpfReclamante)}` : ''}`],
+    ['Reclamada', principal ? `${principal.razaoSocial} — CNPJ ${mascaraCnpj(principal.cnpj)}` : '—'],
+    ...solidarias.map((e): [string, string] => ['Reclamada', `${e.razaoSocial} — CNPJ ${mascaraCnpj(e.cnpj)}`]),
+  ]
+
+  // Folha de rosto (pedido do perito): a identificação desce para perto do
+  // meio da folha e o item 1 abre a folha 2. Espelha `.capa` do PDF.
   const filhos: (Paragraph | Table)[] = [
     ...enderecamentoDoParecer(pericia.vara, pericia.comarca),
-    h3('IDENTIFICAÇÃO DAS PARTES'),
-    tabela([
-      fichaLinha('Processo nº', pericia.numeroProcesso),
-      fichaLinha(
-        'Reclamante',
-        `${pericia.reclamante}${pericia.cpfReclamante ? ` — CPF: ${mascaraCpf(pericia.cpfReclamante)}` : ''}`,
-      ),
-      fichaLinha(
-        'Reclamada',
-        principal ? `${principal.razaoSocial} — CNPJ ${mascaraCnpj(principal.cnpj)}` : '—',
-      ),
-      ...solidarias.map((e) => fichaLinha('Reclamada', `${e.razaoSocial} — CNPJ ${mascaraCnpj(e.cnpj)}`)),
-    ]),
+    h3('IDENTIFICAÇÃO DAS PARTES', espacoDaCapa(pericia, marca, fichasDaCapa.map(([, valor]) => valor), titulo)),
+    tabela(fichasDaCapa.map(([rotulo, valor]) => fichaLinha(rotulo, valor))),
     h1(titulo, true, false, 510),
     h3('APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA'),
     ...blocos(t.apresentacao),
-    h2(num.secao('OBJETO DA PERÍCIA E DADOS CONTRATUAIS')),
+    h2(num.secao('OBJETO DA PERÍCIA E DADOS CONTRATUAIS'), true),
     ...blocos(objetivoAutomaticoDocumento(pericia.modalidade)),
     tabela([
       fichaLinha('Função Inicial', pericia.funcaoReclamante || '—'),
@@ -767,27 +898,40 @@ async function docParecer(
     periculosidade: 'Atividade ou Operação Perigosa',
   } as Record<string, string>)[tipo ?? ''] ?? 'Agente'
 
+  /**
+   * A tabela do agente, com a conclusão como última linha. Agente não
+   * identificado não tem tabela: a conclusão sai sozinha, numa tabela de uma
+   * linha com o mesmo destaque. Espelha `quadroDoAgente` do PDF.
+   */
+  const quadroDoAgente = (agente: (typeof agentes)[number], linhas: TableRow[]): Table[] => {
+    const conclusao = agenteExibeConclusao(agente) ? [linhaConclusaoAgente(agente.observacao ?? '')] : []
+    if (agente.identificadoNaAtividade === false) return conclusao.length ? [tabela(conclusao)] : []
+    return [tabela([
+      new TableRow({
+        tableHeader: true,
+        cantSplit: true,
+        children: [
+          celula('Propriedade', { cabecalho: true, larguraDxa: COLUNAS_FICHA[0] }),
+          celula('Informação', { cabecalho: true, larguraDxa: COLUNAS_FICHA[1] }),
+        ],
+      }),
+      ...linhas,
+      ...conclusao,
+    ])]
+  }
+
   const adicionarAgentes = (lista: typeof agentes, prefixo?: string) => {
     if (!lista.length) return
     for (const [indice, agente] of lista.entries()) {
       const apresentacao = montarApresentacaoAgente(agente)
-      const identificado = agente.identificadoNaAtividade !== false
       filhos.push(
         prefixo
           ? h4(`${prefixo}.${indice + 1}. ${rotuloNatureza(agente.tipo)} — ${apresentacao.titulo}`)
           : h3(apresentacao.titulo),
-        ...(identificado ? [tabela([
-          new TableRow({
-            tableHeader: true,
-            cantSplit: true,
-            children: [
-              celula('Propriedade', { cabecalho: true, larguraDxa: COLUNAS_FICHA[0] }),
-              celula('Informação', { cabecalho: true, larguraDxa: COLUNAS_FICHA[1] }),
-            ],
-          }),
-          ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor, false, item.destaque)),
-        ])] : []),
-        ...(agenteExibeConclusao(agente) ? blocos(`Conclusão: ${(agente.observacao ?? '').trim()}`) : []),
+        ...quadroDoAgente(
+          agente,
+          apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor, false, item.destaque)),
+        ),
       )
     }
   }
@@ -902,23 +1046,13 @@ async function docParecer(
     filhos.push(h3(`${prefixo}. ${tituloGrupo}`))
     lista.forEach((agente, indice) => {
       const apresentacao = montarApresentacaoAgente(agente)
-      const identificado = agente.identificadoNaAtividade !== false
       const protecoes = resumoProtecoesAssociadas(agente.epis)
       filhos.push(
         h4(`${prefixo}.${indice + 1}. ${apresentacao.titulo}`),
-        ...(identificado ? [tabela([
-          new TableRow({
-            tableHeader: true,
-            cantSplit: true,
-            children: [
-              celula('Propriedade', { cabecalho: true, larguraDxa: COLUNAS_FICHA[0] }),
-              celula('Informação', { cabecalho: true, larguraDxa: COLUNAS_FICHA[1] }),
-            ],
-          }),
+        ...quadroDoAgente(agente, [
           ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor, false, item.destaque)),
           ...(protecoes ? [fichaLinha('Proteções associadas', protecoes)] : []),
-        ])] : []),
-        ...(agenteExibeConclusao(agente) ? blocos(`Conclusão: ${(agente.observacao ?? '').trim()}`) : []),
+        ]),
       )
     })
   }
@@ -948,13 +1082,15 @@ async function docParecer(
 
   adicionarQuadrosDeAnalise(agentesNr15, 'NR-15 — Avaliação da Exposição Ocupacional', numeroAnaliseNr15)
   adicionarQuadrosNr16(agentesNr16, numeroAnaliseNr16)
-  filhos.push(...blocos(t.analiseTecnica))
+  // Só os quadros: o texto livre da análise técnica saiu do formulário e do
+  // documento (pedido do perito). `t.analiseTecnica` segue gravado nas
+  // perícias antigas, mas não é mais impresso — igual ao PDF e à prévia.
   if (temInsalubridade) filhos.push(h2(num.secao('NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr15))
   if (temPericulosidade) filhos.push(h2(num.secao('NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr16))
   if (t.respostasQuesitos?.trim()) filhos.push(h2(num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')), ...blocos(t.respostasQuesitos))
   filhos.push(h2(num.secao('ENCERRAMENTO')), ...blocosComProximo(encerramento))
 
-  filhos.push(...assinatura(perito, fecho.cidade, fecho.data))
+  filhos.push(...assinatura(perito, manuscrita, fecho.cidade, fecho.data, { espacado: true }))
 
   return filhos
 }
@@ -966,6 +1102,7 @@ function docQuesitos(
   pericia: PericiaCompleta | null,
   empresa: Empresa | null,
   perito: Usuario | null,
+  manuscrita: AssinaturaDoDocumento | null,
 ): (Paragraph | Table)[] {
   const itens = ((doc.conteudo ?? {}) as ConteudoQuesitos).quesitos ?? []
 
@@ -993,6 +1130,8 @@ function docQuesitos(
         new Paragraph({
           alignment: AlignmentType.JUSTIFIED,
           indent: { firstLine: RECUO_PRIMEIRA_LINHA },
+          // A última resposta desce junto com o fecho, se ele mudar de folha.
+          keepNext: i === itens.length - 1,
           spacing: { after: 200, line: 340 },
           children: [
             texto('Resposta: ', { negrito: true }),
@@ -1003,7 +1142,7 @@ function docQuesitos(
     })
   }
 
-  filhos.push(...assinatura(perito, pericia?.comarca))
+  filhos.push(...assinatura(perito, manuscrita, pericia?.comarca))
   return filhos
 }
 
@@ -1014,6 +1153,7 @@ function docManifestacao(
   pericia: PericiaCompleta | null,
   empresa: Empresa | null,
   perito: Usuario | null,
+  manuscrita: AssinaturaDoDocumento | null,
 ): (Paragraph | Table)[] {
   const c = (doc.conteudo ?? {}) as ConteudoManifestacao
   const ehConcordancia = c.posicionamento === 'concordancia'
@@ -1048,7 +1188,7 @@ function docManifestacao(
     )
   }
 
-  filhos.push(h2('III — Requerimento'), ...blocos(c.encerramento), ...assinatura(perito, pericia?.comarca))
+  filhos.push(h2('III — Requerimento'), ...blocosAteOFecho(c.encerramento), ...assinatura(perito, manuscrita, pericia?.comarca))
   return filhos
 }
 
@@ -1059,6 +1199,7 @@ function docEsclarecimento(
   pericia: PericiaCompleta | null,
   empresa: Empresa | null,
   perito: Usuario | null,
+  manuscrita: AssinaturaDoDocumento | null,
 ): (Paragraph | Table)[] {
   const c = (doc.conteudo ?? {}) as ConteudoEsclarecimento
 
@@ -1102,7 +1243,7 @@ function docEsclarecimento(
     filhos.push(new Paragraph({ children: [texto('[Nenhum ponto informado]', { italico: true })] }))
   }
 
-  filhos.push(h2('III — Conclusão'), ...blocos(c.conclusao), ...assinatura(perito, pericia?.comarca))
+  filhos.push(h2('III — Conclusão'), ...blocosAteOFecho(c.conclusao), ...assinatura(perito, manuscrita, pericia?.comarca))
   return filhos
 }
 
@@ -1118,25 +1259,27 @@ export async function gerarDocx(
     empresas.find((e) => e.id === pericia?.reclamadas.find((r) => r.principal)?.empresaId) ?? null
 
   let filhos: (Paragraph | Table)[]
+  const marca = await marcaDoDocumento(perito)
+  const manuscrita = await assinaturaDoDocumento(perito)
 
   switch (doc.tipo) {
     case 'parecer':
     case 'laudo':
       filhos = pericia
-        ? await docParecer(pericia, empresas, perito, doc.titulo)
+        ? await docParecer(pericia, empresas, perito, doc.titulo, marca, manuscrita)
         : [h1(doc.titulo), p('[A perícia vinculada não existe mais.]')]
       break
     case 'quesitos':
-      filhos = docQuesitos(doc, pericia, principal, perito)
+      filhos = docQuesitos(doc, pericia, principal, perito, manuscrita)
       break
     case 'manifestacao':
     case 'impugnacao':
-      filhos = docManifestacao(doc, pericia, principal, perito)
+      filhos = docManifestacao(doc, pericia, principal, perito, manuscrita)
       break
     case 'esclarecimento':
-      filhos = docEsclarecimento(doc, pericia, principal, perito)
+      filhos = docEsclarecimento(doc, pericia, principal, perito, manuscrita)
       break
   }
 
-  return Packer.toBuffer(montarDocumento(filhos, await marcaDoDocumento(perito)))
+  return Packer.toBuffer(montarDocumento(filhos, marca))
 }

@@ -48,6 +48,7 @@ export function usuarioParaApi(u: Usuario) {
     // marca. Sai como caminho relativo pelo mesmo motivo das fotos — ver o
     // comentário de urlDaFoto logo acima.
     logoUrl: u.logoArquivo ? urlDaFoto(u.logoArquivo) : undefined,
+    assinaturaUrl: u.assinaturaArquivo ? urlDaFoto(u.assinaturaArquivo) : undefined,
     ativo: u.ativo,
     ultimoAcesso: u.ultimoAcesso?.toISOString(),
   }

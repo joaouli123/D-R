@@ -26,6 +26,12 @@ export interface Usuario {
    * (Configurações › Meu perfil). Ausente = usa a arte embutida do sistema.
    */
   logoUrl?: string
+  /**
+   * Assinatura manuscrita do perito: PNG com fundo transparente, já tratado
+   * pelo servidor a partir da foto da assinatura em papel. Ausente = os
+   * documentos saem com a linha em branco, para assinar à mão.
+   */
+  assinaturaUrl?: string
   ativo: boolean
   ultimoAcesso?: string
 }

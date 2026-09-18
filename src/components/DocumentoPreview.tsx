@@ -18,6 +18,7 @@ import { atividadesDoPeriodo } from '@/lib/periodos'
 import { emParagrafos, linhasDoBloco } from '@/lib/listasDocumento'
 import { fotosEmOrdemDeDocumento } from '@/lib/fotosDocumento'
 import { Logo } from '@/components/Logo'
+import { FechoDoDocumento } from '@/components/FechoDoDocumento'
 import { exibirQuadroVarredura, normalizarVarredura, type AnexoVarredura } from '@/lib/varreduraNormativa'
 
 // ============================================================
@@ -243,18 +244,36 @@ export function DocumentoPreview({
     periculosidade: 'Atividade ou Operação Perigosa',
   } as Record<AgenteDoLaudo['tipo'], string>)[tipo]
 
+  /**
+   * Conclusão do agente como ÚLTIMA LINHA da tabela dele, na largura toda
+   * (feedback do perito de 17/09/2026) — antes era um parágrafo solto depois
+   * da tabela. Espelha `linhaConclusao` de documento-html.ts e
+   * `linhaConclusaoAgente` de docx.ts. Agente sem conclusão não ganha linha.
+   */
+  const linhaConclusao = (agente: AgenteDoLaudo) => agenteExibeConclusao(agente) ? (
+    <tr className="conclusao-agente">
+      <td colSpan={2}>
+        <strong>Conclusão:</strong>{' '}
+        {(agente.observacao ?? '').trim().split('\n').map((linha, indice) => (
+          <Fragment key={indice}>{indice > 0 && <br />}{linha}</Fragment>
+        ))}
+      </td>
+    </tr>
+  ) : null
+
   const agentesSemProtecoes = (agentes: AgenteDoLaudo[], prefixo?: string) =>
     agentes.length ? (
       <div className="space-y-4">
         {agentes.map((agente, indice) => {
           const apresentacao = montarApresentacaoAgente(agente)
           const identificado = agente.identificadoNaAtividade !== false
+          const conclusao = linhaConclusao(agente)
           return (
             <section key={agente.id} className="agente-bloco">
               {prefixo
                 ? <h4>{prefixo}.{indice + 1}. {rotuloNatureza(agente.tipo)} — {apresentacao.titulo}</h4>
                 : <h3>{apresentacao.titulo}</h3>}
-              {identificado && <table className="agente-propriedades">
+              {identificado ? <table className="agente-propriedades">
                 <thead><tr><th>Propriedade</th><th>Informação</th></tr></thead>
                 <tbody>
                   {apresentacao.linhas.map((linha) => (
@@ -263,11 +282,9 @@ export function DocumentoPreview({
                       <td className={linha.destaque ? `resultado-${linha.destaque}` : ''}>{valorDeCelula(linha.valor)}</td>
                     </tr>
                   ))}
+                  {conclusao}
                 </tbody>
-              </table>}
-              {agenteExibeConclusao(agente) && (
-                <Paragrafos texto={`Conclusão: ${(agente.observacao ?? '').trim()}`} />
-              )}
+              </table> : conclusao && <table className="tabela-conclusao"><tbody>{conclusao}</tbody></table>}
             </section>
           )
         })}
@@ -286,11 +303,12 @@ export function DocumentoPreview({
           const apresentacao = montarApresentacaoAgente(agente)
           const identificado = agente.identificadoNaAtividade !== false
           const protecoesAssociadas = resumoProtecoesAssociadas(agente.epis)
+          const conclusao = linhaConclusao(agente)
 
           return (
             <section key={`analise-${agente.id}`} className="agente-bloco">
               <h4>{prefixo}.{indice + 1}. {apresentacao.titulo}</h4>
-              {identificado && <table className="agente-propriedades">
+              {identificado ? <table className="agente-propriedades">
                 <thead><tr><th>Propriedade</th><th>Informação</th></tr></thead>
                 <tbody>
                   {apresentacao.linhas.map((linha) => (
@@ -305,11 +323,9 @@ export function DocumentoPreview({
                       <td>{valorDeCelula(protecoesAssociadas)}</td>
                     </tr>
                   )}
+                  {conclusao}
                 </tbody>
-              </table>}
-              {agenteExibeConclusao(agente) && (
-                <Paragrafos texto={`Conclusão: ${(agente.observacao ?? '').trim()}`} />
-              )}
+              </table> : conclusao && <table className="tabela-conclusao"><tbody>{conclusao}</tbody></table>}
             </section>
           )
         })}
@@ -399,6 +415,10 @@ export function DocumentoPreview({
           .join(' — ')}`.toUpperCase()}
       </p>
 
+      {/* Folha de rosto (feedback de 17/09/2026): a identificação das partes
+          desce para perto do meio da folha e o item 1 abre a folha 2 — no PDF
+          (.capa em documento-html.ts) e no DOCX (espacoDaCapa em docx.ts). */}
+      <div className="espaco-capa" aria-hidden="true" />
       <h3 className="mt-0 mb-2">IDENTIFICAÇÃO DAS PARTES</h3>
       <table className="ficha-processual">
         <tbody>
@@ -436,7 +456,8 @@ export function DocumentoPreview({
       <h3 className="mt-0 mb-2">APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA</h3>
       <Paragrafos texto={t.apresentacao} />
 
-      <h2>1. Objeto da Perícia e Dados Contratuais</h2>
+      <div className="quebra-folha" aria-hidden="true"><span>Folha 2</span></div>
+      <h2 className="mt-0">1. Objeto da Perícia e Dados Contratuais</h2>
       <Paragrafos texto={objetivoPadraoDaPericia(pericia)} />
       <table>
         <tbody>
@@ -591,7 +612,8 @@ export function DocumentoPreview({
       <h2>10. {pericia.modalidade === 'insalubridade' ? 'Análise Técnica dos Agentes Identificados' : pericia.modalidade === 'periculosidade' ? 'Análise Técnica das Atividades e Riscos Identificados' : 'Análise Técnica dos Agentes, Atividades e Riscos Identificados'}</h2>
       {quadrosDeAnalise(agentesNr15, numeroAnaliseNr15, 'NR-15 — Avaliação da Exposição Ocupacional')}
       {quadrosNr16DeAnalise(numeroAnaliseNr16)}
-      <Paragrafos texto={t.analiseTecnica} />
+      {/* `t.analiseTecnica` saiu do formulário e não é mais impresso: as
+          conclusões de cada agente já fecham as tabelas acima. */}
 
       {numeroConclusaoNr15 && <><h2>{numeroConclusaoNr15}. NR-15 — Conclusão e Fundamentação</h2><Paragrafos texto={conclusaoNr15} /></>}
       {numeroConclusaoNr16 && <><h2>{numeroConclusaoNr16}. NR-16 — Conclusão e Fundamentação</h2><Paragrafos texto={conclusaoNr16} /></>}
@@ -599,18 +621,7 @@ export function DocumentoPreview({
 
       <h2>{numeroEncerramento}. Encerramento</h2>
       <Paragrafos texto={encerramento} />
-      <p className="mt-6 no-indent text-center">{fecho.cidade}, {extenso(fecho.data)}.</p>
-      <div className="mt-8 text-center">
-        <div className="mx-auto w-72 border-t border-ink-800 pt-1.5">
-          <p className="no-indent font-bold">{perito?.nome ?? '—'}</p>
-          {(perito?.titulo ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean).map((linha) => (
-            <p key={`titulo-${linha}`} className="no-indent text-[10pt]">{linha}</p>
-          ))}
-          {(perito?.registroProfissional ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean).map((linha) => (
-            <p key={`registro-${linha}`} className="no-indent text-[10pt]">{linha}</p>
-          ))}
-        </div>
-      </div>
+      <FechoDoDocumento cidade={fecho.cidade} data={fecho.data} perito={perito} espacado />
     </article>
   )
 }

@@ -191,10 +191,18 @@ describe('DocumentoPreview', () => {
 
     expect(html).toContain('Não foi constatada exposição habitual a agentes biológicos.')
     expect(html).not.toContain('<th>Propriedade</th><th>Informação</th>')
-    expect(html).toMatch(/Agentes biológicos[\s\S]*?Conclusão: Não foi constatada exposição habitual a agentes biológicos\./)
+    // Sem a tabela de propriedades, a conclusão vira uma tabela de uma linha
+    // só — o mesmo destaque cinza-azulado dos agentes identificados.
+    expect(html).toMatch(
+      /Agentes biológicos[\s\S]*?<table class="tabela-conclusao"><tbody><tr class="conclusao-agente"><td colSpan="2"><strong>Conclusão:<\/strong> Não foi constatada exposição habitual a agentes biológicos\.<\/td><\/tr><\/tbody><\/table>/,
+    )
   })
 
-  it('mostra a conclusão logo após a tabela de cada agente identificado', () => {
+  it('fecha a tabela de cada agente identificado com a linha da conclusão', () => {
+    // Feedback do perito de 17/09/2026: a conclusão é a ÚLTIMA LINHA da
+    // tabela, na largura toda, com "Conclusão:" em negrito — não mais um
+    // parágrafo solto depois dela. Gêmeo de documento-parecer.test.ts e
+    // docx-parecer.test.ts.
     const html = renderToStaticMarkup(
       <DocumentoPreview
         pericia={{
@@ -213,13 +221,42 @@ describe('DocumentoPreview', () => {
       />,
     )
 
-    expect(html).toMatch(/<table class="agente-propriedades">[\s\S]*?<\/table><p>Conclusão: Conclusão técnica exclusiva do agente frio\.<\/p>/)
+    expect(html).toMatch(
+      /<table class="agente-propriedades">[\s\S]*?<tr class="conclusao-agente"><td colSpan="2"><strong>Conclusão:<\/strong> Conclusão técnica exclusiva do agente frio\.<\/td><\/tr><\/tbody><\/table>/,
+    )
+    expect(html).not.toContain('<p>Conclusão:')
   })
 
-  it('imprime a análise técnica depois dos quadros dos agentes, não antes', () => {
-    // Espelha documento-parecer.test.ts e docx-parecer.test.ts: o texto do item
-    // 10 é a CONCLUSÃO de cada agente avaliado, tem que sair depois dos
-    // quadros — antes saía colado no título da seção.
+  it('põe a conclusão também nas tabelas do item 7 quando só há NR-15', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={{
+          ...pericia,
+          modalidade: 'insalubridade',
+          tecnico: {
+            ...pericia.tecnico,
+            agentes: [{
+              id: 'frio-2', nome: 'Frio', tipo: 'fisico', criterio: 'qualitativo',
+              identificadoNaAtividade: true, observacao: 'Linha um.\nLinha dois.',
+            } as never],
+          },
+        }}
+        empresas={[]}
+        titulo="Parecer de teste"
+      />,
+    )
+
+    // Item 7 e item 10: as duas tabelas do agente terminam na conclusão, e a
+    // quebra de linha digitada pelo perito é mantida.
+    const linhas = html.match(/<tr class="conclusao-agente">/g) ?? []
+    expect(linhas.length).toBe(2)
+    expect(html).toContain('<strong>Conclusão:</strong> Linha um.<br/>Linha dois.')
+  })
+
+  it('não imprime mais o texto livre da análise técnica no item 10', () => {
+    // Feedback de 17/09/2026: a caixa de texto do item 10 saiu do formulário;
+    // o item é só as tabelas dos agentes, cada uma fechada pela conclusão.
+    // Perícias antigas ainda têm o texto gravado — ele não pode reaparecer.
     const html = renderToStaticMarkup(
       <DocumentoPreview
         pericia={{
@@ -239,10 +276,8 @@ describe('DocumentoPreview', () => {
       />,
     )
 
-    expect(html).toContain('Texto exclusivo de teste da análise técnica.')
-    expect(html.lastIndexOf('agente-propriedades')).toBeLessThan(
-      html.indexOf('Texto exclusivo de teste da análise técnica.'),
-    )
+    expect(html).toContain('agente-propriedades')
+    expect(html).not.toContain('Texto exclusivo de teste da análise técnica.')
   })
 
   it('omite a linha "Conclusão:" quando a avaliação NR-15 está sem texto', () => {
@@ -570,6 +605,59 @@ describe('DocumentoPreview', () => {
     expect(html).not.toContain('Vara / Comarca')
     expect(html).not.toContain('Reclamada principal')
     expect(html).not.toContain('Reclamada solidária')
+  })
+
+  it('desce a identificação das partes e começa o item 1 na folha 2', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview pericia={pericia} empresas={[]} titulo="Parecer de teste" />,
+    )
+
+    // O vão da folha de rosto fica entre o endereçamento e a identificação…
+    expect(html.indexOf('EXCELENTÍSSIMO')).toBeLessThan(html.indexOf('espaco-capa'))
+    expect(html.indexOf('espaco-capa')).toBeLessThan(html.indexOf('IDENTIFICAÇÃO DAS PARTES'))
+    // …e a marca de folha nova vem logo antes do item 1 (no print ela vira
+    // quebra de página de verdade).
+    expect(html).toMatch(/<div class="quebra-folha" aria-hidden="true"><span>Folha 2<\/span><\/div><h2 class="mt-0">1\. Objeto da Perícia/)
+    expect(html.match(/quebra-folha/g)?.length).toBe(1)
+  })
+
+  it('fecha o parecer com data e assinatura num bloco só, com respiro maior', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={pericia}
+        empresas={[]}
+        titulo="Parecer de teste"
+        perito={{
+          id: 'u1', nome: 'Dinoel Ribeiro', email: 'd@x.com', perfil: 'perito', ativo: true,
+          titulo: 'Engenheiro de Segurança do Trabalho', registroProfissional: 'CREA/SP 123',
+        } as never}
+      />,
+    )
+
+    expect(html).toMatch(
+      /<div class="fecho fecho-parecer"><p class="local-data no-indent text-center">[^<]*, \d{1,2} de [a-zç]+ de \d{4}\.<\/p><div class="assinatura"><div class="traco"><p class="no-indent font-bold">Dinoel Ribeiro<\/p>/,
+    )
+    expect(html).toContain('<p class="no-indent text-[10pt]">CREA/SP 123</p>')
+    // Sem assinatura cadastrada, a linha fica em branco para assinar à mão.
+    expect(html).not.toContain('assinatura-imagem')
+  })
+
+  it('pousa a assinatura manuscrita do perito sobre a linha', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={pericia}
+        empresas={[]}
+        titulo="Parecer de teste"
+        perito={{
+          id: 'u1', nome: 'Dinoel Ribeiro', email: 'd@x.com', perfil: 'perito', ativo: true,
+          assinaturaUrl: '/api/uploads/assinatura-u1.png',
+        } as never}
+      />,
+    )
+
+    expect(html).toContain(
+      '<div class="assinatura com-imagem"><img class="assinatura-imagem" src="/api/uploads/assinatura-u1.png" alt="Assinatura de Dinoel Ribeiro"/><div class="traco">',
+    )
   })
 
   it('segue a estrutura enxuta aprovada com numeração jurídica fixa de 1 a 14', () => {

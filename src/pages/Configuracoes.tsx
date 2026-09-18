@@ -3,6 +3,7 @@ import {
   ImageUp,
   KeyRound,
   Mail,
+  PenLine,
   Plus,
   Server,
   ShieldCheck,
@@ -29,6 +30,7 @@ import * as api from '@/services/api'
 import { API_MODE } from '@/services/api'
 import type { PerfilUsuario, Usuario } from '@/types'
 import { recusaPorTamanho } from '@/lib/limitesUpload'
+import { prepararFotosParaEnvio } from '@/lib/prepararFotos'
 import { formatDateTime, uid } from '@/lib/utils'
 
 // ============================================================
@@ -42,10 +44,20 @@ const PERFIL: Record<PerfilUsuario, { label: string; tone: 'green' | 'navy' | 'g
 }
 
 export default function Configuracoes() {
-  const { usuario, usuarios, salvarUsuario, trocarLogo, removerLogo } = useApp()
+  const {
+    usuario,
+    usuarios,
+    salvarUsuario,
+    trocarLogo,
+    removerLogo,
+    trocarAssinatura,
+    removerAssinatura,
+  } = useApp()
   const toast = useToast()
   const campoLogo = useRef<HTMLInputElement>(null)
   const [logoOcupada, setLogoOcupada] = useState(false)
+  const campoAssinatura = useRef<HTMLInputElement>(null)
+  const [assinaturaOcupada, setAssinaturaOcupada] = useState(false)
   const [aba, setAba] = useState<'perfil' | 'usuarios' | 'documento' | 'sistema'>('perfil')
   const [novo, setNovo] = useState<(Usuario & { senha?: string }) | null>(null)
   const [perfilLocal, setPerfilLocal] = useState<Usuario>(usuario!)
@@ -107,6 +119,45 @@ export default function Configuracoes() {
       toast(api.mensagemDeErro(e, 'Não foi possível remover a logo.'), 'error')
     } finally {
       setLogoOcupada(false)
+    }
+  }
+
+  /**
+   * Sobe a FOTO da assinatura feita em papel; o servidor recorta e tira o
+   * fundo. Passa antes pelo mesmo preparo das fotos da vistoria: a foto do
+   * celular costuma ter 4 MB+ ou vir em HEIC, e ali ela já vira um JPEG leve.
+   */
+  async function enviarAssinatura(arquivo: File | undefined) {
+    if (!arquivo || !usuario) return
+    setAssinaturaOcupada(true)
+    try {
+      const { prontos, recusas } = await prepararFotosParaEnvio([arquivo])
+      const foto = prontos[0]
+      const recusa = recusas[0] ?? (foto ? recusaPorTamanho([foto]) : null)
+      if (recusa || !foto) {
+        toast(recusa ?? 'Não foi possível abrir a foto da assinatura.', 'error')
+        return
+      }
+      await trocarAssinatura(usuario.id, foto)
+      toast('Assinatura cadastrada. Ela já sai nos próximos documentos.')
+    } catch (e) {
+      toast(api.mensagemDeErro(e, 'Não foi possível enviar a assinatura.'), 'error')
+    } finally {
+      setAssinaturaOcupada(false)
+      if (campoAssinatura.current) campoAssinatura.current.value = ''
+    }
+  }
+
+  async function apagarAssinatura() {
+    if (!usuario) return
+    setAssinaturaOcupada(true)
+    try {
+      await removerAssinatura(usuario.id)
+      toast('Assinatura removida. Os documentos voltam a sair com a linha em branco.')
+    } catch (e) {
+      toast(api.mensagemDeErro(e, 'Não foi possível remover a assinatura.'), 'error')
+    } finally {
+      setAssinaturaOcupada(false)
     }
   }
 
@@ -259,6 +310,67 @@ export default function Configuracoes() {
                 <p className="text-[10px] leading-snug text-ink-400">
                   PNG (de preferência com fundo transparente) ou JPEG, até 3 MB. O Word não
                   aceita embutir WebP — por isso esses dois formatos apenas.
+                </p>
+              </div>
+            </Card>
+            <Card>
+              <CardHeader
+                title="Minha assinatura"
+                subtitle="Sai sobre a linha de assinatura do PDF e do DOCX."
+                icon={<PenLine size={18} />}
+              />
+              <div className="flex flex-col items-center gap-3 p-5 text-center">
+                {/* Amostra de como a assinatura fica no fim do documento. */}
+                <div className="w-full rounded-lg border border-ink-100 bg-white px-3 pb-3 pt-4">
+                  {usuario?.assinaturaUrl ? (
+                    <img
+                      src={usuario.assinaturaUrl}
+                      alt="Sua assinatura cadastrada"
+                      className="relative mx-auto -mb-2 block max-h-16 max-w-[200px]"
+                    />
+                  ) : (
+                    <div className="h-12" aria-hidden="true" />
+                  )}
+                  <div className="mx-auto w-52 border-t border-ink-800 pt-1">
+                    <p className="text-[11px] font-bold text-ink-800">{usuario?.nome}</p>
+                  </div>
+                </div>
+                <p className="text-[11px] leading-snug text-ink-500">
+                  {usuario?.assinaturaUrl
+                    ? 'Os documentos já saem assinados. Para trocar, envie uma nova foto.'
+                    : 'Sem assinatura cadastrada, os documentos saem com a linha em branco para assinar à mão.'}
+                </p>
+                <input
+                  ref={campoAssinatura}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/heic,image/heif"
+                  className="hidden"
+                  aria-label="Foto da assinatura"
+                  onChange={(e) => void enviarAssinatura(e.target.files?.[0])}
+                />
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    loading={assinaturaOcupada}
+                    icon={<PenLine size={15} />}
+                    onClick={() => campoAssinatura.current?.click()}
+                  >
+                    {usuario?.assinaturaUrl ? 'Trocar assinatura' : 'Enviar assinatura'}
+                  </Button>
+                  {usuario?.assinaturaUrl && (
+                    <Button
+                      variant="ghost"
+                      disabled={assinaturaOcupada}
+                      icon={<Trash2 size={15} />}
+                      onClick={() => void apagarAssinatura()}
+                    >
+                      Remover
+                    </Button>
+                  )}
+                </div>
+                <p className="text-[10px] leading-snug text-ink-400">
+                  Assine com caneta azul ou preta numa folha branca e fotografe de perto, com boa
+                  luz e sem sombra. O sistema recorta a assinatura e apaga o fundo sozinho.
                 </p>
               </div>
             </Card>

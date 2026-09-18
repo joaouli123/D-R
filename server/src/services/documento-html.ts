@@ -1,5 +1,6 @@
 import type { DocumentoGerado, Empresa, Usuario } from '@prisma/client'
 import type { PericiaCompleta } from '../mappers.js'
+import { assinaturaDoDocumento } from './assinatura-perito.js'
 import { marcaDoDocumento } from './logo-oficial.js'
 import { exibirQuadroVarredura, normalizarVarredura, type AnexoVarreduraDocumento } from './varredura-normativa.js'
 import {
@@ -217,6 +218,29 @@ const CSS = `
     font-weight: 700;
     text-transform: none;
   }
+  /* Folha de rosto do parecer (pedido do perito): a Identificação das Partes
+     desce até perto do meio da folha e o item 1 abre a folha 2. A altura é a
+     da área útil da página 1 (297mm - 2,5cm - 2cm = 252mm), com folga para o
+     arredondamento não criar uma folha em branco. O espaço entre o
+     endereçamento e a identificação é elástico: com uma apresentação longa
+     ele encolhe, em vez de empurrar a capa para duas folhas. */
+  .capa {
+    display: flex;
+    flex-direction: column;
+    min-height: 246mm;
+    break-after: page;
+    page-break-after: always;
+  }
+  .capa > * { flex: none; }
+  .capa > .espaco-capa { flex: 1 1 auto; max-height: 62mm; }
+  /* Conclusão do agente como última linha da própria tabela, em destaque
+     (pedido do perito): antes ela saía solta, depois do quadro. */
+  tr.conclusao-agente td {
+    background: ${css(MARCA.tinta100)};
+    color: var(--documento-texto);
+    padding: 8px 10px;
+  }
+  tr.conclusao-agente strong { color: var(--documento-titulo); }
   .fotos { display: block; margin-bottom: 14px; }
   figure { margin: 0 0 18px; text-align: center; page-break-inside: avoid; break-inside: avoid; }
   figure img {
@@ -230,8 +254,31 @@ const CSS = `
     margin: 0 auto;
   }
   figcaption { font-size: 9pt; font-style: italic; color: ${css(MARCA.tinta600)}; margin-top: 4px; }
+  /* Data e assinatura nunca se separam: a data sozinha no pé de uma folha e
+     a assinatura órfã na seguinte invalidava a peça. E quando o bloco não
+     cabe e desce, leva junto o último parágrafo do texto — nunca sai uma
+     folha só com a data e a assinatura. */
+  .fecho { break-inside: avoid; page-break-inside: avoid; break-before: avoid; page-break-before: avoid; }
   .local-data { text-align: center; text-indent: 0; margin-top: 20px; }
   .assinatura { margin-top: 24px; margin-bottom: 12px; text-align: center; page-break-inside: avoid; }
+  /* Parecer e laudo: a data desce mais em relação ao "Diante do exposto" e
+     sobra espaço para assinar à mão. Só aqui — a impugnação tem de caber
+     numa folha. */
+  .fecho-parecer .local-data { margin-top: 44px; }
+  .fecho-parecer .assinatura { margin-top: 56px; }
+  /* Assinatura manuscrita enviada pelo perito: pousa sobre a linha, como
+     quem assina no papel — a base do traço cruza o fio. */
+  .assinatura.com-imagem { margin-top: 12px; }
+  .fecho-parecer .assinatura.com-imagem { margin-top: 20px; }
+  .assinatura-imagem {
+    position: relative;
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 220px;
+    max-height: 64px;
+    margin: 0 auto -10px;
+  }
   .assinatura .traco { width: 280px; margin: 0 auto; border-top: 1px solid ${css(MARCA.tinta800)}; padding-top: 6px; }
   .assinatura p { text-indent: 0; margin: 0; }
   .assinatura .nome { font-weight: 700; }
@@ -242,7 +289,12 @@ async function moldura(
   titulo: string,
   perito: Usuario | null,
   corpo: string,
-  opcoes: { comMarca?: boolean; classeCorpo?: string } = {},
+  opcoes: {
+    comMarca?: boolean
+    classeCorpo?: string
+    /** Folha de rosto: o cabeçalho com a logo entra nela, e o corpo começa na folha 2. */
+    capa?: string
+  } = {},
 ): Promise<string> {
   const credencial = perito
     ? `<p class="perito-cabecalho">${esc(perito.nome)}${perito.titulo ? ` — ${esc(perito.titulo)}` : ''}${
@@ -264,6 +316,16 @@ async function moldura(
     : ''
   const classe = opcoes.classeCorpo ? ` class="${opcoes.classeCorpo}"` : ''
 
+  // Com capa, a logo fica dentro dela: a altura da folha de rosto é medida
+  // com o cabeçalho junto, qualquer que seja o tamanho da logo do perito.
+  if (opcoes.capa !== undefined) {
+    return `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>${CSS}</style></head>
+<body>
+  <main${classe}><section class="capa">${cabecalho}${opcoes.capa}</section>${corpo}</main>
+</body></html>`
+  }
+
   return `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>${CSS}</style></head>
 <body>
@@ -272,21 +334,37 @@ async function moldura(
 </body></html>`
 }
 
-function assinatura(
+/**
+ * Local, data e assinatura, num bloco que não se parte entre folhas.
+ *
+ * `espacado` é o fecho do parecer/laudo, com mais ar acima da data e da
+ * linha. Com a assinatura manuscrita cadastrada (Configurações › Meu
+ * perfil), a imagem pousa sobre a linha; sem ela, a linha fica em branco
+ * para assinar à mão, como sempre foi.
+ */
+async function assinatura(
   perito: Usuario | null,
   cidade?: string | null,
   dataAssinatura: string = hoje(),
-): string {
+  opcoes: { espacado?: boolean } = {},
+): Promise<string> {
   const titulos = (perito?.titulo ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean)
   const registros = (perito?.registroProfissional ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean)
+  const manuscrita = await assinaturaDoDocumento(perito)
+  const imagem = manuscrita
+    ? `<img class="assinatura-imagem" src="${manuscrita.dataUri}" alt="Assinatura de ${esc(perito?.nome ?? 'perito')}">`
+    : ''
   return `
+  <div class="fecho${opcoes.espacado ? ' fecho-parecer' : ''}">
   <p class="local-data">${esc(cidade || 'São Paulo/SP')}, ${extenso(dataAssinatura)}.</p>
-  <div class="assinatura">
+  <div class="assinatura${manuscrita ? ' com-imagem' : ''}">
+    ${imagem}
     <div class="traco">
       <p class="nome">${esc(perito?.nome ?? '—')}</p>
       ${titulos.map((linha) => `<p class="dado">${esc(linha)}</p>`).join('')}
       ${registros.map((linha) => `<p class="dado">${esc(linha)}</p>`).join('')}
     </div>
+  </div>
   </div>`
 }
 
@@ -395,10 +473,14 @@ export async function htmlDoParecer(
       </table>`
     : ''
 
-  const tabelaLinhasAgente = (linhas: ReturnType<typeof montarApresentacaoAgente>['linhas'], cabecalho = false) =>
+  const tabelaLinhasAgente = (
+    linhas: ReturnType<typeof montarApresentacaoAgente>['linhas'],
+    cabecalho = false,
+    rodape = '',
+  ) =>
     `<table>${cabecalho ? '<thead><tr><th>Propriedade</th><th>Informação</th></tr></thead>' : ''}<tbody>${linhas
       .map((item) => `<tr><th>${esc(item.rotulo)}</th><td${item.destaque ? ` class="resultado-${item.destaque}"` : ''}>${esc(item.valor).replace(/\n/g, '<br>')}</td></tr>`)
-      .join('')}</tbody></table>`
+      .join('')}${rodape}</tbody></table>`
 
   // Um agente por função: o rótulo é resolvido aqui, uma vez, a partir do
   // período. Ver `comFuncaoPosto`.
@@ -420,17 +502,31 @@ export async function htmlDoParecer(
     periculosidade: 'Atividade ou Operação Perigosa',
   } as Record<string, string>)[tipo ?? ''] ?? 'Agente'
 
+  /**
+   * A conclusão do agente fecha a própria tabela, numa linha inteira em
+   * destaque (pedido do perito). Espelha `LinhaConclusaoAgente` da prévia e
+   * `linhaConclusaoAgente` do DOCX. Agente não identificado não tem tabela:
+   * a conclusão sai numa tabela de uma linha só, com o mesmo destaque.
+   */
+  const linhaConclusao = (agente: (typeof agentes)[number]) => agenteExibeConclusao(agente)
+    ? `<tr class="conclusao-agente"><td colspan="2"><strong>Conclusão:</strong> ${esc((agente.observacao ?? '').trim()).replace(/\n/g, '<br>')}</td></tr>`
+    : ''
+  const quadroDoAgente = (
+    agente: (typeof agentes)[number],
+    linhas: ReturnType<typeof montarApresentacaoAgente>['linhas'],
+  ) => {
+    const conclusao = linhaConclusao(agente)
+    if (agente.identificadoNaAtividade !== false) return tabelaLinhasAgente(linhas, true, conclusao)
+    return conclusao ? `<table class="tabela-conclusao"><tbody>${conclusao}</tbody></table>` : ''
+  }
+
   const tabelaAgentes = (lista: typeof agentes, prefixo?: string) => lista.length
     ? lista.map((agente, indice) => {
         const apresentacao = montarApresentacaoAgente(agente)
-        const identificado = agente.identificadoNaAtividade !== false
         const titulo = prefixo
           ? `${prefixo}.${indice + 1}. ${rotuloNatureza(agente.tipo)} — ${apresentacao.titulo}`
           : apresentacao.titulo
-        const conclusao = agenteExibeConclusao(agente)
-          ? paragrafos(`Conclusão: ${(agente.observacao ?? '').trim()}`)
-          : ''
-        return `<section class="agente-bloco"><div class="agente-resumo"><h3 class="agente-titulo">${esc(titulo)}</h3>${identificado ? tabelaLinhasAgente(apresentacao.linhas, true) : ''}</div>${conclusao}</section>`
+        return `<section class="agente-bloco"><div class="agente-resumo"><h3 class="agente-titulo">${esc(titulo)}</h3>${quadroDoAgente(agente, apresentacao.linhas)}</div></section>`
       }).join('')
     : ''
 
@@ -513,15 +609,11 @@ export async function htmlDoParecer(
       if (!prefixo || !lista.length) return ''
       const quadros = lista.map((agente, indice) => {
         const apresentacao = montarApresentacaoAgente(agente)
-        const identificado = agente.identificadoNaAtividade !== false
         const protecoes = resumoProtecoesAssociadas(agente.epis)
         const linhas = protecoes
           ? [...apresentacao.linhas, { rotulo: 'Proteções associadas', valor: protecoes }]
           : apresentacao.linhas
-        const conclusao = agenteExibeConclusao(agente)
-          ? paragrafos(`Conclusão: ${(agente.observacao ?? '').trim()}`)
-          : ''
-        return `<section class="agente-bloco"><h4>${prefixo}.${indice + 1}. ${esc(apresentacao.titulo)}</h4>${identificado ? tabelaLinhasAgente(linhas, true) : ''}${conclusao}</section>`
+        return `<section class="agente-bloco"><h4>${prefixo}.${indice + 1}. ${esc(apresentacao.titulo)}</h4>${quadroDoAgente(agente, linhas)}</section>`
       }).join('')
       return `<h3>${prefixo}. ${esc(tituloGrupo)}</h3>${quadros}`
     }
@@ -578,13 +670,19 @@ export async function htmlDoParecer(
     )
   }
 
-  const partes: string[] = [
+  // Folha de rosto: endereçamento no alto, identificação perto do meio da
+  // folha, título e apresentação logo abaixo. O item 1 abre a folha 2.
+  const capa = [
     enderecamentoDoParecer(pericia.vara, pericia.comarca),
+    '<div class="espaco-capa" aria-hidden="true"></div>',
     '<h3 class="titulo-qualificacao">IDENTIFICAÇÃO DAS PARTES</h3>',
     identificacao,
     `<h1>${esc(titulo)}</h1>`,
     '<h3 class="titulo-qualificacao">APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA</h3>',
     blocoConteudo(paragrafos(t.apresentacao)),
+  ].join('\n')
+
+  const partes: string[] = [
     `<h2>${num.secao('OBJETO DA PERÍCIA E DADOS CONTRATUAIS')}</h2>`,
     blocoConteudo(paragrafos(objetivoAutomaticoDocumento(pericia.modalidade)) + dadosContratuais),
     `<h2>${num.secao('DA DILIGÊNCIA TÉCNICA PERICIAL')}</h2>`,
@@ -654,8 +752,12 @@ export async function htmlDoParecer(
     blocoConteudo(paragrafos(t.notaTecnicaEpis) + blocoProtecoes),
     `<h2>${num.secao('DAS PROTEÇÕES COLETIVAS')}</h2>`,
     blocoConteudo(paragrafos(t.protecoesColetivas)),
+    // Só os quadros: o texto livre da análise técnica saiu do formulário e do
+    // documento (pedido do perito) — ele imprimia depois das tabelas da NR-16
+    // um texto que repetia as conclusões. `t.analiseTecnica` segue gravado
+    // nas perícias antigas, mas não é mais impresso.
     `<h2>${num.secao(tituloAnalise)}</h2>`,
-    blocoConteudo(quadrosAnalise + paragrafos(t.analiseTecnica)),
+    blocoConteudo(quadrosAnalise),
   ]
 
   if (temInsalubridade) partes.push(`<h2>${num.secao('NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')}</h2>`, blocoConteudo(paragrafos(conclusaoNr15)))
@@ -665,12 +767,13 @@ export async function htmlDoParecer(
   partes.push(
     `<h2>${num.secao('ENCERRAMENTO')}</h2>`,
     blocoConteudo(paragrafos(encerramento)),
-    assinatura(perito, fecho.cidade, fecho.data),
+    await assinatura(perito, fecho.cidade, fecho.data, { espacado: true }),
   )
 
   return moldura(titulo, perito, partes.join('\n'), {
     comMarca: true,
     classeCorpo: 'parecer-manual',
+    capa,
   })
 }
 
@@ -713,7 +816,7 @@ async function htmlDosQuesitos(
      ${identificacao}
      <h2>Quesitos e Respostas</h2>
      ${lista}
-     ${assinatura(perito, pericia?.comarca)}`,
+     ${await assinatura(perito, pericia?.comarca)}`,
   )
 }
 
@@ -755,7 +858,7 @@ async function htmlDaManifestacao(
      ${argumentos}
      <h2>III — Requerimento</h2>
      ${blocoConteudo(paragrafos(c.encerramento))}
-     ${assinatura(perito, pericia?.comarca)}`,
+     ${await assinatura(perito, pericia?.comarca)}`,
   )
 }
 
@@ -802,7 +905,7 @@ async function htmlDoEsclarecimento(
      ${pontos}
      <h2>III — Conclusão</h2>
      ${blocoConteudo(paragrafos(c.conclusao))}
-     ${assinatura(perito, pericia?.comarca)}`,
+     ${await assinatura(perito, pericia?.comarca)}`,
   )
 }
 

@@ -8,10 +8,17 @@ import { empresa, periciaAmbasSoNr16, periciaDeTeste, periciaSoPericulosidade, p
 // Sem disco: `lerUpload` devolve um buffer vazio, o sharp falha e o
 // renderizador cai no ramo "imagem indisponível" — que ainda imprime a
 // legenda "Fotografia N", que é o que este teste mede.
-vi.mock('./armazenamento.js', () => ({
-  comoDataUri: async () => null,
-  lerUpload: async () => Buffer.alloc(0),
-}))
+// A única exceção é 'assinatura.png', a assinatura manuscrita do perito.
+vi.mock('./armazenamento.js', async () => {
+  const { default: sharp } = await import('sharp')
+  const assinatura = await sharp({
+    create: { width: 600, height: 200, channels: 4, background: { r: 20, g: 30, b: 90, alpha: 1 } },
+  }).png().toBuffer()
+  return {
+    comoDataUri: async () => null,
+    lerUpload: async (arquivo: string) => (arquivo === 'assinatura.png' ? assinatura : Buffer.alloc(0)),
+  }
+})
 
 const { gerarDocx } = await import('./docx.js')
 
@@ -29,11 +36,20 @@ const documento = {
   periciaId: 'per-1',
 } as DocumentoGerado
 
+/** O word/document.xml do DOCX gerado. */
+async function xmlDoDocx(
+  pericia: PericiaCompleta = periciaDeTeste(),
+  quemAssina: typeof perito = perito,
+  doc: DocumentoGerado = documento,
+): Promise<string> {
+  const buffer = await gerarDocx(doc, pericia, [empresa], quemAssina)
+  const zip = await JSZip.loadAsync(buffer)
+  return zip.file('word/document.xml')!.async('string')
+}
+
 /** Texto corrido do DOCX: só a concatenação dos <w:t> de word/document.xml. */
 async function textoDoDocx(pericia: PericiaCompleta = periciaDeTeste()): Promise<string> {
-  const buffer = await gerarDocx(documento, pericia, [empresa], perito)
-  const zip = await JSZip.loadAsync(buffer)
-  const xml = await zip.file('word/document.xml')!.async('string')
+  const xml = await xmlDoDocx(pericia)
   return (xml.match(/<w:t[^>]*>[^<]*<\/w:t>/g) ?? [])
     .map((n) => n.replace(/<[^>]+>/g, ''))
     .join(' ')
@@ -99,14 +115,26 @@ describe('parecer em DOCX', () => {
     expect(await textoDoDocx()).not.toContain('Conclusão:')
   })
 
-  it('imprime a conclusão da avaliação quando ela existe', async () => {
+  it('imprime a conclusão como última linha da tabela do agente, nos itens 7 e 10', async () => {
     const pericia = periciaDeTeste()
     ;(pericia.tecnico as unknown as { agentes: { observacao?: string }[] }).agentes[0]!.observacao =
       'A exposição é habitual e permanente.'
 
-    const texto = await textoDoDocx(pericia)
+    const xml = await xmlDoDocx(pericia)
+    const tabelas = xml.match(/<w:tbl>[\s\S]*?<\/w:tbl>/g) ?? []
+    const comConclusao = tabelas.filter((t) => t.includes('A exposição é habitual e permanente.'))
 
-    expect(texto).toContain('Conclusão: A exposição é habitual e permanente.')
+    // Dentro da tabela (item 7 e item 10), e na última linha dela: uma célula
+    // na largura toda, com o fundo cinza-azulado e "Conclusão:" em negrito.
+    expect(comConclusao).toHaveLength(2)
+    for (const tabela of comConclusao) {
+      const linhas = tabela.match(/<w:tr>[\s\S]*?<\/w:tr>|<w:tr [\s\S]*?<\/w:tr>/g) ?? []
+      const ultima = linhas[linhas.length - 1]!
+      expect(ultima).toContain('A exposição é habitual e permanente.')
+      expect(ultima).toContain('<w:gridSpan w:val="2"/>')
+      expect(ultima).toMatch(/w:fill="EEF1F5"/)
+      expect(ultima).toMatch(/<w:b\/>[\s\S]*?Conclusão: </)
+    }
   })
 
   it('tira da seção de EPIs os agentes que a modalidade excluiu', async () => {
@@ -212,19 +240,16 @@ describe('parecer em DOCX', () => {
     expect(semDestaque).not.toContain('<w:b/>')
   })
 
-  it('imprime a análise técnica depois dos quadros dos agentes, não antes', async () => {
-    // Espelha o mesmo caso em documento-parecer.test.ts: o texto do item 10 é
-    // a CONCLUSÃO de cada agente avaliado, tem que sair depois dos quadros.
+  it('não imprime mais o texto livre da análise técnica no item 10', async () => {
+    // Espelha o mesmo caso em documento-parecer.test.ts.
     const pericia = periciaDeTeste()
     ;(pericia.tecnico as unknown as { analiseTecnica: string }).analiseTecnica =
       'Texto exclusivo de teste da análise técnica.'
 
     const texto = await textoDoDocx(pericia)
 
-    expect(texto).toContain('Texto exclusivo de teste da análise técnica.')
-    expect(texto.lastIndexOf('NR-15 — Avaliação da Exposição Ocupacional')).toBeLessThan(
-      texto.indexOf('Texto exclusivo de teste da análise técnica.'),
-    )
+    expect(texto).toContain('10. ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS')
+    expect(texto).not.toContain('Texto exclusivo de teste da análise técnica.')
   })
 
   it('abre a capa pela identificação das partes', async () => {
@@ -235,5 +260,99 @@ describe('parecer em DOCX', () => {
     )
     expect(posicoes.every((p) => p >= 0)).toBe(true)
     expect(posicoes).toEqual([...posicoes].sort((a, b) => a - b))
+  })
+
+  it('desce a identificação na capa e começa o item 1 na folha 2', async () => {
+    const xml = await xmlDoDocx()
+    const paragrafos = xml.match(/<w:p>[\s\S]*?<\/w:p>|<w:p [\s\S]*?<\/w:p>/g) ?? []
+
+    const identificacao = paragrafos.find((p) => p.includes('IDENTIFICAÇÃO DAS PARTES'))!
+    const antes = Number(identificacao.match(/w:before="(\d+)"/)?.[1])
+    // A capa desta fixture é curta: o espaço bate no teto (~6,2cm).
+    expect(antes).toBeGreaterThan(2000)
+
+    const item1 = paragrafos.find((p) => p.includes('1. OBJETO DA PERÍCIA E DADOS CONTRATUAIS'))!
+    expect(item1).toContain('<w:pageBreakBefore/>')
+    // Só o item 1 abre folha nova.
+    expect(paragrafos.filter((p) => p.includes('<w:pageBreakBefore/>'))).toHaveLength(1)
+  })
+
+  it('encolhe o espaço da capa quando a apresentação é longa', async () => {
+    const pericia = periciaDeTeste()
+    ;(pericia.tecnico as unknown as { apresentacao: string }).apresentacao =
+      Array.from({ length: 6 }, () => 'Texto longo de apresentação e qualificação técnica do perito. '.repeat(5)).join('\n')
+
+    const xml = await xmlDoDocx(pericia)
+    const identificacao = (xml.match(/<w:p>[\s\S]*?<\/w:p>|<w:p [\s\S]*?<\/w:p>/g) ?? [])
+      .find((p) => p.includes('IDENTIFICAÇÃO DAS PARTES'))!
+    expect(Number(identificacao.match(/w:before="(\d+)"/)?.[1])).toBeLessThan(1000)
+  })
+
+  it('prende a data à assinatura e centraliza a linha', async () => {
+    const xml = await xmlDoDocx()
+    const paragrafos = xml.match(/<w:p>[\s\S]*?<\/w:p>|<w:p [\s\S]*?<\/w:p>/g) ?? []
+    const indiceNome = paragrafos.findIndex((p) => p.includes('Dinoel Ribeiro da Silva') && p.includes('<w:pBdr>'))
+    const nome = paragrafos[indiceNome]!
+    // Sem assinatura manuscrita, a data vem logo antes da linha.
+    const data = paragrafos[indiceNome - 1]!
+    expect(data).toMatch(/, \d{1,2} de [a-zç]+ de \d{4}\./)
+
+    expect(data).toContain('<w:keepNext/>')
+    // Parecer: mais ar acima da data (pedido do perito).
+    expect(Number(data.match(/w:before="(\d+)"/)?.[1])).toBeGreaterThanOrEqual(720)
+    expect(nome).toContain('<w:keepNext/>')
+    expect(nome).toMatch(/<w:ind w:left="2435" w:right="2435"\/>/)
+    expect(xml).not.toContain('Assinatura de Dinoel')
+  })
+
+  it('embute a assinatura manuscrita acima da linha', async () => {
+    const xml = await xmlDoDocx(periciaDeTeste(), { ...perito, assinaturaArquivo: 'assinatura.png' })
+    const paragrafos = xml.match(/<w:p>[\s\S]*?<\/w:p>|<w:p [\s\S]*?<\/w:p>/g) ?? []
+    const indiceImagem = paragrafos.findIndex((p) => p.includes('Assinatura de Dinoel Ribeiro da Silva'))
+
+    expect(indiceImagem).toBeGreaterThan(0)
+    expect(paragrafos[indiceImagem]).toContain('<w:keepNext/>')
+    // 600x200 na caixa de 220x64 → 192x64 px = 1828800x609600 EMU.
+    expect(paragrafos[indiceImagem]).toContain('cx="1828800" cy="609600"')
+    // A linha com o nome vem logo depois da imagem.
+    expect(paragrafos[indiceImagem + 1]).toContain('Dinoel Ribeiro da Silva')
+    expect(paragrafos[indiceImagem + 1]).toContain('<w:pBdr>')
+  })
+
+  it('leva o último parágrafo da impugnação junto quando o fecho desce de folha', async () => {
+    // Espelha o `break-before: avoid` do `.fecho` no PDF: com a assinatura
+    // manuscrita a impugnação passa de uma folha, e a folha 2 não pode ter
+    // só a data e a assinatura.
+    const impugnacao = {
+      id: 'doc-2',
+      tipo: 'impugnacao',
+      titulo: 'Impugnação ao Laudo Pericial — Ruído',
+      periciaId: 'per-1',
+      conteudo: {
+        posicionamento: 'impugnacao',
+        agente: 'ruido',
+        fundamentacao: 'Fundamentação.',
+        blocos: [],
+        encerramento: 'Pedido intermediário.\n\nAnte o exposto, requer o acolhimento.',
+      },
+    } as unknown as DocumentoGerado
+    const xml = await xmlDoDocx(periciaDeTeste(), perito, impugnacao)
+    const paragrafos = xml.match(/<w:p>[\s\S]*?<\/w:p>|<w:p [\s\S]*?<\/w:p>/g) ?? []
+    const intermediario = paragrafos.find((p) => p.includes('Pedido intermediário.'))!
+    const ultimo = paragrafos.find((p) => p.includes('Ante o exposto, requer o acolhimento.'))!
+
+    expect(ultimo).toContain('<w:keepNext/>')
+    expect(intermediario).not.toContain('<w:keepNext/>')
+  })
+
+  it('usa o mesmo rodapé do PDF, com a paginação na margem direita', async () => {
+    const zip = await JSZip.loadAsync(await gerarDocx(documento, periciaDeTeste(), [empresa], perito))
+    const arquivo = Object.keys(zip.files).find((nome) => /^word\/footer\d*\.xml$/.test(nome))!
+    const xml = await zip.file(arquivo)!.async('string')
+
+    expect(xml).toContain('© D&amp;R Perícia Trabalhista — Propriedade intelectual exclusiva e protegida.')
+    expect(xml).toMatch(/<w:tab w:val="right" w:pos="9070"\/>/)
+    expect(xml).toContain('Página ')
+    expect(xml).not.toContain('D&amp;R Perícia — Página')
   })
 })

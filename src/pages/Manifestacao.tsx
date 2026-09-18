@@ -25,6 +25,7 @@ import {
 } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { Logo } from '@/components/Logo'
+import { FechoDoDocumento } from '@/components/FechoDoDocumento'
 import { useApp } from '@/store/AppStore'
 import * as api from '@/services/api'
 import {
@@ -34,7 +35,7 @@ import {
   montarModelo,
 } from '@/content/manifestacao'
 import type { AgenteManifestacao, ModeloManifestacao, PosicionamentoManifestacao } from '@/types'
-import { cn, extenso, uid } from '@/lib/utils'
+import { cn, uid } from '@/lib/utils'
 
 // ============================================================
 // MÓDULO L — MANIFESTAÇÃO AO LAUDO (item 18)
@@ -444,17 +445,11 @@ export default function Manifestacao() {
               <h2>III — Requerimento</h2>
               <p>{encerramento}</p>
 
-              <p className="mt-10 no-indent text-center">
-                {pericia?.comarca ?? 'São Paulo/SP'}, {extenso(new Date().toISOString().slice(0, 10))}.
-              </p>
-
-              <div className="mt-14 text-center">
-                <div className="mx-auto w-72 border-t border-ink-800 pt-1.5">
-                  <p className="no-indent font-bold">{usuario?.nome}</p>
-                  <p className="no-indent text-[10pt]">{usuario?.titulo}</p>
-                  <p className="no-indent text-[10pt]">{usuario?.registroProfissional}</p>
-                </div>
-              </div>
+              <FechoDoDocumento
+                cidade={pericia?.comarca ?? 'São Paulo/SP'}
+                data={new Date().toISOString().slice(0, 10)}
+                perito={usuario}
+              />
             </article>
           </div>
         </div>

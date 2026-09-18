@@ -3,11 +3,12 @@ import { FileDown, Plus, Printer, ScrollText, Sparkles, Trash2 } from 'lucide-re
 import { Badge, Button, Card, CardHeader, Input, Select, Textarea, useToast } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { Logo } from '@/components/Logo'
+import { FechoDoDocumento } from '@/components/FechoDoDocumento'
 import { useApp } from '@/store/AppStore'
 import * as api from '@/services/api'
 import { AGENTES_MANIFESTACAO } from '@/content/manifestacao'
 import type { AgenteManifestacao } from '@/types'
-import { extenso, uid } from '@/lib/utils'
+import { uid } from '@/lib/utils'
 
 // ============================================================
 // ESCLARECIMENTOS TÉCNICOS (item 18.3 — mesma lógica da
@@ -334,17 +335,11 @@ export default function Esclarecimento() {
             <h2>III — Conclusão</h2>
             <p>{conclusao}</p>
 
-            <p className="mt-10 no-indent text-center">
-              {pericia?.comarca ?? 'São Paulo/SP'}, {extenso(new Date().toISOString().slice(0, 10))}.
-            </p>
-
-            <div className="mt-14 text-center">
-              <div className="mx-auto w-72 border-t border-ink-800 pt-1.5">
-                <p className="no-indent font-bold">{usuario?.nome}</p>
-                <p className="no-indent text-[10pt]">{usuario?.titulo}</p>
-                <p className="no-indent text-[10pt]">{usuario?.registroProfissional}</p>
-              </div>
-            </div>
+            <FechoDoDocumento
+              cidade={pericia?.comarca ?? 'São Paulo/SP'}
+              data={new Date().toISOString().slice(0, 10)}
+              perito={usuario}
+            />
           </article>
         </div>
       </div>

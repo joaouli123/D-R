@@ -19,6 +19,8 @@ interface AppState {
   salvarUsuario: (u: Usuario & { senha?: string }) => Promise<void>
   trocarLogo: (id: string, arquivo: File) => Promise<void>
   removerLogo: (id: string) => Promise<void>
+  trocarAssinatura: (id: string, arquivo: File) => Promise<void>
+  removerAssinatura: (id: string) => Promise<void>
 
   // Módulo B
   empresas: Empresa[]
@@ -261,6 +263,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // servidor tenha recusado (formato ou tamanho).
       trocarLogo: async (id, arquivo) => adotarUsuario(await api.usuarios.enviarLogo(id, arquivo)),
       removerLogo: async (id) => adotarUsuario(await api.usuarios.removerLogo(id)),
+      // Mesma regra da logo: quem trata a foto é o servidor, e a tela só
+      // mostra a assinatura depois que ele devolve o PNG pronto.
+      trocarAssinatura: async (id, arquivo) =>
+        adotarUsuario(await api.usuarios.enviarAssinatura(id, arquivo)),
+      removerAssinatura: async (id) => adotarUsuario(await api.usuarios.removerAssinatura(id)),
 
       empresas,
       // Devolve a empresa como o servidor gravou: quem cadastra de

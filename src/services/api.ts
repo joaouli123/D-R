@@ -161,15 +161,20 @@ function comFotosResolvidas(p: Pericia): Pericia {
 }
 
 /**
- * Resolve a logo do perito pelo mesmo caminho das fotos.
+ * Resolve a logo e a assinatura do perito pelo mesmo caminho das fotos.
  *
- * O `logoUrl` chega relativo (`/uploads/<arquivo>`) e precisa do prefixo da
- * API para virar `<img src>` — sem isso ele cai no index.html do site e o
- * perito vê a marca quebrada. Passa por AQUI toda resposta que traz usuário:
- * login, sessão restaurada, listagem e as duas rotas da logo.
+ * O `logoUrl` (e o `assinaturaUrl`) chega relativo (`/uploads/<arquivo>`) e
+ * precisa do prefixo da API para virar `<img src>` — sem isso ele cai no
+ * index.html do site e o perito vê a marca quebrada. Passa por AQUI toda
+ * resposta que traz usuário: login, sessão restaurada, listagem e as rotas
+ * da logo e da assinatura.
  */
-function comLogoResolvida<T extends { logoUrl?: string }>(u: T): T {
-  return u.logoUrl ? { ...u, logoUrl: urlDeUpload(u.logoUrl) } : u
+function comLogoResolvida<T extends { logoUrl?: string; assinaturaUrl?: string }>(u: T): T {
+  return {
+    ...u,
+    ...(u.logoUrl ? { logoUrl: urlDeUpload(u.logoUrl) } : {}),
+    ...(u.assinaturaUrl ? { assinaturaUrl: urlDeUpload(u.assinaturaUrl) } : {}),
+  }
 }
 
 export interface AplicacaoEpiCatalogo {
@@ -577,6 +582,25 @@ export const usuarios = {
   async removerLogo(id: string): Promise<Usuario> {
     if (!ehRest) throw new ErroApi(503, 'Trocar a logo exige o backend ativo.')
     return comLogoResolvida(await http<Usuario>(`/usuarios/${id}/logo`, { method: 'DELETE' }))
+  },
+
+  /**
+   * Sobe a FOTO da assinatura feita em papel. O servidor recorta, tira o
+   * fundo e grava só o traço; a resposta traz o `assinaturaUrl` desse PNG.
+   */
+  async enviarAssinatura(id: string, arquivo: File): Promise<Usuario> {
+    if (!ehRest) throw new ErroApi(503, 'Enviar a assinatura exige o backend ativo.')
+    const form = new FormData()
+    form.append('assinatura', arquivo)
+    return comLogoResolvida(
+      await http<Usuario>(`/usuarios/${id}/assinatura`, { method: 'POST', body: form }),
+    )
+  },
+
+  /** Os documentos voltam a sair com a linha em branco, para assinar à mão. */
+  async removerAssinatura(id: string): Promise<Usuario> {
+    if (!ehRest) throw new ErroApi(503, 'Remover a assinatura exige o backend ativo.')
+    return comLogoResolvida(await http<Usuario>(`/usuarios/${id}/assinatura`, { method: 'DELETE' }))
   },
 }
 

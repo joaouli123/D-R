@@ -27,11 +27,12 @@ import {
 } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { Logo } from '@/components/Logo'
+import { FechoDoDocumento } from '@/components/FechoDoDocumento'
 import { useApp } from '@/store/AppStore'
 import * as api from '@/services/api'
 import { ORIGENS_QUESITO, TEMAS_QUESITO } from '@/content/quesitos'
 import type { Quesito, QuesitoSelecionado } from '@/types'
-import { cn, extenso, interpolar, uid } from '@/lib/utils'
+import { cn, interpolar, uid } from '@/lib/utils'
 
 // ============================================================
 // MÓDULO K — QUESITOS TÉCNICOS (item 17)
@@ -589,17 +590,11 @@ export default function Quesitos() {
                 </div>
               ))}
 
-              <p className="mt-10 no-indent text-center">
-                {pericia?.comarca ?? 'São Paulo/SP'}, {extenso(new Date().toISOString().slice(0, 10))}.
-              </p>
-
-              <div className="mt-14 text-center">
-                <div className="mx-auto w-72 border-t border-ink-800 pt-1.5">
-                  <p className="no-indent font-bold">{usuario?.nome}</p>
-                  <p className="no-indent text-[10pt]">{usuario?.titulo}</p>
-                  <p className="no-indent text-[10pt]">{usuario?.registroProfissional}</p>
-                </div>
-              </div>
+              <FechoDoDocumento
+                cidade={pericia?.comarca ?? 'São Paulo/SP'}
+                data={new Date().toISOString().slice(0, 10)}
+                perito={usuario}
+              />
             </article>
           </div>
         </div>

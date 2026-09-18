@@ -15,6 +15,8 @@ import type { DocumentoGerado, Empresa, Usuario } from '@prisma/client'
 import JSZip from 'jszip'
 import { PDFDocument } from 'pdf-lib'
 import type { PericiaCompleta } from '../src/mappers.js'
+import { apagarUpload, gravarUpload } from '../src/services/armazenamento.js'
+import { processarAssinatura } from '../src/services/assinatura-perito.js'
 import { montarHtml } from '../src/services/documento-html.js'
 import { gerarDocx } from '../src/services/docx.js'
 import { encerrarBrowser, gerarPdf } from '../src/services/pdf.js'
@@ -714,6 +716,68 @@ async function main() {
     /<w:br\s*\/?>/,
     'títulos longos do DOCX devem quebrar dentro das margens da página',
   )
+
+  // ── Folha de rosto (feedback de 17/09/2026): a identificação das partes
+  // desce e o item 1 abre a folha 2 — no PDF e no DOCX.
+  const parecerVisual = saidasVisuais.find((saida) => saida.nome === 'parecer')!
+  assert.match(parecerVisual.html, /<section class="capa">/, 'o parecer deve abrir com a folha de rosto')
+  assert.equal(
+    (parecerVisual.xml.match(/<w:pageBreakBefore\/>/g) ?? []).length,
+    1,
+    'o DOCX deve abrir o item 1 em folha nova, e só ele',
+  )
+  assert.doesNotMatch(parecerVisual.html, /Súmulas 80 e 289/, 'o item 10 não imprime mais o texto livre da análise técnica')
+  assert.ok(!parecerVisual.xml.includes('Súmulas 80 e 289'), 'nem no DOCX')
+  assert.match(parecerVisual.html, /<tr class="conclusao-agente"><td colspan="2"><strong>Conclusão:<\/strong>/)
+  assert.match(parecerVisual.xml, /<w:gridSpan w:val="2"\/>[\s\S]{0,400}?w:fill="EEF1F5"/)
+
+  // ── Assinatura manuscrita: a foto da assinatura em papel passa pelo mesmo
+  // tratamento da rota POST /usuarios/:id/assinatura e pousa sobre a linha.
+  // A impugnação sem assinatura enche a folha 1 até o fim; com a imagem, o
+  // fecho desce para a folha 2 levando o último parágrafo junto — no máximo
+  // uma folha a mais, e nunca a assinatura sozinha.
+  const { default: sharp } = await import('sharp')
+  const fotoAssinatura = await sharp(
+    Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800">
+      <rect width="1200" height="800" fill="#ece8df"/>
+      <path d="M300 450 C 380 300, 450 600, 520 420 S 700 350, 780 470 S 900 380, 940 430"
+        stroke="#1d2a6b" stroke-width="9" fill="none" stroke-linecap="round"/>
+    </svg>`),
+  ).jpeg({ quality: 90 }).toBuffer()
+  const arquivoAssinatura = await gravarUpload(await processarAssinatura(fotoAssinatura), 'image/png')
+  try {
+    const peritoAssinado = { ...perito, assinaturaArquivo: arquivoAssinatura } as Usuario
+    for (const caso of CASOS.filter((c) => c.nome === 'parecer' || c.nome === 'impugnacao')) {
+      const html = await montarHtml(caso.doc, pericia, [empresa], peritoAssinado)
+      assert.match(
+        html,
+        /<img class="assinatura-imagem" src="data:image\/png;base64,/,
+        `${caso.nome}: a assinatura manuscrita deve sair embutida sobre a linha`,
+      )
+      const pdf = await gerarPdf(html)
+      await fs.writeFile(path.join(SAIDA, `${caso.nome}-assinado.html`), html, 'utf8')
+      await fs.writeFile(path.join(SAIDA, `${caso.nome}-assinado.pdf`), pdf)
+      const docx = await gerarDocx(caso.doc, pericia, [empresa], peritoAssinado)
+      await fs.writeFile(path.join(SAIDA, `${caso.nome}-assinado.docx`), docx)
+      const xml = await (await JSZip.loadAsync(docx)).file('word/document.xml')!.async('string')
+      assert.match(xml, /Assinatura de Dinoel R\. Santos/, `${caso.nome}: o DOCX deve embutir a assinatura`)
+
+      assert.match(
+        html,
+        /\.fecho \{[^}]*break-inside: avoid;[^}]*break-before: avoid;/,
+        `${caso.nome}: o fecho não se parte e, se descer, leva o último parágrafo`,
+      )
+      const paginas = (await PDFDocument.load(pdf)).getPageCount()
+      const semAssinatura = saidasVisuais.find((saida) => saida.nome === caso.nome)!.paginasPdf
+      assert.ok(
+        paginas <= semAssinatura + 1,
+        `${caso.nome}: a assinatura manuscrita não pode acrescentar mais de uma folha`,
+      )
+      resumo.push(`${`${caso.nome}+assinatura`.padEnd(16)} pdf ${paginas} pág.`)
+    }
+  } finally {
+    await apagarUpload(arquivoAssinatura)
+  }
 
   assert.match(htmlParecer, /12,5 ppm/)
   assert.match(htmlParecer, /Limite de tolerância.*78 ppm/s)

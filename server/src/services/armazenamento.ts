@@ -202,6 +202,27 @@ export const uploadLogo = multer({
   },
 })
 
+/**
+ * Foto da assinatura manuscrita: fica na MEMÓRIA, não no volume.
+ *
+ * O arquivo enviado é só matéria-prima — o que se grava é o PNG recortado e
+ * com fundo transparente que services/assinatura-perito.ts gera a partir
+ * dele. Guardar a foto original seria deixar no disco, sem uso, a imagem de
+ * uma assinatura com o papel, a mesa e o que mais a câmera pegou.
+ */
+export const uploadAssinatura = multer({
+  storage: multer.memoryStorage(),
+  defParamCharset: CHARSET_DO_NOME,
+  limits: { fileSize: LIMITE_MULTER_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (!IMAGENS.has(file.mimetype)) {
+      cb(new ErroHttp(415, `Formato não suportado: ${file.mimetype}. Envie a foto da assinatura em JPEG ou PNG.`))
+      return
+    }
+    cb(null, true)
+  },
+})
+
 export const uploadPdf = multer({
   storage: armazenamento,
   defParamCharset: CHARSET_DO_NOME,
@@ -228,6 +249,17 @@ export function caminhoDoUpload(arquivo: string): string {
 
 export async function lerUpload(arquivo: string): Promise<Buffer> {
   return fs.readFile(caminhoDoUpload(arquivo))
+}
+
+/**
+ * Grava no volume um arquivo gerado pelo próprio servidor (não pelo multer),
+ * com o mesmo nome opaco dos uploads. Devolve o nome gravado.
+ */
+export async function gravarUpload(dados: Buffer, mimetype: string): Promise<string> {
+  const nome = nomeSeguro(mimetype)
+  await fs.mkdir(PASTA_UPLOADS, { recursive: true })
+  await fs.writeFile(caminhoDoUpload(nome), dados)
+  return nome
 }
 
 /** Remove sem estourar: um arquivo já ausente não é problema. */
