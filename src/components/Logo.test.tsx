@@ -28,22 +28,22 @@ describe('Logo do perito', () => {
 
     expect(html).toContain('src="/api/uploads/minha.png"')
     expect(html).toContain('alt="Logo de Dinoel Ribeiro da Silva"')
-    // A proporcao e de cada logo: declarar 1600x549 numa marca de outro
+    // A proporcao e de cada logo: declarar 1390x433 numa marca de outro
     // formato reservaria a caixa errada durante o carregamento.
-    expect(html).not.toContain('width="1600"')
+    expect(html).not.toContain('width="1390"')
   })
 
   it('perito sem logo volta para a arte embutida, com as dimensoes dela', () => {
     const html = renderToStaticMarkup(<Logo size="lg" perito={{ nome: 'Dinoel', logoUrl: undefined }} />)
 
     expect(html).toContain('alt="D&amp;R Perícia Trabalhista — Engenharia de Segurança e Higiene Ocupacional"')
-    expect(html).toContain('width="1600"')
+    expect(html).toContain('width="1390"')
   })
 
   it('logo em branco no cadastro nao vira src vazio', () => {
     const html = renderToStaticMarkup(<Logo size="lg" perito={{ nome: 'Dinoel', logoUrl: '   ' }} />)
 
     expect(html).not.toContain('src="   "')
-    expect(html).toContain('width="1600"')
+    expect(html).toContain('width="1390"')
   })
 })

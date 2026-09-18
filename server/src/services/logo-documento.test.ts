@@ -28,6 +28,7 @@ vi.mock('./armazenamento.js', () => ({
 
 const { htmlDoParecer } = await import('./documento-html.js')
 const { gerarDocx } = await import('./docx.js')
+const { LOGO_OFICIAL_DATA_URI } = await import('./logo-oficial.js')
 
 const comLogo = { ...perito, logoArquivo: 'minha-marca.png' } as Usuario
 
@@ -44,14 +45,15 @@ describe('logo do perito no documento', () => {
 
     expect(html).toContain(`<img class="logo-oficial" src="data:image/png;base64,${PNG.toString('base64')}"`)
     expect(html).toContain('alt="Logo de Dinoel Ribeiro da Silva"')
-    // A arte embutida e JPEG: se ela vazasse, apareceria aqui.
-    expect(html).not.toContain('src="data:image/jpeg;base64,')
+    // Os dois sao PNG agora, entao o MIME nao distingue: o vazamento da arte
+    // embutida se confere pelos bytes dela.
+    expect(html).not.toContain(LOGO_OFICIAL_DATA_URI)
   })
 
   it('o perito sem logo continua com a arte embutida do sistema', async () => {
     const html = await htmlDoParecer(periciaDeTeste(), [empresa], perito, 'Parecer')
 
-    expect(html).toContain('<img class="logo-oficial" src="data:image/jpeg;base64,')
+    expect(html).toContain(`<img class="logo-oficial" src="${LOGO_OFICIAL_DATA_URI}"`)
     expect(html).toContain('D&amp;R Perícia Trabalhista')
   })
 

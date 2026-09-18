@@ -11,13 +11,19 @@ import path from 'node:path'
 // sumiu do volume, continua com um cabeçalho válido em vez de um buraco.
 // ============================================================
 
-/** Arte embutida, usada apenas como fallback. */
-export const LOGO_OFICIAL_JPEG = readFileSync(
-  new URL('../../assets/logo-dr-oficial.jpeg', import.meta.url),
+/**
+ * Arte embutida, usada apenas como fallback.
+ *
+ * PNG com fundo transparente (server/scripts/tratar-logos-orgaos.ts), e não
+ * mais o JPEG: o JPEG carregava um retângulo branco que aparecia como
+ * "print colado" em qualquer fundo que não fosse branco (perito, 18/09).
+ */
+export const LOGO_OFICIAL_PNG = readFileSync(
+  new URL('../../assets/logo-dr-oficial.png', import.meta.url),
 )
 
 export const LOGO_OFICIAL_DATA_URI =
-  `data:image/jpeg;base64,${LOGO_OFICIAL_JPEG.toString('base64')}`
+  `data:image/png;base64,${LOGO_OFICIAL_PNG.toString('base64')}`
 
 export const LOGO_OFICIAL_ALT =
   'Logo oficial D&R Perícia Trabalhista — Engenharia de Segurança e Higiene Ocupacional'
@@ -86,10 +92,10 @@ async function dimensoes(dados: Buffer): Promise<{ largura?: number; altura?: nu
 
 /** A marca embutida, já medida. Fallback de todos os caminhos abaixo. */
 async function marcaPadrao(): Promise<MarcaDoDocumento> {
-  const { largura, altura } = await dimensoes(LOGO_OFICIAL_JPEG)
+  const { largura, altura } = await dimensoes(LOGO_OFICIAL_PNG)
   return {
-    dados: LOGO_OFICIAL_JPEG,
-    tipo: 'jpg',
+    dados: LOGO_OFICIAL_PNG,
+    tipo: 'png',
     dataUri: LOGO_OFICIAL_DATA_URI,
     ...encaixar(largura, altura),
     alt: LOGO_OFICIAL_ALT,
