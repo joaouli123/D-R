@@ -32,4 +32,15 @@ describe('responsavelDaPericia', () => {
 
     expect(responsavelDaPericia(pericia, [], criador)).toBeNull()
   })
+
+  it('trata a lista ainda ausente sem interromper a prévia', () => {
+    const criador = usuario('criador')
+    const pericia = { responsavelId: 'responsavel' } as Pericia
+
+    expect(responsavelDaPericia(
+      pericia,
+      undefined,
+      criador,
+    )).toBeNull()
+  })
 })
