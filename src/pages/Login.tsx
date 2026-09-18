@@ -89,9 +89,12 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="login-shell flex min-h-screen">
       {/* Painel esquerdo — identidade visual */}
-      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-brand-800 p-12 lg:flex">
+      <div
+        data-testid="login-brand-panel"
+        className="login-brand-panel relative hidden w-1/2 flex-col justify-between overflow-hidden bg-brand-800 p-12 lg:flex"
+      >
         <div
           className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-[0.70] grayscale"
           style={{ backgroundImage: `url(${loginBg})` }}
@@ -105,13 +108,11 @@ export default function Login() {
           }}
         />
         <div className="relative">
-          <Logo size="xl" invert showTagline />
+          <Logo size="xl" invert showTagline className="login-brand-logo" />
         </div>
 
-        {/* min-h-0 + overflow: são doze itens em três grupos, e numa tela
-            baixa o bloco rola em vez de empurrar o selo para fora. */}
-        <div className="relative my-6 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
-          <div className="space-y-2">
+        <div className="login-brand-content relative my-6 min-h-0 flex-1 space-y-5 pr-1">
+          <div className="login-brand-intro space-y-2">
             <h2 className="text-2xl font-bold leading-snug text-white">
               Precisão, fundamentação e praticidade
               <br />
@@ -123,10 +124,10 @@ export default function Login() {
             </p>
           </div>
 
-          <div className="space-y-4">
+          <div className="login-audiences space-y-4">
             {PUBLICOS.map(({ titulo, icone: Icone, itens, emDesenvolvimento }) => (
-              <section key={titulo}>
-                <h3 className="mb-1.5 flex flex-wrap items-center gap-2 text-[12px] font-bold uppercase tracking-wide text-brand-200">
+              <section key={titulo} className="login-audience-section">
+                <h3 className="login-audience-title mb-1.5 flex flex-wrap items-center gap-2 text-[12px] font-bold uppercase tracking-wide text-brand-200">
                   <Icone size={15} strokeWidth={2} aria-hidden="true" />
                   {titulo}
                   {emDesenvolvimento && (
@@ -139,7 +140,7 @@ export default function Login() {
                 </h3>
                 <ul
                   className={cn(
-                    'space-y-1 text-[13px] leading-snug',
+                    'login-audience-list space-y-1 text-[13px] leading-snug',
                     emDesenvolvimento ? 'text-white/50' : 'text-white/75',
                   )}
                 >
@@ -159,20 +160,23 @@ export default function Login() {
             ))}
           </div>
 
-          <p className="text-[12.5px] leading-relaxed text-white/60">
+          <p className="login-brand-footer text-[12.5px] leading-relaxed text-white/60">
             D&amp;R Perícia Trabalhista — tecnologia para trabalhar com mais agilidade, precisão
             e segurança.
           </p>
         </div>
 
         <div className="relative shrink-0">
-          <SeloCredenciado invert />
+          <SeloCredenciado invert className="login-credential-seal" />
         </div>
       </div>
 
       {/* Painel direito — formulário */}
-      <div className="flex w-full flex-col items-center justify-center bg-white px-6 py-12 lg:w-1/2">
-        <div className="w-full max-w-sm">
+      <div
+        data-testid="login-form-panel"
+        className="login-form-panel flex w-full flex-col items-center justify-center bg-white px-6 py-12 lg:w-1/2"
+      >
+        <div className="login-form-card w-full max-w-sm">
           <div className="mb-8 lg:hidden">
             <Logo size="lg" showTagline />
           </div>
