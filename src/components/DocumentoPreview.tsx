@@ -267,7 +267,6 @@ export function DocumentoPreview({
         {agentes.map((agente, indice) => {
           const apresentacao = montarApresentacaoAgente(agente)
           const identificado = agente.identificadoNaAtividade !== false
-          const conclusao = linhaConclusao(agente)
           return (
             <section key={agente.id} className="agente-bloco">
               {prefixo

@@ -11,6 +11,7 @@ import { gerarDocx } from '../services/docx.js'
 import { type TecnicoJson } from '../services/documento-comum.js'
 import { enviarDocumento } from '../services/email.js'
 import { concatenarPdf, gerarPdf } from '../services/pdf.js'
+import { idDoSignatario } from '../services/signatario-documento.js'
 import { mensagemPendencias, pendenciasVarredura } from '../services/varredura-normativa.js'
 
 // ============================================================
@@ -68,7 +69,9 @@ async function carregarContexto(id: string) {
       })
     : []
 
-  const perito = await prisma.usuario.findUnique({ where: { id: documento.criadoPorId } })
+  const perito = await prisma.usuario.findUnique({
+    where: { id: idDoSignatario(documento, pericia) },
+  })
 
   return { documento, pericia: pericia as PericiaCompleta | null, empresas, perito }
 }

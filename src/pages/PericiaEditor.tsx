@@ -96,6 +96,7 @@ import {
 } from '@/lib/participantes'
 import { intervaloDoPeriodo, periodoAvaliacaoEmpresa } from '@/lib/periodoAvaliacao'
 import { dadosAssinatura } from '@/lib/assinaturaDocumento'
+import { responsavelDaPericia } from '@/lib/responsavelPericia'
 import { comEmpresaVinculada, empresasLivres, opcoesDaLinha } from '@/lib/reclamadas'
 import { uid } from '@/lib/utils'
 import {
@@ -400,7 +401,7 @@ export default function PericiaEditor() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const toast = useToast()
-  const { usuario, empresas, pericias, salvarPericia, salvarDocumento, documentos } = useApp()
+  const { usuario, usuarios, empresas, pericias, salvarPericia, salvarDocumento, documentos } = useApp()
 
   const tipoDoc = (params.get('tipo') as 'parecer' | 'laudo') ?? 'parecer'
   // O cabeçalho chama de "novo" o documento que vai sair, não a perícia: é
@@ -2385,7 +2386,12 @@ export default function PericiaEditor() {
 
           <div className="overflow-x-auto rounded-xl bg-ink-100 p-4 lg:p-6">
             <FolhasA4>
-              <DocumentoPreview pericia={p} empresas={empresas} perito={usuario} titulo={tituloDocumento} />
+              <DocumentoPreview
+                pericia={p}
+                empresas={empresas}
+                perito={responsavelDaPericia(p, usuarios, usuario)}
+                titulo={tituloDocumento}
+              />
             </FolhasA4>
             {anexo && (
               <div className="mx-auto mt-4 max-w-[820px] rounded-lg border-2 border-dashed border-ink-300 bg-white px-6 py-8 text-center no-print">
