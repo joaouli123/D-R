@@ -3,6 +3,7 @@ import JSZip from 'jszip'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { PericiaCompleta } from '../mappers.js'
+import { agentesNr15DeRegressao, anexosNr15DeRegressao } from './conclusoes-nr15.fixture.js'
 import { empresa, periciaAmbasSoNr16, periciaDeTeste, periciaSoPericulosidade, perito } from './parecer.fixture.js'
 
 // Sem disco: `lerUpload` devolve um buffer vazio, o sharp falha e o
@@ -136,6 +137,21 @@ describe('parecer em DOCX', () => {
       expect(ultima).toContain('<w:gridSpan w:val="2"/>')
       expect(ultima).toMatch(/w:fill="EEF1F5"/)
       expect(ultima).toMatch(/<w:b\/>[\s\S]*?Conclusão: </)
+    }
+  })
+
+  it('mantém a conclusão dos Anexos 1 a 14 e 13-A somente no item 10', async () => {
+    const pericia = periciaDeTeste()
+    ;(pericia.tecnico as unknown as { agentes: unknown[] }).agentes = agentesNr15DeRegressao()
+
+    const texto = await textoDoDocx(pericia)
+    const inicioItem10 = texto.indexOf('10.1. NR-15')
+
+    expect(inicioItem10).toBeGreaterThan(0)
+    for (const anexo of anexosNr15DeRegressao) {
+      const conclusao = `Conclusão exclusiva ${anexo}.`
+      expect(texto.split(conclusao)).toHaveLength(2)
+      expect(texto.indexOf(conclusao)).toBeGreaterThan(inicioItem10)
     }
   })
 

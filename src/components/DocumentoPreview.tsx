@@ -286,7 +286,7 @@ export function DocumentoPreview({
                       (`quadrosDeAnalise`). No 7.2.x ela antecipava o desfecho e
                       saía repetida no mesmo documento (perito, 18/09). */}
                 </tbody>
-              </table> : conclusao && <table className="tabela-conclusao"><tbody>{conclusao}</tbody></table>}
+              </table> : null}
             </section>
           )
         })}

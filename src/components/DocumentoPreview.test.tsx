@@ -145,6 +145,12 @@ const pericia = {
   ],
 } satisfies Pericia
 
+const anexosNr15DeRegressao = [
+  'Anexo 1', 'Anexo 2', 'Anexo 3', 'Anexo 4', 'Anexo 5',
+  'Anexo 6', 'Anexo 7', 'Anexo 8', 'Anexo 9', 'Anexo 10',
+  'Anexo 11', 'Anexo 12', 'Anexo 13', 'Anexo 13-A', 'Anexo 14',
+] as const
+
 describe('DocumentoPreview', () => {
   it('abrevia a empresa na representação e apresenta ausência da parte reclamante em linha única', () => {
     const html = renderToStaticMarkup(
@@ -170,7 +176,7 @@ describe('DocumentoPreview', () => {
     expect(html).not.toContain('Recursos Humanos — Acme Serviços Industriais Ltda.')
   })
 
-  it('omite a tabela do agente não identificado e mantém sua conclusão individual', () => {
+  it('omite a conclusão do agente não identificado no item 7 e a mantém no item 10', () => {
     const html = renderToStaticMarkup(
       <DocumentoPreview
         pericia={{
@@ -189,13 +195,42 @@ describe('DocumentoPreview', () => {
       />,
     )
 
-    expect(html).toContain('Não foi constatada exposição habitual a agentes biológicos.')
+    expect(html.match(/Não foi constatada exposição habitual a agentes biológicos\./g)).toHaveLength(1)
     expect(html).not.toContain('<th>Propriedade</th><th>Informação</th>')
-    // Sem a tabela de propriedades, a conclusão vira uma tabela de uma linha
-    // só — o mesmo destaque cinza-azulado dos agentes identificados.
-    expect(html).toMatch(
-      /Agentes biológicos[\s\S]*?<table class="tabela-conclusao"><tbody><tr class="conclusao-agente"><td colSpan="2"><strong>Conclusão:<\/strong> Não foi constatada exposição habitual a agentes biológicos\.<\/td><\/tr><\/tbody><\/table>/,
+    const inicioItem10 = html.indexOf('10.1. NR-15')
+    expect(inicioItem10).toBeGreaterThan(0)
+    expect(html.indexOf('Não foi constatada exposição habitual a agentes biológicos.')).toBeGreaterThan(inicioItem10)
+  })
+
+  it('mantém a conclusão dos Anexos 1 a 14 e 13-A somente no item 10', () => {
+    const agentes = anexosNr15DeRegressao.map((anexo, indice) => ({
+      id: `agente-regressao-${indice + 1}`,
+      nome: `Agente de regressão ${anexo}`,
+      tipo: (['fisico', 'quimico', 'biologico'] as const)[indice % 3],
+      anexoNr15: anexo,
+      criterio: 'qualitativo' as const,
+      identificadoNaAtividade: indice % 2 === 0,
+      observacao: `Conclusão exclusiva ${anexo}.`,
+    }))
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={{
+          ...pericia,
+          modalidade: 'insalubridade',
+          tecnico: { ...pericia.tecnico, agentes },
+        }}
+        empresas={[]}
+        titulo="Parecer de teste"
+      />,
     )
+    const inicioItem10 = html.indexOf('10.1. NR-15')
+
+    expect(inicioItem10).toBeGreaterThan(0)
+    for (const anexo of anexosNr15DeRegressao) {
+      const conclusao = `Conclusão exclusiva ${anexo}.`
+      expect(html.split(conclusao)).toHaveLength(2)
+      expect(html.indexOf(conclusao)).toBeGreaterThan(inicioItem10)
+    }
   })
 
   it('fecha a tabela de cada agente identificado com a linha da conclusão', () => {

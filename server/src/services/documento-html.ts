@@ -559,13 +559,12 @@ export async function htmlDoParecer(
     // o que foi avaliado; repetir ali o desfecho antecipava a conclusão e saía
     // duas vezes no mesmo documento (perito, 18/09).
     //
-    // O agente NÃO identificado é a exceção: ele não tem tabela de dados, e a
-    // linha é a própria declaração de que o agente não foi encontrado na
-    // atividade. Sem ela, o item 7 ficaria com o título pendurado sozinho.
     if (agente.identificadoNaAtividade !== false) {
       return tabelaLinhasAgente(linhas, true, opcoes.comConclusao ? conclusao : '')
     }
-    return conclusao ? `<table class="tabela-conclusao"><tbody>${conclusao}</tbody></table>` : ''
+    return opcoes.comConclusao && conclusao
+      ? `<table class="tabela-conclusao"><tbody>${conclusao}</tbody></table>`
+      : ''
   }
 
   const tabelaAgentes = (lista: typeof agentes, prefixo?: string) => lista.length

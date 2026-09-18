@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { PericiaCompleta } from '../mappers.js'
+import { agentesNr15DeRegressao, anexosNr15DeRegressao } from './conclusoes-nr15.fixture.js'
 import { empresa, periciaAmbasSoNr16, periciaDeTeste, periciaSoPericulosidade, perito } from './parecer.fixture.js'
 
 // O renderizador carrega o armazenamento sob demanda, só quando há foto para
@@ -133,7 +134,7 @@ describe('parecer em HTML (motor do PDF)', () => {
     expect(item10).toContain(linha)
   })
 
-  it('imprime a conclusão de agente não identificado numa tabela de uma linha', async () => {
+  it('imprime a conclusão de agente não identificado somente no item 10', async () => {
     const pericia = periciaDeTeste()
     Object.assign((pericia.tecnico as unknown as { agentes: object[] }).agentes[0]!, {
       identificadoNaAtividade: false,
@@ -142,9 +143,23 @@ describe('parecer em HTML (motor do PDF)', () => {
 
     const html = await gerar(pericia)
 
-    expect(html).toContain(
-      '<table class="tabela-conclusao"><tbody><tr class="conclusao-agente"><td colspan="2"><strong>Conclusão:</strong> Agente não identificado na atividade.</td></tr></tbody></table>',
-    )
+    expect(html.split('Agente não identificado na atividade.')).toHaveLength(2)
+    expect(html.indexOf('Agente não identificado na atividade.')).toBeGreaterThan(html.indexOf('10.1. NR-15'))
+  })
+
+  it('mantém a conclusão dos Anexos 1 a 14 e 13-A somente no item 10', async () => {
+    const pericia = periciaDeTeste()
+    ;(pericia.tecnico as unknown as { agentes: unknown[] }).agentes = agentesNr15DeRegressao()
+
+    const html = await gerar(pericia)
+    const inicioItem10 = html.indexOf('10.1. NR-15')
+
+    expect(inicioItem10).toBeGreaterThan(0)
+    for (const anexo of anexosNr15DeRegressao) {
+      const conclusao = `Conclusão exclusiva ${anexo}.`
+      expect(html.split(conclusao)).toHaveLength(2)
+      expect(html.indexOf(conclusao)).toBeGreaterThan(inicioItem10)
+    }
   })
 
   it('tira da seção de EPIs os agentes que a modalidade excluiu', async () => {

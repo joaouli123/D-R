@@ -906,10 +906,9 @@ async function docParecer(
   /**
    * A tabela do agente. A conclusão fecha a tabela SÓ no item 10
    * (`comConclusao`): no 7.2.x ela antecipava o desfecho e saía repetida no
-   * mesmo documento (perito, 18/09). Agente não identificado não tem tabela: a
-   * linha sai sozinha e permanece nos dois itens, porque ali ela é a própria
-   * declaração de que o agente não foi encontrado na atividade — sem ela, o
-   * título ficaria pendurado sozinho. Espelha `quadroDoAgente` do PDF.
+   * mesmo documento (perito, 18/09). Agente não identificado não tem tabela
+   * descritiva: sua conclusão sai somente no item 10, como as demais.
+   * Espelha `quadroDoAgente` do PDF.
    */
   const quadroDoAgente = (
     agente: (typeof agentes)[number],
@@ -920,7 +919,9 @@ async function docParecer(
       ? [linhaConclusaoAgente(agente.observacao ?? '')]
       : []
     if (agente.identificadoNaAtividade === false) {
-      return conclusaoDoAgente.length ? [tabela(conclusaoDoAgente)] : []
+      return opcoes.comConclusao && conclusaoDoAgente.length
+        ? [tabela(conclusaoDoAgente)]
+        : []
     }
     const conclusao = opcoes.comConclusao ? conclusaoDoAgente : []
     return [tabela([
