@@ -30,33 +30,46 @@
   .section-title {
     @apply text-[15px] font-bold text-navy-700 uppercase tracking-wide;
   }
-  /* Folha de documento (preview A4) */
+  /* Folha de documento (preview A4). Corpo nas regras da ABNT (NBR 14724):
+     12pt, entrelinha 1,5 e recuo de 1,25cm. Os vãos são os do PDF
+     (server/src/services/documento-html.ts): a prévia é paginada com eles, e
+     a quebra de folha só bate se as alturas forem as mesmas. */
   .doc-sheet {
-    @apply bg-white text-ink-900 leading-relaxed;
+    @apply bg-white text-ink-900;
     font-family: Arial, sans-serif;
-    font-size: 11pt;
+    font-size: 12pt;
+    line-height: 1.5;
     text-align: justify;
   }
   .doc-sheet h1 {
-    @apply font-bold text-center uppercase mb-4 pb-1.5 border-b-2;
+    @apply font-bold text-center uppercase mb-3 pb-1.5 border-b-2;
     font-size: 18pt;
     color: #2c3e50;
     border-color: #2c3e50;
   }
   .doc-sheet h2 {
-    @apply font-bold mt-6 mb-2 uppercase;
+    @apply font-bold mt-4 mb-[7px] uppercase;
     font-size: 14pt;
     text-align: left;
     color: #2c3e50;
   }
   .doc-sheet h3 {
-    @apply font-bold mt-4 mb-1;
-    font-size: 11pt;
+    @apply font-bold mt-3 mb-1;
+    font-size: 12pt;
     text-align: left;
     color: #2c3e50;
   }
+  /* Subitem de terceiro nível (4.1.1., 5.2.1.): sem esta regra o reset do
+     Tailwind o deixava com cara de parágrafo comum. */
+  .doc-sheet h4 {
+    @apply font-bold;
+    margin: 10px 0 4px;
+    text-align: left;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
   .doc-sheet p {
-    @apply mb-3;
+    @apply mb-2;
     text-indent: 1.25cm;
   }
   .doc-sheet p.no-indent {
@@ -88,7 +101,7 @@
     @apply mb-1 italic;
   }
   .doc-sheet table {
-    @apply w-full border-collapse my-3 text-[10pt];
+    @apply w-full border-collapse my-2.5 text-[10pt];
   }
   /* Ficha das partes da capa: mesmo vão e mesma largura de rótulo do PDF
      (.parecer-manual .ficha-processual) e do DOCX (COLUNAS_FICHA). */
@@ -100,19 +113,23 @@
   }
   .doc-sheet th,
   .doc-sheet td {
-    @apply border border-ink-400 px-2 py-1 align-top text-left;
+    @apply border border-ink-400 align-top text-left;
+    padding: 6px 9px;
     text-indent: 0;
   }
   .doc-sheet th {
     @apply bg-ink-100 font-bold;
   }
+  /* O bloco do agente pode atravessar a folha, como no PDF: o título desce
+     junto com o começo da ficha (break-after do h3), e a ficha continua na
+     folha seguinte com o cabeçalho repetido. */
   .doc-sheet .agente-bloco {
     @apply mb-4;
-    break-inside: avoid;
-    page-break-inside: avoid;
   }
   .doc-sheet .agente-bloco > h3 {
     @apply mt-3 mb-1.5 pb-1 border-b border-ink-300;
+    break-after: avoid;
+    page-break-after: avoid;
   }
   .doc-sheet .agente-bloco table {
     @apply my-0;
@@ -141,16 +158,19 @@
   .doc-sheet tr.conclusao-agente strong {
     color: #2c3e50;
   }
-  /* Folha de rosto: o espaço que desce a identificação das partes (no PDF é
-     elástico, até 62 mm) e a marca de onde começa a folha 2. */
+  /* Logo do perito no cabeçalho: uma arte alta demais não come a folha. */
+  .doc-sheet header img {
+    max-height: 32mm;
+  }
+  /* Folha de rosto: termina a folha 1, e o item 1 abre a folha 2. O espaço
+     que desce a identificação das partes é elástico dentro da folha (até
+     62 mm, como no PDF); fora dela, fica fixo. */
+  .doc-sheet .capa {
+    break-after: page;
+    page-break-after: always;
+  }
   .doc-sheet .espaco-capa {
     height: 48mm;
-  }
-  .doc-sheet .quebra-folha {
-    @apply relative my-10 border-t border-dashed border-ink-300;
-  }
-  .doc-sheet .quebra-folha span {
-    @apply absolute left-1/2 -top-2.5 -translate-x-1/2 bg-white px-2 text-[9pt] text-ink-400;
   }
   /* Fecho: data e assinatura num bloco só, que ao descer de folha leva junto
      o último parágrafo. Mesmos vãos de .fecho, .local-data e .assinatura em
@@ -183,6 +203,90 @@
   .doc-sheet .assinatura .traco p {
     @apply mb-0;
   }
+
+  /* ---------- Prévia em folhas A4 (src/components/FolhasA4.tsx) ----------
+     Cada folha tem 210 x 297 mm e as margens da ABNT: 3 cm em cima e à
+     esquerda, 2 cm embaixo e à direita — 160 x 247 mm de área útil, a mesma
+     do PDF. O rodapé fica na margem de baixo, como no PDF. */
+  .folhas-a4__folhas {
+    @apply flex flex-col items-center gap-6;
+    width: 210mm;
+    margin: 0 auto;
+    transform-origin: top left;
+  }
+  .folha-a4 {
+    @apply relative shadow-card;
+    width: 210mm;
+    min-height: 297mm;
+    padding: 30mm 20mm 20mm 30mm;
+    box-sizing: border-box;
+    background: #fff;
+  }
+  .folha-a4__corpo {
+    min-height: 247mm;
+  }
+  .folha-a4__rodape {
+    position: absolute;
+    left: 30mm;
+    right: 20mm;
+    bottom: 10mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    font-family: Arial, sans-serif;
+    font-size: 8pt;
+    line-height: 1.2;
+    color: #656155;
+  }
+  /* O que continua da folha anterior não repete recuo, marcador nem vão. */
+  .folha-a4__corpo p.continuacao {
+    text-indent: 0;
+  }
+  .folha-a4__corpo p.item-lista.continuacao::before {
+    content: none;
+  }
+  .folha-a4__corpo li.continuacao {
+    list-style: none;
+  }
+  .folha-a4__corpo > :first-child,
+  .folha-a4__corpo > .continuacao:first-child > :first-child,
+  .folha-a4__corpo table.continuacao {
+    margin-top: 0;
+  }
+  /* A folha de rosto ocupa a folha 1 inteira, e o espaço antes da
+     identificação estica ou encolhe conforme o tamanho da apresentação. */
+  .folha-a4__corpo > .capa {
+    display: flex;
+    flex-direction: column;
+    min-height: 241mm;
+  }
+  .folha-a4__corpo > .capa > * {
+    flex: none;
+  }
+  .folha-a4__corpo > .capa > .espaco-capa {
+    flex: 1 1 auto;
+    height: auto;
+    max-height: 62mm;
+  }
+  .folha-a4__corpo > .capa.continuacao {
+    min-height: 0;
+  }
+  /* Antes de paginar (e se não houver como medir), o documento aparece
+     corrido: a linha tracejada marca onde a folha de rosto termina. */
+  .folhas-a4__fonte .capa {
+    @apply mb-8 border-b border-dashed border-ink-300 pb-8;
+  }
+}
+
+/* Na tela, ou o documento corrido ou as folhas — nunca os dois. */
+.folhas-a4:not(.paginado) > .folhas-a4__janela {
+  display: none;
+}
+@media screen {
+  .folhas-a4.paginado > .folhas-a4__fonte {
+    display: none;
+  }
 }
 
 /* Scrollbar discreta */
@@ -210,11 +314,21 @@
     margin: 0 !important;
     padding: 0 !important;
   }
-  .doc-sheet .agente-bloco { break-inside: avoid; page-break-inside: avoid; }
-  .doc-sheet .quebra-folha { border: 0; margin: 0; break-after: page; page-break-after: always; }
-  .doc-sheet .quebra-folha span { display: none; }
+  /* Na impressão quem pagina é o navegador, com as margens da ABNT: sai o
+     documento de origem, não as folhas montadas para a tela. */
+  .folhas-a4__janela {
+    display: none !important;
+  }
+  .folhas-a4__fonte {
+    display: block !important;
+  }
+  .folhas-a4__fonte .capa {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
   @page {
     size: A4;
-    margin: 2.5cm 2cm 2cm 3cm;
+    margin: 3cm 2cm 2cm 3cm;
   }
 }

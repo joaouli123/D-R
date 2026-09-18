@@ -697,10 +697,12 @@ async function main() {
     )
   }
 
-  assert.equal(
-    saidasVisuais.find((saida) => saida.nome === 'impugnacao')?.paginasPdf,
-    1,
-    'a assinatura da impugnação não deve ficar órfã em uma segunda página',
+  // Com o corpo da ABNT (12pt, entrelinha 1,5) a impugnação de teste não cabe
+  // mais numa folha: o requerimento desce para a folha 2 com a assinatura
+  // (o .fecho não se parte e leva o último parágrafo — checado no CSS mais abaixo).
+  assert.ok(
+    (saidasVisuais.find((saida) => saida.nome === 'impugnacao')?.paginasPdf ?? Infinity) <= 2,
+    'a impugnação curta de teste deve caber em duas folhas',
   )
   assert.ok(
     (saidasVisuais.find((saida) => saida.nome === 'parecer')?.paginasPdf ?? Infinity) <= 15,
@@ -865,7 +867,9 @@ async function main() {
   assert.match(htmlParecer, /font-family: Arial, sans-serif/)
   assert.match(htmlParecer, /h1 \{[^}]*font-size: 18pt/s)
   assert.match(htmlParecer, /h2 \{[^}]*font-size: 14pt/s)
-  assert.match(htmlParecer, /body \{[\s\S]*font-size: 11pt/)
+  // Corpo e margens da ABNT (NBR 14724).
+  assert.match(htmlParecer, /body \{[^}]*font-size: 12pt;[^}]*line-height: 1\.5;/s)
+  assert.match(htmlParecer, /@page \{ size: A4; margin: 3cm 2cm 2cm 3cm; \}/)
   assert.match(htmlParecer, /table \{[\s\S]*font-size: 10pt/)
   assert.match(
     htmlParecer,

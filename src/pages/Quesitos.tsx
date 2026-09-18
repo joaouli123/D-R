@@ -27,6 +27,7 @@ import {
 } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { Logo } from '@/components/Logo'
+import { FolhasA4 } from '@/components/FolhasA4'
 import { FechoDoDocumento } from '@/components/FechoDoDocumento'
 import { useApp } from '@/store/AppStore'
 import * as api from '@/services/api'
@@ -544,58 +545,60 @@ export default function Quesitos() {
           </div>
 
           <div className="overflow-x-auto rounded-xl bg-ink-100 p-4 lg:p-6">
-            <article className="doc-sheet mx-auto w-full max-w-[820px] bg-white px-10 py-12 shadow-card print-area sm:px-14">
-              <header className="mb-10 border-b-2 border-brand-700 pb-5 text-center">
-                <Logo size="lg" perito={usuario} />
-                <p className="mt-3 text-[9pt] font-bold uppercase tracking-[0.2em] text-navy-600">
-                  Plataforma Inteligente de Perícia Trabalhista
-                </p>
-              </header>
-
-              <h1>Quesitos Técnicos</h1>
-
-              {pericia && (
-                <table>
-                  <tbody>
-                    <tr>
-                      <th className="w-[30%]">Processo nº</th>
-                      <td>{pericia.numeroProcesso}</td>
-                    </tr>
-                    <tr>
-                      <th>Vara</th>
-                      <td>{pericia.vara}</td>
-                    </tr>
-                    <tr>
-                      <th>Reclamante</th>
-                      <td>{pericia.reclamante}</td>
-                    </tr>
-                    <tr>
-                      <th>Reclamada</th>
-                      <td>{empresa?.razaoSocial ?? '—'}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              )}
-
-              <h2>Quesitos e Respostas</h2>
-              {selecionados.map((s, i) => (
-                <div key={s.quesitoId} className="mb-5">
-                  <p className="no-indent font-bold">
-                    {i + 1}. {s.pergunta}
+            <FolhasA4>
+              <article className="doc-sheet mx-auto w-full max-w-[820px] bg-white px-10 py-12 shadow-card print-area sm:px-14">
+                <header className="mb-10 border-b-2 border-brand-700 pb-5 text-center">
+                  <Logo size="lg" perito={usuario} />
+                  <p className="mt-3 text-[9pt] font-bold uppercase tracking-[0.2em] text-navy-600">
+                    Plataforma Inteligente de Perícia Trabalhista
                   </p>
-                  <p className="mt-1">
-                    <strong>Resposta: </strong>
-                    {s.resposta || '[resposta não preenchida]'}
-                  </p>
-                </div>
-              ))}
+                </header>
 
-              <FechoDoDocumento
-                cidade={pericia?.comarca ?? 'São Paulo/SP'}
-                data={new Date().toISOString().slice(0, 10)}
-                perito={usuario}
-              />
-            </article>
+                <h1>Quesitos Técnicos</h1>
+
+                {pericia && (
+                  <table>
+                    <tbody>
+                      <tr>
+                        <th className="w-[30%]">Processo nº</th>
+                        <td>{pericia.numeroProcesso}</td>
+                      </tr>
+                      <tr>
+                        <th>Vara</th>
+                        <td>{pericia.vara}</td>
+                      </tr>
+                      <tr>
+                        <th>Reclamante</th>
+                        <td>{pericia.reclamante}</td>
+                      </tr>
+                      <tr>
+                        <th>Reclamada</th>
+                        <td>{empresa?.razaoSocial ?? '—'}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                )}
+
+                <h2>Quesitos e Respostas</h2>
+                {selecionados.map((s, i) => (
+                  <div key={s.quesitoId} className="mb-5">
+                    <p className="no-indent font-bold">
+                      {i + 1}. {s.pergunta}
+                    </p>
+                    <p className="mt-1">
+                      <strong>Resposta: </strong>
+                      {s.resposta || '[resposta não preenchida]'}
+                    </p>
+                  </div>
+                ))}
+
+                <FechoDoDocumento
+                  cidade={pericia?.comarca ?? 'São Paulo/SP'}
+                  data={new Date().toISOString().slice(0, 10)}
+                  perito={usuario}
+                />
+              </article>
+            </FolhasA4>
           </div>
         </div>
       )}

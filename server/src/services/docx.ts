@@ -69,7 +69,10 @@ import { exibirQuadroVarredura, normalizarVarredura, type AnexoVarreduraDocument
 // ============================================================
 
 const FONTE = 'Arial'
-const CORPO = 22 // meio-pontos → 11pt
+// Corpo nas regras da ABNT (NBR 14724): 12pt com entrelinha 1,5 (360 =
+// 1,5 × 240 no Word). O PDF e a prévia usam as mesmas medidas.
+const CORPO = 24 // meio-pontos → 12pt
+const ENTRELINHA = 360
 const RECUO_PRIMEIRA_LINHA = 709 // 1,25cm em twips
 // Listas da matriz do perito: marcador em 1,25cm e texto em 2,25cm.
 // O deslocamento (hanging) e a diferenca entre os dois, 1cm.
@@ -107,7 +110,7 @@ const p = (t: string, manterComProximo = false) =>
     alignment: AlignmentType.JUSTIFIED,
     indent: { firstLine: RECUO_PRIMEIRA_LINHA },
     keepNext: manterComProximo,
-    spacing: { after: 120, line: 340 },
+    spacing: { after: 120, line: ENTRELINHA },
     children: [texto(t)],
   })
 
@@ -121,7 +124,7 @@ const pItem = (t: string, manterComProximo = false) =>
     alignment: AlignmentType.LEFT,
     numbering: { reference: REFERENCIA_LISTA, level: 0 },
     keepNext: manterComProximo,
-    spacing: { after: 40, line: 340 },
+    spacing: { after: 40, line: ENTRELINHA },
     children: [texto(t)],
   })
 
@@ -131,7 +134,7 @@ const pItemSemMarcador = (t: string, manterComProximo = false) =>
     alignment: AlignmentType.LEFT,
     indent: { left: RECUO_PRIMEIRA_LINHA },
     keepNext: manterComProximo,
-    spacing: { after: 40, line: 340 },
+    spacing: { after: 40, line: ENTRELINHA },
     children: [texto(t)],
   })
 
@@ -151,7 +154,7 @@ const pSemRecuo = (t: string, negrito = false, manterComProximo = false) =>
   new Paragraph({
     alignment: AlignmentType.JUSTIFIED,
     keepNext: manterComProximo,
-    spacing: { after: 120, line: 340 },
+    spacing: { after: 120, line: ENTRELINHA },
     children: [texto(t, { negrito })],
   })
 
@@ -207,7 +210,7 @@ const h4 = (t: string) =>
     keepNext: true,
     keepLines: true,
     spacing: { before: 180, after: 80 },
-    children: [texto(t, { negrito: true, tamanho: 20, cor: MARCA.documentoSecao })],
+    children: [texto(t, { negrito: true, tamanho: CORPO, cor: MARCA.documentoSecao })],
   })
 
 const blocos = (t?: string | null): Paragraph[] => {
@@ -226,7 +229,7 @@ const blocosTranscricao = (t?: string | null): Paragraph[] => {
   return linhas.map((linha, indice) => new Paragraph({
     alignment: AlignmentType.JUSTIFIED,
     indent: { firstLine: RECUO_PRIMEIRA_LINHA },
-    spacing: { after: 60, line: 340 },
+    spacing: { after: 60, line: ENTRELINHA },
     children: [texto(
       `${indice === 0 ? '“' : ''}${linha}${indice === linhas.length - 1 ? '”' : ''}`,
       { italico: true },
@@ -544,7 +547,7 @@ const enderecamentoDoParecer = (
     (linha, indice) =>
       new Paragraph({
         alignment: AlignmentType.JUSTIFIED,
-        spacing: { after: indice === linhas.length - 1 ? 290 : 80, line: 340 },
+        spacing: { after: indice === linhas.length - 1 ? 290 : 80, line: ENTRELINHA },
         children: [texto(linha, { negrito: true })],
       }),
   )
@@ -634,9 +637,11 @@ function montarDocumento(filhos: (Paragraph | Table)[], marca: MarcaDoDocumento)
       {
         properties: {
           page: {
-            // A4 com as margens do modelo em Word do contratante.
+            // A4 com as margens da ABNT (NBR 14724): 3cm em cima e à
+            // esquerda, 2cm embaixo e à direita — as mesmas do PDF. O rodapé
+            // fica a 1cm da borda, dentro da margem de baixo.
             size: { width: 11906, height: 16838 },
-            margin: { top: 1417, right: 1134, bottom: 1701, left: 1701 },
+            margin: { top: 1701, right: 1134, bottom: 1134, left: 1701, footer: 567 },
           },
         },
         footers: { default: rodape() },
@@ -649,7 +654,7 @@ function montarDocumento(filhos: (Paragraph | Table)[], marca: MarcaDoDocumento)
 // ---------------- parecer / laudo ----------------
 
 /** Altura útil da folha A4 com as margens de `montarDocumento`, em twips. */
-const ALTURA_UTIL_TWIPS = 16838 - 1417 - 1701
+const ALTURA_UTIL_TWIPS = 16838 - 1701 - 1134
 
 /** Teto do espaço acima da identificação na capa: ~6,2cm, o `max-height` do `.espaco-capa` no PDF. */
 const ESPACO_MAXIMO_CAPA = 3515
@@ -667,11 +672,11 @@ const linhasDe = (textoLinha: string, porLinha: number) => Math.max(1, Math.ceil
  * capa transbordasse, o item 1 — que abre folha nova — iria para a folha 3.
  */
 function espacoDaCapa(pericia: PericiaCompleta, marca: MarcaDoDocumento, fichas: string[], titulo: string): number {
-  const LINHA_CORPO = 360 // 11pt com o entrelinhas 340 do corpo
+  const LINHA_CORPO = 414 // 12pt com a entrelinha 1,5 do corpo
   const logo = marca.altura * 15 + 380
   const enderecamentoCapa = linhasDe(
     `EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA ${[pericia.vara, pericia.comarca].filter(Boolean).join(' — ')}`,
-    58,
+    53,
   ) * LINHA_CORPO + 290
   const subtitulos = 2 * 600
   const ficha = fichas.reduce((total, valor) => total + 140 + linhasDe(valor, 52) * 250, 0)
@@ -681,7 +686,7 @@ function espacoDaCapa(pericia: PericiaCompleta, marca: MarcaDoDocumento, fichas:
     .split('\n')
     .map((linha) => linha.trim())
     .filter(Boolean)
-    .reduce((total, linha) => total + linhasDe(linha, 78) * LINHA_CORPO + 120, 0)
+    .reduce((total, linha) => total + linhasDe(linha, 71) * LINHA_CORPO + 120, 0)
   const folga = 700
   const livre = ALTURA_UTIL_TWIPS - (logo + enderecamentoCapa + subtitulos + ficha + tituloCapa + apresentacao + folga)
   return Math.max(220, Math.min(ESPACO_MAXIMO_CAPA, livre))
@@ -1132,7 +1137,7 @@ function docQuesitos(
           indent: { firstLine: RECUO_PRIMEIRA_LINHA },
           // A última resposta desce junto com o fecho, se ele mudar de folha.
           keepNext: i === itens.length - 1,
-          spacing: { after: 200, line: 340 },
+          spacing: { after: 200, line: ENTRELINHA },
           children: [
             texto('Resposta: ', { negrito: true }),
             texto(q.resposta || '[resposta não preenchida]'),
@@ -1225,13 +1230,13 @@ function docEsclarecimento(
         new Paragraph({
           alignment: AlignmentType.JUSTIFIED,
           indent: { firstLine: RECUO_PRIMEIRA_LINHA },
-          spacing: { after: 120, line: 340 },
+          spacing: { after: 120, line: ENTRELINHA },
           children: [texto(pt.questionamento || '[questionamento não informado]', { italico: true })],
         }),
         new Paragraph({
           alignment: AlignmentType.JUSTIFIED,
           indent: { firstLine: RECUO_PRIMEIRA_LINHA },
-          spacing: { after: 200, line: 340 },
+          spacing: { after: 200, line: ENTRELINHA },
           children: [
             texto('Esclarecimento: ', { negrito: true }),
             texto(pt.resposta || '[esclarecimento não preenchido]'),

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import logoOficial from '@/assets/logo-dr-oficial.jpeg'
 
@@ -43,7 +44,13 @@ export function Logo({
     xl: 'w-[520px]',
   }
 
-  const propria = perito?.logoUrl?.trim()
+  // Logo do perito que não carrega (link expirado, arquivo removido do volume)
+  // cai na arte padrão em vez de deixar o ícone de imagem quebrada no
+  // documento. Guarda a URL que falhou: se o perito trocar a logo, a nova é
+  // tentada de novo.
+  const [falhou, setFalhou] = useState<string | null>(null)
+  const informada = perito?.logoUrl?.trim()
+  const propria = informada && informada !== falhou ? informada : undefined
   const alt = propria
     ? `Logo de ${perito?.nome?.trim() || 'perito responsável'}`
     : LOGO_PADRAO_ALT
@@ -54,6 +61,7 @@ export function Logo({
         src={propria || logoOficial}
         alt={alt}
         {...(propria ? {} : { width: 1600, height: 549 })}
+        onError={propria ? () => setFalhou(propria) : undefined}
         className="h-auto w-full max-w-full object-contain"
       />
     </div>

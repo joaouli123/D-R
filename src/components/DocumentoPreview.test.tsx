@@ -615,10 +615,13 @@ describe('DocumentoPreview', () => {
     // O vão da folha de rosto fica entre o endereçamento e a identificação…
     expect(html.indexOf('EXCELENTÍSSIMO')).toBeLessThan(html.indexOf('espaco-capa'))
     expect(html.indexOf('espaco-capa')).toBeLessThan(html.indexOf('IDENTIFICAÇÃO DAS PARTES'))
-    // …e a marca de folha nova vem logo antes do item 1 (no print ela vira
-    // quebra de página de verdade).
-    expect(html).toMatch(/<div class="quebra-folha" aria-hidden="true"><span>Folha 2<\/span><\/div><h2 class="mt-0">1\. Objeto da Perícia/)
-    expect(html.match(/quebra-folha/g)?.length).toBe(1)
+    // …e a folha de rosto é um bloco só, da marca à apresentação, que termina
+    // a folha (break-after no CSS): o item 1 vem logo depois dela.
+    expect(html).toMatch(/^<article[^>]*><section class="capa"><header class="marca-oficial/)
+    expect(html).toMatch(/<\/section><h2 class="mt-0">1\. Objeto da Perícia/)
+    expect(html.indexOf('APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA')).toBeLessThan(html.indexOf('</section>'))
+    expect(html.match(/<section class="capa">/g)?.length).toBe(1)
+    expect(html).not.toContain('quebra-folha')
   })
 
   it('fecha o parecer com data e assinatura num bloco só, com respiro maior', () => {

@@ -38,6 +38,7 @@ import { BibliotecaDrawer } from '@/components/BibliotecaDrawer'
 import { BuscaProcesso } from '@/components/BuscaProcesso'
 import type { OrigemConsulta } from '@/components/BuscaCnpj'
 import { DocumentoPreview } from '@/components/DocumentoPreview'
+import { FolhasA4 } from '@/components/FolhasA4'
 import { AgenteNr15Fields } from '@/components/AgenteNr15Fields'
 import { PericulosidadeNr16Fields } from '@/components/PericulosidadeNr16Fields'
 import {
@@ -2383,7 +2384,9 @@ export default function PericiaEditor() {
           </div>
 
           <div className="overflow-x-auto rounded-xl bg-ink-100 p-4 lg:p-6">
-            <DocumentoPreview pericia={p} empresas={empresas} perito={usuario} titulo={tituloDocumento} />
+            <FolhasA4>
+              <DocumentoPreview pericia={p} empresas={empresas} perito={usuario} titulo={tituloDocumento} />
+            </FolhasA4>
             {anexo && (
               <div className="mx-auto mt-4 max-w-[820px] rounded-lg border-2 border-dashed border-ink-300 bg-white px-6 py-8 text-center no-print">
                 <Paperclip size={20} className="mx-auto mb-2 text-ink-400" />

@@ -25,6 +25,7 @@ import {
 } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { Logo } from '@/components/Logo'
+import { FolhasA4 } from '@/components/FolhasA4'
 import { FechoDoDocumento } from '@/components/FechoDoDocumento'
 import { useApp } from '@/store/AppStore'
 import * as api from '@/services/api'
@@ -378,79 +379,81 @@ export default function Manifestacao() {
             </div>
           </div>
 
-          {/* Preview — folha única */}
+          {/* Preview em folhas A4 */}
           <div className="overflow-x-auto rounded-xl bg-ink-100 p-4 lg:p-6">
-            <article className="doc-sheet mx-auto w-full max-w-[820px] bg-white px-10 py-12 shadow-card print-area sm:px-14">
-              <header className="mb-8 border-b-2 border-brand-700 pb-5 text-center">
-                <Logo size="lg" perito={usuario} />
-                <p className="mt-3 text-[9pt] font-bold uppercase tracking-[0.2em] text-navy-600">
-                  Plataforma Inteligente de Perícia Trabalhista
-                </p>
-              </header>
-
-              <h1>{modelo.titulo}</h1>
-
-              {pericia && (
-                <>
-                  <p className="no-indent font-bold">
-                    EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO
+            <FolhasA4>
+              <article className="doc-sheet mx-auto w-full max-w-[820px] bg-white px-10 py-12 shadow-card print-area sm:px-14">
+                <header className="mb-8 border-b-2 border-brand-700 pb-5 text-center">
+                  <Logo size="lg" perito={usuario} />
+                  <p className="mt-3 text-[9pt] font-bold uppercase tracking-[0.2em] text-navy-600">
+                    Plataforma Inteligente de Perícia Trabalhista
                   </p>
-                  <p className="no-indent mb-5 font-bold uppercase">{pericia.vara}</p>
+                </header>
 
-                  <table>
-                    <tbody>
-                      <tr>
-                        <th className="w-[30%]">Processo nº</th>
-                        <td>{pericia.numeroProcesso}</td>
-                      </tr>
-                      <tr>
-                        <th>Reclamante</th>
-                        <td>{pericia.reclamante}</td>
-                      </tr>
-                      <tr>
-                        <th>Reclamada</th>
-                        <td>{empresa?.razaoSocial ?? '—'}</td>
-                      </tr>
-                      <tr>
-                        <th>Agente objeto</th>
-                        <td>{AGENTES_MANIFESTACAO.find((a) => a.value === modelo.agente)?.label}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </>
-              )}
+                <h1>{modelo.titulo}</h1>
 
-              <h2>I — Fundamentação Técnica</h2>
-              <p>{modelo.fundamentacao}</p>
+                {pericia && (
+                  <>
+                    <p className="no-indent font-bold">
+                      EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO
+                    </p>
+                    <p className="no-indent mb-5 font-bold uppercase">{pericia.vara}</p>
 
-              <h2>
-                II —{' '}
-                {posicionamento === 'concordancia'
-                  ? 'Razões da Concordância'
-                  : 'Razões da Impugnação'}
-              </h2>
-              {blocosAtivos.length === 0 ? (
-                <p className="italic text-ink-400">[Selecione ao menos um argumento]</p>
-              ) : (
-                blocosAtivos.map((b, i) => (
-                  <div key={b.id} className="mb-4">
-                    <h3>
-                      {i + 1}. {b.titulo}
-                    </h3>
-                    <p>{b.conteudo}</p>
-                  </div>
-                ))
-              )}
+                    <table>
+                      <tbody>
+                        <tr>
+                          <th className="w-[30%]">Processo nº</th>
+                          <td>{pericia.numeroProcesso}</td>
+                        </tr>
+                        <tr>
+                          <th>Reclamante</th>
+                          <td>{pericia.reclamante}</td>
+                        </tr>
+                        <tr>
+                          <th>Reclamada</th>
+                          <td>{empresa?.razaoSocial ?? '—'}</td>
+                        </tr>
+                        <tr>
+                          <th>Agente objeto</th>
+                          <td>{AGENTES_MANIFESTACAO.find((a) => a.value === modelo.agente)?.label}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </>
+                )}
 
-              <h2>III — Requerimento</h2>
-              <p>{encerramento}</p>
+                <h2>I — Fundamentação Técnica</h2>
+                <p>{modelo.fundamentacao}</p>
 
-              <FechoDoDocumento
-                cidade={pericia?.comarca ?? 'São Paulo/SP'}
-                data={new Date().toISOString().slice(0, 10)}
-                perito={usuario}
-              />
-            </article>
+                <h2>
+                  II —{' '}
+                  {posicionamento === 'concordancia'
+                    ? 'Razões da Concordância'
+                    : 'Razões da Impugnação'}
+                </h2>
+                {blocosAtivos.length === 0 ? (
+                  <p className="italic text-ink-400">[Selecione ao menos um argumento]</p>
+                ) : (
+                  blocosAtivos.map((b, i) => (
+                    <div key={b.id} className="mb-4">
+                      <h3>
+                        {i + 1}. {b.titulo}
+                      </h3>
+                      <p>{b.conteudo}</p>
+                    </div>
+                  ))
+                )}
+
+                <h2>III — Requerimento</h2>
+                <p>{encerramento}</p>
+
+                <FechoDoDocumento
+                  cidade={pericia?.comarca ?? 'São Paulo/SP'}
+                  data={new Date().toISOString().slice(0, 10)}
+                  perito={usuario}
+                />
+              </article>
+            </FolhasA4>
           </div>
         </div>
       )}

@@ -48,8 +48,9 @@ export async function encerrarBrowser(): Promise<void> {
   await browser?.close().catch(() => undefined)
 }
 
+// O rodapé ocupa a largura da folha; o recuo o alinha às margens do texto.
 const RODAPE = `
-  <div style="width:100%;font-family:Arial,sans-serif;font-size:8pt;color:#656155;padding:0 2cm;
+  <div style="width:100%;font-family:Arial,sans-serif;font-size:8pt;color:#656155;padding:0 2cm 0 3cm;
               display:flex;justify-content:space-between;align-items:center;">
     <span>© D&amp;R Perícia Trabalhista — Propriedade intelectual exclusiva e protegida.</span>
     <span>Página <span class="pageNumber"></span> de <span class="totalPages"></span></span>
@@ -87,7 +88,8 @@ export async function gerarPdf(html: string): Promise<Buffer> {
       displayHeaderFooter: true,
       headerTemplate: '<span></span>',
       footerTemplate: RODAPE,
-      margin: { top: '2.5cm', right: '2cm', bottom: '2cm', left: '3cm' },
+      // Margens da ABNT (NBR 14724), as mesmas do @page de documento-html.ts.
+      margin: { top: '3cm', right: '2cm', bottom: '2cm', left: '3cm' },
       timeout: 60_000,
     })
 

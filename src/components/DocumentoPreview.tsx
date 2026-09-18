@@ -400,63 +400,64 @@ export function DocumentoPreview({
 
   return (
     <article className="doc-sheet mx-auto w-full max-w-[820px] bg-white px-10 py-12 shadow-card print-area sm:px-14">
-      <header className="marca-oficial mb-8 border-b-2 border-[#007a3d] pb-5 text-center">
-        <Logo size="lg" className="mx-auto" perito={perito} />
-        {perito && (
-          <p className="no-indent mt-2 text-center text-[8.5pt] text-ink-500">
-            {perito.nome}{perito.titulo ? ` — ${perito.titulo}` : ''}
-            {perito.registroProfissional ? ` · ${perito.registroProfissional}` : ''}
-          </p>
-        )}
-      </header>
-      <p className="no-indent font-bold uppercase mb-[34px]">
-        {`EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA ${[pericia.vara, pericia.comarca]
-          .filter(Boolean)
-          .join(' — ')}`.toUpperCase()}
-      </p>
-
       {/* Folha de rosto (feedback de 17/09/2026): a identificação das partes
           desce para perto do meio da folha e o item 1 abre a folha 2 — no PDF
           (.capa em documento-html.ts) e no DOCX (espacoDaCapa em docx.ts). */}
-      <div className="espaco-capa" aria-hidden="true" />
-      <h3 className="mt-0 mb-2">IDENTIFICAÇÃO DAS PARTES</h3>
-      <table className="ficha-processual">
-        <tbody>
-          <tr>
-            <th>Processo nº</th>
-            <td>{pericia.numeroProcesso}</td>
-          </tr>
-          <tr>
-            <th>Reclamante</th>
-            <td>
-              {pericia.reclamante}
-              {pericia.cpfReclamante ? ` — CPF: ${maskCPF(pericia.cpfReclamante)}` : ''}
-            </td>
-          </tr>
-          <tr>
-            <th>Reclamada</th>
-            <td>
-              {empresaPrincipal
-                ? `${empresaPrincipal.razaoSocial} — CNPJ ${maskCNPJ(empresaPrincipal.cnpj)}`
-                : '—'}
-            </td>
-          </tr>
-          {outras.map((e) => (
-            <tr key={e.id}>
-              <th>Reclamada</th>
+      <section className="capa">
+        <header className="marca-oficial mb-5 border-b-2 border-[#007a3d] pb-1.5 text-center">
+          <Logo size="lg" className="mx-auto" perito={perito} />
+          {perito && (
+            <p className="no-indent mt-1.5 text-center text-[8.5pt] text-ink-500">
+              {perito.nome}{perito.titulo ? ` — ${perito.titulo}` : ''}
+              {perito.registroProfissional ? ` · ${perito.registroProfissional}` : ''}
+            </p>
+          )}
+        </header>
+        <p className="no-indent font-bold uppercase mb-[34px]">
+          {`EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA ${[pericia.vara, pericia.comarca]
+            .filter(Boolean)
+            .join(' — ')}`.toUpperCase()}
+        </p>
+
+        <div className="espaco-capa" aria-hidden="true" />
+        <h3 className="mt-0 mb-2">IDENTIFICAÇÃO DAS PARTES</h3>
+        <table className="ficha-processual">
+          <tbody>
+            <tr>
+              <th>Processo nº</th>
+              <td>{pericia.numeroProcesso}</td>
+            </tr>
+            <tr>
+              <th>Reclamante</th>
               <td>
-                {e.razaoSocial} — CNPJ {maskCNPJ(e.cnpj)}
+                {pericia.reclamante}
+                {pericia.cpfReclamante ? ` — CPF: ${maskCPF(pericia.cpfReclamante)}` : ''}
               </td>
             </tr>
-          ))}
-        </tbody>
-      </table>
+            <tr>
+              <th>Reclamada</th>
+              <td>
+                {empresaPrincipal
+                  ? `${empresaPrincipal.razaoSocial} — CNPJ ${maskCNPJ(empresaPrincipal.cnpj)}`
+                  : '—'}
+              </td>
+            </tr>
+            {outras.map((e) => (
+              <tr key={e.id}>
+                <th>Reclamada</th>
+                <td>
+                  {e.razaoSocial} — CNPJ {maskCNPJ(e.cnpj)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-      <h1>{titulo}</h1>
-      <h3 className="mt-0 mb-2">APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA</h3>
-      <Paragrafos texto={t.apresentacao} />
+        <h1>{titulo}</h1>
+        <h3 className="mt-0 mb-2">APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA</h3>
+        <Paragrafos texto={t.apresentacao} />
+      </section>
 
-      <div className="quebra-folha" aria-hidden="true"><span>Folha 2</span></div>
       <h2 className="mt-0">1. Objeto da Perícia e Dados Contratuais</h2>
       <Paragrafos texto={objetivoPadraoDaPericia(pericia)} />
       <table>

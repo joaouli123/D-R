@@ -116,7 +116,10 @@ const linha = (rotulo: string, valor: string): string =>
 // ---------------- moldura ----------------
 
 const CSS = `
-  @page { size: A4; margin: 2.5cm 2cm 2cm 3cm; }
+  /* Margens e corpo nas regras da ABNT (NBR 14724): 3 cm em cima e à
+     esquerda, 2 cm embaixo e à direita; Arial 12pt, entrelinha 1,5 e recuo
+     de 1,25cm. A prévia (src/index.css, .folha-a4) usa as mesmas medidas. */
+  @page { size: A4; margin: 3cm 2cm 2cm 3cm; }
   :root {
     --documento-titulo: ${css(MARCA.documentoTitulo)};
     --documento-secao: ${css(MARCA.documentoSecao)};
@@ -133,7 +136,7 @@ const CSS = `
     margin: 0;
     background: #ffffff;
     font-family: Arial, sans-serif;
-    font-size: 11pt;
+    font-size: 12pt;
     line-height: 1.5;
     color: var(--documento-texto);
     text-align: justify;
@@ -144,7 +147,8 @@ const CSS = `
     padding-bottom: 6px;
     margin-bottom: 20px;
   }
-  .logo-oficial { display: block; width: 100%; max-width: 300px; height: auto; margin: 0 auto; }
+  /* Teto de altura: uma arte alta demais não come a folha de rosto. */
+  .logo-oficial { display: block; width: 100%; max-width: 300px; height: auto; max-height: 32mm; object-fit: contain; margin: 0 auto; }
   .perito-cabecalho { font-size: 8.5pt; color: ${css(MARCA.tinta500)}; margin-top: 6px; }
   h1 {
     color: var(--documento-titulo);
@@ -156,8 +160,8 @@ const CSS = `
     border-bottom: 2px solid var(--documento-titulo);
   }
   h2 { color: var(--documento-secao); font-size: 14pt; font-weight: 700; text-align: left; margin: 16px 0 7px; page-break-after: avoid; }
-  h3 { color: var(--documento-secao); font-size: 11pt; font-weight: 700; text-align: left; margin: 12px 0 4px; page-break-after: avoid; }
-  h4 { font-size: 10pt; font-weight: 700; margin: 10px 0 4px; page-break-after: avoid; }
+  h3 { color: var(--documento-secao); font-size: 12pt; font-weight: 700; text-align: left; margin: 12px 0 4px; page-break-after: avoid; }
+  h4 { font-size: 12pt; font-weight: 700; text-align: left; margin: 10px 0 4px; page-break-after: avoid; }
   p { margin: 0 0 8px; text-indent: 1.25cm; }
   p.sem-recuo { text-indent: 0; }
   p.vazio { font-style: italic; color: ${css(MARCA.tinta400)}; text-indent: 0; }
@@ -182,7 +186,7 @@ const CSS = `
   .historico-periodos .periodo-atividades td { padding-top: 7px; padding-bottom: 8px; }
   .atividades-periodo { margin: 4px 0 0 22px; padding: 0; }
   .atividades-periodo li { margin: 1px 0; }
-  .box { font-size: 11pt; }
+  .box { font-size: 12pt; }
   /* Sem caixa: o texto corre em parágrafos justificados, como uma peça
      técnica padrão. A classe segue existindo só para agrupar o conteúdo. */
   .bloco-conteudo { margin: 0 0 8px; }
@@ -201,6 +205,7 @@ const CSS = `
   .agente-bloco thead { display: table-header-group; }
   .agente-bloco th { width: 32%; }
   .protecao-bloco { margin: 10px 0 0; }
+  .protecao-bloco h4 { font-size: 10pt; color: var(--documento-secao); }
   /* Sem verde/vermelho/âmbar: o resultado se destaca só pelo negrito. */
   .resultado-positivo,
   .resultado-negativo,
@@ -214,20 +219,20 @@ const CSS = `
   .parecer-manual .titulo-qualificacao {
     margin: 0 0 8px;
     color: var(--documento-secao);
-    font-size: 11pt;
+    font-size: 12pt;
     font-weight: 700;
     text-transform: none;
   }
   /* Folha de rosto do parecer (pedido do perito): a Identificação das Partes
      desce até perto do meio da folha e o item 1 abre a folha 2. A altura é a
-     da área útil da página 1 (297mm - 2,5cm - 2cm = 252mm), com folga para o
+     da área útil da página 1 (297mm - 3cm - 2cm = 247mm), com folga para o
      arredondamento não criar uma folha em branco. O espaço entre o
      endereçamento e a identificação é elástico: com uma apresentação longa
      ele encolhe, em vez de empurrar a capa para duas folhas. */
   .capa {
     display: flex;
     flex-direction: column;
-    min-height: 246mm;
+    min-height: 241mm;
     break-after: page;
     page-break-after: always;
   }

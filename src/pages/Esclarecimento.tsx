@@ -3,6 +3,7 @@ import { FileDown, Plus, Printer, ScrollText, Sparkles, Trash2 } from 'lucide-re
 import { Badge, Button, Card, CardHeader, Input, Select, Textarea, useToast } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { Logo } from '@/components/Logo'
+import { FolhasA4 } from '@/components/FolhasA4'
 import { FechoDoDocumento } from '@/components/FechoDoDocumento'
 import { useApp } from '@/store/AppStore'
 import * as api from '@/services/api'
@@ -270,77 +271,79 @@ export default function Esclarecimento() {
 
         {/* Preview */}
         <div className="overflow-x-auto rounded-xl bg-ink-100 p-4 lg:p-6">
-          <article className="doc-sheet mx-auto w-full max-w-[820px] bg-white px-10 py-12 shadow-card print-area sm:px-14">
-            <header className="mb-8 border-b-2 border-brand-700 pb-5 text-center">
-              <Logo size="lg" perito={usuario} />
-              <p className="mt-3 text-[9pt] font-bold uppercase tracking-[0.2em] text-navy-600">
-                Plataforma Inteligente de Perícia Trabalhista
-              </p>
-            </header>
-
-            <h1>Esclarecimentos Técnicos</h1>
-
-            {pericia && (
-              <>
-                <p className="no-indent font-bold">
-                  EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO
+          <FolhasA4>
+            <article className="doc-sheet mx-auto w-full max-w-[820px] bg-white px-10 py-12 shadow-card print-area sm:px-14">
+              <header className="mb-8 border-b-2 border-brand-700 pb-5 text-center">
+                <Logo size="lg" perito={usuario} />
+                <p className="mt-3 text-[9pt] font-bold uppercase tracking-[0.2em] text-navy-600">
+                  Plataforma Inteligente de Perícia Trabalhista
                 </p>
-                <p className="no-indent mb-5 font-bold uppercase">{pericia.vara}</p>
-                <table>
-                  <tbody>
-                    <tr>
-                      <th className="w-[30%]">Processo nº</th>
-                      <td>{pericia.numeroProcesso}</td>
-                    </tr>
-                    <tr>
-                      <th>Reclamante</th>
-                      <td>{pericia.reclamante}</td>
-                    </tr>
-                    <tr>
-                      <th>Reclamada</th>
-                      <td>{empresa?.razaoSocial ?? '—'}</td>
-                    </tr>
-                    <tr>
-                      <th>Agente objeto</th>
-                      <td>{AGENTES_MANIFESTACAO.find((a) => a.value === agente)?.label}</td>
-                    </tr>
-                    {referencia && (
+              </header>
+
+              <h1>Esclarecimentos Técnicos</h1>
+
+              {pericia && (
+                <>
+                  <p className="no-indent font-bold">
+                    EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO
+                  </p>
+                  <p className="no-indent mb-5 font-bold uppercase">{pericia.vara}</p>
+                  <table>
+                    <tbody>
                       <tr>
-                        <th>Referência</th>
-                        <td>{referencia}</td>
+                        <th className="w-[30%]">Processo nº</th>
+                        <td>{pericia.numeroProcesso}</td>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </>
-            )}
+                      <tr>
+                        <th>Reclamante</th>
+                        <td>{pericia.reclamante}</td>
+                      </tr>
+                      <tr>
+                        <th>Reclamada</th>
+                        <td>{empresa?.razaoSocial ?? '—'}</td>
+                      </tr>
+                      <tr>
+                        <th>Agente objeto</th>
+                        <td>{AGENTES_MANIFESTACAO.find((a) => a.value === agente)?.label}</td>
+                      </tr>
+                      {referencia && (
+                        <tr>
+                          <th>Referência</th>
+                          <td>{referencia}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </>
+              )}
 
-            <h2>I — Da Intimação</h2>
-            <p>{introducao}</p>
+              <h2>I — Da Intimação</h2>
+              <p>{introducao}</p>
 
-            <h2>II — Dos Esclarecimentos Prestados</h2>
-            {pontos.map((pt, i) => (
-              <div key={pt.id} className="mb-5">
-                <h3>
-                  {i + 1}. Questionamento {ORIGEM_LABEL[pt.origem]}
-                </h3>
-                <p className="italic">{pt.questionamento || '[questionamento não informado]'}</p>
-                <p>
-                  <strong>Esclarecimento: </strong>
-                  {pt.resposta || '[esclarecimento não preenchido]'}
-                </p>
-              </div>
-            ))}
+              <h2>II — Dos Esclarecimentos Prestados</h2>
+              {pontos.map((pt, i) => (
+                <div key={pt.id} className="mb-5">
+                  <h3>
+                    {i + 1}. Questionamento {ORIGEM_LABEL[pt.origem]}
+                  </h3>
+                  <p className="italic">{pt.questionamento || '[questionamento não informado]'}</p>
+                  <p>
+                    <strong>Esclarecimento: </strong>
+                    {pt.resposta || '[esclarecimento não preenchido]'}
+                  </p>
+                </div>
+              ))}
 
-            <h2>III — Conclusão</h2>
-            <p>{conclusao}</p>
+              <h2>III — Conclusão</h2>
+              <p>{conclusao}</p>
 
-            <FechoDoDocumento
-              cidade={pericia?.comarca ?? 'São Paulo/SP'}
-              data={new Date().toISOString().slice(0, 10)}
-              perito={usuario}
-            />
-          </article>
+              <FechoDoDocumento
+                cidade={pericia?.comarca ?? 'São Paulo/SP'}
+                data={new Date().toISOString().slice(0, 10)}
+                perito={usuario}
+              />
+            </article>
+          </FolhasA4>
         </div>
       </div>
     </>
