@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { Logo, SeloCredenciado } from '@/components/Logo'
+import { cn } from '@/lib/utils'
 import { useApp } from '@/store/AppStore'
 import { API_MODE } from '@/services/api'
 import loginBg from '@/assets/login-vistoria.jpg'
@@ -25,8 +26,19 @@ import loginBg from '@/assets/login-vistoria.jpg'
  * trocar emoji por ícone de interface justamente porque a arte do emoji muda
  * de sistema para sistema, e a tela de entrada é a primeira coisa que um
  * cliente novo vê.
+ *
+ * `emDesenvolvimento` marca o que ainda não existe no sistema (SST e
+ * Empresas: PGR, LTCAT, laudos, entrega de EPI por biometria — os mesmos
+ * itens que o menu lista como "Em breve"). Decisão do perito em 18/09:
+ * anunciar como vitrine do que vem, mas sinalizado, para a tela de entrada
+ * não prometer o que a conta ainda não entrega.
  */
-const PUBLICOS: { titulo: string; icone: LucideIcon; itens: string[] }[] = [
+const PUBLICOS: {
+  titulo: string
+  icone: LucideIcon
+  itens: string[]
+  emDesenvolvimento?: boolean
+}[] = [
   {
     titulo: 'Para Peritos e Assistentes Técnicos',
     icone: Scale,
@@ -43,6 +55,7 @@ const PUBLICOS: { titulo: string; icone: LucideIcon; itens: string[] }[] = [
     titulo: 'Para Engenheiros e Técnicos de Segurança',
     icone: HardHat,
     itens: ['PGR', 'Laudo de Insalubridade', 'Laudo de Periculosidade', 'LTCAT'],
+    emDesenvolvimento: true,
   },
   {
     titulo: 'Para Empresas',
@@ -51,6 +64,7 @@ const PUBLICOS: { titulo: string; icone: LucideIcon; itens: string[] }[] = [
       'Gestão de SST',
       'Registro e controle eletrônico de entrega de EPIs aos colaboradores com assinatura biométrica ou facial',
     ],
+    emDesenvolvimento: true,
   },
 ]
 
@@ -110,16 +124,33 @@ export default function Login() {
           </div>
 
           <div className="space-y-4">
-            {PUBLICOS.map(({ titulo, icone: Icone, itens }) => (
+            {PUBLICOS.map(({ titulo, icone: Icone, itens, emDesenvolvimento }) => (
               <section key={titulo}>
-                <h3 className="mb-1.5 flex items-center gap-2 text-[12px] font-bold uppercase tracking-wide text-brand-200">
+                <h3 className="mb-1.5 flex flex-wrap items-center gap-2 text-[12px] font-bold uppercase tracking-wide text-brand-200">
                   <Icone size={15} strokeWidth={2} aria-hidden="true" />
                   {titulo}
+                  {emDesenvolvimento && (
+                    // Mesma pílula do menu ("Em breve"), para o visitante ler a
+                    // mesma promessa nos dois lugares.
+                    <span className="rounded-full border border-white/20 px-1.5 py-0.5 text-[9px] font-semibold normal-case tracking-wide text-white/55">
+                      Em desenvolvimento
+                    </span>
+                  )}
                 </h3>
-                <ul className="space-y-1 text-[13px] leading-snug text-white/75">
+                <ul
+                  className={cn(
+                    'space-y-1 text-[13px] leading-snug',
+                    emDesenvolvimento ? 'text-white/50' : 'text-white/75',
+                  )}
+                >
                   {itens.map((item) => (
                     <li key={item} className="flex gap-2.5">
-                      <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-brand-300" />
+                      <span
+                        className={cn(
+                          'mt-[7px] h-1 w-1 shrink-0 rounded-full',
+                          emDesenvolvimento ? 'bg-white/30' : 'bg-brand-300',
+                        )}
+                      />
                       {item}
                     </li>
                   ))}
