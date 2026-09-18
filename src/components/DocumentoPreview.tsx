@@ -282,7 +282,9 @@ export function DocumentoPreview({
                       <td className={linha.destaque ? `resultado-${linha.destaque}` : ''}>{valorDeCelula(linha.valor)}</td>
                     </tr>
                   ))}
-                  {conclusao}
+                  {/* Sem conclusão aqui: quem conclui é o item 10
+                      (`quadrosDeAnalise`). No 7.2.x ela antecipava o desfecho e
+                      saía repetida no mesmo documento (perito, 18/09). */}
                 </tbody>
               </table> : conclusao && <table className="tabela-conclusao"><tbody>{conclusao}</tbody></table>}
             </section>

@@ -904,13 +904,25 @@ async function docParecer(
   } as Record<string, string>)[tipo ?? ''] ?? 'Agente'
 
   /**
-   * A tabela do agente, com a conclusão como última linha. Agente não
-   * identificado não tem tabela: a conclusão sai sozinha, numa tabela de uma
-   * linha com o mesmo destaque. Espelha `quadroDoAgente` do PDF.
+   * A tabela do agente. A conclusão fecha a tabela SÓ no item 10
+   * (`comConclusao`): no 7.2.x ela antecipava o desfecho e saía repetida no
+   * mesmo documento (perito, 18/09). Agente não identificado não tem tabela: a
+   * linha sai sozinha e permanece nos dois itens, porque ali ela é a própria
+   * declaração de que o agente não foi encontrado na atividade — sem ela, o
+   * título ficaria pendurado sozinho. Espelha `quadroDoAgente` do PDF.
    */
-  const quadroDoAgente = (agente: (typeof agentes)[number], linhas: TableRow[]): Table[] => {
-    const conclusao = agenteExibeConclusao(agente) ? [linhaConclusaoAgente(agente.observacao ?? '')] : []
-    if (agente.identificadoNaAtividade === false) return conclusao.length ? [tabela(conclusao)] : []
+  const quadroDoAgente = (
+    agente: (typeof agentes)[number],
+    linhas: TableRow[],
+    opcoes: { comConclusao?: boolean } = {},
+  ): Table[] => {
+    const conclusaoDoAgente = agenteExibeConclusao(agente)
+      ? [linhaConclusaoAgente(agente.observacao ?? '')]
+      : []
+    if (agente.identificadoNaAtividade === false) {
+      return conclusaoDoAgente.length ? [tabela(conclusaoDoAgente)] : []
+    }
+    const conclusao = opcoes.comConclusao ? conclusaoDoAgente : []
     return [tabela([
       new TableRow({
         tableHeader: true,
@@ -1054,10 +1066,14 @@ async function docParecer(
       const protecoes = resumoProtecoesAssociadas(agente.epis)
       filhos.push(
         h4(`${prefixo}.${indice + 1}. ${apresentacao.titulo}`),
-        ...quadroDoAgente(agente, [
-          ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor, false, item.destaque)),
-          ...(protecoes ? [fichaLinha('Proteções associadas', protecoes)] : []),
-        ]),
+        ...quadroDoAgente(
+          agente,
+          [
+            ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor, false, item.destaque)),
+            ...(protecoes ? [fichaLinha('Proteções associadas', protecoes)] : []),
+          ],
+          { comConclusao: true },
+        ),
       )
     })
   }

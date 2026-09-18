@@ -113,19 +113,24 @@ describe('parecer em HTML (motor do PDF)', () => {
     expect(await gerar()).not.toContain('Conclusão:')
   })
 
-  it('imprime a conclusão como última linha da tabela do agente, nos itens 7 e 10', async () => {
+  it('imprime a conclusão só na tabela do item 10, não na do 7.2.x', async () => {
     const pericia = periciaDeTeste()
     ;(pericia.tecnico as unknown as { agentes: { observacao?: string }[] }).agentes[0]!.observacao =
       'A exposição é habitual e permanente.'
 
     const html = await gerar(pericia)
 
-    // Uma linha só, na largura toda, dentro da tabela (pedido do perito) — e
-    // não mais um parágrafo solto depois dela.
+    // Uma vez só no documento inteiro. Sair nos dois itens repetia a conclusão
+    // e antecipava o desfecho ainda na descrição do que foi avaliado
+    // (perito, 18/09); o item 7 descreve, o item 10 conclui.
     const linha =
       '<tr class="conclusao-agente"><td colspan="2"><strong>Conclusão:</strong> A exposição é habitual e permanente.</td></tr></tbody></table>'
-    expect(html.split(linha).length - 1).toBe(2)
+    expect(html.split(linha).length - 1).toBe(1)
     expect(html).not.toContain('<p>Conclusão:')
+
+    // E que ela está no item 10, não no 7: o trecho do 10 é o que a contém.
+    const item10 = html.slice(html.indexOf('10.1.'))
+    expect(item10).toContain(linha)
   })
 
   it('imprime a conclusão de agente não identificado numa tabela de uma linha', async () => {

@@ -246,10 +246,10 @@ describe('DocumentoPreview', () => {
       />,
     )
 
-    // Item 7 e item 10: as duas tabelas do agente terminam na conclusão, e a
-    // quebra de linha digitada pelo perito é mantida.
+    // Só o item 10 fecha na conclusão: no 7.2.x ela saía repetida e antecipava
+    // o desfecho (perito, 18/09). A quebra de linha digitada é mantida.
     const linhas = html.match(/<tr class="conclusao-agente">/g) ?? []
-    expect(linhas.length).toBe(2)
+    expect(linhas.length).toBe(1)
     expect(html).toContain('<strong>Conclusão:</strong> Linha um.<br/>Linha dois.')
   })
 

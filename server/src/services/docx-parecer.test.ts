@@ -115,7 +115,7 @@ describe('parecer em DOCX', () => {
     expect(await textoDoDocx()).not.toContain('Conclusão:')
   })
 
-  it('imprime a conclusão como última linha da tabela do agente, nos itens 7 e 10', async () => {
+  it('imprime a conclusão só na tabela do item 10, não na do 7.2.x', async () => {
     const pericia = periciaDeTeste()
     ;(pericia.tecnico as unknown as { agentes: { observacao?: string }[] }).agentes[0]!.observacao =
       'A exposição é habitual e permanente.'
@@ -124,9 +124,11 @@ describe('parecer em DOCX', () => {
     const tabelas = xml.match(/<w:tbl>[\s\S]*?<\/w:tbl>/g) ?? []
     const comConclusao = tabelas.filter((t) => t.includes('A exposição é habitual e permanente.'))
 
-    // Dentro da tabela (item 7 e item 10), e na última linha dela: uma célula
-    // na largura toda, com o fundo cinza-azulado e "Conclusão:" em negrito.
-    expect(comConclusao).toHaveLength(2)
+    // Uma tabela só: o item 7 descreve o que foi avaliado e o item 10 conclui.
+    // Nos dois, a conclusão saía repetida e antecipava o desfecho (perito,
+    // 18/09). Na tabela que sobra ela é a última linha: uma célula na largura
+    // toda, fundo cinza-azulado e "Conclusão:" em negrito.
+    expect(comConclusao).toHaveLength(1)
     for (const tabela of comConclusao) {
       const linhas = tabela.match(/<w:tr>[\s\S]*?<\/w:tr>|<w:tr [\s\S]*?<\/w:tr>/g) ?? []
       const ultima = linhas[linhas.length - 1]!

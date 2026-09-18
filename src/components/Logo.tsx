@@ -68,7 +68,14 @@ export function Logo({
   )
 }
 
-/** Selo de credenciamento profissional (rodapé do login). */
+/**
+ * Selo de inscrição profissional (rodapé do login).
+ *
+ * "Inscrito", não "credenciado": quem registra o profissional nos conselhos é
+ * uma inscrição, e o termo errado estava na arte original (correção do perito
+ * em 18/09). O nome da função fica como está para não espalhar renomeação por
+ * telas que não mudaram.
+ */
 export function SeloCredenciado({
   invert = false,
   className,
@@ -95,7 +102,7 @@ export function SeloCredenciado({
           invert ? 'text-white/70' : 'text-navy-600',
         )}
       >
-        Profissional Credenciado
+        Profissional Inscrito
       </p>
       <div className="grid grid-cols-3 divide-x divide-current/10">
         {items.map((i) => (

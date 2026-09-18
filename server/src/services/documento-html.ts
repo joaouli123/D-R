@@ -519,9 +519,19 @@ export async function htmlDoParecer(
   const quadroDoAgente = (
     agente: (typeof agentes)[number],
     linhas: ReturnType<typeof montarApresentacaoAgente>['linhas'],
+    opcoes: { comConclusao?: boolean } = {},
   ) => {
     const conclusao = linhaConclusao(agente)
-    if (agente.identificadoNaAtividade !== false) return tabelaLinhasAgente(linhas, true, conclusao)
+    // A conclusão fecha a tabela do item 10, não a do 7.2.x. O item 7 descreve
+    // o que foi avaliado; repetir ali o desfecho antecipava a conclusão e saía
+    // duas vezes no mesmo documento (perito, 18/09).
+    //
+    // O agente NÃO identificado é a exceção: ele não tem tabela de dados, e a
+    // linha é a própria declaração de que o agente não foi encontrado na
+    // atividade. Sem ela, o item 7 ficaria com o título pendurado sozinho.
+    if (agente.identificadoNaAtividade !== false) {
+      return tabelaLinhasAgente(linhas, true, opcoes.comConclusao ? conclusao : '')
+    }
     return conclusao ? `<table class="tabela-conclusao"><tbody>${conclusao}</tbody></table>` : ''
   }
 
@@ -618,7 +628,7 @@ export async function htmlDoParecer(
         const linhas = protecoes
           ? [...apresentacao.linhas, { rotulo: 'Proteções associadas', valor: protecoes }]
           : apresentacao.linhas
-        return `<section class="agente-bloco"><h4>${prefixo}.${indice + 1}. ${esc(apresentacao.titulo)}</h4>${quadroDoAgente(agente, linhas)}</section>`
+        return `<section class="agente-bloco"><h4>${prefixo}.${indice + 1}. ${esc(apresentacao.titulo)}</h4>${quadroDoAgente(agente, linhas, { comConclusao: true })}</section>`
       }).join('')
       return `<h3>${prefixo}. ${esc(tituloGrupo)}</h3>${quadros}`
     }

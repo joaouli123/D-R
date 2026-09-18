@@ -1,5 +1,13 @@
 import { useState } from 'react'
-import { AlertCircle, LockKeyhole, Mail } from 'lucide-react'
+import {
+  AlertCircle,
+  Building2,
+  HardHat,
+  LockKeyhole,
+  Mail,
+  Scale,
+  type LucideIcon,
+} from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { Logo, SeloCredenciado } from '@/components/Logo'
 import { useApp } from '@/store/AppStore'
@@ -9,6 +17,42 @@ import loginBg from '@/assets/login-vistoria.jpg'
 // ============================================================
 // MÓDULO A — Acesso e Gestão de Usuários (login)
 // ============================================================
+
+/**
+ * Os três públicos da plataforma, com o texto que o perito escreveu em 18/09.
+ *
+ * Ícone do lucide no lugar do emoji do original (⚖️ 🦺 🏢): o menu acabou de
+ * trocar emoji por ícone de interface justamente porque a arte do emoji muda
+ * de sistema para sistema, e a tela de entrada é a primeira coisa que um
+ * cliente novo vê.
+ */
+const PUBLICOS: { titulo: string; icone: LucideIcon; itens: string[] }[] = [
+  {
+    titulo: 'Para Peritos e Assistentes Técnicos',
+    icone: Scale,
+    itens: [
+      'Cadastro de empresas e busca de processos',
+      'Laudos e Pareceres Técnicos Periciais',
+      'Quesitos estratégicos',
+      'Manifestações, Impugnações e Esclarecimentos',
+      'EPIs diretamente da base oficial do Ministério do Trabalho',
+      'Biblioteca técnica e exportação em PDF/editável',
+    ],
+  },
+  {
+    titulo: 'Para Engenheiros e Técnicos de Segurança',
+    icone: HardHat,
+    itens: ['PGR', 'Laudo de Insalubridade', 'Laudo de Periculosidade', 'LTCAT'],
+  },
+  {
+    titulo: 'Para Empresas',
+    icone: Building2,
+    itens: [
+      'Gestão de SST',
+      'Registro e controle eletrônico de entrega de EPIs aos colaboradores com assinatura biométrica ou facial',
+    ],
+  },
+]
 
 export default function Login() {
   const { login } = useApp()
@@ -50,29 +94,47 @@ export default function Login() {
           <Logo size="xl" invert showTagline />
         </div>
 
-        <div className="relative space-y-5">
-          <h2 className="text-2xl font-bold leading-snug text-white">
-            Elaboração de documentos técnicos
-            <br />
-            <span className="text-brand-200">com agilidade e precisão.</span>
-          </h2>
-          <ul className="space-y-2.5 text-[14px] text-white/75">
-            {[
-              'Parecer e Laudo Técnico Pericial montados automaticamente',
-              'Banco de quesitos pré-cadastrados e selecionáveis',
-              'Manifestação, impugnação e esclarecimentos com modelos prontos',
-              'Biblioteca pessoal de textos técnicos reutilizáveis',
-              'Exportação em PDF e formato editável, pronta para assinatura',
-            ].map((t) => (
-              <li key={t} className="flex gap-2.5">
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-300" />
-                {t}
-              </li>
+        {/* min-h-0 + overflow: são doze itens em três grupos, e numa tela
+            baixa o bloco rola em vez de empurrar o selo para fora. */}
+        <div className="relative my-6 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold leading-snug text-white">
+              Precisão, fundamentação e praticidade
+              <br />
+              <span className="text-brand-200">em um só lugar.</span>
+            </h2>
+            <p className="text-[13.5px] leading-relaxed text-white/75">
+              Uma plataforma completa, com soluções específicas para Peritos e Assistentes
+              Técnicos, Profissionais de SST e Empresas.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {PUBLICOS.map(({ titulo, icone: Icone, itens }) => (
+              <section key={titulo}>
+                <h3 className="mb-1.5 flex items-center gap-2 text-[12px] font-bold uppercase tracking-wide text-brand-200">
+                  <Icone size={15} strokeWidth={2} aria-hidden="true" />
+                  {titulo}
+                </h3>
+                <ul className="space-y-1 text-[13px] leading-snug text-white/75">
+                  {itens.map((item) => (
+                    <li key={item} className="flex gap-2.5">
+                      <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-brand-300" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
+          </div>
+
+          <p className="text-[12.5px] leading-relaxed text-white/60">
+            D&amp;R Perícia Trabalhista — tecnologia para trabalhar com mais agilidade, precisão
+            e segurança.
+          </p>
         </div>
 
-        <div className="relative">
+        <div className="relative shrink-0">
           <SeloCredenciado invert />
         </div>
       </div>
