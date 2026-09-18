@@ -15,9 +15,24 @@ export function formatDate(iso?: string) {
 
 export function formatDateTime(iso?: string) {
   if (!iso) return '—'
-  const date = formatDate(iso)
-  const time = iso.includes('T') ? iso.slice(11, 16) : ''
-  return time ? `${date} às ${time}` : date
+  if (!iso.includes('T')) return formatDate(iso)
+
+  const instante = new Date(iso)
+  if (Number.isNaN(instante.getTime())) return iso
+
+  const partes = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(instante)
+  const parte = (tipo: Intl.DateTimeFormatPartTypes) =>
+    partes.find((item) => item.type === tipo)?.value ?? ''
+
+  return `${parte('day')}/${parte('month')}/${parte('year')} às ${parte('hour')}:${parte('minute')}`
 }
 
 export function extenso(iso?: string) {
