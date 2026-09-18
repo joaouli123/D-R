@@ -57,6 +57,25 @@ const RODAPE = `
   </div>`
 
 /**
+ * Área útil da folha A4 com as margens da ABNT, em pixels CSS (96 dpi):
+ * 297 − 3 (topo) − 2 (rodapé) = 247 mm. É o teto que a folha de rosto tem
+ * para caber inteira numa página.
+ */
+const ALTURA_UTIL_A4_PX = (247 / 25.4) * 96
+
+/** Largura útil: 210 − 3 (esquerda) − 2 (direita) = 160 mm. */
+const LARGURA_UTIL_A4_PX = (160 / 25.4) * 96
+
+/**
+ * O que o callback de `page.evaluate` usa do DOM. O tsconfig do servidor
+ * não carrega a lib `dom` de propósito (é Node); este é o recorte mínimo
+ * para o callback continuar tipado sem trazer o DOM inteiro.
+ */
+declare const document: {
+  querySelector(seletor: string): { scrollHeight: number; classList: { add(classe: string): void } } | null
+}
+
+/**
  * Renderiza o HTML do documento em PDF A4.
  *
  * A rede fica bloqueada dentro da página: todo recurso já vem
@@ -80,6 +99,30 @@ export async function gerarPdf(html: string): Promise<Buffer> {
     })
 
     await page.setContent(html, { waitUntil: 'load', timeout: 30_000 })
+
+    // A folha de rosto força quebra de página depois dela. Quando ela não
+    // cabe numa folha (dez reclamadas de razão social comprida e uma
+    // apresentação de três parágrafos, 18/09), essa quebra forçada punha o
+    // item 1 na folha 3 depois de uma folha 2 com meia dúzia de linhas — a
+    // folha fantasma. Só o Chromium sabe se coube, então a decisão é tomada
+    // aqui, pela altura real do layout de impressão, e não por contagem de
+    // texto: se a capa passa da área útil, ela perde a quebra forçada e o
+    // item 1 segue no fluxo, logo depois da apresentação.
+    //
+    // `evaluate` roda pelo CDP, fora do sandbox da página: continua
+    // funcionando com o JavaScript da página desligado acima.
+    //
+    // A largura importa tanto quanto a altura: o viewport padrão do Puppeteer
+    // tem 800px, mas a área útil da A4 tem 160mm (≈605px). Em 800px o texto
+    // quebra menos, a capa mede mais baixa e um caso limítrofe "cabe" na
+    // medição e estoura na impressão — foi o que aconteceu com oito
+    // reclamadas. A medição só vale na largura em que o Chromium vai imprimir.
+    await page.setViewport({ width: Math.round(LARGURA_UTIL_A4_PX), height: Math.round(ALTURA_UTIL_A4_PX) })
+    await page.emulateMediaType('print')
+    await page.evaluate((alturaUtilPx) => {
+      const capa = document.querySelector('.capa')
+      if (capa && capa.scrollHeight > alturaUtilPx) capa.classList.add('capa--longa')
+    }, ALTURA_UTIL_A4_PX)
 
     const pdf = await page.pdf({
       format: 'A4',

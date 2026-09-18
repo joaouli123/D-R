@@ -47,8 +47,8 @@ describe('marca do documento', () => {
     const marca = await marcaDoDocumento(null)
 
     expect(marca.padrao).toBe(true)
-    expect(marca.tipo).toBe('jpg')
-    expect(marca.dataUri.startsWith('data:image/jpeg;base64,')).toBe(true)
+    expect(marca.tipo).toBe('png')
+    expect(marca.dataUri.startsWith('data:image/png;base64,')).toBe(true)
     expect(marca.alt).toContain('D&R')
   })
 
@@ -107,7 +107,7 @@ describe('marca do documento', () => {
     const marca = await marcaDoDocumento({ nome: 'Dinoel', logoArquivo: 'sumiu.png' })
 
     expect(marca.padrao).toBe(true)
-    expect(marca.tipo).toBe('jpg')
+    expect(marca.tipo).toBe('png')
   })
 
   it('formato que o Word nao embute cai na arte embutida', async () => {

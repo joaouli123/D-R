@@ -238,6 +238,39 @@ const CSS = `
   }
   .capa > * { flex: none; }
   .capa > .espaco-capa { flex: 1 1 auto; max-height: 62mm; }
+  /* Custos fixos da capa menores, para caber dez reclamadas com uma
+     apresentação de verdade (perito, 18/09 — estourava já com cinco: a capa
+     vazava para a folha 2 e o item 1 abria na 3, com uma folha quase vazia no
+     meio). O espaço elástico acima devolve a folga quando sobra lugar, então a
+     capa de uma reclamada só não fica apertada. Só a capa muda: o resto do
+     documento segue com os vãos de sempre. */
+  .capa .logo-oficial { max-height: 22mm; }
+  .capa .enderecamento-judicial { margin-bottom: 16px; }
+  .capa .ficha-processual { margin-bottom: 16px; }
+  .capa .ficha-processual th,
+  .capa .ficha-processual td { padding: 3px 8px; }
+  /* Entrelinha simples na ficha, não 1,5: a NBR 14724 reserva o 1,5 para o
+     corpo do texto e manda espaçamento simples em tabelas. Herdar o 1,5 do
+     corpo era um desvio da norma — e é o que mais pesa na capa, porque cada
+     razão social comprida vira duas linhas. */
+  .capa .ficha-processual { line-height: 1.2; }
+  .capa h1 { margin-bottom: 8px; }
+  .capa .titulo-qualificacao { margin-bottom: 6px; }
+  /* Sem break-after: avoid no título: dentro de um container flex com quebra
+     forçada, o Chromium travou o layout de impressão com essa regra (o
+     render de um PDF não terminou em 25 min). Órfãs/viúvas bastam para a
+     apresentação não deixar linha solta se ainda assim precisar continuar. */
+  .capa p { orphans: 3; widows: 3; }
+  /* Capa que não coube numa folha (classe posta por services/pdf.ts, medindo
+     a altura real no layout de impressão): solta a quebra forçada e a altura
+     mínima. A apresentação continua na folha 2 e o item 1 vem logo depois —
+     em vez de uma folha 2 com seis linhas e o item 1 empurrado para a 3. */
+  .capa.capa--longa {
+    min-height: 0;
+    break-after: auto;
+    page-break-after: auto;
+  }
+  .capa.capa--longa + * { margin-top: 18px; }
   /* Conclusão do agente como última linha da própria tabela, em destaque
      (pedido do perito): antes ela saía solta, depois do quadro. */
   tr.conclusao-agente td {

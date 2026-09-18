@@ -25,8 +25,11 @@ const LOGOS: { origem: string; nome: string; destinos?: string[] }[] = [
   // azul do login saía um retângulo branco — o "cara de print" que o perito
   // apontou em 18/09. Vai para o front (tela) e para o server (fallback do
   // cabeçalho do PDF/DOCX), os dois lugares que a embutem.
+  // Origem: o "Logotipo.jpg.jpeg" de 3,4 MB que o perito mandou em 18/09 —
+  // praticamente sem compressão, ao contrário do JPEG de 57 kB que estava no
+  // repositório e cujo artefato sujava a borda do recorte.
   {
-    origem: path.join(RAIZ, 'src/assets/logo-dr-oficial.jpeg'),
+    origem: 'Logotipo.jpg.jpeg',
     nome: 'logo-dr-oficial',
     destinos: [path.join(RAIZ, 'src/assets'), path.join(RAIZ, 'server/assets')],
   },

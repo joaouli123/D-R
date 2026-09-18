@@ -172,6 +172,31 @@
   .doc-sheet .espaco-capa {
     height: 48mm;
   }
+  /* Custos fixos da capa menores, espelhando server/src/services/documento-html.ts
+     (regras `.capa ...`): logo mais baixa, vãos e células mais justos, e
+     entrelinha simples na ficha — a NBR 14724 reserva o 1,5 ao corpo do texto
+     e manda espaçamento simples em tabelas. É o que faz dez reclamadas
+     caberem na folha 1 (perito, 18/09). Mudou lá, muda aqui. */
+  .doc-sheet .capa header img {
+    max-height: 22mm;
+  }
+  .doc-sheet .capa .enderecamento-judicial,
+  .doc-sheet .capa .ficha-processual {
+    margin-bottom: 16px;
+  }
+  .doc-sheet .capa .ficha-processual {
+    line-height: 1.2;
+  }
+  .doc-sheet .capa .ficha-processual th,
+  .doc-sheet .capa .ficha-processual td {
+    padding: 3px 8px;
+  }
+  .doc-sheet .capa h1 {
+    margin-bottom: 8px;
+  }
+  .doc-sheet .capa .titulo-qualificacao {
+    margin-bottom: 6px;
+  }
   /* Fecho: data e assinatura num bloco só, que ao descer de folha leva junto
      o último parágrafo. Mesmos vãos de .fecho, .local-data e .assinatura em
      server/src/services/documento-html.ts. */

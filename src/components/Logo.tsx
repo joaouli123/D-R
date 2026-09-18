@@ -27,7 +27,7 @@ export interface DonoDaMarca {
  * A arte embutida continua sendo usada inteira, sem remontar a marca com
  * texto e sem filtro que altere as cores dela. As dimensões intrínsecas só
  * acompanham essa arte: a logo de outro perito tem proporção própria e
- * declarar 1390x433 nela reservaria uma caixa errada durante o carregamento.
+ * declarar 1673x442 nela reservaria uma caixa errada durante o carregamento.
  *
  * A marca sai num cartão claro, não solta sobre o painel. A arte tem "&" e
  * textos cinza-escuros, feitos para fundo branco — em cima do azul do login
@@ -78,7 +78,7 @@ export function Logo({
       <img
         src={propria || logoOficial}
         alt={alt}
-        {...(propria ? {} : { width: 1390, height: 433 })}
+        {...(propria ? {} : { width: 1673, height: 442 })}
         onError={propria ? () => setFalhou(propria) : undefined}
         className="h-auto w-full max-w-full object-contain"
       />
