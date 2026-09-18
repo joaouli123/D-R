@@ -1,66 +1,87 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { ChevronDown, LogOut, Menu, Settings, X } from 'lucide-react'
+import {
+  Building2,
+  ChartColumn,
+  ChevronDown,
+  ClipboardList,
+  FilePenLine,
+  FileSearch,
+  FileStack,
+  FileText,
+  FlaskConical,
+  House,
+  Library,
+  LifeBuoy,
+  LogOut,
+  Menu,
+  MessageCircleQuestion,
+  Scale,
+  ScanFace,
+  Settings,
+  TriangleAlert,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { BuscaGlobal } from '@/components/BuscaGlobal'
 import { useApp } from '@/store/AppStore'
 import { cn } from '@/lib/utils'
 
 // ============================================================
-// Os ícones do menu são EMOJIS, e não desenhos do lucide: o perito pediu o menu
-// colorido, e o emoji já traz a cor embutida na fonte do sistema — não depende
-// de arte nova por item nem de um `fill` que teria de ser mantido item a item.
-// Como a cor é da própria fonte, ela sobrevive ao `text-white/65` do item
-// inativo, que é justamente o efeito pedido.
+// Cada item do menu leva um ícone do lucide numa plaquinha de cor própria. O
+// perito pediu o menu colorido (a primeira versão usava emojis) e depois
+// "ícones de interface, mais bonitos": a plaquinha mantém uma cor por item sem
+// depender da fonte de emoji de cada sistema.
 //
-// Eles são DECORATIVOS: quem nomeia o link é o rótulo ao lado. Por isso saem
-// com `aria-hidden` e ficam fora do nome acessível — sem isso, o leitor de tela
-// anunciaria o nome do emoji antes de cada item do menu.
+// As classes de cor ficam escritas por inteiro em cada item, e não montadas
+// com `bg-${cor}`, porque o Tailwind só gera as classes que acha literais no
+// código.
 //
-// Mexeu na lista? Ajuste também AppLayout.test.tsx: o emoji entra no
-// `textContent` do link (ao contrário do nome acessível) e o teste compara os
-// dois de propósito.
+// Os ícones são DECORATIVOS: quem nomeia o link é o rótulo ao lado. Por isso a
+// plaquinha sai com `aria-hidden` e fica fora do nome acessível.
 // ============================================================
 
-const NAV = [
-  { to: '/', label: 'Início', emoji: '🏠', end: true },
-  { to: '/clientes', label: 'Cadastrar Empresa', emoji: '🏢' },
-  { to: '/pericias/nova?tipo=parecer', label: 'Gerar Parecer Técnico Pericial', emoji: '📄' },
-  { to: '/pericias/nova?tipo=laudo', label: 'Gerar Laudo Técnico Pericial', emoji: '📑' },
-  { to: '/quesitos', label: 'Elaborar Quesitos Técnicos', emoji: '❓' },
-  { to: '/manifestacao/concordancia', label: 'Elaborar Manifestação sobre o Laudo', emoji: '📝' },
-  { to: '/manifestacao/impugnacao_laudo', label: 'Elaborar Impugnação ao Laudo', emoji: '⚖️' },
-  { to: '/esclarecimentos', label: 'Elaborar Esclarecimentos Técnicos', emoji: '🔎' },
-  { to: '/biblioteca', label: 'Biblioteca', emoji: '📚' },
+type ItemMenu = { to: string; label: string; icone: LucideIcon; cor: string; end?: boolean }
+
+const NAV: ItemMenu[] = [
+  { to: '/', label: 'Início', icone: House, cor: 'bg-sky-400/15 text-sky-300', end: true },
+  { to: '/clientes', label: 'Cadastrar Empresa', icone: Building2, cor: 'bg-indigo-400/15 text-indigo-300' },
+  { to: '/pericias/nova?tipo=parecer', label: 'Gerar Parecer Técnico Pericial', icone: FileText, cor: 'bg-blue-400/15 text-blue-300' },
+  { to: '/pericias/nova?tipo=laudo', label: 'Gerar Laudo Técnico Pericial', icone: FileStack, cor: 'bg-violet-400/15 text-violet-300' },
+  { to: '/quesitos', label: 'Elaborar Quesitos Técnicos', icone: MessageCircleQuestion, cor: 'bg-amber-400/15 text-amber-300' },
+  { to: '/manifestacao/concordancia', label: 'Elaborar Manifestação sobre o Laudo', icone: FilePenLine, cor: 'bg-emerald-400/15 text-emerald-300' },
+  { to: '/manifestacao/impugnacao_laudo', label: 'Elaborar Impugnação ao Laudo', icone: Scale, cor: 'bg-rose-400/15 text-rose-300' },
+  { to: '/esclarecimentos', label: 'Elaborar Esclarecimentos Técnicos', icone: FileSearch, cor: 'bg-cyan-400/15 text-cyan-300' },
+  { to: '/biblioteca', label: 'Biblioteca', icone: Library, cor: 'bg-orange-400/15 text-orange-300' },
 ]
 
-const NAV_FOOTER = [
-  { to: '/configuracoes', label: 'Configurações', emoji: '⚙️' },
-  { to: '/ajuda', label: 'Ajuda', emoji: '🛟' },
+const NAV_FOOTER: ItemMenu[] = [
+  { to: '/configuracoes', label: 'Configurações', icone: Settings, cor: 'bg-slate-400/15 text-slate-300' },
+  { to: '/ajuda', label: 'Ajuda', icone: LifeBuoy, cor: 'bg-teal-400/15 text-teal-300' },
 ]
 
-const EM_DESENVOLVIMENTO = [
-  { label: 'Gerar PGR', emoji: '📋' },
-  { label: 'Gerar Laudo de Insalubridade', emoji: '🧪' },
-  { label: 'Gerar Laudo de Periculosidade', emoji: '⚠️' },
-  { label: 'Gerar LTCAT', emoji: '📊' },
-  { label: 'Entrega de EPIs por biometria/facial', emoji: '🦺' },
+const EM_DESENVOLVIMENTO: { label: string; icone: LucideIcon }[] = [
+  { label: 'Gerar PGR', icone: ClipboardList },
+  { label: 'Gerar Laudo de Insalubridade', icone: FlaskConical },
+  { label: 'Gerar Laudo de Periculosidade', icone: TriangleAlert },
+  { label: 'Gerar LTCAT', icone: ChartColumn },
+  { label: 'Entrega de EPIs por biometria/facial', icone: ScanFace },
 ]
 
 /**
- * Ícone (emoji) de um item do menu.
+ * Ícone de um item do menu: o desenho do lucide numa plaquinha quadrada.
  *
- * Largura fixa para os rótulos alinharem entre si, `font-emoji` para o glifo
- * colorido sair igual no Windows, no Mac e no Linux, e `aria-hidden` porque ele
+ * Tamanho fixo para os rótulos alinharem entre si, e `aria-hidden` porque ele
  * não acrescenta nada ao que o rótulo ao lado já diz.
  */
-function IconeMenu({ emoji, className }: { emoji: string; className?: string }) {
+function IconeMenu({ icone: Icone, className }: { icone: LucideIcon; className: string }) {
   return (
     <span
       aria-hidden="true"
-      className={cn('w-[18px] shrink-0 text-center font-emoji text-[15px] leading-5', className)}
+      className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md', className)}
     >
-      {emoji}
+      <Icone size={16} strokeWidth={2} />
     </span>
   )
 }
@@ -86,7 +107,7 @@ export function AppLayout() {
       : isActive
     return (
     cn(
-      'flex items-start gap-3 rounded-lg border-l-[3px] px-2.5 py-2 text-[13px] font-medium leading-4 transition-colors',
+      'flex items-center gap-3 rounded-lg border-l-[3px] px-2 py-1.5 text-[13px] font-medium leading-4 transition-colors',
       ativo
         ? 'border-brand-400 bg-brand-600/20 text-white font-semibold'
         : 'border-transparent text-white/65 hover:bg-white/10 hover:text-white',
@@ -114,18 +135,18 @@ export function AppLayout() {
         </div>
 
         <nav aria-label="Navegação principal" className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
-          {NAV.map(({ to, label, emoji, end }) => (
+          {NAV.map(({ to, label, icone, cor, end }) => (
             <NavLink key={to} to={to} end={end} className={linkClass(to)} onClick={() => setMenuAberto(false)}>
-              <IconeMenu emoji={emoji} />
+              <IconeMenu icone={icone} className={cor} />
               <span>{label}</span>
             </NavLink>
           ))}
 
           <div className="my-3 border-t border-white/10" />
 
-          {NAV_FOOTER.map(({ to, label, emoji }) => (
+          {NAV_FOOTER.map(({ to, label, icone, cor }) => (
             <NavLink key={to} to={to} className={linkClass(to)} onClick={() => setMenuAberto(false)}>
-              <IconeMenu emoji={emoji} />
+              <IconeMenu icone={icone} className={cor} />
               <span>{label}</span>
             </NavLink>
           ))}
@@ -135,16 +156,16 @@ export function AppLayout() {
               Em desenvolvimento
             </p>
             <div className="space-y-1">
-              {EM_DESENVOLVIMENTO.map(({ label, emoji }) => (
+              {EM_DESENVOLVIMENTO.map(({ label, icone }) => (
                 <button
                   key={label}
                   type="button"
                   disabled
-                  className="flex w-full cursor-not-allowed items-start gap-3 rounded-lg border-l-[3px] border-transparent px-2.5 py-2 text-left text-[12.5px] leading-4 text-white/35"
+                  className="flex w-full cursor-not-allowed items-center gap-3 rounded-lg border-l-[3px] border-transparent px-2 py-1.5 text-left text-[12.5px] leading-4 text-white/35"
                 >
-                  {/* Meio apagado: o emoji ignora o `text-white/35` do botão e, em
-                      cor cheia, faria o item desabilitado parecer clicável. */}
-                  <IconeMenu emoji={emoji} className="mt-px opacity-50" />
+                  {/* Plaquinha cinza: em cor cheia, o item desabilitado
+                      pareceria clicável. */}
+                  <IconeMenu icone={icone} className="bg-white/5 text-white/35" />
                   <span className="min-w-0 flex-1">{label}</span>{' '}
                   <span className="shrink-0 rounded-full border border-white/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/35">
                     Em breve

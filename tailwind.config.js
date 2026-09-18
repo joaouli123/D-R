@@ -58,16 +58,6 @@ export default {
         sans: ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
         serif: ['Georgia', 'Cambria', 'Times New Roman', 'serif'],
         display: ['Petrona', 'Georgia', 'Cambria', 'serif'],
-        // Ícones do menu lateral. Sem uma família só de emoji, o Inter entra
-        // primeiro e parte dos glifos cai no desenho monocromático de texto —
-        // que é justamente o que o perito não quis.
-        emoji: [
-          'Apple Color Emoji',
-          'Segoe UI Emoji',
-          'Noto Color Emoji',
-          'Segoe UI Symbol',
-          'sans-serif',
-        ],
       },
       boxShadow: {
         card: '0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.06)',

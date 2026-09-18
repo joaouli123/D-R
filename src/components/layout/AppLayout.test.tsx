@@ -30,25 +30,26 @@ describe('painel lateral por tipo de documento', () => {
 
     const navegacao = screen.getByRole('navigation', { name: 'Navegação principal' })
 
-    // O emoji entra no `textContent` (o `aria-hidden` tira do nome acessível,
-    // não do texto do nó), então é aqui que a lista colorida fica travada: se
-    // alguém trocar um ícone sem querer, este teste acusa.
-    expect(within(navegacao).getAllByRole('link').map((link) => link.textContent?.trim())).toEqual([
-      '🏠Início',
-      '🏢Cadastrar Empresa',
-      '📄Gerar Parecer Técnico Pericial',
-      '📑Gerar Laudo Técnico Pericial',
-      '❓Elaborar Quesitos Técnicos',
-      '📝Elaborar Manifestação sobre o Laudo',
-      '⚖️Elaborar Impugnação ao Laudo',
-      '🔎Elaborar Esclarecimentos Técnicos',
-      '📚Biblioteca',
-      '⚙️Configurações',
-      '🛟Ajuda',
+    const links = within(navegacao).getAllByRole('link')
+    expect(links.map((link) => link.textContent?.trim())).toEqual([
+      'Início',
+      'Cadastrar Empresa',
+      'Gerar Parecer Técnico Pericial',
+      'Gerar Laudo Técnico Pericial',
+      'Elaborar Quesitos Técnicos',
+      'Elaborar Manifestação sobre o Laudo',
+      'Elaborar Impugnação ao Laudo',
+      'Elaborar Esclarecimentos Técnicos',
+      'Biblioteca',
+      'Configurações',
+      'Ajuda',
     ])
 
-    // ...e o nome acessível continua limpo: o leitor de tela anuncia \"Início\",
-    // não \"casa Início\". Sem o `aria-hidden` do IconeMenu isto quebra.
+    // Todo item tem o seu ícone, e ele fica escondido do leitor de tela: quem
+    // nomeia o link é o rótulo. Sem o `aria-hidden` do IconeMenu isto quebra.
+    for (const link of links) {
+      expect(link.querySelector('[aria-hidden="true"] > svg')).toBeTruthy()
+    }
     expect(within(navegacao).getByRole('link', { name: 'Início' })).toBeTruthy()
     expect(within(navegacao).getByRole('link', { name: 'Biblioteca' })).toBeTruthy()
 
@@ -57,11 +58,11 @@ describe('painel lateral por tipo de documento', () => {
       texto: botao.textContent?.replace(/\s+/g, ' ').trim(),
       desabilitado: (botao as HTMLButtonElement).disabled,
     }))).toEqual([
-      { texto: '📋Gerar PGR Em breve', desabilitado: true },
-      { texto: '🧪Gerar Laudo de Insalubridade Em breve', desabilitado: true },
-      { texto: '⚠️Gerar Laudo de Periculosidade Em breve', desabilitado: true },
-      { texto: '📊Gerar LTCAT Em breve', desabilitado: true },
-      { texto: '🦺Entrega de EPIs por biometria/facial Em breve', desabilitado: true },
+      { texto: 'Gerar PGR Em breve', desabilitado: true },
+      { texto: 'Gerar Laudo de Insalubridade Em breve', desabilitado: true },
+      { texto: 'Gerar Laudo de Periculosidade Em breve', desabilitado: true },
+      { texto: 'Gerar LTCAT Em breve', desabilitado: true },
+      { texto: 'Entrega de EPIs por biometria/facial Em breve', desabilitado: true },
     ])
   })
 })
