@@ -21,6 +21,7 @@ import { Logo } from '@/components/Logo'
 import { FechoDoDocumento } from '@/components/FechoDoDocumento'
 import { exibirQuadroVarredura, normalizarVarredura, type AnexoVarredura } from '@/lib/varreduraNormativa'
 import { gruposQuesitosDoLaudo } from '@/lib/quesitosLaudo'
+import { textoHonorariosPericiais } from '@/lib/honorarios'
 
 // ============================================================
 // MÓDULO H — Prévia fiel do Parecer/Laudo.
@@ -230,6 +231,9 @@ export function DocumentoPreview({
     : Boolean(t.respostasQuesitos?.trim())
   const numeroQuesitos = temQuesitos ? ++indiceSecaoFinal : null
   const numeroEncerramento = ++indiceSecaoFinal
+  const numeroHonorarios = tipoDocumento === 'laudo' && (t.honorariosPericiaisCentavos ?? 0) > 0
+    ? ++indiceSecaoFinal
+    : null
   let indiceGrupoAnalise = 0
   const numeroAnaliseNr15 = temInsalubridade ? `10.${++indiceGrupoAnalise}` : null
   const numeroAnaliseNr16 = temPericulosidade ? `10.${++indiceGrupoAnalise}` : null
@@ -638,6 +642,10 @@ export function DocumentoPreview({
 
       <h2>{numeroEncerramento}. Encerramento</h2>
       <Paragrafos texto={encerramento} />
+      {numeroHonorarios && <>
+        <h2>{numeroHonorarios}. DOS HONORÁRIOS PERICIAIS</h2>
+        <Paragrafos texto={textoHonorariosPericiais(t.honorariosPericiaisCentavos!)} />
+      </>}
       <FechoDoDocumento cidade={fecho.cidade} data={fecho.data} perito={perito} espacado />
     </article>
   )

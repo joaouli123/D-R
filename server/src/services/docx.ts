@@ -58,6 +58,7 @@ import {
   hoje,
   ATUACAO,
 } from './documento-comum.js'
+import { textoHonorariosPericiais } from './honorarios.js'
 import { exibirQuadroVarredura, normalizarVarredura, type AnexoVarreduraDocumento } from './varredura-normativa.js'
 
 // ============================================================
@@ -1119,6 +1120,13 @@ async function docParecer(
     filhos.push(h2(num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')), ...blocos(t.respostasQuesitos))
   }
   filhos.push(h2(num.secao('ENCERRAMENTO')), ...blocosComProximo(encerramento))
+
+  if (tipoDocumento === 'laudo' && (t.honorariosPericiaisCentavos ?? 0) > 0) {
+    filhos.push(
+      h2(num.secao('DOS HONORÁRIOS PERICIAIS')),
+      ...blocosComProximo(textoHonorariosPericiais(t.honorariosPericiaisCentavos!)),
+    )
+  }
 
   filhos.push(...assinatura(perito, manuscrita, fecho.cidade, fecho.data, { espacado: true }))
 

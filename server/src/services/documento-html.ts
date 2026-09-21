@@ -37,6 +37,7 @@ import {
   TEXTO_AUSENCIA_RECLAMANTE,
   ATUACAO,
 } from './documento-comum.js'
+import { textoHonorariosPericiais } from './honorarios.js'
 
 // ============================================================
 // MÓDULO H — Montagem automática do documento (lado servidor).
@@ -824,8 +825,14 @@ export async function htmlDoParecer(
   partes.push(
     `<h2>${num.secao('ENCERRAMENTO')}</h2>`,
     blocoConteudo(paragrafos(encerramento)),
-    await assinatura(perito, fecho.cidade, fecho.data, { espacado: true }),
   )
+  if (tipoDocumento === 'laudo' && (t.honorariosPericiaisCentavos ?? 0) > 0) {
+    partes.push(
+      `<h2>${num.secao('DOS HONORÁRIOS PERICIAIS')}</h2>`,
+      blocoConteudo(paragrafos(textoHonorariosPericiais(t.honorariosPericiaisCentavos!))),
+    )
+  }
+  partes.push(await assinatura(perito, fecho.cidade, fecho.data, { espacado: true }))
 
   return moldura(titulo, perito, partes.join('\n'), {
     comMarca: true,

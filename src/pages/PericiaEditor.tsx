@@ -100,6 +100,7 @@ import { responsavelDaPericia } from '@/lib/responsavelPericia'
 import { comEmpresaVinculada, empresasLivres, opcoesDaLinha } from '@/lib/reclamadas'
 import { uid } from '@/lib/utils'
 import { camposQuesitosDoLaudo } from '@/lib/quesitosLaudo'
+import { honorariosPorExtenso } from '@/lib/honorarios'
 import {
   anexoLegalNr15,
   atualizarStatusVarredura,
@@ -2290,6 +2291,38 @@ export default function PericiaEditor() {
                     />
                   </div>
                 ))}
+              </div>
+            </Card>
+          )}
+          {tipoDoc === 'laudo' && (
+            <Card>
+              <CardHeader
+                title="Honorários periciais"
+                subtitle="Proposta do perito para o item DOS HONORÁRIOS PERICIAIS do Laudo. O arbitramento final cabe ao Juízo."
+                icon={<FileText size={18} />}
+              />
+              <div className="p-5">
+                <Input
+                  label="Valor proposto dos honorários (R$)"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  value={p.tecnico.honorariosPericiaisCentavos == null
+                    ? ''
+                    : (p.tecnico.honorariosPericiaisCentavos / 100).toFixed(2)}
+                  onChange={(e) => {
+                    const valor = Number(e.target.value.replace(',', '.'))
+                    setT({
+                      honorariosPericiaisCentavos: e.target.value && Number.isFinite(valor)
+                        ? Math.max(0, Math.round(valor * 100))
+                        : undefined,
+                    })
+                  }}
+                  hint={p.tecnico.honorariosPericiaisCentavos
+                    ? `Por extenso: ${honorariosPorExtenso(p.tecnico.honorariosPericiaisCentavos)}.`
+                    : 'Opcional. A seção não será emitida enquanto o valor estiver vazio.'}
+                />
               </div>
             </Card>
           )}

@@ -178,6 +178,28 @@ describe('DocumentoPreview', () => {
     expect(html).not.toContain('Texto legado que não deve substituir os grupos.')
   })
 
+  it('insere os honorários do Laudo após o encerramento e antes da assinatura', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={{
+          ...pericia,
+          tecnico: { ...pericia.tecnico, honorariosPericiaisCentavos: 500_000 },
+        }}
+        empresas={[]}
+        titulo="Laudo de teste"
+        tipoDocumento="laudo"
+      />,
+    )
+
+    const encerramento = html.indexOf('Encerramento')
+    const honorarios = html.indexOf('DOS HONORÁRIOS PERICIAIS')
+    const assinatura = html.indexOf('class="fecho')
+    expect(encerramento).toBeGreaterThan(-1)
+    expect(honorarios).toBeGreaterThan(encerramento)
+    expect(assinatura).toBeGreaterThan(honorarios)
+    expect(html).toContain('R$ 5.000,00 (cinco mil reais)')
+  })
+
   it('abrevia a empresa na representação e apresenta ausência da parte reclamante em linha única', () => {
     const html = renderToStaticMarkup(
       <DocumentoPreview

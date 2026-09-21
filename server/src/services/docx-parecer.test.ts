@@ -79,6 +79,25 @@ describe('parecer em DOCX', () => {
     expect(texto).not.toContain('Resposta legada do parecer.')
   })
 
+  it('imprime os honorários do Laudo depois do encerramento e antes da assinatura', async () => {
+    const pericia = periciaDeTeste()
+    Object.assign(pericia.tecnico as object, { honorariosPericiaisCentavos: 500_000 })
+    const laudo = { ...documento, tipo: 'laudo', titulo: 'Laudo Técnico Pericial' } as DocumentoGerado
+
+    const xml = await xmlDoDocx(pericia, perito, laudo)
+    const texto = (xml.match(/<w:t[^>]*>[^<]*<\/w:t>/g) ?? [])
+      .map((no) => no.replace(/<[^>]+>/g, ''))
+      .join(' ')
+    const encerramento = texto.indexOf('ENCERRAMENTO')
+    const honorarios = texto.indexOf('DOS HONORÁRIOS PERICIAIS')
+    const assinatura = texto.indexOf(perito.nome)
+
+    expect(honorarios).toBeGreaterThan(encerramento)
+    expect(assinatura).toBeGreaterThan(honorarios)
+    expect(texto).toContain('R$ 5.000,00 (cinco mil reais)')
+    expect(texto).not.toContain('[VALOR]')
+  })
+
   it('imprime o quadro compacto da varredura normativa', async () => {
     const pericia = periciaDeTeste()
     ;(pericia.tecnico as unknown as { varreduraNr15: unknown[] }).varreduraNr15 = [

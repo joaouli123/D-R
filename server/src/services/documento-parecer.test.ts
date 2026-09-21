@@ -49,6 +49,22 @@ describe('parecer em HTML (motor do PDF)', () => {
     expect(html).not.toContain('Resposta legada do parecer.')
   })
 
+  it('imprime os honorários do Laudo após o encerramento e antes da assinatura', async () => {
+    const pericia = periciaDeTeste()
+    Object.assign(pericia.tecnico as object, { honorariosPericiaisCentavos: 500_000 })
+
+    const html = await htmlDoParecer(pericia, [empresa], perito, 'Laudo Técnico Pericial', 'laudo')
+    const encerramento = html.indexOf('ENCERRAMENTO')
+    const honorarios = html.indexOf('DOS HONORÁRIOS PERICIAIS')
+    const assinatura = html.indexOf('class="assinatura')
+
+    expect(honorarios).toBeGreaterThan(encerramento)
+    expect(assinatura).toBeGreaterThan(honorarios)
+    expect(html).toContain('R$ 5.000,00 (cinco mil reais)')
+    expect(html).not.toContain('[VALOR]')
+  })
+
+
   it('imprime o quadro compacto da varredura antes das avaliações detalhadas', async () => {
     const pericia = periciaDeTeste()
     ;(pericia.tecnico as unknown as { varreduraNr15: unknown[] }).varreduraNr15 = [

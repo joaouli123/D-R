@@ -94,6 +94,15 @@ describe('PericiaEditor — cabeçalho do documento novo', () => {
     expect(screen.queryByLabelText('Quesitos do Juízo')).toBeNull()
     expect(screen.getByText(/Respostas aos Quesitos Técnicos/)).toBeDefined()
   })
+
+  it('oferece honorários somente no Laudo e apresenta o valor por extenso', () => {
+    abrirEditor('/pericias/nova?tipo=laudo')
+    fireEvent.click(screen.getByRole('button', { name: /Conclusão/ }))
+
+    const valor = screen.getByLabelText<HTMLInputElement>('Valor proposto dos honorários (R$)')
+    fireEvent.change(valor, { target: { value: '5000' } })
+    expect(screen.getByText('Por extenso: cinco mil reais.')).toBeDefined()
+  })
 })
 
 // O título impresso no documento é o do seletor MAIS a modalidade. Ele
