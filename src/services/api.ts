@@ -791,7 +791,12 @@ export const fotos = {
    * Envia as imagens ao servidor e devolve as fotos já persistidas.
    * No modo mock cai em blob URLs, que não sobrevivem ao reload.
    */
-  async enviar(periciaId: string, secao: SecaoFoto, arquivos: File[]): Promise<Foto[]> {
+  async enviar(
+    periciaId: string,
+    secao: SecaoFoto,
+    arquivos: File[],
+    agenteId?: string,
+  ): Promise<Foto[]> {
     // Recebe um array, nunca o FileList do <input>: o Chromium esvazia o
     // FileList no próprio objeto quando o input é zerado, e a lista chegava
     // aqui vazia depois do primeiro await. Lista vazia é erro, não sucesso —
@@ -807,6 +812,7 @@ export const fotos = {
           url: URL.createObjectURL(f),
           legenda: f.name.replace(/\.[^.]+$/, ''),
           ordem: i + 1,
+          agenteId,
         })),
         400,
       )
@@ -814,6 +820,7 @@ export const fotos = {
 
     const form = new FormData()
     form.append('secao', secao)
+    if (agenteId) form.append('agenteId', agenteId)
     lista.forEach((f) => form.append('fotos', f))
 
     const enviadas = await http<Foto[]>(`/pericias/${periciaId}/fotos`, {

@@ -609,8 +609,7 @@ export async function htmlDoParecer(
   // Fotos viram data URI: o Chromium roda com a rede bloqueada.
   const fotosOrdenadas = fotosEmOrdemDeDocumento(pericia.fotos)
   const numeroDaFoto = new Map(fotosOrdenadas.map((foto, indice) => [foto.id, indice + 1]))
-  const fotosDasSecoes = async (secoes: string[]) => {
-    const fotos = fotosOrdenadas.filter((foto) => secoes.includes(foto.secao))
+  const figurasDasFotos = async (fotos: typeof fotosOrdenadas) => {
     if (!fotos.length) return ''
     // Carrega o armazenamento apenas quando há foto para embutir, como o
     // docx.ts já faz: o import estático puxava env.ts, que chama
@@ -632,6 +631,14 @@ export async function htmlDoParecer(
     )
     return `<div class="fotos">${figuras.join('')}</div>`
   }
+  const fotosDasSecoes = async (secoes: string[]) => figurasDasFotos(
+    fotosOrdenadas.filter((foto) => !foto.agenteId && secoes.includes(foto.secao)),
+  )
+  const idsComFotos = [...new Set(fotosOrdenadas.flatMap((foto) => foto.agenteId ? [foto.agenteId] : []))]
+  const fotosPorAgente = new Map(await Promise.all(idsComFotos.map(async (agenteId) => [
+    agenteId,
+    await figurasDasFotos(fotosOrdenadas.filter((foto) => foto.agenteId === agenteId)),
+  ] as const)))
 
   const fotosAmbiente = await fotosDasSecoes(['ambiente'])
   const fotosAtividades = await fotosDasSecoes(['atividades'])
@@ -663,7 +670,7 @@ export async function htmlDoParecer(
         const linhas = protecoes
           ? [...apresentacao.linhas, { rotulo: 'Proteções associadas', valor: protecoes }]
           : apresentacao.linhas
-        return `<section class="agente-bloco"><h4>${prefixo}.${indice + 1}. ${esc(apresentacao.titulo)}</h4>${quadroDoAgente(agente, linhas, { comConclusao: true })}</section>`
+        return `<section class="agente-bloco"><h4>${prefixo}.${indice + 1}. ${esc(apresentacao.titulo)}</h4>${quadroDoAgente(agente, linhas, { comConclusao: true })}${fotosPorAgente.get(agente.id) ?? ''}</section>`
       }).join('')
       return `<h3>${prefixo}. ${esc(tituloGrupo)}</h3>${quadros}`
     }
@@ -682,9 +689,9 @@ export async function htmlDoParecer(
           ? montarApresentacaoAgente(quadro.agente, { conclusiva: true })
           : null
         const cabecalho = `<h4>${esc(`${quadro.numero}. ${quadro.titulo}`)}</h4>`
-        return apresentacao
-          ? `<section class="agente-bloco">${cabecalho}${tabelaLinhasAgente(apresentacao.linhas)}</section>`
-          : cabecalho
+        return `<section class="agente-bloco">${cabecalho}${apresentacao
+          ? tabelaLinhasAgente(apresentacao.linhas)
+          : ''}${fotosPorAgente.get(quadro.agente.id) ?? ''}</section>`
       }).join('')
       return `<h3>${prefixo}. NR-16 — Avaliação das Atividades e Operações Perigosas</h3>${quadros}`
     }

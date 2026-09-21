@@ -163,8 +163,7 @@ export function DocumentoPreview({
 
   const fotosOrdenadas = fotosEmOrdemDeDocumento(pericia.fotos)
   const numeroDaFoto = new Map(fotosOrdenadas.map((foto, indice) => [foto.id, indice + 1]))
-  const fotosDasSecoes = (secoes: SecaoFoto[]) => {
-    const fotos = fotosOrdenadas.filter((foto) => secoes.includes(foto.secao))
+  const figurasDasFotos = (fotos: Pericia['fotos']) => {
     if (!fotos.length) return null
 
     return (
@@ -198,6 +197,12 @@ export function DocumentoPreview({
       </div>
     )
   }
+  const fotosDasSecoes = (secoes: SecaoFoto[]) => figurasDasFotos(
+    fotosOrdenadas.filter((foto) => !foto.agenteId && secoes.includes(foto.secao)),
+  )
+  const fotosDoAgente = (agenteId: string) => figurasDasFotos(
+    fotosOrdenadas.filter((foto) => foto.agenteId === agenteId),
+  )
 
   // Um agente por função: o rótulo é resolvido aqui, uma vez, a partir do
   // período. Ver `comFuncaoPosto`.
@@ -338,6 +343,7 @@ export function DocumentoPreview({
                   {conclusao}
                 </tbody>
               </table> : conclusao && <table className="tabela-conclusao"><tbody>{conclusao}</tbody></table>}
+              {fotosDoAgente(agente.id)}
             </section>
           )
         })}
@@ -363,7 +369,10 @@ export function DocumentoPreview({
           ? montarApresentacaoAgente(quadro.agente, { conclusiva: true })
           : null
         const chave = `nr16-${quadro.numero}-${indice}`
-        if (!apresentacao) return <h4 key={chave}>{quadro.numero}. {quadro.titulo}</h4>
+        if (!apresentacao) return <section key={chave} className="agente-bloco">
+          <h4>{quadro.numero}. {quadro.titulo}</h4>
+          {fotosDoAgente(quadro.agente.id)}
+        </section>
         return (
           <section key={chave} className="agente-bloco">
             <h4>{quadro.numero}. {quadro.titulo}</h4>
@@ -377,6 +386,7 @@ export function DocumentoPreview({
                 ))}
               </tbody>
             </table>
+            {fotosDoAgente(quadro.agente.id)}
           </section>
         )
       })}

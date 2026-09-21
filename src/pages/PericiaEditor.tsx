@@ -985,10 +985,12 @@ export default function PericiaEditor() {
    * vazia ao envio depois do primeiro await — nenhuma foto subia, e a tela
    * ainda dizia "0 foto(s) adicionada(s)" em verde.
    */
-  async function adicionarFotos(arquivos: File[]) {
+  async function adicionarFotos(arquivos: File[], agenteId?: string, nomeAgente?: string) {
     if (!arquivos.length) return
-    const secao = secaoFotoAtual
-    const rotulo = SECOES_FOTO.find((s) => s.value === secao)?.label
+    const secao: SecaoFoto = agenteId ? 'documentos' : secaoFotoAtual
+    const rotulo = agenteId
+      ? `Medição / avaliação técnica — ${nomeAgente?.trim() || 'agente'}`
+      : SECOES_FOTO.find((s) => s.value === secao)?.label
 
     // A quantidade confere ANTES de tudo: a tela anuncia o teto, e o
     // <input multiple> não o impõe sozinho.
@@ -1027,7 +1029,7 @@ export default function PericiaEditor() {
         const lote = prontos.slice(inicio, inicio + FOTOS_POR_LOTE)
         setProgressoFotos(`Enviando ${inicio + lote.length} de ${prontos.length}…`)
         try {
-          novas.push(...(await api.fotos.enviar(salva.id, secao, lote)))
+          novas.push(...(await api.fotos.enviar(salva.id, secao, lote, agenteId)))
         } catch (e) {
           falha = e
           break
@@ -1086,6 +1088,81 @@ export default function PericiaEditor() {
       setP((v) => ({ ...v, fotos: anterior }))
       toast(e instanceof Error ? e.message : 'Falha ao remover a foto.', 'error')
     }
+  }
+
+  function painelFotosDoAgente(agente: AgenteAvaliado) {
+    const fotos = p.fotos.filter((foto) => foto.agenteId === agente.id)
+    const nome = agente.nome?.trim() || 'agente avaliado'
+    const idUpload = `fotos-agente-${agente.id}`
+    const idCamera = `camera-agente-${agente.id}`
+    const aoSelecionar = (arquivos: FileList | null) => {
+      void adicionarFotos(Array.from(arquivos ?? []), agente.id, nome)
+    }
+
+    return (
+      <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50/50 p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-ink-800">Fotografias da medição / avaliação</p>
+            <p className="text-xs text-ink-500">Ficam vinculadas somente a este agente e saem logo abaixo da tabela correspondente.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <label htmlFor={idUpload} className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-navy-700 bg-white px-3 py-1.5 text-xs font-semibold text-navy-800 hover:bg-navy-50">
+              <ImagePlus size={14} /> Enviar fotos
+            </label>
+            <input
+              id={idUpload}
+              aria-label={`Enviar fotos de ${nome}`}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => { aoSelecionar(e.target.files); e.target.value = '' }}
+            />
+            <label htmlFor={idCamera} className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-navy-700 bg-white px-3 py-1.5 text-xs font-semibold text-navy-800 hover:bg-navy-50">
+              <Camera size={14} /> Usar câmera
+            </label>
+            <input
+              id={idCamera}
+              aria-label={`Capturar foto de ${nome}`}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => { aoSelecionar(e.target.files); e.target.value = '' }}
+            />
+          </div>
+        </div>
+        {fotos.length > 0 && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            {fotos.map((foto) => (
+              <div key={foto.id} className="rounded-lg border border-ink-200 bg-white p-2">
+                <div className="aspect-[4/3] overflow-hidden rounded bg-ink-100">
+                  <img src={foto.url} alt={foto.legenda} className="h-full w-full object-cover" />
+                </div>
+                <input
+                  value={foto.legenda}
+                  onChange={(e) => set({
+                    fotos: p.fotos.map((item) => item.id === foto.id
+                      ? { ...item, legenda: e.target.value }
+                      : item),
+                  })}
+                  placeholder="Legenda da medição"
+                  className="mt-2 w-full rounded border border-ink-200 px-2 py-1 text-[12px] focus:border-brand-600"
+                />
+                <button
+                  type="button"
+                  onClick={() => void removerFoto(foto)}
+                  className="mt-1.5 flex w-full items-center justify-center gap-1 rounded py-1 text-[11px] text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 size={12} /> Remover
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
   }
 
   /** Módulo H — anexo em PDF, concatenado ao final na geração. */
@@ -1856,6 +1933,7 @@ export default function PericiaEditor() {
                           avaliacao={a}
                           onChange={(avaliacaoAtualizada) => atualizarAgente(a.id, () => avaliacaoAtualizada)}
                         />
+                        {painelFotosDoAgente(a)}
                         <BotaoInserirNoLaudo onInserir={() => definirCartaoAberto(a.id, false)} />
                       </SecaoColapsavel>
                     </div>
@@ -2056,6 +2134,7 @@ export default function PericiaEditor() {
                     agente={a}
                     onChange={(epiEficaz) => atualizarAgente(a.id, (atual) => ({ ...atual, epiEficaz }))}
                   />
+                  {painelFotosDoAgente(a)}
                   <BotaoInserirNoLaudo onInserir={() => definirCartaoAberto(a.id, false)} />
                   </SecaoColapsavel>
                 </div>
@@ -2116,11 +2195,58 @@ export default function PericiaEditor() {
               }}
             />
             <div className="space-y-6 p-5">
+              {p.fotos.some((foto) => foto.agenteId) && (
+                <div>
+                  <div className="mb-2 flex items-center gap-2">
+                    <h4 className="section-title">Medições e avaliações técnicas</h4>
+                    <Badge tone="green">{p.fotos.filter((foto) => foto.agenteId).length}</Badge>
+                  </div>
+                  <div className="space-y-4">
+                    {[...new Set(p.fotos.flatMap((foto) => foto.agenteId ? [foto.agenteId] : []))].map((agenteId) => {
+                      const agente = p.tecnico.agentes.find((item) => item.id === agenteId)
+                      const fotos = p.fotos.filter((foto) => foto.agenteId === agenteId)
+                      return (
+                        <div key={agenteId} className="rounded-lg border border-sky-200 bg-sky-50/40 p-3">
+                          <p className="mb-2 text-sm font-semibold text-ink-800">
+                            {agente?.nome?.trim() || 'Avaliação removida — fotos pendentes de revisão'}
+                          </p>
+                          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                            {fotos.map((foto) => (
+                              <div key={foto.id} className="rounded-lg border border-ink-200 bg-white p-2">
+                                <div className="aspect-[4/3] overflow-hidden rounded bg-ink-100">
+                                  <img src={foto.url} alt={foto.legenda} className="h-full w-full object-cover" />
+                                </div>
+                                <input
+                                  value={foto.legenda}
+                                  onChange={(e) => set({
+                                    fotos: p.fotos.map((item) => item.id === foto.id
+                                      ? { ...item, legenda: e.target.value }
+                                      : item),
+                                  })}
+                                  placeholder="Legenda da medição"
+                                  className="mt-2 w-full rounded border border-ink-200 px-2 py-1 text-[12px] focus:border-brand-600"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => void removerFoto(foto)}
+                                  className="mt-1.5 flex w-full items-center justify-center gap-1 rounded py-1 text-[11px] text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 size={12} /> Remover
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
               {SECOES_FOTO.map((s) => {
                 // 'epi' não é mais selecionável (dobrada em 'documentos'),
                 // mas fotos legadas enviadas lá continuam visíveis aqui.
                 const fotos = p.fotos.filter((f) =>
-                  f.secao === s.value || (s.value === 'documentos' && f.secao === 'epi'),
+                  !f.agenteId && (f.secao === s.value || (s.value === 'documentos' && f.secao === 'epi')),
                 )
                 return (
                   <div key={s.value}>

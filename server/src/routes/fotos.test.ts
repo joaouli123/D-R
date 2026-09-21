@@ -12,7 +12,7 @@ vi.mock('../prisma.js', () => ({ prisma: {} }))
 const exigirSessaoMock = vi.hoisted(() => vi.fn())
 vi.mock('../auth.js', () => ({ exigirSessao: exigirSessaoMock }))
 
-const { exigirSessaoDrenandoUpload } = await import('./fotos.js')
+const { agentePertenceAoTecnico, exigirSessaoDrenandoUpload } = await import('./fotos.js')
 
 // ============================================================
 // Se a sessão for rejeitada com um multipart grande ainda chegando e o
@@ -57,5 +57,15 @@ describe('exigirSessaoDrenandoUpload', () => {
 
     expect(chamadas).not.toContain('resume')
     expect(next).toHaveBeenCalledWith(undefined)
+  })
+})
+
+describe('agentePertenceAoTecnico', () => {
+  it('aceita somente um agente gravado no preenchimento da própria perícia', () => {
+    const tecnico = { agentes: [{ id: 'agente-1' }, { id: 'agente-2' }] }
+
+    expect(agentePertenceAoTecnico(tecnico, 'agente-2')).toBe(true)
+    expect(agentePertenceAoTecnico(tecnico, 'agente-de-outra-pericia')).toBe(false)
+    expect(agentePertenceAoTecnico(null, 'agente-1')).toBe(false)
   })
 })

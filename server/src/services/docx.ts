@@ -718,7 +718,14 @@ async function docParecer(
   const numeroDaFoto = new Map(fotosOrdenadas.map((foto, indice) => [foto.id, indice + 1]))
   const fotosDasSecoes = async (secoes: string[]) => {
     const elementos: (Paragraph | Table)[] = []
-    for (const foto of fotosOrdenadas.filter((item) => secoes.includes(item.secao))) {
+    for (const foto of fotosOrdenadas.filter((item) => !item.agenteId && secoes.includes(item.secao))) {
+      elementos.push(...(await figuraDocx(foto.arquivo, foto.legenda, numeroDaFoto.get(foto.id) ?? 0)))
+    }
+    return elementos
+  }
+  const fotosDoAgente = async (agenteId: string) => {
+    const elementos: (Paragraph | Table)[] = []
+    for (const foto of fotosOrdenadas.filter((item) => item.agenteId === agenteId)) {
       elementos.push(...(await figuraDocx(foto.arquivo, foto.legenda, numeroDaFoto.get(foto.id) ?? 0)))
     }
     return elementos
@@ -1058,14 +1065,14 @@ async function docParecer(
   let grupoAnalise = 0
   const numeroAnaliseNr15 = temInsalubridade ? `${numeroAnalise}.${++grupoAnalise}` : null
   const numeroAnaliseNr16 = temPericulosidade ? `${numeroAnalise}.${++grupoAnalise}` : null
-  const adicionarQuadrosDeAnalise = (
+  const adicionarQuadrosDeAnalise = async (
     lista: typeof agentes,
     tituloGrupo: string,
     prefixo: string | null,
   ) => {
     if (!prefixo || !lista.length) return
     filhos.push(h3(`${prefixo}. ${tituloGrupo}`))
-    lista.forEach((agente, indice) => {
+    for (const [indice, agente] of lista.entries()) {
       const apresentacao = montarApresentacaoAgente(agente)
       const protecoes = resumoProtecoesAssociadas(agente.epis)
       filhos.push(
@@ -1079,7 +1086,8 @@ async function docParecer(
           { comConclusao: true },
         ),
       )
-    })
+      filhos.push(...(await fotosDoAgente(agente.id)))
+    }
   }
 
   /**
@@ -1089,7 +1097,7 @@ async function docParecer(
    * técnico / Conclusão”. Quem monta é `quadrosNr16DoItem10`.
    * Espelha `quadrosNr16DeAnalise` da prévia e `montarGrupoNr16` do PDF.
    */
-  const adicionarQuadrosNr16 = (lista: typeof agentes, prefixo: string | null) => {
+  const adicionarQuadrosNr16 = async (lista: typeof agentes, prefixo: string | null) => {
     if (!prefixo || !lista.length) return
     filhos.push(h3(`${prefixo}. NR-16 — Avaliação das Atividades e Operações Perigosas`))
     for (const quadro of quadrosNr16DoItem10(lista, prefixo)) {
@@ -1102,11 +1110,12 @@ async function docParecer(
           ? [tabela(apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor, false, item.destaque)))]
           : []),
       )
+      filhos.push(...(await fotosDoAgente(quadro.agente.id)))
     }
   }
 
-  adicionarQuadrosDeAnalise(agentesNr15, 'NR-15 — Avaliação da Exposição Ocupacional', numeroAnaliseNr15)
-  adicionarQuadrosNr16(agentesNr16, numeroAnaliseNr16)
+  await adicionarQuadrosDeAnalise(agentesNr15, 'NR-15 — Avaliação da Exposição Ocupacional', numeroAnaliseNr15)
+  await adicionarQuadrosNr16(agentesNr16, numeroAnaliseNr16)
   // Só os quadros: o texto livre da análise técnica saiu do formulário e do
   // documento (pedido do perito). `t.analiseTecnica` segue gravado nas
   // perícias antigas, mas não é mais impresso — igual ao PDF e à prévia.

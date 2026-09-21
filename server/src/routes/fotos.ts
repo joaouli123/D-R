@@ -44,6 +44,15 @@ fotosRouter.use(exigirSessaoDrenandoUpload)
 // desatualizado que ainda a ofereça cai no safeParse abaixo.
 const secoes = z.enum(['ambiente', 'atividades', 'equipamentos', 'produtos', 'documentos'])
 
+/** Confirma que a foto não pode ser vinculada a um agente de outra perícia. */
+export function agentePertenceAoTecnico(tecnico: unknown, agenteId: string): boolean {
+  if (!tecnico || typeof tecnico !== 'object' || Array.isArray(tecnico)) return false
+  const agentes = (tecnico as { agentes?: unknown }).agentes
+  return Array.isArray(agentes) && agentes.some((agente) =>
+    Boolean(agente && typeof agente === 'object' && (agente as { id?: unknown }).id === agenteId),
+  )
+}
+
 /** POST /pericias/:periciaId/fotos — multipart, campo "fotos". */
 fotosRouter.post(
   '/',
@@ -70,6 +79,13 @@ fotosRouter.post(
       throw new ErroHttp(400, 'Seção de foto inválida.')
     }
     const secao = resultadoSecao.data
+    const agenteId = typeof req.body.agenteId === 'string' && req.body.agenteId.trim()
+      ? req.body.agenteId.trim()
+      : undefined
+    if (agenteId && !agentePertenceAoTecnico(pericia.tecnico, agenteId)) {
+      await Promise.all(arquivos.map((a) => apagarUpload(a.filename)))
+      throw new ErroHttp(422, 'O agente informado não pertence a esta perícia.')
+    }
 
     // Contagem por PERÍCIA, não por seção: `ordem` é lida globalmente em
     // routes/pericias.ts e os três renderizadores numeram "Fotografia N" na
@@ -88,6 +104,7 @@ fotosRouter.post(
             data: {
               periciaId,
               secao,
+              agenteId,
               arquivo: arquivo.filename,
               legenda: arquivo.originalname.replace(/\.[^.]+$/, ''),
               ordem: jaExistem + i + 1,
@@ -104,6 +121,7 @@ fotosRouter.post(
       criadas.map((f) => ({
         id: f.id,
         secao: f.secao,
+        agenteId: f.agenteId ?? undefined,
         url: urlDaFoto(f.arquivo),
         legenda: f.legenda,
         ordem: f.ordem,

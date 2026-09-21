@@ -200,6 +200,31 @@ describe('DocumentoPreview', () => {
     expect(html).toContain('R$ 5.000,00 (cinco mil reais)')
   })
 
+  it('mostra a fotografia vinculada logo após a tabela do respectivo agente, sem duplicá-la', () => {
+    const legenda = 'Visor do dosímetro durante a medição'
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={{
+          ...pericia,
+          fotos: [...pericia.fotos, {
+            id: 'foto-medicao-ruido', secao: 'documentos', agenteId: 'ruido-calculado',
+            url: '/medicao.jpg', legenda, ordem: 3,
+          }],
+        }}
+        empresas={[]}
+        titulo="Parecer de teste"
+      />,
+    )
+
+    const quadroDoRuido = html.indexOf('10.1.3. Ruído')
+    const foto = html.indexOf(legenda)
+    expect(foto).toBeGreaterThan(quadroDoRuido)
+    // Uma figura usa a legenda duas vezes no HTML: texto alternativo e
+    // figcaption. Cinco partes significariam duas figuras duplicadas.
+    expect(html.split(legenda)).toHaveLength(3)
+  })
+
+
   it('abrevia a empresa na representação e apresenta ausência da parte reclamante em linha única', () => {
     const html = renderToStaticMarkup(
       <DocumentoPreview

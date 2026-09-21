@@ -98,6 +98,23 @@ describe('parecer em DOCX', () => {
     expect(texto).not.toContain('[VALOR]')
   })
 
+  it('coloca a foto vinculada depois da tabela do respectivo agente sem duplicação', async () => {
+    const pericia = periciaDeTeste()
+    const legenda = 'Visor do equipamento na avaliação química'
+    pericia.fotos.push({
+      id: 'foto-agente', periciaId: pericia.id, secao: 'documentos', agenteId: 'agn-1',
+      ordem: 3, arquivo: 'foto-agente.jpg', legenda,
+    } as never)
+
+    const texto = await textoDoDocx(pericia)
+    const quadro = texto.indexOf('10.1.1. Óleos minerais')
+    const foto = texto.indexOf(legenda)
+
+    expect(foto).toBeGreaterThan(quadro)
+    expect(texto.split(legenda)).toHaveLength(2)
+  })
+
+
   it('imprime o quadro compacto da varredura normativa', async () => {
     const pericia = periciaDeTeste()
     ;(pericia.tecnico as unknown as { varreduraNr15: unknown[] }).varreduraNr15 = [

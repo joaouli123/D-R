@@ -350,6 +350,35 @@ describe('PericiaEditor — feedback noturno de 28/08', () => {
     expect(screen.getByText('Amônia: 1 EPI')).toBeDefined()
   })
 
+  it('envia a fotografia da medição vinculada somente ao agente selecionado', async () => {
+    const comAgente = {
+      ...pericia,
+      tecnico: {
+        ...pericia.tecnico,
+        agentes: [{ id: 'agente-ruido', nome: 'Ruído', tipo: 'fisico', criterio: 'quantitativo', epis: [] }],
+      },
+    } as Pericia
+    const arquivo = new File(['foto'], 'dosimetro.jpg', { type: 'image/jpeg' })
+    vi.mocked(prepararFotosParaEnvio).mockResolvedValueOnce({ prontos: [arquivo], recusas: [] })
+    const enviar = vi.spyOn(api.fotos, 'enviar').mockResolvedValue([{
+      id: 'foto-ruido', secao: 'documentos', agenteId: 'agente-ruido',
+      url: 'https://arquivos.example/dosimetro.jpg', legenda: 'Dosímetro', ordem: 1,
+    }])
+    const { salvarPericia } = prepararEditor({ valor: comAgente })
+    fireEvent.click(screen.getByRole('button', { name: /Avaliações e EPIs/ }))
+
+    fireEvent.change(screen.getByLabelText('Enviar fotos de Ruído'), {
+      target: { files: [arquivo] },
+    })
+
+    await waitFor(() => expect(enviar).toHaveBeenCalledTimes(1))
+    expect(enviar).toHaveBeenCalledWith(
+      'pericia-feedback', 'documentos', [arquivo], 'agente-ruido',
+    )
+    await waitFor(() => expect(salvarPericia).toHaveBeenCalledTimes(2))
+    expect(salvarPericia.mock.calls[1]?.[0].fotos[0]?.agenteId).toBe('agente-ruido')
+  })
+
   it('sincroniza a fotografia enviada com a perícia antes de sair da etapa', async () => {
     const foto = {
       id: 'foto-enviada',
