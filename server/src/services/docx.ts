@@ -34,6 +34,7 @@ import {
   ORIGEM_PONTO,
   type LinhaApresentacaoAgente,
   type TecnicoJson,
+  gruposQuesitosDoLaudoDocumento,
   atividadesDoPeriodo,
   comFuncaoPosto,
   data,
@@ -699,6 +700,7 @@ async function docParecer(
   titulo: string,
   marca: MarcaDoDocumento,
   manuscrita: AssinaturaDoDocumento | null,
+  tipoDocumento: 'parecer' | 'laudo' = 'parecer',
 ): Promise<(Paragraph | Table)[]> {
   const t = pericia.tecnico as unknown as TecnicoJson
   const varredura = normalizarVarredura(t, pericia.modalidade)
@@ -1109,7 +1111,13 @@ async function docParecer(
   // perícias antigas, mas não é mais impresso — igual ao PDF e à prévia.
   if (temInsalubridade) filhos.push(h2(num.secao('NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr15))
   if (temPericulosidade) filhos.push(h2(num.secao('NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr16))
-  if (t.respostasQuesitos?.trim()) filhos.push(h2(num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')), ...blocos(t.respostasQuesitos))
+  const gruposQuesitos = tipoDocumento === 'laudo' ? gruposQuesitosDoLaudoDocumento(t) : []
+  if (tipoDocumento === 'laudo' && gruposQuesitos.length) {
+    filhos.push(h2(num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')))
+    for (const grupo of gruposQuesitos) filhos.push(h3(grupo.titulo), ...blocos(grupo.texto))
+  } else if (tipoDocumento === 'parecer' && t.respostasQuesitos?.trim()) {
+    filhos.push(h2(num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')), ...blocos(t.respostasQuesitos))
+  }
   filhos.push(h2(num.secao('ENCERRAMENTO')), ...blocosComProximo(encerramento))
 
   filhos.push(...assinatura(perito, manuscrita, fecho.cidade, fecho.data, { espacado: true }))
@@ -1288,7 +1296,7 @@ export async function gerarDocx(
     case 'parecer':
     case 'laudo':
       filhos = pericia
-        ? await docParecer(pericia, empresas, perito, doc.titulo, marca, manuscrita)
+        ? await docParecer(pericia, empresas, perito, doc.titulo, marca, manuscrita, doc.tipo)
         : [h1(doc.titulo), p('[A perícia vinculada não existe mais.]')]
       break
     case 'quesitos':

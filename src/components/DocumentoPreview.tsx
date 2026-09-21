@@ -20,6 +20,7 @@ import { fotosEmOrdemDeDocumento } from '@/lib/fotosDocumento'
 import { Logo } from '@/components/Logo'
 import { FechoDoDocumento } from '@/components/FechoDoDocumento'
 import { exibirQuadroVarredura, normalizarVarredura, type AnexoVarredura } from '@/lib/varreduraNormativa'
+import { gruposQuesitosDoLaudo } from '@/lib/quesitosLaudo'
 
 // ============================================================
 // MÓDULO H — Prévia fiel do Parecer/Laudo.
@@ -138,11 +139,13 @@ export function DocumentoPreview({
   empresas,
   perito,
   titulo,
+  tipoDocumento = 'parecer',
 }: {
   pericia: Pericia
   empresas: Empresa[]
   perito?: Usuario | null
   titulo: string
+  tipoDocumento?: 'parecer' | 'laudo'
 }) {
   const t = pericia.tecnico
   const principal = pericia.reclamadas.find((reclamada) => reclamada.principal)
@@ -221,7 +224,11 @@ export function DocumentoPreview({
   let indiceSecaoFinal = 10
   const numeroConclusaoNr15 = temInsalubridade ? ++indiceSecaoFinal : null
   const numeroConclusaoNr16 = temPericulosidade ? ++indiceSecaoFinal : null
-  const numeroQuesitos = t.respostasQuesitos?.trim() ? ++indiceSecaoFinal : null
+  const gruposQuesitos = tipoDocumento === 'laudo' ? gruposQuesitosDoLaudo(t) : []
+  const temQuesitos = tipoDocumento === 'laudo'
+    ? gruposQuesitos.length > 0
+    : Boolean(t.respostasQuesitos?.trim())
+  const numeroQuesitos = temQuesitos ? ++indiceSecaoFinal : null
   const numeroEncerramento = ++indiceSecaoFinal
   let indiceGrupoAnalise = 0
   const numeroAnaliseNr15 = temInsalubridade ? `10.${++indiceGrupoAnalise}` : null
@@ -619,7 +626,15 @@ export function DocumentoPreview({
 
       {numeroConclusaoNr15 && <><h2>{numeroConclusaoNr15}. NR-15 — Conclusão e Fundamentação</h2><Paragrafos texto={conclusaoNr15} /></>}
       {numeroConclusaoNr16 && <><h2>{numeroConclusaoNr16}. NR-16 — Conclusão e Fundamentação</h2><Paragrafos texto={conclusaoNr16} /></>}
-      {numeroQuesitos && <><h2>{numeroQuesitos}. Respostas aos Quesitos Técnicos</h2><Paragrafos texto={t.respostasQuesitos} /></>}
+      {numeroQuesitos && <>
+        <h2>{numeroQuesitos}. Respostas aos Quesitos Técnicos</h2>
+        {tipoDocumento === 'laudo'
+          ? gruposQuesitos.map((grupo) => <Fragment key={grupo.campo}>
+              <h3>{grupo.titulo}</h3>
+              <Paragrafos texto={grupo.texto} />
+            </Fragment>)
+          : <Paragrafos texto={t.respostasQuesitos} />}
+      </>}
 
       <h2>{numeroEncerramento}. Encerramento</h2>
       <Paragrafos texto={encerramento} />

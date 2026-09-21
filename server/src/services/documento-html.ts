@@ -12,6 +12,7 @@ import {
   MARCA,
   ORIGEM_PONTO,
   type TecnicoJson,
+  gruposQuesitosDoLaudoDocumento,
   css,
   data,
   dadosAssinaturaDocumento,
@@ -427,6 +428,7 @@ export async function htmlDoParecer(
   empresas: Empresa[],
   perito: Usuario | null,
   titulo: string,
+  tipoDocumento: 'parecer' | 'laudo' = 'parecer',
 ): Promise<string> {
   const t = pericia.tecnico as unknown as TecnicoJson
   const varredura = normalizarVarredura(t, pericia.modalidade)
@@ -809,7 +811,15 @@ export async function htmlDoParecer(
 
   if (temInsalubridade) partes.push(`<h2>${num.secao('NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')}</h2>`, blocoConteudo(paragrafos(conclusaoNr15)))
   if (temPericulosidade) partes.push(`<h2>${num.secao('NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO')}</h2>`, blocoConteudo(paragrafos(conclusaoNr16)))
-  if (t.respostasQuesitos?.trim()) partes.push(`<h2>${num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')}</h2>`, blocoConteudo(paragrafos(t.respostasQuesitos)))
+  const gruposQuesitos = tipoDocumento === 'laudo' ? gruposQuesitosDoLaudoDocumento(t) : []
+  if (tipoDocumento === 'laudo' && gruposQuesitos.length) {
+    partes.push(
+      `<h2>${num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')}</h2>`,
+      ...gruposQuesitos.map((grupo) => blocoConteudo(`<h3>${esc(grupo.titulo)}</h3>${paragrafos(grupo.texto)}`)),
+    )
+  } else if (tipoDocumento === 'parecer' && t.respostasQuesitos?.trim()) {
+    partes.push(`<h2>${num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')}</h2>`, blocoConteudo(paragrafos(t.respostasQuesitos)))
+  }
 
   partes.push(
     `<h2>${num.secao('ENCERRAMENTO')}</h2>`,
@@ -977,7 +987,7 @@ export async function montarHtml(
           `<h1>${esc(doc.titulo)}</h1><p class="vazio">[A perícia vinculada a este documento não existe mais.]</p>`,
         )
       }
-      return htmlDoParecer(pericia, empresas, perito, doc.titulo)
+      return htmlDoParecer(pericia, empresas, perito, doc.titulo, doc.tipo)
 
     case 'quesitos':
       return htmlDosQuesitos(doc, pericia, principal, perito)

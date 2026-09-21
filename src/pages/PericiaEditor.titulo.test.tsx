@@ -72,6 +72,28 @@ describe('PericiaEditor — cabeçalho do documento novo', () => {
 
     expect(titulo()).toBe('Novo Parecer Técnico')
   })
+
+  it('oferece no Laudo os três campos opcionais de quesitos e o atalho Não apresentado', () => {
+    abrirEditor('/pericias/nova?tipo=laudo')
+    fireEvent.click(screen.getByRole('button', { name: /Conclusão/ }))
+
+    expect(screen.getByLabelText('Quesitos do Juízo')).toBeDefined()
+    expect(screen.getByLabelText('Quesitos do Reclamante')).toBeDefined()
+    expect(screen.getByLabelText('Quesitos da Reclamada')).toBeDefined()
+
+    const atalhos = screen.getAllByRole('button', { name: 'Não apresentado' })
+    expect(atalhos).toHaveLength(3)
+    fireEvent.click(atalhos[0]!)
+    expect(screen.getByLabelText<HTMLInputElement>('Quesitos do Juízo').value).toBe('Não apresentado')
+  })
+
+  it('mantém no Parecer somente o campo consolidado legado', () => {
+    abrirEditor('/pericias/nova?tipo=parecer')
+    fireEvent.click(screen.getByRole('button', { name: /Conclusão/ }))
+
+    expect(screen.queryByLabelText('Quesitos do Juízo')).toBeNull()
+    expect(screen.getByText(/Respostas aos Quesitos Técnicos/)).toBeDefined()
+  })
 })
 
 // O título impresso no documento é o do seletor MAIS a modalidade. Ele

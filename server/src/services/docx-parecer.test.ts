@@ -57,6 +57,28 @@ async function textoDoDocx(pericia: PericiaCompleta = periciaDeTeste()): Promise
 }
 
 describe('parecer em DOCX', () => {
+  it('separa os quesitos do Laudo por origem e omite os grupos vazios', async () => {
+    const pericia = periciaDeTeste()
+    Object.assign(pericia.tecnico as object, {
+      respostasQuesitos: 'Resposta legada do parecer.',
+      quesitosJuizo: 'Pergunta e resposta do juízo.',
+      quesitosReclamante: '',
+      quesitosReclamada: 'Não apresentado',
+    })
+    const laudo = { ...documento, tipo: 'laudo', titulo: 'Laudo Técnico Pericial' } as DocumentoGerado
+
+    const xml = await xmlDoDocx(pericia, perito, laudo)
+    const texto = (xml.match(/<w:t[^>]*>[^<]*<\/w:t>/g) ?? [])
+      .map((no) => no.replace(/<[^>]+>/g, ''))
+      .join(' ')
+
+    expect(texto).toContain('RESPOSTAS AOS QUESITOS TÉCNICOS')
+    expect(texto).toContain('Quesitos do Juízo')
+    expect(texto).toContain('Quesitos da Reclamada')
+    expect(texto).not.toContain('Quesitos do Reclamante')
+    expect(texto).not.toContain('Resposta legada do parecer.')
+  })
+
   it('imprime o quadro compacto da varredura normativa', async () => {
     const pericia = periciaDeTeste()
     ;(pericia.tecnico as unknown as { varreduraNr15: unknown[] }).varreduraNr15 = [

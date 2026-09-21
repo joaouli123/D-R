@@ -152,6 +152,32 @@ const anexosNr15DeRegressao = [
 ] as const
 
 describe('DocumentoPreview', () => {
+  it('separa os quesitos do laudo por origem e omite grupos vazios', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={{
+          ...pericia,
+          tecnico: {
+            ...pericia.tecnico,
+            respostasQuesitos: 'Texto legado que não deve substituir os grupos.',
+            quesitosJuizo: '1. Informe o método.\nResposta: Método técnico.',
+            quesitosReclamante: '',
+            quesitosReclamada: 'Não apresentado',
+          },
+        }}
+        empresas={[]}
+        titulo="Laudo de teste"
+        tipoDocumento="laudo"
+      />,
+    )
+
+    expect(html).toContain('Respostas aos Quesitos Técnicos')
+    expect(html).toContain('Quesitos do Juízo')
+    expect(html).toContain('Quesitos da Reclamada')
+    expect(html).not.toContain('Quesitos do Reclamante')
+    expect(html).not.toContain('Texto legado que não deve substituir os grupos.')
+  })
+
   it('abrevia a empresa na representação e apresenta ausência da parte reclamante em linha única', () => {
     const html = renderToStaticMarkup(
       <DocumentoPreview

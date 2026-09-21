@@ -99,6 +99,7 @@ import { dadosAssinatura } from '@/lib/assinaturaDocumento'
 import { responsavelDaPericia } from '@/lib/responsavelPericia'
 import { comEmpresaVinculada, empresasLivres, opcoesDaLinha } from '@/lib/reclamadas'
 import { uid } from '@/lib/utils'
+import { camposQuesitosDoLaudo } from '@/lib/quesitosLaudo'
 import {
   anexoLegalNr15,
   atualizarStatusVarredura,
@@ -2200,7 +2201,10 @@ export default function PericiaEditor() {
             // perícia só de insalubridade o card virava um "7.2.1" que colide
             // com o 7.2 da NR-15 e nunca chega ao documento.
             (f.campo !== 'criterioAvaliacaoPericulosidade' || p.modalidade !== 'insalubridade') &&
-            (f.campo !== 'riscoAlegadoPericulosidade' || p.modalidade !== 'insalubridade'),
+            (f.campo !== 'riscoAlegadoPericulosidade' || p.modalidade !== 'insalubridade') &&
+            // No Laudo, as respostas são separadas por origem logo abaixo.
+            // O campo legado continua preservado e visível nos Pareceres.
+            (f.campo !== 'respostasQuesitos' || tipoDoc !== 'laudo'),
           ).map((f) => {
             const campoPadrao = campoPadraoDe(f.campo)
             return (
@@ -2254,6 +2258,41 @@ export default function PericiaEditor() {
             </Card>
             )
           })}
+          {tipoDoc === 'laudo' && (
+            <Card>
+              <CardHeader
+                title="Respostas aos Quesitos Técnicos"
+                subtitle="Campos opcionais do Laudo Pericial. Mantenha perguntas, respostas, numeração e quebras de linha ao colar o conteúdo dos autos."
+                icon={<FileText size={18} />}
+              />
+              <div className="space-y-5 p-5">
+                {camposQuesitosDoLaudo.map((grupo) => (
+                  <div key={grupo.campo} className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <label className="text-sm font-semibold text-ink-800" htmlFor={grupo.campo}>
+                        {grupo.titulo}
+                      </label>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setT({ [grupo.campo]: 'Não apresentado' })}
+                      >
+                        Não apresentado
+                      </Button>
+                    </div>
+                    <Textarea
+                      id={grupo.campo}
+                      rows={8}
+                      value={p.tecnico[grupo.campo] ?? ''}
+                      onChange={(e) => setT({ [grupo.campo]: e.target.value })}
+                      placeholder="Cole as perguntas e registre as respectivas respostas."
+                    />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
         </div>
       )}
 
@@ -2391,6 +2430,7 @@ export default function PericiaEditor() {
                 empresas={empresas}
                 perito={responsavelDaPericia(p, usuarios, usuario)}
                 titulo={tituloDocumento}
+                tipoDocumento={tipoDoc}
               />
             </FolhasA4>
             {anexo && (

@@ -1506,10 +1506,35 @@ export interface TecnicoJson {
   conclusaoInsalubridade?: string
   conclusaoPericulosidade?: string
   respostasQuesitos?: string
+  quesitosJuizo?: string
+  quesitosReclamante?: string
+  quesitosReclamada?: string
+  honorariosPericiaisCentavos?: number
   encerramento?: string
   dataAssinatura?: string
   cidadeAssinatura?: string
   observacoesAdicionais: string
+}
+
+export interface GrupoQuesitosLaudoDocumento {
+  campo: 'quesitosJuizo' | 'quesitosReclamante' | 'quesitosReclamada'
+  titulo: string
+  texto: string
+}
+
+/** Grupos preenchidos na ordem adotada no Laudo: Juízo, Reclamante, Reclamada. */
+export function gruposQuesitosDoLaudoDocumento(
+  tecnico: TecnicoJson,
+): GrupoQuesitosLaudoDocumento[] {
+  const grupos = [
+    { campo: 'quesitosJuizo', titulo: 'Quesitos do Juízo' },
+    { campo: 'quesitosReclamante', titulo: 'Quesitos do Reclamante' },
+    { campo: 'quesitosReclamada', titulo: 'Quesitos da Reclamada' },
+  ] as const
+  return grupos.flatMap((grupo) => {
+    const texto = tecnico[grupo.campo]?.trim()
+    return texto ? [{ ...grupo, texto }] : []
+  })
 }
 
 export interface ConteudoQuesitos {

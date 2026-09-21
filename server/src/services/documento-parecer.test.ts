@@ -31,6 +31,24 @@ const gerar = (pericia = periciaDeTeste()) =>
   htmlDoParecer(pericia, [empresa], perito, 'Parecer Técnico da Reclamada — Insalubridade')
 
 describe('parecer em HTML (motor do PDF)', () => {
+  it('separa os quesitos do Laudo por origem e não reaproveita o campo legado', async () => {
+    const pericia = periciaDeTeste()
+    Object.assign(pericia.tecnico as object, {
+      respostasQuesitos: 'Resposta legada do parecer.',
+      quesitosJuizo: 'Pergunta e resposta do juízo.',
+      quesitosReclamante: '',
+      quesitosReclamada: 'Não apresentado',
+    })
+
+    const html = await htmlDoParecer(pericia, [empresa], perito, 'Laudo Técnico Pericial', 'laudo')
+
+    expect(html).toContain('RESPOSTAS AOS QUESITOS TÉCNICOS')
+    expect(html).toContain('Quesitos do Juízo')
+    expect(html).toContain('Quesitos da Reclamada')
+    expect(html).not.toContain('Quesitos do Reclamante')
+    expect(html).not.toContain('Resposta legada do parecer.')
+  })
+
   it('imprime o quadro compacto da varredura antes das avaliações detalhadas', async () => {
     const pericia = periciaDeTeste()
     ;(pericia.tecnico as unknown as { varreduraNr15: unknown[] }).varreduraNr15 = [
