@@ -152,14 +152,14 @@ const anexosNr15DeRegressao = [
 ] as const
 
 describe('DocumentoPreview', () => {
-  it('separa os quesitos do laudo por origem e omite grupos vazios', () => {
+  it('separa os quesitos do laudo por origem, omite grupos vazios e mantém o texto antigo no fim', () => {
     const html = renderToStaticMarkup(
       <DocumentoPreview
         pericia={{
           ...pericia,
           tecnico: {
             ...pericia.tecnico,
-            respostasQuesitos: 'Texto legado que não deve substituir os grupos.',
+            respostasQuesitos: 'Texto legado que continua no documento.',
             quesitosJuizo: '1. Informe o método.\nResposta: Método técnico.',
             quesitosReclamante: '',
             quesitosReclamada: 'Não apresentado',
@@ -175,7 +175,33 @@ describe('DocumentoPreview', () => {
     expect(html).toContain('Quesitos do Juízo')
     expect(html).toContain('Quesitos da Reclamada')
     expect(html).not.toContain('Quesitos do Reclamante')
-    expect(html).not.toContain('Texto legado que não deve substituir os grupos.')
+    expect(html).toContain('Outras respostas aos quesitos')
+    expect(html).toContain('Texto legado que continua no documento.')
+    expect(html.indexOf('Texto legado que continua no documento.')).toBeGreaterThan(html.indexOf('Quesitos da Reclamada'))
+  })
+
+  it('imprime o texto antigo dos quesitos sozinho no laudo, sem subtítulo, e numera a seção', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={{
+          ...pericia,
+          tecnico: {
+            ...pericia.tecnico,
+            respostasQuesitos: 'Texto legado que continua no documento.',
+            quesitosJuizo: '',
+            quesitosReclamante: '',
+            quesitosReclamada: '',
+          },
+        }}
+        empresas={[]}
+        titulo="Laudo de teste"
+        tipoDocumento="laudo"
+      />,
+    )
+
+    expect(html).toContain('Respostas aos Quesitos Técnicos')
+    expect(html).toContain('Texto legado que continua no documento.')
+    expect(html).not.toContain('Outras respostas aos quesitos')
   })
 
   it('insere os honorários do Laudo após o encerramento e antes da assinatura', () => {
@@ -200,28 +226,110 @@ describe('DocumentoPreview', () => {
     expect(html).toContain('R$ 5.000,00 (cinco mil reais)')
   })
 
-  it('mostra a fotografia vinculada logo após a tabela do respectivo agente, sem duplicá-la', () => {
-    const legenda = 'Visor do dosímetro durante a medição'
+  it('desce o "Diante do exposto…" para depois dos honorários, logo acima da assinatura', () => {
+    const encerramentoPadrao =
+      'Primeiro parágrafo do encerramento.\n\nSegundo parágrafo do encerramento.\n\nDiante do exposto, o signatário coloca-se à disposição dos envolvidos.'
     const html = renderToStaticMarkup(
       <DocumentoPreview
         pericia={{
           ...pericia,
-          fotos: [...pericia.fotos, {
-            id: 'foto-medicao-ruido', secao: 'documentos', agenteId: 'ruido-calculado',
-            url: '/medicao.jpg', legenda, ordem: 3,
-          }],
+          tecnico: { ...pericia.tecnico, encerramento: encerramentoPadrao, honorariosPericiaisCentavos: 500_000 },
         }}
         empresas={[]}
-        titulo="Parecer de teste"
+        titulo="Laudo de teste"
+        tipoDocumento="laudo"
       />,
     )
 
-    const quadroDoRuido = html.indexOf('10.1.3. Ruído')
-    const foto = html.indexOf(legenda)
-    expect(foto).toBeGreaterThan(quadroDoRuido)
-    // Uma figura usa a legenda duas vezes no HTML: texto alternativo e
-    // figcaption. Cinco partes significariam duas figuras duplicadas.
-    expect(html.split(legenda)).toHaveLength(3)
+    const ordem = [
+      html.indexOf('Encerramento'),
+      html.indexOf('Segundo parágrafo do encerramento.'),
+      html.indexOf('DOS HONORÁRIOS PERICIAIS'),
+      html.indexOf('Diante do exposto'),
+      html.indexOf('class="fecho'),
+    ]
+    expect(ordem.every((posicao) => posicao > -1)).toBe(true)
+    expect([...ordem].sort((a, b) => a - b)).toEqual(ordem)
+    expect(html.match(/Diante do exposto/g)).toHaveLength(1)
+  })
+
+  it('sem honorários, o "Diante do exposto…" continua fechando o encerramento', () => {
+    const html = renderToStaticMarkup(
+      <DocumentoPreview
+        pericia={{
+          ...pericia,
+          tecnico: {
+            ...pericia.tecnico,
+            encerramento: 'Primeiro parágrafo do encerramento.\n\nDiante do exposto, o signatário coloca-se à disposição dos envolvidos.',
+            honorariosPericiaisCentavos: undefined,
+          },
+        }}
+        empresas={[]}
+        titulo="Laudo de teste"
+        tipoDocumento="laudo"
+      />,
+    )
+
+    expect(html).not.toContain('DOS HONORÁRIOS PERICIAIS')
+    expect(html.indexOf('Diante do exposto')).toBeGreaterThan(html.indexOf('Primeiro parágrafo do encerramento.'))
+    expect(html.indexOf('class="fecho')).toBeGreaterThan(html.indexOf('Diante do exposto'))
+    expect(html.match(/Diante do exposto/g)).toHaveLength(1)
+  })
+
+  describe('fotografias vinculadas a agente (só no Laudo)', () => {
+    const legenda = 'Visor do dosímetro durante a medição'
+    const fotoDoAgente = (agenteId: string, id = 'foto-medicao-ruido', texto = legenda) => ({
+      id, secao: 'documentos' as const, agenteId, url: `/${id}.jpg`, legenda: texto, ordem: 3,
+    })
+    const renderizar = (fotos: Pericia['fotos'], tipoDocumento: 'parecer' | 'laudo') =>
+      renderToStaticMarkup(
+        <DocumentoPreview
+          pericia={{ ...pericia, fotos: [...pericia.fotos, ...fotos] }}
+          empresas={[]}
+          titulo="Documento de teste"
+          tipoDocumento={tipoDocumento}
+        />,
+      )
+
+    it('mostra a fotografia logo após a tabela do respectivo agente, sem duplicá-la', () => {
+      const html = renderizar([fotoDoAgente('ruido-calculado')], 'laudo')
+
+      const quadroDoRuido = html.indexOf('10.1.3. Ruído')
+      const foto = html.indexOf(legenda)
+      expect(foto).toBeGreaterThan(quadroDoRuido)
+      // Uma figura usa a legenda duas vezes no HTML: texto alternativo e
+      // figcaption. Cinco partes significariam duas figuras duplicadas.
+      expect(html.split(legenda)).toHaveLength(3)
+    })
+
+    it('no Parecer, não mostra a fotografia do agente nem lhe reserva número', () => {
+      const html = renderizar([fotoDoAgente('ruido-calculado')], 'parecer')
+
+      expect(html).not.toContain(legenda)
+      expect(html).toContain('Fotografia 2 – EPI reconhecido na diligência')
+      expect(html).not.toContain('Fotografia 3')
+    })
+
+    it('numera a fotografia do agente depois das das seções, mesmo gravada em "documentos"', () => {
+      const html = renderizar([
+        fotoDoAgente('ruido-calculado'),
+        { id: 'foto-produto', secao: 'produtos' as const, url: '/produto.jpg', legenda: 'Rótulo do produto', ordem: 1 },
+      ], 'laudo')
+
+      expect(html).toContain('Fotografia 3 – Rótulo do produto')
+      expect(html).toContain(`Fotografia 4 – ${legenda}`)
+    })
+
+    it('não gasta número com foto de agente que já não está no laudo', () => {
+      const html = renderizar([
+        fotoDoAgente('agente-removido', 'foto-orfa', 'Foto de agente excluído'),
+        fotoDoAgente('ruido-calculado'),
+      ], 'laudo')
+
+      expect(html).not.toContain('Foto de agente excluído')
+      expect(html).toContain(`Fotografia 3 – ${legenda}`)
+      expect(html).not.toContain('Fotografia 4')
+    })
   })
 
 

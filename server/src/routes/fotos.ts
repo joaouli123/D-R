@@ -87,11 +87,13 @@ fotosRouter.post(
       throw new ErroHttp(422, 'O agente informado não pertence a esta perícia.')
     }
 
-    // Contagem por PERÍCIA, não por seção: `ordem` é lida globalmente em
-    // routes/pericias.ts e os três renderizadores numeram "Fotografia N" na
-    // sequência global. Contando por seção, a 1ª foto de "Ambiente" e a 1ª de
-    // "EPIs" empatavam em ordem 1 e a legenda saía fora de sequência.
-    const jaExistem = await prisma.foto.count({ where: { periciaId } })
+    // Maior `ordem` da PERÍCIA, não da seção nem a contagem de fotos: `ordem` é
+    // lida globalmente em routes/pericias.ts e os renderizadores desempatam por
+    // ela. Contando por seção, a 1ª foto de "Ambiente" e a 1ª de "EPIs"
+    // empatavam em ordem 1; contando fotos, apagar uma do meio fazia a próxima
+    // repetir a ordem de uma que ficou (ex.: ordens 1, 3 → count 2 → nova = 3).
+    const { _max } = await prisma.foto.aggregate({ where: { periciaId }, _max: { ordem: true } })
+    const ultimaOrdem = _max.ordem ?? 0
 
     // Se o INSERT falhar, os arquivos ja estao no disco: sem esta limpeza
     // eles ficariam ocupando o volume para sempre, sem nenhuma foto no
@@ -107,7 +109,7 @@ fotosRouter.post(
               agenteId,
               arquivo: arquivo.filename,
               legenda: arquivo.originalname.replace(/\.[^.]+$/, ''),
-              ordem: jaExistem + i + 1,
+              ordem: ultimaOrdem + i + 1,
             },
           }),
         ),

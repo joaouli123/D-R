@@ -31,7 +31,7 @@ const gerar = (pericia = periciaDeTeste()) =>
   htmlDoParecer(pericia, [empresa], perito, 'Parecer Técnico da Reclamada — Insalubridade')
 
 describe('parecer em HTML (motor do PDF)', () => {
-  it('separa os quesitos do Laudo por origem e não reaproveita o campo legado', async () => {
+  it('separa os quesitos do Laudo por origem e mantém o texto antigo no fim, sem perdê-lo', async () => {
     const pericia = periciaDeTeste()
     Object.assign(pericia.tecnico as object, {
       respostasQuesitos: 'Resposta legada do parecer.',
@@ -46,7 +46,66 @@ describe('parecer em HTML (motor do PDF)', () => {
     expect(html).toContain('Quesitos do Juízo')
     expect(html).toContain('Quesitos da Reclamada')
     expect(html).not.toContain('Quesitos do Reclamante')
-    expect(html).not.toContain('Resposta legada do parecer.')
+    expect(html).toContain('Outras respostas aos quesitos')
+    expect(html).toContain('Resposta legada do parecer.')
+    expect(html.indexOf('Resposta legada do parecer.')).toBeGreaterThan(html.indexOf('Quesitos da Reclamada'))
+  })
+
+  it('imprime o texto antigo dos quesitos sozinho no Laudo, sem subtítulo', async () => {
+    const pericia = periciaDeTeste()
+    Object.assign(pericia.tecnico as object, {
+      respostasQuesitos: 'Resposta legada do parecer.',
+      quesitosJuizo: '',
+      quesitosReclamante: '',
+      quesitosReclamada: '',
+    })
+
+    const html = await htmlDoParecer(pericia, [empresa], perito, 'Laudo Técnico Pericial', 'laudo')
+
+    expect(html).toContain('RESPOSTAS AOS QUESITOS TÉCNICOS')
+    expect(html).toContain('Resposta legada do parecer.')
+    expect(html).not.toContain('Outras respostas aos quesitos')
+  })
+
+  it('desce o "Diante do exposto…" para depois dos honorários, logo acima da assinatura', async () => {
+    // "Diante do exposto" também aparece antes do encerramento neste HTML; a frase abaixo só existe no fecho.
+    const FECHO = 'coloca-se à disposição dos envolvidos.'
+    const pericia = periciaDeTeste()
+    Object.assign(pericia.tecnico as object, {
+      encerramento:
+        'Primeiro parágrafo do encerramento.\n\nSegundo parágrafo do encerramento.\n\nDiante do exposto, o signatário coloca-se à disposição dos envolvidos.',
+      honorariosPericiaisCentavos: 500_000,
+    })
+
+    const html = await htmlDoParecer(pericia, [empresa], perito, 'Laudo Técnico Pericial', 'laudo')
+    const ordem = [
+      html.indexOf('ENCERRAMENTO'),
+      html.indexOf('Segundo parágrafo do encerramento.'),
+      html.indexOf('DOS HONORÁRIOS PERICIAIS'),
+      html.indexOf(FECHO),
+      html.indexOf('class="assinatura'),
+    ]
+
+    expect(ordem.every((posicao) => posicao > -1)).toBe(true)
+    expect([...ordem].sort((a, b) => a - b)).toEqual(ordem)
+    expect(html.match(/coloca-se à disposição dos envolvidos\./g)).toHaveLength(1)
+  })
+
+  it('sem honorários, o "Diante do exposto…" continua fechando o encerramento', async () => {
+    // "Diante do exposto" também aparece antes do encerramento neste HTML; a frase abaixo só existe no fecho.
+    const FECHO = 'coloca-se à disposição dos envolvidos.'
+    const pericia = periciaDeTeste()
+    Object.assign(pericia.tecnico as object, {
+      encerramento: 'Primeiro parágrafo do encerramento.\n\nDiante do exposto, o signatário coloca-se à disposição dos envolvidos.',
+      honorariosPericiaisCentavos: undefined,
+    })
+
+    const html = await htmlDoParecer(pericia, [empresa], perito, 'Laudo Técnico Pericial', 'laudo')
+
+    expect(html).not.toContain('DOS HONORÁRIOS PERICIAIS')
+    expect(html.indexOf(FECHO)).toBeGreaterThan(html.indexOf('Primeiro parágrafo do encerramento.'))
+    expect(html.indexOf('class="assinatura')).toBeGreaterThan(html.indexOf(FECHO))
+    expect(html.match(/coloca-se à disposição dos envolvidos\./g)).toHaveLength(1)
   })
 
   it('imprime os honorários do Laudo após o encerramento e antes da assinatura', async () => {
@@ -64,20 +123,62 @@ describe('parecer em HTML (motor do PDF)', () => {
     expect(html).not.toContain('[VALOR]')
   })
 
-  it('coloca a foto vinculada depois da tabela do agente e não a repete nas evidências gerais', async () => {
-    const pericia = periciaDeTeste()
-    const legenda = 'Visor do equipamento na avaliação química'
-    pericia.fotos.push({
-      id: 'foto-agente', periciaId: pericia.id, secao: 'documentos', agenteId: 'agn-1',
-      ordem: 3, arquivo: 'foto-agente.jpg', legenda,
-    } as never)
+  const LEGENDA_AGENTE = 'Visor do equipamento na avaliação química'
+  const fotoDoAgente = (agenteId: string, id = 'foto-agente', legenda = LEGENDA_AGENTE) => ({
+    id, periciaId: 'per-1', secao: 'documentos', agenteId,
+    ordem: 3, arquivo: `${id}.jpg`, legenda,
+  }) as never
+  const gerarLaudo = (pericia = periciaDeTeste()) =>
+    htmlDoParecer(pericia, [empresa], perito, 'Laudo Técnico Pericial', 'laudo')
 
-    const html = await gerar(pericia)
+  it('no Laudo, coloca a foto vinculada depois da tabela do agente e não a repete nas evidências gerais', async () => {
+    const pericia = periciaDeTeste()
+    pericia.fotos.push(fotoDoAgente('agn-1'))
+
+    const html = await gerarLaudo(pericia)
     const quadro = html.indexOf('10.1.1. Óleos minerais')
-    const foto = html.indexOf(legenda)
+    const foto = html.indexOf(LEGENDA_AGENTE)
 
     expect(foto).toBeGreaterThan(quadro)
-    expect(html.split(legenda)).toHaveLength(2)
+    expect(html.split(LEGENDA_AGENTE)).toHaveLength(2)
+  })
+
+  it('no Parecer, não imprime a foto vinculada a agente nem lhe reserva número', async () => {
+    const pericia = periciaDeTeste()
+    pericia.fotos.push(fotoDoAgente('agn-1'))
+
+    const html = await gerar(pericia)
+
+    expect(html).not.toContain(LEGENDA_AGENTE)
+    expect(html).toContain('Fotografia 2 – EPI reconhecido na diligência')
+    expect(html).not.toContain('Fotografia 3')
+  })
+
+  it('numera a foto do agente depois das fotos das seções, mesmo gravada em "documentos"', async () => {
+    const pericia = periciaDeTeste()
+    pericia.fotos.push(
+      fotoDoAgente('agn-1'),
+      { id: 'fot-produto', periciaId: 'per-1', secao: 'produtos', ordem: 1, arquivo: 'fot-produto.jpg', legenda: 'Rótulo do produto' } as never,
+    )
+
+    const html = await gerarLaudo(pericia)
+
+    expect(html).toContain('Fotografia 3 – Rótulo do produto')
+    expect(html).toContain(`Fotografia 4 – ${LEGENDA_AGENTE}`)
+  })
+
+  it('não gasta número com foto de agente que já não está no laudo', async () => {
+    const pericia = periciaDeTeste()
+    pericia.fotos.push(
+      fotoDoAgente('agn-removido', 'foto-orfa', 'Foto de agente excluído'),
+      fotoDoAgente('agn-1'),
+    )
+
+    const html = await gerarLaudo(pericia)
+
+    expect(html).not.toContain('Foto de agente excluído')
+    expect(html).toContain(`Fotografia 3 – ${LEGENDA_AGENTE}`)
+    expect(html).not.toContain('Fotografia 4')
   })
 
 

@@ -13,6 +13,8 @@
 // HTTP 200 e nenhum erro. `src/types/chavesAgente.ts` trava esse par.
 import { z } from 'zod'
 
+import { HONORARIOS_MAXIMO_CENTAVOS } from '../services/honorarios.js'
+
 export const texto = z.string().default('')
 export const textoObrigatorio = z.string().trim().min(1)
 export const dataIsoSchema = z
@@ -151,7 +153,7 @@ export const tecnicoSchema = z.object({
   quesitosJuizo: texto.optional(),
   quesitosReclamante: texto.optional(),
   quesitosReclamada: texto.optional(),
-  honorariosPericiaisCentavos: z.number().int().min(0).max(10_000_000_000).optional(),
+  honorariosPericiaisCentavos: z.number().int().min(0).max(HONORARIOS_MAXIMO_CENTAVOS).optional(),
   encerramento: texto,
   dataAssinatura: dataIsoSchema.optional(),
   cidadeAssinatura: texto.optional(),

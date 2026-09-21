@@ -36,6 +36,7 @@ import {
 import { PageHeader } from '@/components/layout/AppLayout'
 import { BibliotecaDrawer } from '@/components/BibliotecaDrawer'
 import { BuscaProcesso } from '@/components/BuscaProcesso'
+import { CampoHonorarios } from '@/components/CampoHonorarios'
 import type { OrigemConsulta } from '@/components/BuscaCnpj'
 import { DocumentoPreview } from '@/components/DocumentoPreview'
 import { FolhasA4 } from '@/components/FolhasA4'
@@ -99,8 +100,8 @@ import { dadosAssinatura } from '@/lib/assinaturaDocumento'
 import { responsavelDaPericia } from '@/lib/responsavelPericia'
 import { comEmpresaVinculada, empresasLivres, opcoesDaLinha } from '@/lib/reclamadas'
 import { uid } from '@/lib/utils'
-import { camposQuesitosDoLaudo } from '@/lib/quesitosLaudo'
-import { honorariosPorExtenso } from '@/lib/honorarios'
+import { blocosQuesitosDoLaudo, camposQuesitosDoLaudo, TITULO_QUESITOS_LEGADOS } from '@/lib/quesitosLaudo'
+import { numerarItensFinais } from '@/lib/numeracaoFinal'
 import {
   anexoLegalNr15,
   atualizarStatusVarredura,
@@ -327,7 +328,9 @@ function novaPericia(responsavelId: string): Pericia {
     localVistoria: '',
     numeroVistoria: '',
     setorVistoriado: '',
-    modalidade: 'insalubridade',
+    // O documento completo é o caso mais comum; as modalidades
+    // individuais ficam a um clique no seletor.
+    modalidade: 'ambas',
     status: 'rascunho',
     responsavelId,
     criadoEm: hoje,
@@ -405,7 +408,9 @@ export default function PericiaEditor() {
   const toast = useToast()
   const { usuario, usuarios, empresas, pericias, salvarPericia, salvarDocumento, documentos } = useApp()
 
-  const tipoDoc = (params.get('tipo') as 'parecer' | 'laudo') ?? 'parecer'
+  // Qualquer valor que não seja 'laudo' cai no Parecer: o parâmetro vem da URL
+  // e um valor solto chegaria à busca do documento e ao POST.
+  const tipoDoc: 'parecer' | 'laudo' = params.get('tipo') === 'laudo' ? 'laudo' : 'parecer'
   // O cabeçalho chama de "novo" o documento que vai sair, não a perícia: é
   // pelo nome do documento que o perito escolheu o caminho no menu.
   const nomeDocumento = tipoDoc === 'laudo' ? 'Laudo Técnico' : 'Parecer Técnico'
@@ -692,7 +697,22 @@ export default function PericiaEditor() {
     agentes.map((agente) => agente.id === idAgente ? transformar(agente) : agente),
   )
 
-  const removerAgente = (idAgente: string) => {
+  // As fotos da medição pertencem à avaliação: excluí-la sem elas deixaria
+  // imagens órfãs no servidor, fora de qualquer tabela. Por isso a exclusão
+  // pede confirmação e leva as fotos junto — e só tira a avaliação se todas as
+  // fotos saíram, para não sobrar foto sem dono quando uma remoção falha.
+  const removerAgente = async (idAgente: string) => {
+    const fotosDoAgente = pRef.current.fotos.filter((foto) => foto.agenteId === idAgente)
+    if (fotosDoAgente.length) {
+      const nome = pRef.current.tecnico.agentes.find((agente) => agente.id === idAgente)?.nome?.trim() || 'Esta avaliação'
+      const confirmado = window.confirm(
+        `${nome} tem ${fotosDoAgente.length} foto(s) de medição vinculada(s). Excluir a avaliação também exclui essas fotos. Deseja continuar?`,
+      )
+      if (!confirmado) return
+      for (const foto of fotosDoAgente) {
+        if (!(await removerFoto(foto))) return
+      }
+    }
     transformarAgentes((agentes) => agentes.filter((agente) => agente.id !== idAgente))
     setAberturaAgentes(({ [idAgente]: _removido, ...resto }) => resto)
   }
@@ -713,10 +733,19 @@ export default function PericiaEditor() {
    */
   const ehAdministrador = usuario?.perfil === 'admin'
   const padroesAplicados = useRef<Partial<Record<CampoComTextoPadrao, string>>>({})
+  // O texto antigo dos quesitos, uma vez visto, fica na tela até o fim da
+  // sessão: esvaziá-lo não pode fazer o campo sumir debaixo do cursor.
+  const legadoQuesitosVisivel = useRef(false)
+  if (p.tecnico.respostasQuesitos?.trim()) legadoQuesitosVisivel.current = true
   useEffect(() => {
-    const padroes = textosPadraoDaPericia(p, usuario, empresaPrincipal)
+    const padroes = textosPadraoDaPericia(p, usuario, empresaPrincipal, tipoDoc)
+    // Parecer e Laudo partem da mesma perícia: o que o outro tipo de documento
+    // deixou gravado é padrão, não edição do administrador.
+    const doOutroTipo = ehAdministrador
+      ? textosPadraoDaPericia(p, usuario, empresaPrincipal, tipoDoc === 'laudo' ? 'parecer' : 'laudo')
+      : {}
     const patch = ehAdministrador
-      ? patchDeTextosPadrao(p.tecnico, padroes, padroesAplicados.current)
+      ? patchDeTextosPadrao(p.tecnico, padroes, padroesAplicados.current, doOutroTipo)
       : Object.fromEntries(
           CAMPOS_COM_TEXTO_PADRAO
             .filter((campo) => p.tecnico[campo] !== padroes[campo])
@@ -724,7 +753,7 @@ export default function PericiaEditor() {
         ) as Partial<Record<CampoComTextoPadrao, string>>
     padroesAplicados.current = padroes
     if (Object.keys(patch).length) setT(patch)
-  }, [p, usuario, empresaPrincipal, ehAdministrador])
+  }, [p, usuario, empresaPrincipal, ehAdministrador, tipoDoc])
 
   /** O campo, quando ele é um dos que têm texto padrão; senão, null. */
   const campoPadraoDe = (campo: string): CampoComTextoPadrao | null =>
@@ -732,7 +761,7 @@ export default function PericiaEditor() {
 
   /** Devolve o campo ao texto padrão e volta a mantê-lo sincronizado. */
   function restaurarTextoPadrao(campo: CampoComTextoPadrao) {
-    const padrao = textosPadraoDaPericia(p, usuario, empresaPrincipal)[campo]
+    const padrao = textosPadraoDaPericia(p, usuario, empresaPrincipal, tipoDoc)[campo]
     padroesAplicados.current = { ...padroesAplicados.current, [campo]: padrao }
     setT({ [campo]: padrao } as never)
     toast('Texto padrão restaurado neste campo.')
@@ -798,6 +827,25 @@ export default function PericiaEditor() {
   const numeroAnaliseNr16Editor = p.modalidade === 'ambas' ? '10.2' : '10.1'
   const numeroDivergenciasEditor = p.modalidade === 'ambas' ? '7.4' : '7.3'
   const numeroConsideracoesEditor = p.modalidade === 'ambas' ? '7.5' : '7.4'
+  // Do item 11 em diante o número depende do que vai ao papel: quesitos e
+  // honorários só existem quando preenchidos. É a mesma conta da prévia e dos
+  // arquivos, para o título de cada cartão prometer o número que o documento usa.
+  const temQuesitosNoDocumento = tipoDoc === 'laudo'
+    ? blocosQuesitosDoLaudo(p.tecnico).length > 0
+    : Boolean(p.tecnico.respostasQuesitos?.trim())
+  const temHonorariosNoDocumento = tipoDoc === 'laudo' && (p.tecnico.honorariosPericiaisCentavos ?? 0) > 0
+  const itensFinais = numerarItensFinais({
+    modalidade: p.modalidade,
+    temQuesitos: temQuesitosNoDocumento,
+    temHonorarios: temHonorariosNoDocumento,
+  })
+  // Vazio, o cartão dos quesitos não tem número (a seção não é impressa); o da
+  // biblioteca mostra o que ele receberia ao ser preenchido.
+  const numeroQuesitosSeImpresso = itensFinais.quesitos ?? numerarItensFinais({
+    modalidade: p.modalidade,
+    temQuesitos: true,
+    temHonorarios: temHonorariosNoDocumento,
+  }).quesitos
   const vinculoPrincipal = p.reclamadas.find((item) => item.principal)
   const vinculosEnvolvidos = p.reclamadas.filter((item) => !item.principal && item.empresaId)
   const nomeDaEmpresa = (empresaId?: string) =>
@@ -1079,18 +1127,30 @@ export default function PericiaEditor() {
     }
   }
 
-  async function removerFoto(foto: Foto) {
-    const anterior = p.fotos
+  /** `true` quando a foto saiu de verdade, do servidor e da tela. */
+  async function removerFoto(foto: Foto): Promise<boolean> {
+    const posicao = p.fotos.findIndex((x) => x.id === foto.id)
     setP((v) => ({ ...v, fotos: v.fotos.filter((x) => x.id !== foto.id) }))
     try {
       await api.fotos.remover(p.id, foto.id)
+      return true
     } catch (e) {
-      setP((v) => ({ ...v, fotos: anterior }))
+      // Devolve só ESTA foto, onde estava. Restaurar a lista inteira de antes
+      // desfaria também as remoções que deram certo enquanto esta esperava.
+      setP((v) => {
+        if (v.fotos.some((x) => x.id === foto.id)) return v
+        const fotos = [...v.fotos]
+        fotos.splice(Math.min(Math.max(posicao, 0), fotos.length), 0, foto)
+        return { ...v, fotos }
+      })
       toast(e instanceof Error ? e.message : 'Falha ao remover a foto.', 'error')
+      return false
     }
   }
 
   function painelFotosDoAgente(agente: AgenteAvaliado) {
+    // As evidências fotográficas por agente são do Laudo: o Parecer não as imprime.
+    if (tipoDoc !== 'laudo') return null
     const fotos = p.fotos.filter((foto) => foto.agenteId === agente.id)
     const nome = agente.nome?.trim() || 'agente avaliado'
     const idUpload = `fotos-agente-${agente.id}`
@@ -1103,8 +1163,8 @@ export default function PericiaEditor() {
       <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50/50 p-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-ink-800">Fotografias da medição / avaliação</p>
-            <p className="text-xs text-ink-500">Ficam vinculadas somente a este agente e saem logo abaixo da tabela correspondente.</p>
+            <p className="text-sm font-semibold text-ink-800">Evidências fotográficas da avaliação</p>
+            <p className="text-xs text-ink-500">Fotos da medição feitas na vistoria, do arquivo ou direto da câmera do celular. Ficam vinculadas somente a este agente e saem no Laudo logo abaixo da tabela correspondente.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <label htmlFor={idUpload} className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-navy-700 bg-white px-3 py-1.5 text-xs font-semibold text-navy-800 hover:bg-navy-50">
@@ -1162,6 +1222,70 @@ export default function PericiaEditor() {
           </div>
         )}
       </div>
+    )
+  }
+
+  /**
+   * Respostas aos quesitos do Laudo, uma caixa por origem. "Não apresentado"
+   * é atalho para o grupo em branco e nunca apaga o que já foi escrito: por
+   * isso o botão só vale para o campo vazio.
+   */
+  function cartaoQuesitosDoLaudo() {
+    return (
+      <Card key="quesitos-do-laudo">
+        <CardHeader
+          title={itensFinais.quesitos ? `${itensFinais.quesitos}. Respostas aos Quesitos Técnicos` : 'Respostas aos Quesitos Técnicos'}
+          subtitle="Campos opcionais do Laudo Pericial. Mantenha perguntas, respostas, numeração e quebras de linha ao colar o conteúdo dos autos. Sem nenhum texto, a seção não é impressa."
+          icon={<FileText size={18} />}
+        />
+        <div className="space-y-5 p-5">
+          {camposQuesitosDoLaudo.map((grupo) => {
+            const jaTemTexto = (p.tecnico[grupo.campo] ?? '').trim() !== ''
+            return (
+              <div key={grupo.campo} className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="text-sm font-semibold text-ink-800" htmlFor={grupo.campo}>
+                    {grupo.titulo}
+                  </label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={jaTemTexto}
+                    title={jaTemTexto ? 'Este campo já tem texto. Apague-o antes de marcar como não apresentado.' : undefined}
+                    onClick={() => setT({ [grupo.campo]: 'Não apresentado' })}
+                  >
+                    Não apresentado
+                  </Button>
+                </div>
+                <Textarea
+                  id={grupo.campo}
+                  rows={8}
+                  value={p.tecnico[grupo.campo] ?? ''}
+                  onChange={(e) => setT({ [grupo.campo]: e.target.value })}
+                  placeholder="Cole as perguntas e registre as respectivas respostas."
+                />
+              </div>
+            )
+          })}
+          {legadoQuesitosVisivel.current && (
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-ink-800" htmlFor="respostasQuesitos">
+                {TITULO_QUESITOS_LEGADOS}
+              </label>
+              <p className="text-xs text-ink-500">
+                Texto salvo antes de as respostas serem separadas por origem. Continua saindo no Laudo, depois dos grupos acima: passe-o para o campo certo ou mantenha aqui.
+              </p>
+              <Textarea
+                id="respostasQuesitos"
+                rows={8}
+                value={p.tecnico.respostasQuesitos ?? ''}
+                onChange={(e) => setT({ respostasQuesitos: e.target.value })}
+              />
+            </div>
+          )}
+        </div>
+      </Card>
     )
   }
 
@@ -1258,9 +1382,9 @@ export default function PericiaEditor() {
                 onChange={(e) => set({ modalidade: e.target.value as Pericia['modalidade'] })}
                 hint="Organiza o documento conforme a modalidade escolhida."
               >
+                <option value="ambas">Insalubridade e Periculosidade</option>
                 <option value="insalubridade">Insalubridade</option>
                 <option value="periculosidade">Periculosidade</option>
-                <option value="ambas">Insalubridade e Periculosidade</option>
               </Select>
             </div>
           </Card>
@@ -1918,7 +2042,7 @@ export default function PericiaEditor() {
                               variant="ghost"
                               className="text-red-600 hover:bg-red-50"
                               icon={<Trash2 size={15} />}
-                              onClick={() => removerAgente(a.id)}
+                              onClick={() => void removerAgente(a.id)}
                               aria-label="Remover avaliação NR-16"
                             />
                           </div>
@@ -1983,7 +2107,7 @@ export default function PericiaEditor() {
                           variant="ghost"
                           className="text-red-600 hover:bg-red-50"
                           icon={<Trash2 size={15} />}
-                          onClick={() => removerAgente(a.id)}
+                          onClick={() => void removerAgente(a.id)}
                           aria-label="Remover agente"
                         />
                       </div>
@@ -2195,7 +2319,7 @@ export default function PericiaEditor() {
               }}
             />
             <div className="space-y-6 p-5">
-              {p.fotos.some((foto) => foto.agenteId) && (
+              {tipoDoc === 'laudo' && p.fotos.some((foto) => foto.agenteId) && (
                 <div>
                   <div className="mb-2 flex items-center gap-2">
                     <h4 className="section-title">Medições e avaliações técnicas</h4>
@@ -2315,10 +2439,10 @@ export default function PericiaEditor() {
               // O item 10 não tem mais caixa de texto (pedido do perito,
               // 17/09/2026): ele é montado só com as tabelas dos agentes, e a
               // conclusão de cada um já fecha a tabela dele.
-              { campo: 'conclusaoInsalubridade', secao: 'conclusao', referencia: '11', label: '11. NR-15 — Conclusão e Fundamentação', rows: 6 },
-              { campo: 'conclusaoPericulosidade', secao: 'conclusao', referencia: p.modalidade === 'ambas' ? '12' : '11', label: p.modalidade === 'ambas' ? '12. NR-16 — Conclusão e Fundamentação' : '11. NR-16 — Conclusão e Fundamentação', rows: 6 },
-              { campo: 'respostasQuesitos', secao: 'conclusao', referencia: p.modalidade === 'ambas' ? '13' : '12', label: p.modalidade === 'ambas' ? '13. Respostas aos Quesitos Técnicos' : '12. Respostas aos Quesitos Técnicos', rows: 8 },
-              { campo: 'encerramento', secao: 'conclusao', referencia: p.modalidade === 'ambas' ? '14' : '13', label: p.modalidade === 'ambas' ? '14. Encerramento' : '13. Encerramento', rows: 5 },
+              { campo: 'conclusaoInsalubridade', secao: 'conclusao', referencia: `${itensFinais.conclusaoNr15}`, label: `${itensFinais.conclusaoNr15}. NR-15 — Conclusão e Fundamentação`, rows: 6 },
+              { campo: 'conclusaoPericulosidade', secao: 'conclusao', referencia: `${itensFinais.conclusaoNr16}`, label: `${itensFinais.conclusaoNr16}. NR-16 — Conclusão e Fundamentação`, rows: 6 },
+              { campo: 'respostasQuesitos', secao: 'conclusao', referencia: `${numeroQuesitosSeImpresso}`, label: itensFinais.quesitos ? `${itensFinais.quesitos}. Respostas aos Quesitos Técnicos` : 'Respostas aos Quesitos Técnicos', rows: 8 },
+              { campo: 'encerramento', secao: 'conclusao', referencia: `${itensFinais.encerramento}`, label: `${itensFinais.encerramento}. Encerramento`, rows: 5 },
             ] as const
           ).filter((f) =>
             (f.campo !== 'conclusaoInsalubridade' || p.modalidade !== 'periculosidade') &&
@@ -2328,11 +2452,11 @@ export default function PericiaEditor() {
             // perícia só de insalubridade o card virava um "7.2.1" que colide
             // com o 7.2 da NR-15 e nunca chega ao documento.
             (f.campo !== 'criterioAvaliacaoPericulosidade' || p.modalidade !== 'insalubridade') &&
-            (f.campo !== 'riscoAlegadoPericulosidade' || p.modalidade !== 'insalubridade') &&
-            // No Laudo, as respostas são separadas por origem logo abaixo.
-            // O campo legado continua preservado e visível nos Pareceres.
-            (f.campo !== 'respostasQuesitos' || tipoDoc !== 'laudo'),
+            (f.campo !== 'riscoAlegadoPericulosidade' || p.modalidade !== 'insalubridade'),
           ).map((f) => {
+            // No Laudo, as respostas são separadas por origem, no lugar em que o
+            // documento as imprime: depois das conclusões e antes do encerramento.
+            if (f.campo === 'respostasQuesitos' && tipoDoc === 'laudo') return cartaoQuesitosDoLaudo()
             const campoPadrao = campoPadraoDe(f.campo)
             return (
             <Card key={f.campo}>
@@ -2388,66 +2512,14 @@ export default function PericiaEditor() {
           {tipoDoc === 'laudo' && (
             <Card>
               <CardHeader
-                title="Respostas aos Quesitos Técnicos"
-                subtitle="Campos opcionais do Laudo Pericial. Mantenha perguntas, respostas, numeração e quebras de linha ao colar o conteúdo dos autos."
-                icon={<FileText size={18} />}
-              />
-              <div className="space-y-5 p-5">
-                {camposQuesitosDoLaudo.map((grupo) => (
-                  <div key={grupo.campo} className="space-y-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <label className="text-sm font-semibold text-ink-800" htmlFor={grupo.campo}>
-                        {grupo.titulo}
-                      </label>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setT({ [grupo.campo]: 'Não apresentado' })}
-                      >
-                        Não apresentado
-                      </Button>
-                    </div>
-                    <Textarea
-                      id={grupo.campo}
-                      rows={8}
-                      value={p.tecnico[grupo.campo] ?? ''}
-                      onChange={(e) => setT({ [grupo.campo]: e.target.value })}
-                      placeholder="Cole as perguntas e registre as respectivas respostas."
-                    />
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-          {tipoDoc === 'laudo' && (
-            <Card>
-              <CardHeader
-                title="Honorários periciais"
+                title={itensFinais.honorarios ? `${itensFinais.honorarios}. Dos Honorários Periciais` : 'Dos Honorários Periciais'}
                 subtitle="Proposta do perito para o item DOS HONORÁRIOS PERICIAIS do Laudo. O arbitramento final cabe ao Juízo."
                 icon={<FileText size={18} />}
               />
               <div className="p-5">
-                <Input
-                  label="Valor proposto dos honorários (R$)"
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
-                  value={p.tecnico.honorariosPericiaisCentavos == null
-                    ? ''
-                    : (p.tecnico.honorariosPericiaisCentavos / 100).toFixed(2)}
-                  onChange={(e) => {
-                    const valor = Number(e.target.value.replace(',', '.'))
-                    setT({
-                      honorariosPericiaisCentavos: e.target.value && Number.isFinite(valor)
-                        ? Math.max(0, Math.round(valor * 100))
-                        : undefined,
-                    })
-                  }}
-                  hint={p.tecnico.honorariosPericiaisCentavos
-                    ? `Por extenso: ${honorariosPorExtenso(p.tecnico.honorariosPericiaisCentavos)}.`
-                    : 'Opcional. A seção não será emitida enquanto o valor estiver vazio.'}
+                <CampoHonorarios
+                  centavos={p.tecnico.honorariosPericiaisCentavos}
+                  onChange={(centavos) => setT({ honorariosPericiaisCentavos: centavos })}
                 />
               </div>
             </Card>

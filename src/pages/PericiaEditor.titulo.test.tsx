@@ -105,6 +105,39 @@ describe('PericiaEditor — cabeçalho do documento novo', () => {
   })
 })
 
+// Pedido do cliente: o caso mais comum é o documento completo (insalubridade
+// e periculosidade), então ele é a primeira opção do seletor e já vem
+// marcado numa perícia nova. As modalidades individuais continuam a um clique.
+describe('PericiaEditor — modalidade padrão da perícia nova', () => {
+  const seletor = () => screen.getByLabelText<HTMLSelectElement>('Modalidade da perícia')
+
+  it('oferece o documento completo como primeira opção', () => {
+    abrirEditor('/pericias/nova?tipo=laudo')
+
+    expect(Array.from(seletor().options).map((o) => o.value)).toEqual([
+      'ambas',
+      'insalubridade',
+      'periculosidade',
+    ])
+    expect(seletor().options[0]!.textContent).toBe('Insalubridade e Periculosidade')
+  })
+
+  it.each(['laudo', 'parecer'])('abre o %s novo já como insalubridade e periculosidade', (tipo) => {
+    abrirEditor(`/pericias/nova?tipo=${tipo}`)
+
+    expect(seletor().value).toBe('ambas')
+  })
+
+  it('o perito ainda escolhe só insalubridade ou só periculosidade', () => {
+    abrirEditor('/pericias/nova?tipo=laudo')
+
+    fireEvent.change(seletor(), { target: { value: 'periculosidade' } })
+    expect(seletor().value).toBe('periculosidade')
+    fireEvent.change(seletor(), { target: { value: 'insalubridade' } })
+    expect(seletor().value).toBe('insalubridade')
+  })
+})
+
 // O título impresso no documento é o do seletor MAIS a modalidade. Ele
 // precisa ser o mesmo na prévia, no histórico e no PDF/DOCX — antes a
 // prévia mostrava só "Parecer Técnico da Reclamada" e o PDF vinha com
@@ -118,6 +151,9 @@ describe('PericiaEditor — modalidade no título do documento', () => {
 
   it('escreve a modalidade única com inicial maiúscula', () => {
     abrirEditor('/pericias/nova?tipo=parecer')
+    fireEvent.change(screen.getByLabelText('Modalidade da perícia'), {
+      target: { value: 'insalubridade' },
+    })
     irParaODocumento()
 
     expect(tituloDaPrevia()).toBe('Parecer Técnico da Reclamada — Insalubridade')

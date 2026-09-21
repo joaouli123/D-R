@@ -28,3 +28,36 @@ export function gruposQuesitosDoLaudo(
 }
 
 export const camposQuesitosDoLaudo = GRUPOS
+
+export interface BlocoQuesitosLaudo {
+  chave: CampoQuesitosLaudo | 'respostasQuesitos'
+  /** Sem título, o bloco entra direto sob "Respostas aos Quesitos Técnicos". */
+  titulo?: string
+  texto: string
+}
+
+export const TITULO_QUESITOS_LEGADOS = 'Outras respostas aos quesitos'
+
+/**
+ * Tudo o que o Laudo imprime na seção de quesitos: os grupos por origem e, por
+ * último, o texto do campo antigo (`respostasQuesitos`), que perícias
+ * anteriores ao Laudo por origem ainda trazem e que não pode sumir do
+ * documento. Sozinho, o texto antigo não leva subtítulo.
+ */
+export function blocosQuesitosDoLaudo(
+  tecnico: Pick<PreenchimentoTecnico, CampoQuesitosLaudo | 'respostasQuesitos'>,
+): BlocoQuesitosLaudo[] {
+  const grupos: BlocoQuesitosLaudo[] = gruposQuesitosDoLaudo(tecnico).map((grupo) => ({
+    chave: grupo.campo,
+    titulo: grupo.titulo,
+    texto: grupo.texto,
+  }))
+  const legado = tecnico.respostasQuesitos?.trim()
+  if (!legado) return grupos
+  return [
+    ...grupos,
+    grupos.length
+      ? { chave: 'respostasQuesitos', titulo: TITULO_QUESITOS_LEGADOS, texto: legado }
+      : { chave: 'respostasQuesitos', texto: legado },
+  ]
+}

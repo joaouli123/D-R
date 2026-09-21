@@ -34,14 +34,15 @@ import {
   ORIGEM_PONTO,
   type LinhaApresentacaoAgente,
   type TecnicoJson,
-  gruposQuesitosDoLaudoDocumento,
+  blocosQuesitosDoLaudoDocumento,
+  type BlocoQuesitosLaudoDocumento,
   atividadesDoPeriodo,
   comFuncaoPosto,
   data,
   dadosAssinaturaDocumento,
   emParagrafos,
   extenso,
-  fotosEmOrdemDeDocumento,
+  fotosImpressasEmOrdem,
   intervaloDoPeriodo,
   linhasDoBloco,
   mascaraCnpj,
@@ -58,7 +59,7 @@ import {
   hoje,
   ATUACAO,
 } from './documento-comum.js'
-import { textoHonorariosPericiais } from './honorarios.js'
+import { separarFechoDoEncerramento, textoHonorariosPericiais } from './honorarios.js'
 import { exibirQuadroVarredura, normalizarVarredura, type AnexoVarreduraDocumento } from './varredura-normativa.js'
 
 // ============================================================
@@ -86,6 +87,16 @@ const RECUO_TABELA_DXA = 120
 const LARGURA_TABELA_DXA = LARGURA_UTIL_DXA - RECUO_TABELA_DXA
 const COLUNAS_FICHA = [2864, 6086] as const
 
+// O XML 1.0 não admite os caracteres de controle abaixo (só \t, \n e \r), e o
+// Word se recusa a abrir um .docx que os contenha. Texto colado de PDF traz
+// quebra de página (\f) e tabulação vertical (\v): viram espaço; os demais
+// somem.
+function textoValidoParaXml(t: string): string {
+  return t
+    .replace(/[\x0b\x0c]/g, ' ')
+    .replace(/[\x00-\x08\x0e-\x1f]/g, '')
+}
+
 const texto = (
   t: string,
   opcoes: {
@@ -97,7 +108,7 @@ const texto = (
   } = {},
 ) =>
   new TextRun({
-    text: t,
+    text: textoValidoParaXml(t),
     break: opcoes.quebraAntes,
     bold: opcoes.negrito,
     italics: opcoes.italico,
@@ -714,23 +725,6 @@ async function docParecer(
     .map((r) => porId.get(r.empresaId))
     .filter((e): e is Empresa => Boolean(e))
 
-  const fotosOrdenadas = fotosEmOrdemDeDocumento(pericia.fotos)
-  const numeroDaFoto = new Map(fotosOrdenadas.map((foto, indice) => [foto.id, indice + 1]))
-  const fotosDasSecoes = async (secoes: string[]) => {
-    const elementos: (Paragraph | Table)[] = []
-    for (const foto of fotosOrdenadas.filter((item) => !item.agenteId && secoes.includes(item.secao))) {
-      elementos.push(...(await figuraDocx(foto.arquivo, foto.legenda, numeroDaFoto.get(foto.id) ?? 0)))
-    }
-    return elementos
-  }
-  const fotosDoAgente = async (agenteId: string) => {
-    const elementos: (Paragraph | Table)[] = []
-    for (const foto of fotosOrdenadas.filter((item) => item.agenteId === agenteId)) {
-      elementos.push(...(await figuraDocx(foto.arquivo, foto.legenda, numeroDaFoto.get(foto.id) ?? 0)))
-    }
-    return elementos
-  }
-
   // Um agente por função: o rótulo é resolvido aqui, uma vez, a partir do
   // período. Ver `comFuncaoPosto`.
   const agentes = comFuncaoPosto(t.agentes ?? [], t.periodos ?? [])
@@ -738,6 +732,32 @@ async function docParecer(
   const agentesNr16 = agentes.filter((agente) => agente.tipo === 'periculosidade')
   const temInsalubridade = pericia.modalidade !== 'periculosidade'
   const temPericulosidade = pericia.modalidade !== 'insalubridade'
+
+  // O que sai e o número de cada fotografia vêm de `fotosImpressasEmOrdem`:
+  // só o Laudo imprime foto por agente, e só de agente que tem quadro no item
+  // 10. A numeração conta apenas o que sai, na ordem em que sai.
+  const agentesComQuadro = tipoDocumento === 'laudo'
+    ? [
+        ...(temInsalubridade ? agentesNr15.map((agente) => agente.id) : []),
+        ...(temPericulosidade ? quadrosNr16DoItem10(agentesNr16, '10').map((quadro) => quadro.agente.id) : []),
+      ]
+    : []
+  const { secoes: fotosDeSecao, porAgente: fotosDosAgentes, numeroDaFoto } = fotosImpressasEmOrdem(
+    pericia.fotos,
+    agentesComQuadro,
+  )
+  const figurasDasFotos = async (fotos: typeof fotosDeSecao) => {
+    const elementos: (Paragraph | Table)[] = []
+    for (const foto of fotos) {
+      elementos.push(...(await figuraDocx(foto.arquivo, foto.legenda, numeroDaFoto.get(foto.id) ?? 0)))
+    }
+    return elementos
+  }
+  const fotosDasSecoes = async (secoes: string[]) => figurasDasFotos(
+    fotosDeSecao.filter((foto) => secoes.includes(foto.secao)),
+  )
+  const fotosDoAgente = async (agenteId: string) => figurasDasFotos(fotosDosAgentes.get(agenteId) ?? [])
+
   const tituloAnalise = pericia.modalidade === 'insalubridade'
     ? 'ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS'
     : pericia.modalidade === 'periculosidade'
@@ -1121,19 +1141,31 @@ async function docParecer(
   // perícias antigas, mas não é mais impresso — igual ao PDF e à prévia.
   if (temInsalubridade) filhos.push(h2(num.secao('NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr15))
   if (temPericulosidade) filhos.push(h2(num.secao('NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr16))
-  const gruposQuesitos = tipoDocumento === 'laudo' ? gruposQuesitosDoLaudoDocumento(t) : []
-  if (tipoDocumento === 'laudo' && gruposQuesitos.length) {
+  // No Laudo, o texto antigo (`respostasQuesitos`) segue impresso depois dos
+  // grupos por origem: nenhuma resposta gravada pode sumir do documento.
+  const blocosQuesitos: BlocoQuesitosLaudoDocumento[] = tipoDocumento === 'laudo'
+    ? blocosQuesitosDoLaudoDocumento(t)
+    : t.respostasQuesitos?.trim() ? [{ chave: 'respostasQuesitos', texto: t.respostasQuesitos }] : []
+  if (blocosQuesitos.length) {
     filhos.push(h2(num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')))
-    for (const grupo of gruposQuesitos) filhos.push(h3(grupo.titulo), ...blocos(grupo.texto))
-  } else if (tipoDocumento === 'parecer' && t.respostasQuesitos?.trim()) {
-    filhos.push(h2(num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')), ...blocos(t.respostasQuesitos))
+    for (const bloco of blocosQuesitos) {
+      if (bloco.titulo) filhos.push(h3(bloco.titulo))
+      filhos.push(...blocos(bloco.texto))
+    }
   }
-  filhos.push(h2(num.secao('ENCERRAMENTO')), ...blocosComProximo(encerramento))
+  const comHonorarios = tipoDocumento === 'laudo' && (t.honorariosPericiaisCentavos ?? 0) > 0
+  // Com honorários, o "Diante do exposto…" desce para depois deles: é o
+  // parágrafo que fecha o laudo logo acima da data e da assinatura.
+  const { corpo: corpoEncerramento, fecho: fechoEncerramento } = comHonorarios
+    ? separarFechoDoEncerramento(encerramento)
+    : { corpo: encerramento, fecho: '' }
+  filhos.push(h2(num.secao('ENCERRAMENTO')), ...blocosComProximo(corpoEncerramento))
 
-  if (tipoDocumento === 'laudo' && (t.honorariosPericiaisCentavos ?? 0) > 0) {
+  if (comHonorarios) {
     filhos.push(
       h2(num.secao('DOS HONORÁRIOS PERICIAIS')),
       ...blocosComProximo(textoHonorariosPericiais(t.honorariosPericiaisCentavos!)),
+      ...blocosComProximo(fechoEncerramento),
     )
   }
 

@@ -16,12 +16,13 @@ import { quadrosNr16DoItem10 } from '@/content/anexosNr16'
 import { horarioDaVistoria } from '@/lib/vistoria'
 import { atividadesDoPeriodo } from '@/lib/periodos'
 import { emParagrafos, linhasDoBloco } from '@/lib/listasDocumento'
-import { fotosEmOrdemDeDocumento } from '@/lib/fotosDocumento'
+import { fotosImpressasEmOrdem } from '@/lib/fotosDocumento'
 import { Logo } from '@/components/Logo'
 import { FechoDoDocumento } from '@/components/FechoDoDocumento'
 import { exibirQuadroVarredura, normalizarVarredura, type AnexoVarredura } from '@/lib/varreduraNormativa'
-import { gruposQuesitosDoLaudo } from '@/lib/quesitosLaudo'
-import { textoHonorariosPericiais } from '@/lib/honorarios'
+import { numerarItensFinais } from '@/lib/numeracaoFinal'
+import { type BlocoQuesitosLaudo, blocosQuesitosDoLaudo } from '@/lib/quesitosLaudo'
+import { separarFechoDoEncerramento, textoHonorariosPericiais } from '@/lib/honorarios'
 
 // ============================================================
 // MÓDULO H — Prévia fiel do Parecer/Laudo.
@@ -161,8 +162,31 @@ export function DocumentoPreview({
   // simplesmente não aparece — janela chutada no laudo é pior que nenhuma.
   const periodo = periodoAvaliacaoEmpresa(pericia)
 
-  const fotosOrdenadas = fotosEmOrdemDeDocumento(pericia.fotos)
-  const numeroDaFoto = new Map(fotosOrdenadas.map((foto, indice) => [foto.id, indice + 1]))
+  // Um agente por função: o rótulo é resolvido aqui, uma vez, a partir do
+  // período. Ver `comFuncaoPosto`.
+  const agentes = comFuncaoPosto(t.agentes, t.periodos)
+  type AgenteDoLaudo = (typeof agentes)[number]
+  const agentesNr15 = agentes.filter((agente) => agente.tipo !== 'periculosidade')
+  const agentesNr16 = agentes.filter((agente) => agente.tipo === 'periculosidade')
+  const varredura = normalizarVarredura(t, pericia.modalidade)
+  const { nr15: exibeVarreduraNr15, nr16: exibeVarreduraNr16 } = exibirQuadroVarredura(t)
+  const temInsalubridade = pericia.modalidade !== 'periculosidade'
+  const temPericulosidade = pericia.modalidade !== 'insalubridade'
+
+  // O que sai e o número de cada fotografia vêm de `fotosImpressasEmOrdem`:
+  // só o Laudo imprime foto por agente, e só de agente que tem quadro no item
+  // 10. A numeração conta apenas o que sai, na ordem em que sai — o mesmo
+  // resultado do PDF e do DOCX.
+  const agentesComQuadro = tipoDocumento === 'laudo'
+    ? [
+        ...(temInsalubridade ? agentesNr15.map((agente) => agente.id) : []),
+        ...(temPericulosidade ? quadrosNr16DoItem10(agentesNr16, '10').map((quadro) => quadro.agente.id) : []),
+      ]
+    : []
+  const { secoes: fotosDeSecao, porAgente: fotosDosAgentes, numeroDaFoto } = fotosImpressasEmOrdem(
+    pericia.fotos,
+    agentesComQuadro,
+  )
   const figurasDasFotos = (fotos: Pericia['fotos']) => {
     if (!fotos.length) return null
 
@@ -198,22 +222,10 @@ export function DocumentoPreview({
     )
   }
   const fotosDasSecoes = (secoes: SecaoFoto[]) => figurasDasFotos(
-    fotosOrdenadas.filter((foto) => !foto.agenteId && secoes.includes(foto.secao)),
+    fotosDeSecao.filter((foto) => secoes.includes(foto.secao)),
   )
-  const fotosDoAgente = (agenteId: string) => figurasDasFotos(
-    fotosOrdenadas.filter((foto) => foto.agenteId === agenteId),
-  )
+  const fotosDoAgente = (agenteId: string) => figurasDasFotos(fotosDosAgentes.get(agenteId) ?? [])
 
-  // Um agente por função: o rótulo é resolvido aqui, uma vez, a partir do
-  // período. Ver `comFuncaoPosto`.
-  const agentes = comFuncaoPosto(t.agentes, t.periodos)
-  type AgenteDoLaudo = (typeof agentes)[number]
-  const agentesNr15 = agentes.filter((agente) => agente.tipo !== 'periculosidade')
-  const agentesNr16 = agentes.filter((agente) => agente.tipo === 'periculosidade')
-  const varredura = normalizarVarredura(t, pericia.modalidade)
-  const { nr15: exibeVarreduraNr15, nr16: exibeVarreduraNr16 } = exibirQuadroVarredura(t)
-  const temInsalubridade = pericia.modalidade !== 'periculosidade'
-  const temPericulosidade = pericia.modalidade !== 'insalubridade'
   let indiceSubsecao7 = 1
   const numeroAvaliacaoNr15 = temInsalubridade ? `7.${++indiceSubsecao7}` : null
   const numeroAvaliacaoNr16 = temPericulosidade ? `7.${++indiceSubsecao7}` : null
@@ -227,18 +239,22 @@ export function DocumentoPreview({
   const numeroConsideracoes = t.consideracoesDivergencias?.trim()
     ? `7.${++indiceSubsecao7}`
     : null
-  let indiceSecaoFinal = 10
-  const numeroConclusaoNr15 = temInsalubridade ? ++indiceSecaoFinal : null
-  const numeroConclusaoNr16 = temPericulosidade ? ++indiceSecaoFinal : null
-  const gruposQuesitos = tipoDocumento === 'laudo' ? gruposQuesitosDoLaudo(t) : []
-  const temQuesitos = tipoDocumento === 'laudo'
-    ? gruposQuesitos.length > 0
-    : Boolean(t.respostasQuesitos?.trim())
-  const numeroQuesitos = temQuesitos ? ++indiceSecaoFinal : null
-  const numeroEncerramento = ++indiceSecaoFinal
-  const numeroHonorarios = tipoDocumento === 'laudo' && (t.honorariosPericiaisCentavos ?? 0) > 0
-    ? ++indiceSecaoFinal
-    : null
+  // No Laudo, o texto antigo (`respostasQuesitos`) segue impresso depois dos
+  // grupos por origem: nenhuma resposta gravada pode sumir do documento.
+  const blocosQuesitos: BlocoQuesitosLaudo[] = tipoDocumento === 'laudo'
+    ? blocosQuesitosDoLaudo(t)
+    : t.respostasQuesitos?.trim() ? [{ chave: 'respostasQuesitos', texto: t.respostasQuesitos }] : []
+  const {
+    conclusaoNr15: numeroConclusaoNr15,
+    conclusaoNr16: numeroConclusaoNr16,
+    quesitos: numeroQuesitos,
+    encerramento: numeroEncerramento,
+    honorarios: numeroHonorarios,
+  } = numerarItensFinais({
+    modalidade: pericia.modalidade,
+    temQuesitos: blocosQuesitos.length > 0,
+    temHonorarios: tipoDocumento === 'laudo' && (t.honorariosPericiaisCentavos ?? 0) > 0,
+  })
   let indiceGrupoAnalise = 0
   const numeroAnaliseNr15 = temInsalubridade ? `10.${++indiceGrupoAnalise}` : null
   const numeroAnaliseNr16 = temPericulosidade ? `10.${++indiceGrupoAnalise}` : null
@@ -251,6 +267,11 @@ export function DocumentoPreview({
     t.conclusaoPericulosidade?.trim() ||
     (pericia.modalidade === 'periculosidade' ? t.conclusao : '')
   const encerramento = t.encerramento?.trim() || t.observacoesAdicionais
+  // Com honorários, o "Diante do exposto…" desce para depois deles: é o
+  // parágrafo que fecha o laudo logo acima da data e da assinatura.
+  const { corpo: corpoEncerramento, fecho: fechoEncerramento } = numeroHonorarios
+    ? separarFechoDoEncerramento(encerramento)
+    : { corpo: encerramento, fecho: '' }
   const fecho = dadosAssinatura(pericia)
 
   const rotuloNatureza = (tipo: AgenteDoLaudo['tipo']) => ({
@@ -642,19 +663,18 @@ export function DocumentoPreview({
       {numeroConclusaoNr16 && <><h2>{numeroConclusaoNr16}. NR-16 — Conclusão e Fundamentação</h2><Paragrafos texto={conclusaoNr16} /></>}
       {numeroQuesitos && <>
         <h2>{numeroQuesitos}. Respostas aos Quesitos Técnicos</h2>
-        {tipoDocumento === 'laudo'
-          ? gruposQuesitos.map((grupo) => <Fragment key={grupo.campo}>
-              <h3>{grupo.titulo}</h3>
-              <Paragrafos texto={grupo.texto} />
-            </Fragment>)
-          : <Paragrafos texto={t.respostasQuesitos} />}
+        {blocosQuesitos.map((bloco) => <Fragment key={bloco.chave}>
+          {bloco.titulo && <h3>{bloco.titulo}</h3>}
+          <Paragrafos texto={bloco.texto} />
+        </Fragment>)}
       </>}
 
       <h2>{numeroEncerramento}. Encerramento</h2>
-      <Paragrafos texto={encerramento} />
+      <Paragrafos texto={corpoEncerramento} />
       {numeroHonorarios && <>
         <h2>{numeroHonorarios}. DOS HONORÁRIOS PERICIAIS</h2>
         <Paragrafos texto={textoHonorariosPericiais(t.honorariosPericiaisCentavos!)} />
+        <Paragrafos texto={fechoEncerramento} />
       </>}
       <FechoDoDocumento cidade={fecho.cidade} data={fecho.data} perito={perito} espacado />
     </article>

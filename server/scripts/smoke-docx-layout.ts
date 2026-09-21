@@ -224,6 +224,33 @@ async function main() {
   const html = await montarHtml(documento, pericia, [empresa], perito)
   const pdf = await gerarPdf(html)
   await fs.writeFile(path.join(SAIDA, 'parecer-layout.pdf'), pdf)
+
+  // Laudo da mesma perícia: quesitos por origem (mais o campo antigo), honorários
+  // e a foto vinculada ao agente, que só o Laudo imprime.
+  const periciaLaudo = {
+    ...pericia,
+    tecnico: {
+      ...(pericia.tecnico as object),
+      quesitosJuizo: 'Resposta ao quesito do Juízo.',
+      quesitosReclamante: 'Não apresentado',
+      quesitosReclamada: 'Resposta ao quesito da Reclamada.',
+      honorariosPericiaisCentavos: 250050,
+      encerramento:
+        'As considerações e conclusões apresentadas neste parecer foram elaboradas com base na vistoria.\n\n' +
+        'O presente laudo técnico foi elaborado por este Perito Judicial.\n\n' +
+        'Diante do exposto, encerra-se o presente laudo.',
+    },
+  } as unknown as PericiaCompleta
+  const documentoLaudo = {
+    ...documento,
+    id: 'doc-laudo-layout',
+    tipo: 'laudo',
+    titulo: 'Laudo Técnico Pericial',
+  } as DocumentoGerado
+  const bufferLaudo = await gerarDocx(documentoLaudo, periciaLaudo, [empresa], perito)
+  await fs.writeFile(path.join(SAIDA, 'laudo-layout.docx'), bufferLaudo)
+  const htmlLaudo = await montarHtml(documentoLaudo, periciaLaudo, [empresa], perito)
+  await fs.writeFile(path.join(SAIDA, 'laudo-layout.pdf'), await gerarPdf(htmlLaudo))
   await encerrarBrowser()
 
   const zip = await JSZip.loadAsync(buffer)
@@ -297,25 +324,20 @@ async function main() {
   const secao63 = xml.indexOf('6.3. Constatações da Vistoria Pericial')
   const secao64 = xml.indexOf('6.4. Produtos Utilizados Habitualmente nas Atividades')
   assert.ok(secao63 < fotoEpi && fotoEpi < secao64, 'evidência geral de EPI deve permanecer na seção 6.3')
-  const fotoAgente = xml.indexOf('Fotografia 6 – Visor do equipamento durante a medição do ruído')
-  const quadroAgente = xml.indexOf('10.1.1. Ruído contínuo ou intermitente')
-  const conclusaoNr15 = xml.indexOf('11. NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')
-  assert.ok(
-    quadroAgente < fotoAgente && fotoAgente < conclusaoNr15,
-    'foto vinculada deve permanecer logo depois do quadro do respectivo agente no item 10',
-  )
+  assert.doesNotMatch(xml, /Visor do equipamento durante a medição do ruído/, 'o Parecer não imprime foto vinculada a agente')
+  assert.doesNotMatch(html, /Visor do equipamento durante a medição do ruído/, 'o PDF do Parecer não imprime foto vinculada a agente')
+  assert.doesNotMatch(xml, /Quesitos do Juízo|DOS HONORÁRIOS PERICIAIS/, 'blocos exclusivos do Laudo não entram no Parecer')
 
   assert.equal(
     (xml.match(/<wp:inline\b/g) ?? []).length,
-    7,
-    'o logo oficial e todas as fotos devem ser incluídos inline',
+    6,
+    'o logo oficial e as fotos das seções devem ser incluídos inline (a do agente é só do Laudo)',
   )
   assert.doesNotMatch(xml, /<wp:anchor\b/, 'imagens flutuantes não são permitidas')
-  assert.equal(imagens.length, 7, 'o logo oficial e cada foto devem ser incorporados ao DOCX')
+  assert.equal(imagens.length, 6, 'o logo oficial e cada foto impressa devem ser incorporados ao DOCX')
   assert.match(xml, /Fotografia 1 – Vista geral do ambiente de trabalho/)
   assert.match(xml, /Vista geral do ambiente de trabalho - Fonte: Ato pericial\./)
   assert.match(xml, /Fotografia 2 – Detalhe vertical do ambiente/)
-  assert.match(xml, /Fotografia 6 – Visor do equipamento durante a medição do ruído/)
   assert.doesNotMatch(xml, /w:type="pct"/, 'tabelas percentuais variam entre renderizadores')
   assert.match(xml, /<w:tblW w:type="dxa"/)
   assert.match(xml, /<w:keepNext\/?>/, 'a imagem deve permanecer unida à legenda')
@@ -324,9 +346,64 @@ async function main() {
     'cada figura deve formar um bloco indivisível para respeitar as margens na quebra de página',
   )
 
-  console.log('DOCX layout: logo oficial e 6 fotos inline, legendas vinculadas e tabelas em DXA — ok')
+  // ---- Laudo ----
+  const zipLaudo = await JSZip.loadAsync(bufferLaudo)
+  const xmlLaudo = await zipLaudo.file('word/document.xml')!.async('string')
+  const imagensLaudo = Object.entries(zipLaudo.files)
+    .filter(([nome, entrada]) => /^word\/media\/.+/.test(nome) && !entrada.dir)
+  const emOrdem = (documentoXml: string, trechos: string[]) => {
+    const indices = trechos.map((trecho) => documentoXml.indexOf(trecho))
+    assert.ok(
+      indices.every((indice) => indice >= 0) && indices.every((indice, i) => i === 0 || indice > indices[i - 1]),
+      `ordem inesperada (${indices.join(', ')}): ${trechos.join(' | ')}`,
+    )
+  }
+  const ordemDoLaudo = [
+    '10. ANÁLISE TÉCNICA DOS AGENTES, ATIVIDADES E RISCOS IDENTIFICADOS',
+    '10.1.1. Ruído contínuo ou intermitente',
+    'Fotografia 6 – Visor do equipamento durante a medição do ruído',
+    '11. NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO',
+    '12. NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO',
+    '13. RESPOSTAS AOS QUESITOS TÉCNICOS',
+    'Quesitos do Juízo',
+    'Quesitos do Reclamante',
+    'Quesitos da Reclamada',
+    'Outras respostas aos quesitos',
+    '14. ENCERRAMENTO',
+    'O presente laudo técnico foi elaborado por este Perito Judicial.',
+    '15. DOS HONORÁRIOS PERICIAIS',
+    'Diante do exposto, encerra-se o presente laudo.',
+  ]
+  emOrdem(xmlLaudo, ordemDoLaudo)
+  assert.match(xmlLaudo, /R\$ 2\.500,50 \(dois mil e quinhentos reais e cinquenta centavos\)/)
+  assert.match(xmlLaudo, /Não apresentado/)
+  assert.equal((xmlLaudo.match(/<wp:inline\b/g) ?? []).length, 7, 'Laudo: logo oficial e as 6 fotos inline')
+  assert.equal(imagensLaudo.length, 7, 'Laudo: logo oficial e as 6 fotos incorporadas')
+  assert.equal(
+    (xmlLaudo.match(/Diante do exposto, encerra-se o presente laudo\./g) ?? []).length,
+    1,
+    'o fecho do Laudo sai uma única vez, depois dos honorários',
+  )
+  // Mesma ordem no PDF (HTML de origem).
+  const textoHtmlLaudo = htmlLaudo.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+  emOrdem(textoHtmlLaudo, [
+    '10.1.1. Ruído contínuo ou intermitente',
+    'Visor do equipamento durante a medição do ruído',
+    '11. NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO',
+    '13. RESPOSTAS AOS QUESITOS TÉCNICOS',
+    'Quesitos do Juízo',
+    'Quesitos do Reclamante',
+    'Quesitos da Reclamada',
+    'Outras respostas aos quesitos',
+    '14. ENCERRAMENTO',
+    '15. DOS HONORÁRIOS PERICIAIS',
+    'Diante do exposto, encerra-se o presente laudo.',
+  ])
+
+  console.log('DOCX layout: Parecer com logo e 5 fotos inline; Laudo com 6 fotos, quesitos por origem e honorários — ok')
   console.log(`arquivo de inspeção: ${path.join(SAIDA, 'parecer-layout.docx')}`)
   console.log(`PDF de inspeção: ${path.join(SAIDA, 'parecer-layout.pdf')}`)
+  console.log(`Laudo de inspeção: ${path.join(SAIDA, 'laudo-layout.docx')} e ${path.join(SAIDA, 'laudo-layout.pdf')}`)
 }
 
 main().catch((erro) => {

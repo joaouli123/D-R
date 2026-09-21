@@ -110,7 +110,7 @@ const pericia: Pericia = {
   fotos: [],
 }
 
-function prepararEditor(opcoes: { perfil?: 'admin' | 'perito' | 'assistente'; valor?: Pericia } = {}) {
+function prepararEditor(opcoes: { perfil?: 'admin' | 'perito' | 'assistente'; valor?: Pericia; tipo?: 'parecer' | 'laudo' } = {}) {
   const valor = opcoes.valor ?? pericia
   const salvarPericia = vi.fn(async (valor: Pericia) => valor)
   vi.mocked(useApp).mockReturnValue({
@@ -125,7 +125,7 @@ function prepararEditor(opcoes: { perfil?: 'admin' | 'perito' | 'assistente'; va
   } as unknown as ReturnType<typeof useApp>)
 
   const renderizado = render(
-    <MemoryRouter initialEntries={['/pericias/pericia-feedback']}>
+    <MemoryRouter initialEntries={[`/pericias/pericia-feedback${opcoes.tipo ? `?tipo=${opcoes.tipo}` : ''}`]}>
       <ToastProvider>
         <Routes>
           <Route path="/pericias/:id" element={<PericiaEditor />} />
@@ -364,7 +364,7 @@ describe('PericiaEditor — feedback noturno de 28/08', () => {
       id: 'foto-ruido', secao: 'documentos', agenteId: 'agente-ruido',
       url: 'https://arquivos.example/dosimetro.jpg', legenda: 'Dosímetro', ordem: 1,
     }])
-    const { salvarPericia } = prepararEditor({ valor: comAgente })
+    const { salvarPericia } = prepararEditor({ valor: comAgente, tipo: 'laudo' })
     fireEvent.click(screen.getByRole('button', { name: /Avaliações e EPIs/ }))
 
     fireEvent.change(screen.getByLabelText('Enviar fotos de Ruído'), {

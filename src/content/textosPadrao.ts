@@ -35,6 +35,13 @@ export const CAMPOS_COM_TEXTO_PADRAO = [
 
 export type CampoComTextoPadrao = (typeof CAMPOS_COM_TEXTO_PADRAO)[number]
 
+/**
+ * Parecer (assistente técnico da Reclamada) e Laudo (perito nomeado pelo
+ * Juízo) dividem a matriz inteira; só a Apresentação e o Encerramento mudam
+ * de voz. O padrão é o Parecer, que é o que sempre existiu.
+ */
+export type TipoDocumentoMatriz = 'parecer' | 'laudo'
+
 /** Junta parágrafos descartando os que ficaram vazios. */
 function paragrafos(...partes: (string | false | undefined)[]): string {
   return partes.filter((parte): parte is string => Boolean(parte)).join('\n\n')
@@ -52,7 +59,12 @@ function apresentacao(
   _pericia: Pick<Pericia, 'modalidade'>,
   perito?: Usuario | null,
   _reclamada?: Empresa,
+  tipo: TipoDocumentoMatriz = 'parecer',
 ): string {
+  if (tipo === 'laudo') {
+    return `${qualificacao(perito)}, nomeado pelo Juízo como Perito Judicial, apresenta o LAUDO TÉCNICO PERICIAL, elaborado com base na diligência realizada, nas condições efetivamente constatadas, na documentação constante dos autos e nos elementos técnicos analisados, à luz da Portaria MTb nº 3.214/1978, das Normas Regulamentadoras aplicáveis e demais disposições técnicas pertinentes, apresentando suas conclusões de forma objetiva, fundamentada e imparcial.`
+  }
+
   return `${qualificacao(perito)}, qualificado nos autos como Assistente Técnico da Reclamada, vem, respeitosamente, apresentar o presente PARECER TÉCNICO, elaborado com base na diligência realizada, nas condições efetivamente constatadas e na documentação analisada, à luz das Normas Regulamentadoras aplicáveis, apresentando suas conclusões técnicas de forma objetiva e fundamentada.`
 }
 
@@ -149,10 +161,14 @@ function metodologia(pericia: Pick<Pericia, 'modalidade'>): string {
   )
 }
 
-function encerramento(): string {
+function encerramento(tipo: TipoDocumentoMatriz = 'parecer'): string {
   return paragrafos(
+    // No Laudo revisado pelo cliente este parágrafo continua dizendo "neste
+    // parecer"; a redação dele foi mantida palavra por palavra.
     'As considerações e conclusões apresentadas neste parecer são fundamentadas nos elementos técnicos, documentais e fáticos pertinentes ao objeto da perícia, considerados à luz da legislação aplicável, das Normas Regulamentadoras e das normas técnicas pertinentes.',
-    'O presente parecer técnico foi elaborado por este Assistente Técnico com fundamento nos elementos disponíveis para análise e em observância ao Código de Ética Profissional do Sistema Confea/Crea, à legislação trabalhista, às Normas Regulamentadoras e às normas técnicas aplicáveis.',
+    tipo === 'laudo'
+      ? 'O presente laudo técnico foi elaborado por este Perito Judicial com fundamento nos elementos disponíveis para análise e em observância ao Código de Ética Profissional do Sistema Confea/Crea, à legislação trabalhista, às Normas Regulamentadoras e às normas técnicas aplicáveis.'
+      : 'O presente parecer técnico foi elaborado por este Assistente Técnico com fundamento nos elementos disponíveis para análise e em observância ao Código de Ética Profissional do Sistema Confea/Crea, à legislação trabalhista, às Normas Regulamentadoras e às normas técnicas aplicáveis.',
     'Diante do exposto, o signatário coloca-se à disposição dos envolvidos para os esclarecimentos técnicos que se fizerem necessários.',
   )
 }
@@ -162,16 +178,17 @@ export function textosPadraoDaPericia(
   pericia: Pick<Pericia, 'modalidade'>,
   perito?: Usuario | null,
   reclamada?: Empresa,
+  tipo: TipoDocumentoMatriz = 'parecer',
 ): Record<CampoComTextoPadrao, string> {
   return {
-    apresentacao: apresentacao(pericia, perito, reclamada),
+    apresentacao: apresentacao(pericia, perito, reclamada, tipo),
     objetivoPericia: objetivoPadraoDaPericia(pericia),
     normasReferencias: normasReferencias(pericia),
     equipamentosAnalisados: metodologia(pericia),
     criterioAvaliacaoPericulosidade: criterioAvaliacaoPericulosidade(),
     notaTecnicaEpis: notaTecnicaEpis(),
     protecoesColetivas: protecoesColetivas(),
-    encerramento: encerramento(),
+    encerramento: encerramento(tipo),
   }
 }
 
@@ -227,8 +244,9 @@ export interface TextoOficialDaMatriz {
 export function textosOficiaisDaMatriz(
   modalidade: ModalidadePericia,
   perito?: Usuario | null,
+  tipo: TipoDocumentoMatriz = 'parecer',
 ): TextoOficialDaMatriz[] {
-  const textos = textosPadraoDaPericia({ modalidade }, perito)
+  const textos = textosPadraoDaPericia({ modalidade }, perito, undefined, tipo)
 
   return CAMPOS_COM_TEXTO_PADRAO.filter(
     (campo) => campo !== 'criterioAvaliacaoPericulosidade' || modalidade !== 'insalubridade',
@@ -251,6 +269,12 @@ export function patchDeTextosPadrao(
   tecnico: Pericia['tecnico'],
   padroes: Record<CampoComTextoPadrao, string>,
   aplicadosAntes: Partial<Record<CampoComTextoPadrao, string>>,
+  /**
+   * Textos que também contam como padrão, não como edição: o Parecer e o Laudo
+   * partem da mesma perícia, então o que o outro tipo de documento deixou
+   * gravado precisa ser trocado ao abrir este.
+   */
+  tambemPadrao: Partial<Record<CampoComTextoPadrao, string>> = {},
 ): Partial<Record<CampoComTextoPadrao, string>> {
   const patch: Partial<Record<CampoComTextoPadrao, string>> = {}
 
@@ -292,7 +316,8 @@ export function patchDeTextosPadrao(
       (campo === 'encerramento' && atual.startsWith('Os trabalhos periciais foram desenvolvidos com imparcialidade')) ||
       (campo === 'encerramento' && atual.startsWith('1 - Foi realizada inspeção in loco')) ||
       (campo === 'encerramento' && atual.includes('No melhor conhecimento e crédito'))
-    const doPerito = atual.trim() !== '' && atual !== anterior && !padraoLegado
+    const doPerito =
+      atual.trim() !== '' && atual !== anterior && atual !== tambemPadrao[campo] && !padraoLegado
     if (!doPerito && atual !== padroes[campo]) patch[campo] = padroes[campo]
   }
 

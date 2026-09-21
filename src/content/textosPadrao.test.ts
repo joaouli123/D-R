@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { CAMPOS_COM_TEXTO_PADRAO, patchDeTextosPadrao, textosPadraoDaPericia } from './textosPadrao'
+import {
+  CAMPOS_COM_TEXTO_PADRAO,
+  patchDeTextosPadrao,
+  textosOficiaisDaMatriz,
+  textosPadraoDaPericia,
+} from './textosPadrao'
 import type { Empresa, ModalidadePericia, Pericia, Usuario } from '@/types'
 
 const PERITO: Usuario = {
@@ -161,6 +166,31 @@ describe('patchDeTextosPadrao', () => {
     expect(patchDeTextosPadrao(tecnico, padroes, {})).not.toHaveProperty('apresentacao')
   })
 
+  it('troca o padrão do outro tipo de documento gravado na mesma perícia (Parecer aberto como Laudo)', () => {
+    const doParecer = textosPadraoDaPericia(pericia(), PERITO, RECLAMADA, 'parecer')
+    const doLaudo = textosPadraoDaPericia(pericia(), PERITO, RECLAMADA, 'laudo')
+    const tecnico = {
+      ...pericia().tecnico,
+      apresentacao: doParecer.apresentacao,
+      encerramento: doParecer.encerramento,
+    }
+
+    // Sem dizer que o do Parecer também é padrão, o texto parece do administrador.
+    expect(patchDeTextosPadrao(tecnico, doLaudo, {})).not.toHaveProperty('apresentacao')
+
+    const patch = patchDeTextosPadrao(tecnico, doLaudo, {}, doParecer)
+    expect(patch.apresentacao).toBe(doLaudo.apresentacao)
+    expect(patch.encerramento).toBe(doLaudo.encerramento)
+  })
+
+  it('o padrão do outro tipo não protege texto que o administrador de fato editou', () => {
+    const doParecer = textosPadraoDaPericia(pericia(), PERITO, RECLAMADA, 'parecer')
+    const doLaudo = textosPadraoDaPericia(pericia(), PERITO, RECLAMADA, 'laudo')
+    const tecnico = { ...pericia().tecnico, apresentacao: 'Redação própria do administrador.' }
+
+    expect(patchDeTextosPadrao(tecnico, doLaudo, {}, doParecer)).not.toHaveProperty('apresentacao')
+  })
+
   it('atualiza o campo que ainda tem o padrão que nós colocamos', () => {
     // Trocar a modalidade tem de reescrever o objeto — mas só porque
     // ninguém tinha mexido nele.
@@ -276,5 +306,58 @@ describe('fidelidade à matriz canônica do Parecer Jhonathan Victor', () => {
       'O presente parecer técnico foi elaborado por este Assistente Técnico com fundamento nos elementos disponíveis para análise e em observância ao Código de Ética Profissional do Sistema Confea/Crea, à legislação trabalhista, às Normas Regulamentadoras e às normas técnicas aplicáveis.',
       'Diante do exposto, o signatário coloca-se à disposição dos envolvidos para os esclarecimentos técnicos que se fizerem necessários.',
     ])
+  })
+  describe('Laudo (perito nomeado pelo Juízo)', () => {
+    it('apresenta o perito judicial no lugar do assistente técnico, com o texto do laudo revisado', () => {
+      const { apresentacao } = textosPadraoDaPericia(pericia('ambas'), PERITO, RECLAMADA, 'laudo')
+
+      expect(apresentacao).toBe(
+        'Dinoel Ribeiro, Engenheiro de Segurança do Trabalho, CREA-SP 5063000000, nomeado pelo Juízo como Perito Judicial, apresenta o LAUDO TÉCNICO PERICIAL, elaborado com base na diligência realizada, nas condições efetivamente constatadas, na documentação constante dos autos e nos elementos técnicos analisados, à luz da Portaria MTb nº 3.214/1978, das Normas Regulamentadoras aplicáveis e demais disposições técnicas pertinentes, apresentando suas conclusões de forma objetiva, fundamentada e imparcial.',
+      )
+      expect(apresentacao).not.toMatch(/Assistente Técnico|PARECER|Reclamada/)
+    })
+
+    it('encerra com o texto do laudo revisado (perito judicial, laudo técnico)', () => {
+      const { encerramento } = textosPadraoDaPericia(pericia('ambas'), PERITO, RECLAMADA, 'laudo')
+
+      expect(encerramento.split('\n\n')).toEqual([
+        // O cliente manteve "neste parecer" neste primeiro parágrafo; o texto segue a redação dele.
+        'As considerações e conclusões apresentadas neste parecer são fundamentadas nos elementos técnicos, documentais e fáticos pertinentes ao objeto da perícia, considerados à luz da legislação aplicável, das Normas Regulamentadoras e das normas técnicas pertinentes.',
+        'O presente laudo técnico foi elaborado por este Perito Judicial com fundamento nos elementos disponíveis para análise e em observância ao Código de Ética Profissional do Sistema Confea/Crea, à legislação trabalhista, às Normas Regulamentadoras e às normas técnicas aplicáveis.',
+        'Diante do exposto, o signatário coloca-se à disposição dos envolvidos para os esclarecimentos técnicos que se fizerem necessários.',
+      ])
+    })
+
+    it('mantém o Parecer exatamente como era: sem tipo, ou com tipo parecer', () => {
+      const semTipo = textosPadraoDaPericia(pericia('ambas'), PERITO, RECLAMADA)
+      const comTipo = textosPadraoDaPericia(pericia('ambas'), PERITO, RECLAMADA, 'parecer')
+
+      expect(comTipo).toEqual(semTipo)
+      expect(semTipo.apresentacao).toContain('qualificado nos autos como Assistente Técnico da Reclamada')
+      expect(semTipo.encerramento).toContain('por este Assistente Técnico')
+    })
+
+    it('só a apresentação e o encerramento mudam entre Parecer e Laudo', () => {
+      const parecer = textosPadraoDaPericia(pericia('ambas'), PERITO, RECLAMADA, 'parecer')
+      const laudo = textosPadraoDaPericia(pericia('ambas'), PERITO, RECLAMADA, 'laudo')
+
+      for (const campo of CAMPOS_COM_TEXTO_PADRAO) {
+        if (campo === 'apresentacao' || campo === 'encerramento') {
+          expect(laudo[campo]).not.toBe(parecer[campo])
+        } else {
+          expect(laudo[campo]).toBe(parecer[campo])
+        }
+      }
+    })
+
+    it('a matriz oficial mostra os textos do tipo pedido', () => {
+      const doLaudo = textosOficiaisDaMatriz('ambas', PERITO, 'laudo')
+      const doParecer = textosOficiaisDaMatriz('ambas', PERITO)
+
+      const apresentacaoLaudo = doLaudo.find((item) => item.campo === 'apresentacao')
+      const apresentacaoParecer = doParecer.find((item) => item.campo === 'apresentacao')
+      expect(apresentacaoLaudo?.conteudo).toContain('nomeado pelo Juízo como Perito Judicial')
+      expect(apresentacaoParecer?.conteudo).toContain('Assistente Técnico da Reclamada')
+    })
   })
 })

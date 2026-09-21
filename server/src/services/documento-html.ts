@@ -12,7 +12,8 @@ import {
   MARCA,
   ORIGEM_PONTO,
   type TecnicoJson,
-  gruposQuesitosDoLaudoDocumento,
+  blocosQuesitosDoLaudoDocumento,
+  type BlocoQuesitosLaudoDocumento,
   css,
   data,
   dadosAssinaturaDocumento,
@@ -20,7 +21,7 @@ import {
   comFuncaoPosto,
   emParagrafos,
   extenso,
-  fotosEmOrdemDeDocumento,
+  fotosImpressasEmOrdem,
   linhasDoBloco,
   intervaloDoPeriodo,
   mascaraCnpj,
@@ -37,7 +38,7 @@ import {
   TEXTO_AUSENCIA_RECLAMANTE,
   ATUACAO,
 } from './documento-comum.js'
-import { textoHonorariosPericiais } from './honorarios.js'
+import { separarFechoDoEncerramento, textoHonorariosPericiais } from './honorarios.js'
 
 // ============================================================
 // MÓDULO H — Montagem automática do documento (lado servidor).
@@ -607,9 +608,21 @@ export async function htmlDoParecer(
   }).join('')
 
   // Fotos viram data URI: o Chromium roda com a rede bloqueada.
-  const fotosOrdenadas = fotosEmOrdemDeDocumento(pericia.fotos)
-  const numeroDaFoto = new Map(fotosOrdenadas.map((foto, indice) => [foto.id, indice + 1]))
-  const figurasDasFotos = async (fotos: typeof fotosOrdenadas) => {
+  //
+  // O que sai e o número de cada fotografia vêm de `fotosImpressasEmOrdem`:
+  // só o Laudo imprime foto por agente, e só de agente que tem quadro no item
+  // 10. A numeração conta apenas o que sai, na ordem em que sai.
+  const agentesComQuadro = tipoDocumento === 'laudo'
+    ? [
+        ...(temInsalubridade ? agentesNr15.map((agente) => agente.id) : []),
+        ...(temPericulosidade ? quadrosNr16DoItem10(agentesNr16, '10').map((quadro) => quadro.agente.id) : []),
+      ]
+    : []
+  const { secoes: fotosDeSecao, porAgente: fotosDosAgentes, numeroDaFoto } = fotosImpressasEmOrdem(
+    pericia.fotos,
+    agentesComQuadro,
+  )
+  const figurasDasFotos = async (fotos: typeof fotosDeSecao) => {
     if (!fotos.length) return ''
     // Carrega o armazenamento apenas quando há foto para embutir, como o
     // docx.ts já faz: o import estático puxava env.ts, que chama
@@ -632,12 +645,11 @@ export async function htmlDoParecer(
     return `<div class="fotos">${figuras.join('')}</div>`
   }
   const fotosDasSecoes = async (secoes: string[]) => figurasDasFotos(
-    fotosOrdenadas.filter((foto) => !foto.agenteId && secoes.includes(foto.secao)),
+    fotosDeSecao.filter((foto) => secoes.includes(foto.secao)),
   )
-  const idsComFotos = [...new Set(fotosOrdenadas.flatMap((foto) => foto.agenteId ? [foto.agenteId] : []))]
-  const fotosPorAgente = new Map(await Promise.all(idsComFotos.map(async (agenteId) => [
+  const fotosPorAgente = new Map(await Promise.all([...fotosDosAgentes].map(async ([agenteId, fotos]) => [
     agenteId,
-    await figurasDasFotos(fotosOrdenadas.filter((foto) => foto.agenteId === agenteId)),
+    await figurasDasFotos(fotos),
   ] as const)))
 
   const fotosAmbiente = await fotosDasSecoes(['ambiente'])
@@ -819,25 +831,34 @@ export async function htmlDoParecer(
 
   if (temInsalubridade) partes.push(`<h2>${num.secao('NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')}</h2>`, blocoConteudo(paragrafos(conclusaoNr15)))
   if (temPericulosidade) partes.push(`<h2>${num.secao('NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO')}</h2>`, blocoConteudo(paragrafos(conclusaoNr16)))
-  const gruposQuesitos = tipoDocumento === 'laudo' ? gruposQuesitosDoLaudoDocumento(t) : []
-  if (tipoDocumento === 'laudo' && gruposQuesitos.length) {
+  // No Laudo, o texto antigo (`respostasQuesitos`) segue impresso depois dos
+  // grupos por origem: nenhuma resposta gravada pode sumir do documento.
+  const blocosQuesitos: BlocoQuesitosLaudoDocumento[] = tipoDocumento === 'laudo'
+    ? blocosQuesitosDoLaudoDocumento(t)
+    : t.respostasQuesitos?.trim() ? [{ chave: 'respostasQuesitos', texto: t.respostasQuesitos }] : []
+  if (blocosQuesitos.length) {
     partes.push(
       `<h2>${num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')}</h2>`,
-      ...gruposQuesitos.map((grupo) => blocoConteudo(`<h3>${esc(grupo.titulo)}</h3>${paragrafos(grupo.texto)}`)),
+      ...blocosQuesitos.map((bloco) => blocoConteudo(`${bloco.titulo ? `<h3>${esc(bloco.titulo)}</h3>` : ''}${paragrafos(bloco.texto)}`)),
     )
-  } else if (tipoDocumento === 'parecer' && t.respostasQuesitos?.trim()) {
-    partes.push(`<h2>${num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')}</h2>`, blocoConteudo(paragrafos(t.respostasQuesitos)))
   }
 
+  const comHonorarios = tipoDocumento === 'laudo' && (t.honorariosPericiaisCentavos ?? 0) > 0
+  // Com honorários, o "Diante do exposto…" desce para depois deles: é o
+  // parágrafo que fecha o laudo logo acima da data e da assinatura.
+  const { corpo: corpoEncerramento, fecho: fechoEncerramento } = comHonorarios
+    ? separarFechoDoEncerramento(encerramento)
+    : { corpo: encerramento, fecho: '' }
   partes.push(
     `<h2>${num.secao('ENCERRAMENTO')}</h2>`,
-    blocoConteudo(paragrafos(encerramento)),
+    blocoConteudo(paragrafos(corpoEncerramento)),
   )
-  if (tipoDocumento === 'laudo' && (t.honorariosPericiaisCentavos ?? 0) > 0) {
+  if (comHonorarios) {
     partes.push(
       `<h2>${num.secao('DOS HONORÁRIOS PERICIAIS')}</h2>`,
       blocoConteudo(paragrafos(textoHonorariosPericiais(t.honorariosPericiaisCentavos!))),
     )
+    if (fechoEncerramento) partes.push(blocoConteudo(paragrafos(fechoEncerramento)))
   }
   partes.push(await assinatura(perito, fecho.cidade, fecho.data, { espacado: true }))
 
