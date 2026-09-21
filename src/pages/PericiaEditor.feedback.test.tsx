@@ -350,7 +350,7 @@ describe('PericiaEditor — feedback noturno de 28/08', () => {
     expect(screen.getByText('Amônia: 1 EPI')).toBeDefined()
   })
 
-  it('envia a fotografia da medição vinculada somente ao agente selecionado', async () => {
+  it.each(['laudo', 'parecer'] as const)('envia a fotografia da medição vinculada somente ao agente selecionado (%s)', async (tipo) => {
     const comAgente = {
       ...pericia,
       tecnico: {
@@ -364,7 +364,7 @@ describe('PericiaEditor — feedback noturno de 28/08', () => {
       id: 'foto-ruido', secao: 'documentos', agenteId: 'agente-ruido',
       url: 'https://arquivos.example/dosimetro.jpg', legenda: 'Dosímetro', ordem: 1,
     }])
-    const { salvarPericia } = prepararEditor({ valor: comAgente, tipo: 'laudo' })
+    const { salvarPericia } = prepararEditor({ valor: comAgente, tipo })
     fireEvent.click(screen.getByRole('button', { name: /Avaliações e EPIs/ }))
 
     fireEvent.change(screen.getByLabelText('Enviar fotos de Ruído'), {

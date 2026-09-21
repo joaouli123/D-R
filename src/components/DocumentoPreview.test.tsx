@@ -276,7 +276,7 @@ describe('DocumentoPreview', () => {
     expect(html.match(/Diante do exposto/g)).toHaveLength(1)
   })
 
-  describe('fotografias vinculadas a agente (só no Laudo)', () => {
+  describe('fotografias vinculadas a agente (Laudo e Parecer)', () => {
     const legenda = 'Visor do dosímetro durante a medição'
     const fotoDoAgente = (agenteId: string, id = 'foto-medicao-ruido', texto = legenda) => ({
       id, secao: 'documentos' as const, agenteId, url: `/${id}.jpg`, legenda: texto, ordem: 3,
@@ -291,44 +291,66 @@ describe('DocumentoPreview', () => {
         />,
       )
 
-    it('mostra a fotografia logo após a tabela do respectivo agente, sem duplicá-la', () => {
-      const html = renderizar([fotoDoAgente('ruido-calculado')], 'laudo')
+    // O Parecer imprime a foto do agente igual ao Laudo (pedido do perito de
+    // 21/09/2026): mesma posição, mesma legenda, mesma numeração.
+    it.each(['laudo', 'parecer'] as const)(
+      '%s: mostra a fotografia logo após a tabela do respectivo agente, sem duplicá-la',
+      (tipo) => {
+        const html = renderizar([fotoDoAgente('ruido-calculado')], tipo)
 
-      const quadroDoRuido = html.indexOf('10.1.3. Ruído')
-      const foto = html.indexOf(legenda)
-      expect(foto).toBeGreaterThan(quadroDoRuido)
-      // Uma figura usa a legenda duas vezes no HTML: texto alternativo e
-      // figcaption. Cinco partes significariam duas figuras duplicadas.
-      expect(html.split(legenda)).toHaveLength(3)
-    })
+        const quadroDoRuido = html.indexOf('10.1.3. Ruído')
+        const foto = html.indexOf(legenda)
+        expect(quadroDoRuido).toBeGreaterThan(-1)
+        expect(foto).toBeGreaterThan(quadroDoRuido)
+        // Uma figura usa a legenda duas vezes no HTML: texto alternativo e
+        // figcaption. Cinco partes significariam duas figuras duplicadas.
+        expect(html.split(legenda)).toHaveLength(3)
+      },
+    )
 
-    it('no Parecer, não mostra a fotografia do agente nem lhe reserva número', () => {
+    it('no Parecer, a fotografia do agente ganha o número seguinte ao das seções', () => {
       const html = renderizar([fotoDoAgente('ruido-calculado')], 'parecer')
 
-      expect(html).not.toContain(legenda)
       expect(html).toContain('Fotografia 2 – EPI reconhecido na diligência')
-      expect(html).not.toContain('Fotografia 3')
-    })
-
-    it('numera a fotografia do agente depois das das seções, mesmo gravada em "documentos"', () => {
-      const html = renderizar([
-        fotoDoAgente('ruido-calculado'),
-        { id: 'foto-produto', secao: 'produtos' as const, url: '/produto.jpg', legenda: 'Rótulo do produto', ordem: 1 },
-      ], 'laudo')
-
-      expect(html).toContain('Fotografia 3 – Rótulo do produto')
-      expect(html).toContain(`Fotografia 4 – ${legenda}`)
-    })
-
-    it('não gasta número com foto de agente que já não está no laudo', () => {
-      const html = renderizar([
-        fotoDoAgente('agente-removido', 'foto-orfa', 'Foto de agente excluído'),
-        fotoDoAgente('ruido-calculado'),
-      ], 'laudo')
-
-      expect(html).not.toContain('Foto de agente excluído')
       expect(html).toContain(`Fotografia 3 – ${legenda}`)
       expect(html).not.toContain('Fotografia 4')
+    })
+
+    it.each(['laudo', 'parecer'] as const)(
+      '%s: numera a fotografia do agente depois das das seções, mesmo gravada em "documentos"',
+      (tipo) => {
+        const html = renderizar([
+          fotoDoAgente('ruido-calculado'),
+          { id: 'foto-produto', secao: 'produtos' as const, url: '/produto.jpg', legenda: 'Rótulo do produto', ordem: 1 },
+        ], tipo)
+
+        expect(html).toContain('Fotografia 3 – Rótulo do produto')
+        expect(html).toContain(`Fotografia 4 – ${legenda}`)
+      },
+    )
+
+    it.each(['laudo', 'parecer'] as const)(
+      '%s: não gasta número com foto de agente que já não está no documento',
+      (tipo) => {
+        const html = renderizar([
+          fotoDoAgente('agente-removido', 'foto-orfa', 'Foto de agente excluído'),
+          fotoDoAgente('ruido-calculado'),
+        ], tipo)
+
+        expect(html).not.toContain('Foto de agente excluído')
+        expect(html).toContain(`Fotografia 3 – ${legenda}`)
+        expect(html).not.toContain('Fotografia 4')
+      },
+    )
+
+    it('Laudo e Parecer numeram e ordenam as fotografias do mesmo jeito', () => {
+      const fotos = [
+        fotoDoAgente('ruido-calculado'),
+        { id: 'foto-produto', secao: 'produtos' as const, url: '/produto.jpg', legenda: 'Rótulo do produto', ordem: 1 },
+      ]
+      const legendas = (html: string) => [...html.matchAll(/Fotografia (\d+) – ([^<]+)/g)].map((m) => `${m[1]}:${m[2]}`)
+
+      expect(legendas(renderizar(fotos, 'parecer'))).toEqual(legendas(renderizar(fotos, 'laudo')))
     })
   })
 

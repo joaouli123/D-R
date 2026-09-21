@@ -192,54 +192,75 @@ describe('parecer em DOCX', () => {
   const legendaDaFoto = (texto: string, numero: number) =>
     texto.split(`Fotografia ${numero} – `)[1]?.slice(0, 120) ?? ''
 
-  it('no Laudo, coloca a foto vinculada depois da tabela do respectivo agente sem duplicação', async () => {
+  // O Parecer imprime a foto do agente igual ao Laudo (pedido do perito de
+  // 21/09/2026): mesma posição, mesma legenda, mesma numeração.
+  const documentos = [
+    ['Laudo', laudo],
+    ['Parecer', documento],
+  ] as const
+
+  it.each(documentos)('no %s, coloca a foto vinculada depois da tabela do respectivo agente sem duplicação', async (_nome, doc) => {
     const pericia = periciaDeTeste()
     pericia.fotos.push(fotoDoAgente('agn-1'))
 
-    const texto = await textoDoDocx(pericia, laudo)
+    const texto = await textoDoDocx(pericia, doc)
     const quadro = texto.indexOf('10.1.1. Óleos minerais')
     const foto = texto.indexOf(LEGENDA_AGENTE)
 
+    expect(quadro).toBeGreaterThan(-1)
     expect(foto).toBeGreaterThan(quadro)
     expect(texto.split(LEGENDA_AGENTE)).toHaveLength(2)
   })
 
-  it('no Parecer, não imprime a foto vinculada a agente nem lhe reserva número', async () => {
+  it('no Parecer, a foto do agente ganha o número seguinte ao das seções', async () => {
     const pericia = periciaDeTeste()
     pericia.fotos.push(fotoDoAgente('agn-1'))
 
     const texto = await textoDoDocx(pericia)
 
-    expect(texto).not.toContain(LEGENDA_AGENTE)
     expect(texto).toContain('Fotografia 2')
-    expect(texto).not.toContain('Fotografia 3')
+    expect(legendaDaFoto(texto, 3)).toContain(LEGENDA_AGENTE)
+    expect(texto).not.toContain('Fotografia 4')
   })
 
-  it('numera a foto do agente depois das fotos das seções, mesmo gravada em "documentos"', async () => {
+  it.each(documentos)('%s: numera a foto do agente depois das fotos das seções, mesmo gravada em "documentos"', async (_nome, doc) => {
     const pericia = periciaDeTeste()
     pericia.fotos.push(
       fotoDoAgente('agn-1'),
       { id: 'fot-produto', periciaId: 'per-1', secao: 'produtos', ordem: 1, arquivo: 'fot-produto.jpg', legenda: 'Rótulo do produto' } as never,
     )
 
-    const texto = await textoDoDocx(pericia, laudo)
+    const texto = await textoDoDocx(pericia, doc)
 
     expect(legendaDaFoto(texto, 3)).toContain('Rótulo do produto')
     expect(legendaDaFoto(texto, 4)).toContain(LEGENDA_AGENTE)
   })
 
-  it('não gasta número com foto de agente que já não está no laudo', async () => {
+  it.each(documentos)('%s: não gasta número com foto de agente que já não está no documento', async (_nome, doc) => {
     const pericia = periciaDeTeste()
     pericia.fotos.push(
       fotoDoAgente('agn-removido', 'foto-orfa', 'Foto de agente excluído'),
       fotoDoAgente('agn-1'),
     )
 
-    const texto = await textoDoDocx(pericia, laudo)
+    const texto = await textoDoDocx(pericia, doc)
 
     expect(texto).not.toContain('Foto de agente excluído')
     expect(legendaDaFoto(texto, 3)).toContain(LEGENDA_AGENTE)
     expect(texto).not.toContain('Fotografia 4')
+  })
+
+  it.each(documentos)('%s: foto de agente NR-16 sai depois do quadro dele no item 10, uma vez só', async (_nome, doc) => {
+    const pericia = periciaSoPericulosidade()
+    pericia.fotos.push(fotoDoAgente('agn-nr16', 'foto-nr16', 'Sinalização da área de risco'))
+
+    const texto = await textoDoDocx(pericia, doc)
+    const quadro = texto.indexOf('10.1.1. Inflamáveis – Avaliação, Resultado e Conclusão')
+    const foto = texto.indexOf('Sinalização da área de risco')
+
+    expect(quadro).toBeGreaterThan(-1)
+    expect(foto).toBeGreaterThan(quadro)
+    expect(texto.split('Sinalização da área de risco')).toHaveLength(2)
   })
 
 

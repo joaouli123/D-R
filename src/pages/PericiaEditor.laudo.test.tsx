@@ -34,9 +34,10 @@ afterEach(() => {
 })
 
 // ------------------------------------------------------------------
-// O que o cliente pediu para o LAUDO (e que o Parecer não mostra):
+// O que o cliente pediu para o LAUDO:
 //   • fotos das medições logo abaixo do agente avaliado, inclusive pela
-//     câmera do celular;
+//     câmera do celular (em 21/09/2026 o perito pediu o mesmo no Parecer:
+//     o Laudo e o Parecer oferecem e imprimem essas fotos);
 //   • respostas aos quesitos em campos separados — Juízo, Reclamante e
 //     Reclamada — com o atalho "Não apresentado";
 //   • item DOS HONORÁRIOS PERICIAIS, com o valor proposto pelo perito.
@@ -150,7 +151,7 @@ const caixaDoCartao = (titulo: string) => {
 const antes = (a: Element, b: Element) =>
   Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
 
-describe('PericiaEditor — fotos das medições por agente (Laudo)', () => {
+describe('PericiaEditor — fotos das medições por agente (Laudo e Parecer)', () => {
   it('no Laudo, cada avaliação ganha o bloco de evidências, com galeria e câmera do celular', () => {
     abrirEditor({ tipo: 'laudo', pericia: periciaComRuido() })
     irParaEtapa(/Avaliações e EPIs/)
@@ -166,17 +167,37 @@ describe('PericiaEditor — fotos das medições por agente (Laudo)', () => {
   })
 
   it.each([undefined, 'parecer', 'qualquer-coisa'])(
-    'sem tipo=laudo (%s) o bloco não aparece: o Parecer não imprime fotos por agente',
+    'sem tipo=laudo (%s) o Parecer também oferece o bloco, com galeria e câmera, e diz que sai no Parecer',
     (tipo) => {
       abrirEditor({ tipo, pericia: periciaComRuido() })
       irParaEtapa(/Avaliações e EPIs/)
 
       expect(screen.getByRole('button', { name: 'Remover agente' })).toBeDefined()
-      expect(screen.queryByText('Evidências fotográficas da avaliação')).toBeNull()
-      expect(screen.queryByLabelText('Enviar fotos de Ruído')).toBeNull()
-      expect(screen.queryByLabelText('Capturar foto de Ruído')).toBeNull()
+      expect(screen.getByText('Evidências fotográficas da avaliação')).toBeDefined()
+      const galeria = screen.getByLabelText<HTMLInputElement>('Enviar fotos de Ruído')
+      expect(galeria.accept).toBe('image/*')
+      expect(galeria.multiple).toBe(true)
+      expect(screen.getByLabelText<HTMLInputElement>('Capturar foto de Ruído').getAttribute('capture')).toBe('environment')
+      expect(screen.getByText(/saem no Parecer logo abaixo da tabela correspondente/)).toBeDefined()
+      expect(screen.queryByText(/saem no Laudo/)).toBeNull()
     },
   )
+
+  it('no Laudo, o texto do bloco diz que as fotos saem no Laudo', () => {
+    abrirEditor({ tipo: 'laudo', pericia: periciaComRuido() })
+    irParaEtapa(/Avaliações e EPIs/)
+
+    expect(screen.getByText(/saem no Laudo logo abaixo da tabela correspondente/)).toBeDefined()
+    expect(screen.queryByText(/saem no Parecer/)).toBeNull()
+  })
+
+  it('no Parecer, mostra as fotos da medição logo abaixo do agente, na etapa das avaliações', () => {
+    abrirEditor({ tipo: 'parecer', pericia: periciaComRuido([fotoDoRuido('foto-1', 'Dosímetro no ombro', 1)]) })
+    irParaEtapa(/Avaliações e EPIs/)
+
+    const imagem = screen.getByAltText('Dosímetro no ombro')
+    expect(antes(screen.getByText('Evidências fotográficas da avaliação'), imagem)).toBe(true)
+  })
 
   it('mostra as fotos da medição logo abaixo do agente, na etapa das avaliações', () => {
     abrirEditor({ tipo: 'laudo', pericia: periciaComRuido([fotoDoRuido('foto-1', 'Dosímetro no ombro', 1)]) })
@@ -194,11 +215,12 @@ describe('PericiaEditor — fotos das medições por agente (Laudo)', () => {
     expect(screen.getByAltText('Dosímetro no ombro')).toBeDefined()
   })
 
-  it('na etapa de fotografias do Parecer não aparece o grupo das medições', () => {
+  it('na etapa de fotografias do Parecer também aparece o grupo das medições', () => {
     abrirEditor({ tipo: 'parecer', pericia: periciaComRuido([fotoDoRuido('foto-1', 'Dosímetro no ombro', 1)]) })
     irParaEtapa(/Fotografias/)
 
-    expect(screen.queryByText('Medições e avaliações técnicas')).toBeNull()
+    expect(screen.getByText('Medições e avaliações técnicas')).toBeDefined()
+    expect(screen.getByAltText('Dosímetro no ombro')).toBeDefined()
   })
 })
 

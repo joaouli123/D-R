@@ -154,8 +154,8 @@ export function fotosEmOrdemDeDocumento<T extends { secao: string; ordem: number
  * - `secoes`: fotos sem agente, de seção conhecida (3.1, 6.1 a 6.4), na ordem
  *   do documento.
  * - `porAgente`: fotos ligadas a um agente, no item 10, na ordem em que os
- *   quadros dos agentes saem em `agentesImpressos`. Só o Laudo imprime fotos
- *   por agente — no Parecer a lista vem vazia. Foto de agente removido ou fora
+ *   quadros dos agentes saem em `agentesImpressos`. Laudo e Parecer imprimem
+ *   fotos por agente do mesmo jeito. Foto de agente removido ou fora
  *   da modalidade não entra.
  *
  * O número conta só o que sai, de 1 a N, sem buraco: a prévia, o PDF e o DOCX

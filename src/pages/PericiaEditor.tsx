@@ -1149,8 +1149,9 @@ export default function PericiaEditor() {
   }
 
   function painelFotosDoAgente(agente: AgenteAvaliado) {
-    // As evidências fotográficas por agente são do Laudo: o Parecer não as imprime.
-    if (tipoDoc !== 'laudo') return null
+    // As evidências fotográficas por agente valem para o Laudo e para o
+    // Parecer (pedido do perito de 21/09/2026): as duas saídas imprimem a foto
+    // logo abaixo do quadro do agente no item 10.
     const fotos = p.fotos.filter((foto) => foto.agenteId === agente.id)
     const nome = agente.nome?.trim() || 'agente avaliado'
     const idUpload = `fotos-agente-${agente.id}`
@@ -1164,7 +1165,7 @@ export default function PericiaEditor() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-ink-800">Evidências fotográficas da avaliação</p>
-            <p className="text-xs text-ink-500">Fotos da medição feitas na vistoria, do arquivo ou direto da câmera do celular. Ficam vinculadas somente a este agente e saem no Laudo logo abaixo da tabela correspondente.</p>
+            <p className="text-xs text-ink-500">Fotos da medição feitas na vistoria, do arquivo ou direto da câmera do celular. Ficam vinculadas somente a este agente e saem no {tipoDoc === 'laudo' ? 'Laudo' : 'Parecer'} logo abaixo da tabela correspondente.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <label htmlFor={idUpload} className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-navy-700 bg-white px-3 py-1.5 text-xs font-semibold text-navy-800 hover:bg-navy-50">
@@ -2319,7 +2320,7 @@ export default function PericiaEditor() {
               }}
             />
             <div className="space-y-6 p-5">
-              {tipoDoc === 'laudo' && p.fotos.some((foto) => foto.agenteId) && (
+              {p.fotos.some((foto) => foto.agenteId) && (
                 <div>
                   <div className="mb-2 flex items-center gap-2">
                     <h4 className="section-title">Medições e avaliações técnicas</h4>

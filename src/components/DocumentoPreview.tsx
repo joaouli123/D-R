@@ -174,15 +174,14 @@ export function DocumentoPreview({
   const temPericulosidade = pericia.modalidade !== 'insalubridade'
 
   // O que sai e o número de cada fotografia vêm de `fotosImpressasEmOrdem`:
-  // só o Laudo imprime foto por agente, e só de agente que tem quadro no item
-  // 10. A numeração conta apenas o que sai, na ordem em que sai — o mesmo
-  // resultado do PDF e do DOCX.
-  const agentesComQuadro = tipoDocumento === 'laudo'
-    ? [
-        ...(temInsalubridade ? agentesNr15.map((agente) => agente.id) : []),
-        ...(temPericulosidade ? quadrosNr16DoItem10(agentesNr16, '10').map((quadro) => quadro.agente.id) : []),
-      ]
-    : []
+  // Laudo e Parecer imprimem foto por agente (pedido do perito de
+  // 21/09/2026), e só de agente que tem quadro no item 10. A numeração conta
+  // apenas o que sai, na ordem em que sai — o mesmo resultado do PDF e do
+  // DOCX.
+  const agentesComQuadro = [
+    ...(temInsalubridade ? agentesNr15.map((agente) => agente.id) : []),
+    ...(temPericulosidade ? quadrosNr16DoItem10(agentesNr16, '10').map((quadro) => quadro.agente.id) : []),
+  ]
   const { secoes: fotosDeSecao, porAgente: fotosDosAgentes, numeroDaFoto } = fotosImpressasEmOrdem(
     pericia.fotos,
     agentesComQuadro,

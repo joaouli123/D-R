@@ -131,56 +131,87 @@ describe('parecer em HTML (motor do PDF)', () => {
   const gerarLaudo = (pericia = periciaDeTeste()) =>
     htmlDoParecer(pericia, [empresa], perito, 'Laudo Técnico Pericial', 'laudo')
 
-  it('no Laudo, coloca a foto vinculada depois da tabela do agente e não a repete nas evidências gerais', async () => {
+  // O Parecer imprime a foto do agente igual ao Laudo (pedido do perito de
+  // 21/09/2026): mesma posição, mesma legenda, mesma numeração.
+  const gerarDocumento = [
+    ['Laudo', gerarLaudo],
+    ['Parecer', gerar],
+  ] as const
+
+  it.each(gerarDocumento)('no %s, coloca a foto vinculada depois da tabela do agente e não a repete nas evidências gerais', async (_nome, gerarDoc) => {
     const pericia = periciaDeTeste()
     pericia.fotos.push(fotoDoAgente('agn-1'))
 
-    const html = await gerarLaudo(pericia)
+    const html = await gerarDoc(pericia)
     const quadro = html.indexOf('10.1.1. Óleos minerais')
     const foto = html.indexOf(LEGENDA_AGENTE)
 
+    expect(quadro).toBeGreaterThan(-1)
     expect(foto).toBeGreaterThan(quadro)
     expect(html.split(LEGENDA_AGENTE)).toHaveLength(2)
   })
 
-  it('no Parecer, não imprime a foto vinculada a agente nem lhe reserva número', async () => {
+  it('no Parecer, a foto do agente ganha o número seguinte ao das seções', async () => {
     const pericia = periciaDeTeste()
     pericia.fotos.push(fotoDoAgente('agn-1'))
 
     const html = await gerar(pericia)
 
-    expect(html).not.toContain(LEGENDA_AGENTE)
     expect(html).toContain('Fotografia 2 – EPI reconhecido na diligência')
-    expect(html).not.toContain('Fotografia 3')
+    expect(html).toContain(`Fotografia 3 – ${LEGENDA_AGENTE}`)
+    expect(html).not.toContain('Fotografia 4')
   })
 
-  it('numera a foto do agente depois das fotos das seções, mesmo gravada em "documentos"', async () => {
+  it.each(gerarDocumento)('%s: numera a foto do agente depois das fotos das seções, mesmo gravada em "documentos"', async (_nome, gerarDoc) => {
     const pericia = periciaDeTeste()
     pericia.fotos.push(
       fotoDoAgente('agn-1'),
       { id: 'fot-produto', periciaId: 'per-1', secao: 'produtos', ordem: 1, arquivo: 'fot-produto.jpg', legenda: 'Rótulo do produto' } as never,
     )
 
-    const html = await gerarLaudo(pericia)
+    const html = await gerarDoc(pericia)
 
     expect(html).toContain('Fotografia 3 – Rótulo do produto')
     expect(html).toContain(`Fotografia 4 – ${LEGENDA_AGENTE}`)
   })
 
-  it('não gasta número com foto de agente que já não está no laudo', async () => {
+  it.each(gerarDocumento)('%s: não gasta número com foto de agente que já não está no documento', async (_nome, gerarDoc) => {
     const pericia = periciaDeTeste()
     pericia.fotos.push(
       fotoDoAgente('agn-removido', 'foto-orfa', 'Foto de agente excluído'),
       fotoDoAgente('agn-1'),
     )
 
-    const html = await gerarLaudo(pericia)
+    const html = await gerarDoc(pericia)
 
     expect(html).not.toContain('Foto de agente excluído')
     expect(html).toContain(`Fotografia 3 – ${LEGENDA_AGENTE}`)
     expect(html).not.toContain('Fotografia 4')
   })
 
+  it('Laudo e Parecer numeram e ordenam as fotografias do mesmo jeito', async () => {
+    const pericia = periciaDeTeste()
+    pericia.fotos.push(
+      fotoDoAgente('agn-1'),
+      { id: 'fot-produto', periciaId: 'per-1', secao: 'produtos', ordem: 1, arquivo: 'fot-produto.jpg', legenda: 'Rótulo do produto' } as never,
+    )
+    const legendas = (html: string) => [...html.matchAll(/Fotografia (\d+) – ([^<]+)/g)].map((m) => `${m[1]}:${m[2]}`)
+
+    expect(legendas(await gerar(pericia))).toEqual(legendas(await gerarLaudo(pericia)))
+  })
+
+  it.each(gerarDocumento)('%s: foto de agente NR-16 sai depois do quadro dele no item 10, uma vez só', async (_nome, gerarDoc) => {
+    const pericia = periciaSoPericulosidade()
+    pericia.fotos.push(fotoDoAgente('agn-nr16', 'foto-nr16', 'Sinalização da área de risco'))
+
+    const html = await gerarDoc(pericia)
+    const quadro = html.indexOf('10.1.1. Inflamáveis – Avaliação, Resultado e Conclusão')
+    const foto = html.indexOf('Sinalização da área de risco')
+
+    expect(quadro).toBeGreaterThan(-1)
+    expect(foto).toBeGreaterThan(quadro)
+    expect(html.split('Sinalização da área de risco')).toHaveLength(2)
+  })
 
 
   it('imprime o quadro compacto da varredura antes das avaliações detalhadas', async () => {
