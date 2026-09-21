@@ -89,7 +89,17 @@ async function main() {
           descricaoAtividades: 'Operou a máquina impressora.\nAnalisou os clichês antes da impressão.',
         },
       ],
-      agentes: [],
+      agentes: [{
+        id: 'agente-layout',
+        nome: 'Ruído contínuo ou intermitente',
+        tipo: 'fisico',
+        anexoNr15: 'ANEXO_01',
+        criterio: 'quantitativo',
+        grau: 'medio',
+        valorMedido: '89',
+        unidadeMedicao: 'dB(A)',
+        observacao: 'A exposição ao ruído foi tecnicamente avaliada.',
+      }],
       normasReferencias: 'NR-15.',
       equipamentosAnalisados: 'Equipamentos analisados.',
       informacoesLevantadas: 'Informações da vistoria.',
@@ -163,9 +173,10 @@ async function main() {
       {
         id: 'foto-6',
         periciaId: 'per-layout',
-        secao: 'epi',
+        secao: 'documentos',
+        agenteId: 'agente-layout',
         arquivo: 'foto-detalhe.png',
-        legenda: 'Detalhe dos equipamentos de proteção apresentados durante a vistoria',
+        legenda: 'Visor do equipamento durante a medição do ruído',
         ordem: 5,
         criadoEm: new Date(),
       },
@@ -283,9 +294,16 @@ async function main() {
   const secao4 = xml.indexOf('4. CRITÉRIOS TÉCNICOS PARA AVALIAÇÃO PERICIAL')
   assert.ok(secao3 < fotoAmbiente && fotoAmbiente < secao4, 'foto do ambiente deve permanecer na seção 3')
   const fotoEpi = xml.indexOf('Fotografia 5 – Registro documental relacionado aos equipamentos de proteção individual')
-  const secao8 = xml.indexOf('8. DOS EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (NR-06)')
-  const secao9 = xml.indexOf('9. DAS PROTEÇÕES COLETIVAS')
-  assert.ok(secao8 < fotoEpi && fotoEpi < secao9, 'foto de EPI deve permanecer na seção 8')
+  const secao63 = xml.indexOf('6.3. Constatações da Vistoria Pericial')
+  const secao64 = xml.indexOf('6.4. Produtos Utilizados Habitualmente nas Atividades')
+  assert.ok(secao63 < fotoEpi && fotoEpi < secao64, 'evidência geral de EPI deve permanecer na seção 6.3')
+  const fotoAgente = xml.indexOf('Fotografia 6 – Visor do equipamento durante a medição do ruído')
+  const quadroAgente = xml.indexOf('10.1.1. Ruído contínuo ou intermitente')
+  const conclusaoNr15 = xml.indexOf('11. NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')
+  assert.ok(
+    quadroAgente < fotoAgente && fotoAgente < conclusaoNr15,
+    'foto vinculada deve permanecer logo depois do quadro do respectivo agente no item 10',
+  )
 
   assert.equal(
     (xml.match(/<wp:inline\b/g) ?? []).length,
@@ -297,7 +315,7 @@ async function main() {
   assert.match(xml, /Fotografia 1 – Vista geral do ambiente de trabalho/)
   assert.match(xml, /Vista geral do ambiente de trabalho - Fonte: Ato pericial\./)
   assert.match(xml, /Fotografia 2 – Detalhe vertical do ambiente/)
-  assert.match(xml, /Fotografia 6 – Detalhe dos equipamentos de proteção apresentados durante a vistoria/)
+  assert.match(xml, /Fotografia 6 – Visor do equipamento durante a medição do ruído/)
   assert.doesNotMatch(xml, /w:type="pct"/, 'tabelas percentuais variam entre renderizadores')
   assert.match(xml, /<w:tblW w:type="dxa"/)
   assert.match(xml, /<w:keepNext\/?>/, 'a imagem deve permanecer unida à legenda')
