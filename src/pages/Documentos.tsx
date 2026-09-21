@@ -239,6 +239,10 @@ export default function Documentos() {
                             variant="ghost"
                             size="sm"
                             icon={<Eye size={14} />}
+                            // Sem perícia (ela foi excluída, o documento ficou no histórico)
+                            // não há para onde ir: /pericias/null só mostraria erro.
+                            disabled={!d.periciaId || d.periciaId === '—'}
+                            title={!d.periciaId || d.periciaId === '—' ? 'A perícia deste documento foi excluída' : undefined}
                             onClick={() => navigate(`/pericias/${d.periciaId}`)}
                             aria-label="Visualizar"
                           />
