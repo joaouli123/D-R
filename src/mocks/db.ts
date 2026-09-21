@@ -12,6 +12,25 @@ import type {
 // descartado — apenas src/services/api.ts muda de implementação.
 // ============================================================
 
+/** A equipe principal — a raiz da árvore, a mesma que o servidor cria no seed. */
+export const EQUIPE_PRINCIPAL_ID = 'eqp-1'
+
+export interface EquipeMock {
+  id: string
+  nome: string
+  paiId: string | null
+}
+
+/**
+ * A hierarquia de demonstração: a equipe do Dinoel, uma equipe cliente abaixo
+ * dela e uma filial ainda vazia (que dá para excluir).
+ */
+export const EQUIPES: EquipeMock[] = [
+  { id: EQUIPE_PRINCIPAL_ID, nome: 'D&R Perícia Elite', paiId: null },
+  { id: 'eqp-2', nome: 'Laboratório Alfa Segurança', paiId: EQUIPE_PRINCIPAL_ID },
+  { id: 'eqp-3', nome: 'Alfa · Filial Campinas', paiId: 'eqp-2' },
+]
+
 export const USUARIOS: Usuario[] = [
   {
     id: 'usr-1',
@@ -23,6 +42,8 @@ export const USUARIOS: Usuario[] = [
     telefone: '(11) 97121-4323',
     ativo: true,
     ultimoAcesso: '2026-07-27T09:12:00',
+    organizacaoId: EQUIPE_PRINCIPAL_ID,
+    equipePrincipal: true,
   },
   {
     id: 'usr-2',
@@ -34,6 +55,8 @@ export const USUARIOS: Usuario[] = [
     telefone: '(11) 98844-1020',
     ativo: true,
     ultimoAcesso: '2026-07-26T17:40:00',
+    organizacaoId: EQUIPE_PRINCIPAL_ID,
+    equipePrincipal: true,
   },
   {
     id: 'usr-3',
@@ -44,6 +67,8 @@ export const USUARIOS: Usuario[] = [
     telefone: '(11) 99120-7788',
     ativo: true,
     ultimoAcesso: '2026-07-25T11:05:00',
+    organizacaoId: EQUIPE_PRINCIPAL_ID,
+    equipePrincipal: true,
   },
   {
     id: 'usr-4',
@@ -52,6 +77,31 @@ export const USUARIOS: Usuario[] = [
     perfil: 'assistente',
     titulo: 'Estagiária de Engenharia',
     ativo: false,
+    organizacaoId: EQUIPE_PRINCIPAL_ID,
+    equipePrincipal: true,
+  },
+  {
+    id: 'usr-5',
+    nome: 'Carlos Eduardo Tavares',
+    email: 'carlos@alfaseguranca.com.br',
+    perfil: 'admin',
+    registroProfissional: 'CREA-SP 5070112233',
+    titulo: 'Engenheiro de Segurança do Trabalho',
+    telefone: '(19) 99871-2040',
+    ativo: true,
+    organizacaoId: 'eqp-2',
+    equipePrincipal: false,
+  },
+  {
+    id: 'usr-6',
+    nome: 'Fernanda Souza Lima',
+    email: 'fernanda@alfaseguranca.com.br',
+    perfil: 'perito',
+    registroProfissional: 'CREA-SP 5069001188',
+    titulo: 'Engenheira de Segurança do Trabalho',
+    ativo: true,
+    organizacaoId: 'eqp-2',
+    equipePrincipal: false,
   },
 ]
 

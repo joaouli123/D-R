@@ -55,7 +55,15 @@ const FAQ = [
   },
   {
     q: 'Quem pode fazer o quê no sistema?',
-    a: 'O administrador cadastra e desativa usuários. Perito e assistente trabalham nas perícias e documentos. A Biblioteca Pessoal de Textos é privada de cada usuário — ninguém vê os textos do outro. Cada um troca a própria senha em Configurações › Meu perfil.',
+    a: 'O administrador gere os acessos na página Usuários e Equipes: cadastra, edita, troca a senha, desativa e exclui usuários. Perito e assistente trabalham nas perícias e documentos. A Biblioteca Pessoal de Textos é privada de cada usuário — ninguém vê os textos do outro. Cada um troca a própria senha em Configurações › Meu perfil.',
+  },
+  {
+    q: 'Como funcionam as equipes? Uma equipe enxerga o trabalho da outra?',
+    a: 'Não. Cada equipe (uma empresa ou laboratório) tem o próprio espaço: empresas, perícias e documentos ficam só com quem os criou. Em Usuários e Equipes, o administrador monta a hierarquia — cria equipes abaixo da dele e cadastra usuários nelas — e gere apenas os ACESSOS das equipes de baixo; o trabalho delas ele não lê. Um usuário não muda de equipe depois de criado, e uma equipe só pode ser excluída quando está vazia.',
+  },
+  {
+    q: 'O que acontece quando desativo ou excluo um usuário?',
+    a: 'Desativar tira o acesso na hora — mesmo que a pessoa esteja logada — e pode ser desfeito quando quiser. Excluir apaga o cadastro de vez, com os textos e quesitos pessoais desse cadastro. Quem é responsável por perícias ou documentos só pode ser excluído se o trabalho passar para outro usuário ativo da mesma equipe; se você só quer que a pessoa pare de entrar, desative.',
   },
 ]
 

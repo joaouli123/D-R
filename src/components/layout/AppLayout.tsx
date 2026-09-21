@@ -20,6 +20,7 @@ import {
   ScanFace,
   Settings,
   TriangleAlert,
+  UsersRound,
   X,
   type LucideIcon,
 } from 'lucide-react'
@@ -54,6 +55,11 @@ const NAV: ItemMenu[] = [
   { to: '/manifestacao/impugnacao_laudo', label: 'Elaborar Impugnação ao Laudo', icone: Scale, cor: 'bg-rose-400/15 text-rose-300' },
   { to: '/esclarecimentos', label: 'Elaborar Esclarecimentos Técnicos', icone: FileSearch, cor: 'bg-cyan-400/15 text-cyan-300' },
   { to: '/biblioteca', label: 'Biblioteca', icone: Library, cor: 'bg-orange-400/15 text-orange-300' },
+]
+
+/** Só o administrador vê: cadastro de usuários e da hierarquia de equipes. */
+const NAV_ADMIN: ItemMenu[] = [
+  { to: '/usuarios', label: 'Usuários e Equipes', icone: UsersRound, cor: 'bg-lime-400/15 text-lime-300' },
 ]
 
 const NAV_FOOTER: ItemMenu[] = [
@@ -144,7 +150,7 @@ export function AppLayout() {
 
           <div className="my-3 border-t border-white/10" />
 
-          {NAV_FOOTER.map(({ to, label, icone, cor }) => (
+          {[...(usuario?.perfil === 'admin' ? NAV_ADMIN : []), ...NAV_FOOTER].map(({ to, label, icone, cor }) => (
             <NavLink key={to} to={to} className={linkClass(to)} onClick={() => setMenuAberto(false)}>
               <IconeMenu icone={icone} className={cor} />
               <span>{label}</span>

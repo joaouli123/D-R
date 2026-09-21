@@ -3,6 +3,7 @@ import type {
   DocumentoGerado,
   EpiSelecionado,
   Empresa,
+  Equipe,
   Foto,
   Pericia,
   Quesito,
@@ -11,7 +12,7 @@ import type {
   Usuario,
 } from '@/types'
 import { QUESITOS } from '@/content/quesitos'
-import { formatDate } from '@/lib/utils'
+import { formatDate, uid } from '@/lib/utils'
 
 // ============================================================
 // CAMADA DE API — ponto único de integração com o backend.
@@ -556,6 +557,10 @@ export const auth = {
       await delay(null, 400)
       throw new ErroApi(401, 'E-mail ou senha inválidos.')
     }
+    sessaoMock = {
+      usuarioId: usuario.id,
+      equipeId: usuario.organizacaoId ?? mock.EQUIPE_PRINCIPAL_ID,
+    }
     return delay(usuario, 500)
   },
 
@@ -584,19 +589,43 @@ export const auth = {
   },
 }
 
+/**
+ * O que a tela manda ao cadastrar ou editar um usuário.
+ *
+ * `id` ausente (ou desconhecido) = cadastro novo; `senha` só vale nele;
+ * `organizacaoId` só vale nele também — depois de criado o usuário não troca de
+ * equipe (o servidor responde 422 se tentarem).
+ */
+export type UsuarioParaSalvar = Omit<Usuario, 'id'> & { id?: string; senha?: string }
+
 export const usuarios = {
+  /** Os usuários da PRÓPRIA equipe. A árvore inteira, com todas as equipes, é `equipes.listar`. */
   listar: () =>
     ehRest
       ? http<Usuario[]>('/usuarios').then((l) => l.map(comLogoResolvida))
-      : delay(mock.USUARIOS),
-  salvar: (u: Usuario & { senha?: string }) =>
+      : delay(usuariosDaEquipeMock(sessaoMock.equipeId)),
+  salvar: (u: UsuarioParaSalvar) =>
     ehRest
       ? http<Usuario>('/usuarios', { method: 'POST', body: JSON.stringify(u) }).then(comLogoResolvida)
-      : delay(u),
+      : delay(null).then(() => salvarUsuarioMock(u)),
+  /** O administrador redefine a senha de alguém do seu alcance. */
   redefinirSenha: (id: string, nova: string) =>
     ehRest
       ? http<void>(`/usuarios/${id}/senha`, { method: 'POST', body: JSON.stringify({ nova }) })
-      : delay(undefined),
+      : delay(null).then(() => redefinirSenhaMock(id, nova)),
+  /**
+   * Exclui de vez. Quem é responsável por perícias ou documentos só sai se o
+   * trabalho for repassado (`transferirPara`, alguém ATIVO da mesma equipe);
+   * sem isso o servidor responde 409 com a contagem — é o sinal de a tela
+   * perguntar quem assume. Para só tirar o acesso, o caminho é desativar.
+   */
+  excluir: (id: string, transferirPara?: string) =>
+    ehRest
+      ? http<void>(
+          `/usuarios/${id}${transferirPara ? `?transferirPara=${encodeURIComponent(transferirPara)}` : ''}`,
+          { method: 'DELETE' },
+        )
+      : delay(null).then(() => excluirUsuarioMock(id, transferirPara)),
 
   /**
    * Sobe a logo do perito (white-label).
@@ -640,9 +669,270 @@ export const usuarios = {
   },
 }
 
+/**
+ * Equipes — a hierarquia de organizações (só o administrador).
+ *
+ * `listar` devolve a árvore visível para quem consulta — a própria equipe e as
+ * de baixo, já em ordem de exibição, cada uma com seus usuários. O
+ * administrador gere os ACESSOS delas (criar, editar, desativar, trocar senha,
+ * excluir), mas não lê o trabalho (empresas, perícias, documentos).
+ */
+export const equipes = {
+  listar: (): Promise<Equipe[]> =>
+    ehRest
+      ? http<Equipe[]>('/equipes').then((l) => l.map(comUsuariosResolvidos))
+      : delay(null).then(() => structuredClone(arvoreMock())),
+  /** Sem `paiId`, a equipe nasce logo abaixo da de quem cria. */
+  criar: (nome: string, paiId?: string): Promise<Equipe> =>
+    ehRest
+      ? http<Equipe>('/equipes', {
+          method: 'POST',
+          body: JSON.stringify({ nome, ...(paiId ? { paiId } : {}) }),
+        }).then(comUsuariosResolvidos)
+      : delay(null).then(() => criarEquipeMock(nome, paiId)),
+  renomear: (id: string, nome: string): Promise<Equipe> =>
+    ehRest
+      ? http<Equipe>(`/equipes/${id}`, { method: 'PATCH', body: JSON.stringify({ nome }) }).then(
+          comUsuariosResolvidos,
+        )
+      : delay(null).then(() => renomearEquipeMock(id, nome)),
+  /** Só uma equipe VAZIA (sem gente, sem trabalho, sem equipes filhas) e nunca a própria. */
+  excluir: (id: string): Promise<void> =>
+    ehRest
+      ? http<void>(`/equipes/${id}`, { method: 'DELETE' })
+      : delay(null).then(() => excluirEquipeMock(id)),
+}
+
+function comUsuariosResolvidos(e: Equipe): Equipe {
+  return { ...e, usuarios: e.usuarios.map(comLogoResolvida) }
+}
+
+// ---------------- Equipes e usuários: demonstração sem backend ----------------
+//
+// O que o servidor faz de verdade (alcance pela hierarquia, e-mail único, o
+// trabalho de quem sai indo para outra pessoa) fica reproduzido aqui em
+// pequeno — o bastante para percorrer a tela inteira sem API. Quem "entrou" no
+// login define de que equipe são as listas.
+
+let sessaoMock = { usuarioId: 'usr-1', equipeId: mock.EQUIPE_PRINCIPAL_ID }
+
+/**
+ * Demonstração: recoloca a sessão de exemplo de quem já estava logado antes de a
+ * página recarregar (o AppStore guarda o usuário no sessionStorage, mas o "banco"
+ * do mock volta ao início). Sem isso a tela mostraria uma pessoa e as chamadas
+ * responderiam como o Dinoel. `false` quando o cadastro não existe mais.
+ */
+export function retomarSessaoDemo(u: Pick<Usuario, 'id'>): boolean {
+  const existente = mock.USUARIOS.find((x) => x.id === u.id && x.ativo)
+  if (!existente) return false
+  sessaoMock = {
+    usuarioId: existente.id,
+    equipeId: existente.organizacaoId ?? mock.EQUIPE_PRINCIPAL_ID,
+  }
+  return true
+}
+
+/**
+ * O conteúdo de exemplo (empresas, perícias e documentos) pertence à equipe
+ * principal. Quem entra por outra equipe começa com a casa vazia — o mesmo
+ * isolamento que o servidor aplica por `organizacaoId`.
+ */
+function conteudoDaEquipeMock<T>(itens: T[]): T[] {
+  return sessaoMock.equipeId === mock.EQUIPE_PRINCIPAL_ID ? itens : []
+}
+
+const porNome = (a: { nome: string }, b: { nome: string }) => a.nome.localeCompare(b.nome, 'pt-BR')
+
+function usuariosDaEquipeMock(equipeId: string): Usuario[] {
+  return mock.USUARIOS.filter((u) => u.organizacaoId === equipeId).sort(porNome)
+}
+
+/** A equipe da sessão e todas as de baixo. */
+function equipesAlcancadasMock(): string[] {
+  const ids = [sessaoMock.equipeId]
+  for (let i = 0; i < ids.length; i++) {
+    for (const e of mock.EQUIPES) if (e.paiId === ids[i]) ids.push(e.id)
+  }
+  return ids
+}
+
+function arvoreMock(): Equipe[] {
+  const saida: Equipe[] = []
+
+  const visitar = (id: string, nivel: number) => {
+    const equipe = mock.EQUIPES.find((e) => e.id === id)
+    if (!equipe) return
+    const filhas = mock.EQUIPES.filter((e) => e.paiId === id).sort(porNome)
+    const usuarios = usuariosDaEquipeMock(id)
+
+    saida.push({
+      id,
+      nome: equipe.nome,
+      // A mãe da equipe da sessão fica fora do alcance: não a revelamos.
+      paiId: nivel === 0 ? null : equipe.paiId,
+      nivel,
+      propria: id === sessaoMock.equipeId,
+      principal: id === mock.EQUIPE_PRINCIPAL_ID,
+      podeExcluir: id !== sessaoMock.equipeId && filhas.length === 0 && usuarios.length === 0,
+      usuarios,
+    })
+    filhas.forEach((f) => visitar(f.id, nivel + 1))
+  }
+
+  visitar(sessaoMock.equipeId, 0)
+  return saida
+}
+
+function equipeMockDoAlcance(id: string): mock.EquipeMock {
+  const equipe = mock.EQUIPES.find((e) => e.id === id)
+  if (!equipe || !equipesAlcancadasMock().includes(id)) {
+    throw new ErroApi(404, 'Equipe não encontrada.')
+  }
+  return equipe
+}
+
+function equipeMockComoNo(id: string): Equipe {
+  const no = arvoreMock().find((e) => e.id === id)
+  if (!no) throw new ErroApi(404, 'Equipe não encontrada.')
+  // Cópia, como a resposta de uma API: quem recebe não pode mexer no "banco".
+  return structuredClone(no)
+}
+
+function nomeDeEquipeValido(nome: string): string {
+  const limpo = nome.trim()
+  if (limpo.length < 2) throw new ErroApi(422, 'Informe o nome da equipe.')
+  return limpo
+}
+
+function criarEquipeMock(nome: string, paiId?: string): Equipe {
+  const limpo = nomeDeEquipeValido(nome)
+  const pai = equipeMockDoAlcance(paiId ?? sessaoMock.equipeId)
+  const criada = { id: uid('eqp'), nome: limpo, paiId: pai.id }
+  mock.EQUIPES.push(criada)
+  return equipeMockComoNo(criada.id)
+}
+
+function renomearEquipeMock(id: string, nome: string): Equipe {
+  const equipe = equipeMockDoAlcance(id)
+  equipe.nome = nomeDeEquipeValido(nome)
+  return equipeMockComoNo(id)
+}
+
+function excluirEquipeMock(id: string): void {
+  const equipe = equipeMockDoAlcance(id)
+  if (equipe.id === sessaoMock.equipeId) {
+    throw new ErroApi(400, 'Você não pode excluir a própria equipe.')
+  }
+  if (mock.EQUIPES.some((e) => e.paiId === id)) {
+    throw new ErroApi(409, 'Esta equipe tem equipes abaixo dela. Exclua-as primeiro.')
+  }
+  if (usuariosDaEquipeMock(id).length > 0) {
+    throw new ErroApi(
+      409,
+      'Esta equipe ainda tem usuários. Exclua-os (ou desative-os, para só tirar o acesso) antes.',
+    )
+  }
+  mock.EQUIPES.splice(mock.EQUIPES.indexOf(equipe), 1)
+}
+
+/** Carrega o usuário-alvo; o que está fora do alcance é tratado como inexistente. */
+function usuarioMockDoAlcance(id: string): Usuario {
+  const alvo = mock.USUARIOS.find((u) => u.id === id)
+  if (!alvo || !equipesAlcancadasMock().includes(alvo.organizacaoId ?? '')) {
+    throw new ErroApi(404, 'Usuário não encontrado.')
+  }
+  return alvo
+}
+
+function salvarUsuarioMock(dados: UsuarioParaSalvar): Usuario {
+  const { senha, id, ...campos } = dados
+  const email = dados.email.trim().toLowerCase()
+  const existente = id ? mock.USUARIOS.find((u) => u.id === id) : undefined
+
+  if (mock.USUARIOS.some((u) => u.id !== existente?.id && u.email.toLowerCase() === email)) {
+    throw new ErroApi(409, 'Já existe um usuário com este e-mail.')
+  }
+
+  if (existente) {
+    const alvo = usuarioMockDoAlcance(existente.id)
+    if (dados.organizacaoId && dados.organizacaoId !== alvo.organizacaoId) {
+      throw new ErroApi(422, 'Um usuário não muda de equipe depois de criado.')
+    }
+    if (alvo.id === sessaoMock.usuarioId && (!dados.ativo || dados.perfil !== 'admin')) {
+      throw new ErroApi(
+        400,
+        'Você não pode remover o próprio acesso de administrador. Peça a outro administrador.',
+      )
+    }
+    Object.assign(alvo, campos, {
+      email,
+      organizacaoId: alvo.organizacaoId,
+      equipePrincipal: alvo.equipePrincipal,
+    })
+    return structuredClone(alvo)
+  }
+
+  if (!senha || senha.length < 8) {
+    throw new ErroApi(422, 'Informe uma senha inicial de pelo menos 8 caracteres.')
+  }
+  const organizacaoId = dados.organizacaoId ?? sessaoMock.equipeId
+  if (!equipesAlcancadasMock().includes(organizacaoId)) {
+    throw new ErroApi(
+      403,
+      'Você só pode cadastrar usuários na sua equipe ou nas equipes abaixo dela.',
+    )
+  }
+
+  const criado: Usuario = {
+    ...campos,
+    id: uid('usr'),
+    email,
+    organizacaoId,
+    equipePrincipal: organizacaoId === mock.EQUIPE_PRINCIPAL_ID,
+  }
+  mock.USUARIOS.push(criado)
+  return structuredClone(criado)
+}
+
+function redefinirSenhaMock(id: string, nova: string): void {
+  usuarioMockDoAlcance(id)
+  if (nova.length < 8) throw new ErroApi(422, 'A senha deve ter pelo menos 8 caracteres.')
+}
+
+function excluirUsuarioMock(id: string, transferirPara?: string): void {
+  const alvo = usuarioMockDoAlcance(id)
+  if (alvo.id === sessaoMock.usuarioId) {
+    throw new ErroApi(400, 'Você não pode excluir o próprio usuário. Peça a outro administrador.')
+  }
+
+  const pericias = mock.PERICIAS.filter((p) => p.responsavelId === alvo.id)
+  if (pericias.length > 0) {
+    if (!transferirPara) {
+      throw new ErroApi(
+        409,
+        `${alvo.nome} é responsável por ${pericias.length} ${pericias.length === 1 ? 'perícia' : 'perícias'} ` +
+          'e 0 documentos. Escolha quem assume esse trabalho ou, se só quer tirar o acesso, desative o usuário.',
+      )
+    }
+    const herdeiro = mock.USUARIOS.find(
+      (u) => u.id === transferirPara && u.ativo && u.organizacaoId === alvo.organizacaoId && u.id !== alvo.id,
+    )
+    if (!herdeiro) {
+      throw new ErroApi(
+        422,
+        'Escolha, para assumir o trabalho, outro usuário ATIVO da mesma equipe.',
+      )
+    }
+    for (const p of pericias) p.responsavelId = herdeiro.id
+  }
+
+  mock.USUARIOS.splice(mock.USUARIOS.indexOf(alvo), 1)
+}
+
 // ---------------- Módulo B — Empresas ----------------
 export const empresas = {
-  listar: () => (ehRest ? http<Empresa[]>('/empresas') : delay(mock.EMPRESAS)),
+  listar: () =>
+    ehRest ? http<Empresa[]>('/empresas') : delay(conteudoDaEquipeMock(mock.EMPRESAS)),
   salvar: (e: Empresa) =>
     ehRest ? http<Empresa>('/empresas', { method: 'POST', body: JSON.stringify(e) }) : delay(e),
   remover: (id: string) =>
@@ -668,11 +958,11 @@ export const pericias = {
   listar: () =>
     ehRest
       ? http<Pericia[]>('/pericias').then((l) => l.map(comFotosResolvidas))
-      : delay(mock.PERICIAS),
+      : delay(conteudoDaEquipeMock(mock.PERICIAS)),
   obter: (id: string) =>
     ehRest
       ? http<Pericia>(`/pericias/${id}`).then(comFotosResolvidas)
-      : delay(mock.PERICIAS.find((p) => p.id === id)!),
+      : delay(conteudoDaEquipeMock(mock.PERICIAS).find((p) => p.id === id)!),
   salvar: (p: Pericia) =>
     ehRest
       ? http<Pericia>('/pericias', { method: 'POST', body: JSON.stringify(p) }).then(
@@ -859,11 +1149,14 @@ export const quesitos = {
 
 // ---------------- Módulos G/H/I/J — Documentos ----------------
 export const documentos = {
-  listar: () => (ehRest ? http<DocumentoGerado[]>('/documentos') : delay(mock.DOCUMENTOS)),
+  listar: () =>
+    ehRest
+      ? http<DocumentoGerado[]>('/documentos')
+      : delay(conteudoDaEquipeMock(mock.DOCUMENTOS)),
   obter: (id: string) =>
     ehRest
       ? http<DocumentoGerado>(`/documentos/${id}`)
-      : delay(mock.DOCUMENTOS.find((d) => d.id === id)!),
+      : delay(conteudoDaEquipeMock(mock.DOCUMENTOS).find((d) => d.id === id)!),
   salvar: (d: DocumentoGerado) =>
     ehRest
       ? http<DocumentoGerado>('/documentos', { method: 'POST', body: JSON.stringify(d) })

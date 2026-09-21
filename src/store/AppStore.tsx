@@ -17,6 +17,12 @@ interface AppState {
   login: (email: string, senha: string) => Promise<void>
   logout: () => void
   salvarUsuario: (u: Usuario & { senha?: string }) => Promise<void>
+  /**
+   * Relê os usuários da equipe. A tela de Usuários cadastra, exclui e
+   * desativa direto na API (com a árvore de equipes ao lado); quem consome
+   * `usuarios` — o responsável pela perícia, por exemplo — precisa acompanhar.
+   */
+  recarregarUsuarios: () => Promise<void>
   trocarLogo: (id: string, arquivo: File) => Promise<void>
   removerLogo: (id: string) => Promise<void>
   trocarAssinatura: (id: string, arquivo: File) => Promise<void>
@@ -108,7 +114,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         // No modo REST a sessão precisa ser confirmada antes de
         // pedir os dados — sem ela toda chamada responderia 401.
-        const sessao = API_MODE === 'rest' ? await api.auth.eu() : usuario
+        // Na demonstração o "banco" do mock recomeça a cada recarga: a sessão
+        // guardada só vale se o cadastro ainda existe, e o mock volta a agir por ela.
+        const sessao =
+          API_MODE === 'rest'
+            ? await api.auth.eu()
+            : usuario && api.retomarSessaoDemo(usuario)
+              ? usuario
+              : null
         if (!vivo) return
 
         setUsuario(sessao)
@@ -254,6 +267,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // Editar o próprio cadastro precisa refletir no cabeçalho
         // e na assinatura dos documentos.
         if (u.id === usuario?.id) setUsuario((atual) => (atual ? { ...atual, ...u } : atual))
+      },
+      recarregarUsuarios: async () => {
+        const lista = await api.usuarios.listar()
+        setUsuarios(lista)
+        // Se o meu próprio cadastro mudou, a sessão acompanha.
+        setUsuario((atual) => (atual ? (lista.find((x) => x.id === atual.id) ?? atual) : atual))
       },
 
       // A logo não passa por salvarUsuario: é arquivo, vai em multipart e

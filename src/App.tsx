@@ -13,6 +13,7 @@ import Documentos from '@/pages/Documentos'
 import Clientes from '@/pages/Clientes'
 import Biblioteca from '@/pages/Biblioteca'
 import Configuracoes from '@/pages/Configuracoes'
+import Usuarios from '@/pages/Usuarios'
 import Ajuda from '@/pages/Ajuda'
 import Quesitos from '@/pages/Quesitos'
 import Manifestacao from '@/pages/Manifestacao'
@@ -75,6 +76,11 @@ export default function App() {
 
         {/* Módulo A e apoio */}
         <Route path="/configuracoes" element={<Configuracoes />} />
+        {/* Só o administrador gere usuários e equipes; o servidor confere de novo. */}
+        <Route
+          path="/usuarios"
+          element={usuario.perfil === 'admin' ? <Usuarios /> : <Navigate to="/" replace />}
+        />
         <Route path="/ajuda" element={<Ajuda />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />

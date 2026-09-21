@@ -1,15 +1,16 @@
 import { useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   ImageUp,
   KeyRound,
   Mail,
   PenLine,
-  Plus,
   Server,
   ShieldCheck,
   Trash2,
   User,
   UserCog,
+  UsersRound,
 } from 'lucide-react'
 import {
   Badge,
@@ -18,7 +19,6 @@ import {
   CardHeader,
   Input,
   Modal,
-  Select,
   Tabs,
   useToast,
 } from '@/components/ui'
@@ -28,20 +28,15 @@ import { Logo, SeloCredenciado } from '@/components/Logo'
 import { useApp } from '@/store/AppStore'
 import * as api from '@/services/api'
 import { API_MODE } from '@/services/api'
-import type { PerfilUsuario, Usuario } from '@/types'
+import type { Usuario } from '@/types'
+import { PERFIL, iniciaisDe } from '@/lib/perfis'
 import { recusaPorTamanho } from '@/lib/limitesUpload'
 import { prepararFotosParaEnvio } from '@/lib/prepararFotos'
-import { formatDateTime, uid } from '@/lib/utils'
+import { formatDateTime } from '@/lib/utils'
 
 // ============================================================
 // MÓDULO A — Gestão de Usuários + preferências do sistema
 // ============================================================
-
-const PERFIL: Record<PerfilUsuario, { label: string; tone: 'green' | 'navy' | 'gray' }> = {
-  admin: { label: 'Administrador', tone: 'green' },
-  perito: { label: 'Perito', tone: 'navy' },
-  assistente: { label: 'Assistente', tone: 'gray' },
-}
 
 export default function Configuracoes() {
   const {
@@ -59,7 +54,6 @@ export default function Configuracoes() {
   const campoAssinatura = useRef<HTMLInputElement>(null)
   const [assinaturaOcupada, setAssinaturaOcupada] = useState(false)
   const [aba, setAba] = useState<'perfil' | 'usuarios' | 'documento' | 'sistema'>('perfil')
-  const [novo, setNovo] = useState<(Usuario & { senha?: string }) | null>(null)
   const [perfilLocal, setPerfilLocal] = useState<Usuario>(usuario!)
   const [salvando, setSalvando] = useState(false)
   const [senhaAberta, setSenhaAberta] = useState(false)
@@ -158,37 +152,6 @@ export default function Configuracoes() {
       toast(api.mensagemDeErro(e, 'Não foi possível remover a assinatura.'), 'error')
     } finally {
       setAssinaturaOcupada(false)
-    }
-  }
-
-  async function cadastrarUsuario() {
-    if (!novo?.nome.trim() || !novo.email.trim()) {
-      toast('Nome e e-mail são obrigatórios.', 'error')
-      return
-    }
-    if (!novo.senha || novo.senha.length < 8) {
-      toast('Defina uma senha inicial com pelo menos 8 caracteres.', 'error')
-      return
-    }
-
-    setSalvando(true)
-    try {
-      await salvarUsuario(novo)
-      toast('Usuário cadastrado.')
-      setNovo(null)
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Não foi possível cadastrar o usuário.', 'error')
-    } finally {
-      setSalvando(false)
-    }
-  }
-
-  async function alternarAtivo(u: Usuario) {
-    try {
-      await salvarUsuario({ ...u, ativo: !u.ativo })
-      toast(u.ativo ? 'Usuário desativado.' : 'Usuário ativado.')
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Não foi possível alterar o status.', 'error')
     }
   }
 
@@ -383,28 +346,19 @@ export default function Configuracoes() {
       {aba === 'usuarios' && (
         <Card className="overflow-hidden">
           <CardHeader
-            title="Usuários autorizados"
+            title="Usuários da sua equipe"
             subtitle="Somente usuários ativos conseguem acessar o sistema."
             icon={<UserCog size={18} />}
             action={
-              <Button
-                size="sm"
-                icon={<Plus size={14} />}
-                disabled={!ehAdmin}
-                title={ehAdmin ? undefined : 'Somente o administrador cadastra usuários.'}
-                onClick={() =>
-                  setNovo({
-                    id: uid('usr'),
-                    nome: '',
-                    email: '',
-                    perfil: 'assistente',
-                    ativo: true,
-                    senha: '',
-                  })
-                }
-              >
-                Novo usuário
-              </Button>
+              ehAdmin && (
+                <Link
+                  to="/usuarios"
+                  className="inline-flex h-8 items-center justify-center gap-2 rounded-lg bg-brand-700 px-3 text-[13px] font-semibold text-white transition-colors hover:bg-brand-800"
+                >
+                  <UsersRound size={14} />
+                  Gerenciar usuários e equipes
+                </Link>
+              )
             }
           />
           <div className="overflow-x-auto">
@@ -424,7 +378,7 @@ export default function Configuracoes() {
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2.5">
                         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-700 text-[11px] font-bold text-white">
-                          {u.nome.split(' ').slice(0, 2).map((n) => n[0]).join('')}
+                          {iniciaisDe(u.nome)}
                         </span>
                         <div>
                           <p className="font-medium leading-tight text-ink-900">{u.nome}</p>
@@ -442,22 +396,7 @@ export default function Configuracoes() {
                       {formatDateTime(u.ultimoAcesso)}
                     </td>
                     <td className="px-5 py-3 text-right">
-                      <button
-                        onClick={() => void alternarAtivo(u)}
-                        disabled={!ehAdmin || u.id === usuario?.id}
-                        title={
-                          u.id === usuario?.id
-                            ? 'Você não pode desativar o próprio acesso.'
-                            : !ehAdmin
-                              ? 'Somente o administrador altera o status.'
-                              : undefined
-                        }
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${
-                          u.ativo ? 'bg-brand-50 text-brand-700' : 'bg-ink-100 text-ink-500'
-                        }`}
-                      >
-                        {u.ativo ? 'Ativo' : 'Inativo'}
-                      </button>
+                      <Badge tone={u.ativo ? 'green' : 'gray'}>{u.ativo ? 'Ativo' : 'Inativo'}</Badge>
                     </td>
                   </tr>
                 ))}
@@ -546,73 +485,6 @@ export default function Configuracoes() {
           </Card>
         </div>
       )}
-
-      {/* Modal novo usuário */}
-      <Modal
-        open={!!novo}
-        onClose={() => setNovo(null)}
-        title="Novo usuário"
-        subtitle="Cadastro e gerenciamento dos usuários autorizados a utilizar o sistema."
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setNovo(null)} disabled={salvando}>
-              Cancelar
-            </Button>
-            <Button loading={salvando} onClick={() => void cadastrarUsuario()}>
-              Cadastrar
-            </Button>
-          </>
-        }
-      >
-        {novo && (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              label="Nome"
-              required
-              className="sm:col-span-2"
-              value={novo.nome}
-              onChange={(e) => setNovo({ ...novo, nome: e.target.value })}
-            />
-            <Input
-              label="E-mail"
-              type="email"
-              required
-              value={novo.email}
-              onChange={(e) => setNovo({ ...novo, email: e.target.value })}
-            />
-            <Select
-              label="Perfil"
-              value={novo.perfil}
-              onChange={(e) => setNovo({ ...novo, perfil: e.target.value as PerfilUsuario })}
-            >
-              <option value="admin">Administrador</option>
-              <option value="perito">Perito</option>
-              <option value="assistente">Assistente</option>
-            </Select>
-            <Input
-              label="Senha inicial"
-              type="password"
-              required
-              className="sm:col-span-2"
-              value={novo.senha ?? ''}
-              onChange={(e) => setNovo({ ...novo, senha: e.target.value })}
-              hint="Mínimo 8 caracteres. O usuário pode trocá-la depois em Meu perfil."
-            />
-            <Input
-              label="Títulos / qualificações profissionais"
-              className="sm:col-span-2"
-              value={novo.titulo ?? ''}
-              onChange={(e) => setNovo({ ...novo, titulo: e.target.value })}
-            />
-            <Input
-              label="Registros profissionais (CREA / CONFEA / MTE)"
-              className="sm:col-span-2"
-              value={novo.registroProfissional ?? ''}
-              onChange={(e) => setNovo({ ...novo, registroProfissional: e.target.value })}
-            />
-          </div>
-        )}
-      </Modal>
 
       <TrocaDeSenha aberto={senhaAberta} onFechar={() => setSenhaAberta(false)} />
     </>

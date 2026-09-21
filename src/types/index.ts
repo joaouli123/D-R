@@ -34,6 +34,35 @@ export interface Usuario {
   assinaturaUrl?: string
   ativo: boolean
   ultimoAcesso?: string
+  /** Equipe a que o usuário pertence (ver `Equipe`). Fixa depois de criado. */
+  organizacaoId?: UUID
+  /**
+   * Pertence à equipe principal do sistema — a única que altera as bases
+   * compartilhadas (CAEPI, quesitos globais). As demais só leem.
+   */
+  equipePrincipal?: boolean
+}
+
+/**
+ * Uma equipe (organização) na hierarquia. O administrador enxerga a própria e
+ * as que estão abaixo dela, sempre em ordem de exibição (a mãe antes das
+ * filhas), com os usuários de cada uma. Gere ACESSOS — não lê o trabalho
+ * (empresas, perícias, documentos) das equipes de baixo.
+ */
+export interface Equipe {
+  id: UUID
+  nome: string
+  /** Mãe da equipe; `null` na raiz da árvore visível para quem consulta. */
+  paiId: UUID | null
+  /** Profundidade a partir da equipe de quem consulta (0 = a própria). */
+  nivel: number
+  /** É a equipe de quem está logado. */
+  propria: boolean
+  /** É a equipe principal do sistema (dona das bases compartilhadas). */
+  principal: boolean
+  /** Vazia (sem gente, sem trabalho, sem equipes filhas) e não é a própria. */
+  podeExcluir: boolean
+  usuarios: Usuario[]
 }
 
 // ---------- Módulo B — Cadastro de Empresas ----------
