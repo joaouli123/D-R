@@ -389,6 +389,12 @@ export interface PreenchimentoTecnico {
   conclusaoInsalubridade?: string
   conclusaoPericulosidade?: string
   respostasQuesitos?: string
+  /** Respostas do laudo separadas pela origem processual dos quesitos. */
+  quesitosJuizo?: string
+  quesitosReclamante?: string
+  quesitosReclamada?: string
+  /** Proposta de honorários em centavos, sem ambiguidade de separador decimal. */
+  honorariosPericiaisCentavos?: number
   encerramento?: string
   /** Data escolhida para o fecho e a assinatura do documento. */
   dataAssinatura?: string
@@ -409,6 +415,8 @@ export type SecaoFoto =
 export interface Foto {
   id: UUID
   secao: SecaoFoto
+  /** Avaliação técnica comprovada pela imagem; ausente nas fotos gerais e legadas. */
+  agenteId?: UUID
   url: string
   legenda: string
   ordem: number

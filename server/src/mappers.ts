@@ -125,6 +125,7 @@ export function periciaParaApi(p: PericiaCompleta) {
       .map((f) => ({
         id: f.id,
         secao: f.secao,
+        agenteId: f.agenteId ?? undefined,
         url: urlDaFoto(f.arquivo),
         legenda: f.legenda,
         ordem: f.ordem,

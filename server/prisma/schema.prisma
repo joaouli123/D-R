@@ -217,6 +217,8 @@ enum SecaoFoto {
 model Foto {
   id        String    @id @default(uuid())
   periciaId String
+  /// Id do agente dentro de Pericia.tecnico.agentes; anulável para fotos gerais e legadas.
+  agenteId  String?
   secao     SecaoFoto
   /// Nome do arquivo no volume de uploads — a URL pública é montada no mapper.
   arquivo   String
@@ -227,6 +229,7 @@ model Foto {
   pericia Pericia @relation(fields: [periciaId], references: [id], onDelete: Cascade)
 
   @@index([periciaId])
+  @@index([periciaId, agenteId])
   @@map("fotos")
 }
 

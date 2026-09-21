@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-import { agenteSchema } from './esquemas-pericia'
+import { agenteSchema, tecnicoSchema } from './esquemas-pericia'
 import { CHAVES_AGENTE_AVALIADO } from '../../../src/types/chavesAgente'
 
 // ============================================================
@@ -64,5 +64,37 @@ describe('agenteSchema e AgenteAvaliado', () => {
     // reexporta, e é essa reexportação que o smoke enxerga.
     expect(readFileSync(caminho('./pericias.ts'), 'utf8'))
       .toContain("export { agenteSchema, dataIsoSchema, tecnicoSchema } from './esquemas-pericia.js'")
+  })
+})
+
+describe('tecnicoSchema e campos exclusivos do laudo', () => {
+  const BASE = {
+    apresentacao: '', enderecamento: '', objetivoPericia: '', descricaoEmpresa: '',
+    descricaoAmbiente: '', descricaoPostoTrabalho: '', maquinasFerramentas: '',
+    produtosUtilizados: '', atividadesFuncoes: '', periodos: [], agentes: [],
+    normasReferencias: '', equipamentosAnalisados: '', informacoesLevantadas: '',
+    divergenciasFaticas: '', alegacoesReclamante: '', informacoesReclamada: '',
+    consideracoesDivergencias: '', criterioAvaliacaoPericulosidade: '',
+    riscoAlegadoPericulosidade: '', fonteRiscoAlegado: '', notaTecnicaEpis: '',
+    protecoesColetivas: '', analiseTecnica: '', conclusao: '', conclusaoInsalubridade: '',
+    conclusaoPericulosidade: '', respostasQuesitos: '', encerramento: '',
+    observacoesAdicionais: '',
+  }
+
+  it('preserva quesitos por origem e honorarios em centavos', () => {
+    const validado = tecnicoSchema.parse({
+      ...BASE,
+      quesitosJuizo: '1. Informe.\nResposta: Sim.',
+      quesitosReclamante: 'Não apresentado',
+      quesitosReclamada: '',
+      honorariosPericiaisCentavos: 450_000,
+    })
+
+    expect(validado).toMatchObject({
+      quesitosJuizo: '1. Informe.\nResposta: Sim.',
+      quesitosReclamante: 'Não apresentado',
+      quesitosReclamada: '',
+      honorariosPericiaisCentavos: 450_000,
+    })
   })
 })

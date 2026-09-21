@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-import { urlDaFoto } from './mappers.js'
+import { periciaParaApi, urlDaFoto } from './mappers.js'
 
 // ============================================================
 // A URL publica da fotografia.
@@ -53,5 +53,24 @@ describe('urlDaFoto', () => {
     expect(readFileSync(caminho('../../src/services/api.ts'), 'utf8')).toContain(
       'A API devolve `/uploads/<arquivo>`',
     )
+  })
+})
+
+describe('periciaParaApi', () => {
+  it('devolve o vinculo opcional entre fotografia e agente', () => {
+    const pericia = {
+      id: 'per-1', numeroProcesso: '', vara: '', comarca: '', reclamante: '',
+      modalidade: 'insalubridade', status: 'rascunho', responsavelId: 'usr-1',
+      criadoEm: new Date('2026-09-21T12:00:00.000Z'),
+      atualizadoEm: new Date('2026-09-21T12:00:00.000Z'),
+      tecnico: {}, reclamadas: [], participantes: [],
+      fotos: [{
+        id: 'foto-1', periciaId: 'per-1', agenteId: 'ag-ruido', secao: 'documentos',
+        arquivo: 'ruido.jpg', legenda: 'Dosímetro', ordem: 1,
+        criadoEm: new Date('2026-09-21T12:00:00.000Z'),
+      }],
+    }
+
+    expect(periciaParaApi(pericia as never).fotos[0]).toMatchObject({ agenteId: 'ag-ruido' })
   })
 })
