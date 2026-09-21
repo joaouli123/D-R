@@ -1,4 +1,5 @@
 import type { Empresa } from '@prisma/client'
+import type { Request } from 'express'
 import { Router } from 'express'
 import { z } from 'zod'
 import { exigirSessao, sessaoDe } from '../auth.js'
@@ -19,6 +20,10 @@ import { mensagemPendencias, pendenciasVarredura } from '../services/varredura-n
 // em PDF e DOCX, anexo externo e envio por e-mail.
 // ============================================================
 
+// Multi-tenant: o documento pertence à EQUIPE do usuário. Toda leitura e
+// escrita leva `organizacaoId` da sessão (nunca `undefined`, que o Prisma leria
+// como "sem filtro"); um id de outra equipe responde 404, como se não existisse.
+
 export const documentosRouter = Router()
 documentosRouter.use(exigirSessao)
 
@@ -37,6 +42,13 @@ const corpo = z.object({
   anexoExternoNome: z.string().optional(),
 })
 
+/** O documento do parâmetro `:id`, se for da equipe da sessão. */
+function documentoDaEquipe(req: Request) {
+  return prisma.documentoGerado.findFirst({
+    where: { id: parametro(req, 'id'), organizacaoId: sessaoDe(req).organizacaoId },
+  })
+}
+
 /** O '—' que o frontend usa para "sem vínculo" não é um id válido. */
 const idOuNulo = (v?: string): string | null => (v && v !== '—' ? v : null)
 
@@ -51,26 +63,26 @@ const nomeArquivo = (titulo: string, ext: string): string => {
   return `${base || 'documento'}.${ext}`
 }
 
-/** Carrega o documento com tudo que a renderização precisa. */
-async function carregarContexto(id: string) {
-  const documento = await prisma.documentoGerado.findUnique({ where: { id } })
+/** Carrega o documento com tudo que a renderização precisa — tudo da mesma equipe. */
+async function carregarContexto(id: string, organizacaoId: string) {
+  const documento = await prisma.documentoGerado.findFirst({ where: { id, organizacaoId } })
   if (!documento) throw naoEncontrado('Documento')
 
   const pericia = documento.periciaId
-    ? await prisma.pericia.findUnique({
-        where: { id: documento.periciaId },
+    ? await prisma.pericia.findFirst({
+        where: { id: documento.periciaId, organizacaoId },
         include: { reclamadas: true, participantes: true, fotos: { orderBy: { ordem: 'asc' } } },
       })
     : null
 
   const empresas: Empresa[] = pericia?.reclamadas.length
     ? await prisma.empresa.findMany({
-        where: { id: { in: pericia.reclamadas.map((r) => r.empresaId) } },
+        where: { id: { in: pericia.reclamadas.map((r) => r.empresaId) }, organizacaoId },
       })
     : []
 
-  const perito = await prisma.usuario.findUnique({
-    where: { id: idDoSignatario(documento, pericia) },
+  const perito = await prisma.usuario.findFirst({
+    where: { id: idDoSignatario(documento, pericia), organizacaoId },
   })
 
   return { documento, pericia: pericia as PericiaCompleta | null, empresas, perito }
@@ -95,8 +107,11 @@ function exigirConclusoesNr15(
 /** GET /documentos */
 documentosRouter.get(
   '/',
-  rota(async (_req, res) => {
-    const documentos = await prisma.documentoGerado.findMany({ orderBy: { atualizadoEm: 'desc' } })
+  rota(async (req, res) => {
+    const documentos = await prisma.documentoGerado.findMany({
+      where: { organizacaoId: sessaoDe(req).organizacaoId },
+      orderBy: { atualizadoEm: 'desc' },
+    })
     res.json(documentos.map(documentoParaApi))
   }),
 )
@@ -105,7 +120,7 @@ documentosRouter.get(
 documentosRouter.get(
   '/:id',
   rota(async (req, res) => {
-    const documento = await prisma.documentoGerado.findUnique({ where: { id: parametro(req, 'id') } })
+    const documento = await documentoDaEquipe(req)
     if (!documento) throw naoEncontrado('Documento')
     res.json(documentoParaApi(documento))
   }),
@@ -130,14 +145,36 @@ documentosRouter.post(
       anexoExternoNome: d.anexoExternoNome?.trim() || null,
     }
 
+    // A perícia citada tem de ser da mesma equipe: senão bastaria colar o id
+    // de uma perícia alheia para o documento puxar os dados dela na exportação.
+    if (dados.periciaId) {
+      const daEquipe = await prisma.pericia.count({
+        where: { id: dados.periciaId, organizacaoId: sessao.organizacaoId },
+      })
+      if (!daEquipe) throw new ErroHttp(422, 'A perícia deste documento não existe na sua equipe.')
+    }
+
+    // Só enxerga como "existente" o que é da própria equipe. Um id de outra
+    // equipe vira um documento novo (com id gerado), nunca uma edição do alheio.
     const existente = d.id
-      ? await prisma.documentoGerado.findUnique({ where: { id: d.id } })
+      ? await prisma.documentoGerado.findFirst({
+          where: { id: d.id, organizacaoId: sessao.organizacaoId },
+        })
       : null
+    const idSugerido =
+      !existente && d.id && (await prisma.documentoGerado.count({ where: { id: d.id } })) === 0
+        ? d.id
+        : undefined
 
     const documento = existente
       ? await prisma.documentoGerado.update({ where: { id: existente.id }, data: dados })
       : await prisma.documentoGerado.create({
-          data: { ...(d.id ? { id: d.id } : {}), ...dados, criadoPorId: sessao.id },
+          data: {
+            ...(idSugerido ? { id: idSugerido } : {}),
+            ...dados,
+            organizacaoId: sessao.organizacaoId,
+            criadoPorId: sessao.id,
+          },
         })
 
     res.status(existente ? 200 : 201).json(documentoParaApi(documento))
@@ -148,7 +185,7 @@ documentosRouter.post(
 documentosRouter.delete(
   '/:id',
   rota(async (req, res) => {
-    const documento = await prisma.documentoGerado.findUnique({ where: { id: parametro(req, 'id') } })
+    const documento = await documentoDaEquipe(req)
     if (!documento) throw naoEncontrado('Documento')
 
     await prisma.documentoGerado.delete({ where: { id: documento.id } })
@@ -168,7 +205,7 @@ documentosRouter.post(
     const arquivo = req.file
     if (!arquivo) throw new ErroHttp(400, 'Nenhum arquivo enviado.')
 
-    const documento = await prisma.documentoGerado.findUnique({ where: { id: parametro(req, 'id') } })
+    const documento = await documentoDaEquipe(req)
     if (!documento) {
       await apagarUpload(arquivo.filename)
       throw naoEncontrado('Documento')
@@ -191,7 +228,7 @@ documentosRouter.post(
 documentosRouter.delete(
   '/:id/anexo',
   rota(async (req, res) => {
-    const documento = await prisma.documentoGerado.findUnique({ where: { id: parametro(req, 'id') } })
+    const documento = await documentoDaEquipe(req)
     if (!documento) throw naoEncontrado('Documento')
 
     const atualizado = await prisma.documentoGerado.update({
@@ -214,7 +251,10 @@ documentosRouter.delete(
 documentosRouter.post(
   '/:id/pdf',
   rota(async (req, res) => {
-    const { documento, pericia, empresas, perito } = await carregarContexto(parametro(req, 'id'))
+    const { documento, pericia, empresas, perito } = await carregarContexto(
+      parametro(req, 'id'),
+      sessaoDe(req).organizacaoId,
+    )
     exigirConclusoesNr15(documento, pericia)
 
     const html = await montarHtml(documento, pericia, empresas, perito)
@@ -246,7 +286,10 @@ documentosRouter.post(
 documentosRouter.post(
   '/:id/docx',
   rota(async (req, res) => {
-    const { documento, pericia, empresas, perito } = await carregarContexto(parametro(req, 'id'))
+    const { documento, pericia, empresas, perito } = await carregarContexto(
+      parametro(req, 'id'),
+      sessaoDe(req).organizacaoId,
+    )
     exigirConclusoesNr15(documento, pericia)
 
     const docx = await gerarDocx(documento, pericia, empresas, perito)
@@ -293,7 +336,10 @@ documentosRouter.post(
     if (!para.length) throw new ErroHttp(422, 'Informe ao menos um destinatário.')
     const copia = listaDeEmails(d.copia, 'Cópia')
 
-    const { documento, pericia, empresas, perito } = await carregarContexto(parametro(req, 'id'))
+    const { documento, pericia, empresas, perito } = await carregarContexto(
+      parametro(req, 'id'),
+      sessaoDe(req).organizacaoId,
+    )
     exigirConclusoesNr15(documento, pericia)
 
     // O PDF anexado é gerado na hora — o destinatário sempre recebe

@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { exigirSessao, sessaoDe } from '../auth.js'
-import { naoEncontrado, parametro, rota } from '../erros.js'
+import { ErroHttp, naoEncontrado, parametro, rota } from '../erros.js'
 import { periciaParaApi } from '../mappers.js'
 import { prisma } from '../prisma.js'
 import { apagarUpload } from '../services/armazenamento.js'
@@ -11,6 +11,10 @@ import { dataIsoSchema, tecnicoSchema, texto } from './esquemas-pericia.js'
 // `npm run smoke:pericia` lê os esquemas por este módulo desde antes da
 // extração; continua lendo.
 export { agenteSchema, dataIsoSchema, tecnicoSchema } from './esquemas-pericia.js'
+
+// Multi-tenant: a perícia pertence à EQUIPE do usuário. Toda leitura e escrita
+// leva `organizacaoId` da sessão (nunca `undefined`, que o Prisma leria como
+// "sem filtro"); um id de outra equipe responde 404, como se não existisse.
 
 export const periciasRouter = Router()
 periciasRouter.use(exigirSessao)
@@ -98,8 +102,9 @@ const nulo = (v?: string) => (v?.trim() ? v.trim() : null)
 /** GET /pericias */
 periciasRouter.get(
   '/',
-  rota(async (_req, res) => {
+  rota(async (req, res) => {
     const pericias = await prisma.pericia.findMany({
+      where: { organizacaoId: sessaoDe(req).organizacaoId },
       include: incluirTudo,
       orderBy: { atualizadoEm: 'desc' },
     })
@@ -111,8 +116,8 @@ periciasRouter.get(
 periciasRouter.get(
   '/:id',
   rota(async (req, res) => {
-    const pericia = await prisma.pericia.findUnique({
-      where: { id: parametro(req, 'id') },
+    const pericia = await prisma.pericia.findFirst({
+      where: { id: parametro(req, 'id'), organizacaoId: sessaoDe(req).organizacaoId },
       include: incluirTudo,
     })
     if (!pericia) throw naoEncontrado('Perícia')
@@ -190,14 +195,44 @@ periciasRouter.post(
       },
     }
 
-    const existente = d.id ? await prisma.pericia.findUnique({ where: { id: d.id } }) : null
+    // O que a perícia referencia tem de ser da MESMA equipe: senão bastaria
+    // colar o id de uma empresa (ou de um usuário) de outra equipe para puxar
+    // os dados dela para dentro do laudo.
+    if (d.responsavelId) {
+      const responsavel = await prisma.usuario.findFirst({
+        where: { id: d.responsavelId, organizacaoId: sessao.organizacaoId },
+        select: { id: true },
+      })
+      if (!responsavel) throw new ErroHttp(422, 'O perito responsável precisa ser da sua equipe.')
+    }
+    if (empresasReclamadas.size > 0) {
+      const daEquipe = await prisma.empresa.count({
+        where: { id: { in: [...empresasReclamadas] }, organizacaoId: sessao.organizacaoId },
+      })
+      if (daEquipe !== empresasReclamadas.size) {
+        throw new ErroHttp(422, 'Uma das empresas reclamadas não existe no cadastro da sua equipe.')
+      }
+    }
+
+    // Só enxerga como "existente" o que é da própria equipe. Um id de outra
+    // equipe vira uma perícia nova (com id gerado), nunca uma edição da alheia.
+    const existente = d.id
+      ? await prisma.pericia.findFirst({
+          where: { id: d.id, organizacaoId: sessao.organizacaoId },
+        })
+      : null
+    const idSugerido =
+      !existente && d.id && (await prisma.pericia.count({ where: { id: d.id } })) === 0
+        ? d.id
+        : undefined
 
     const pericia = await prisma.$transaction(async (tx) => {
       if (!existente) {
         return tx.pericia.create({
           data: {
-            ...(d.id ? { id: d.id } : {}),
+            ...(idSugerido ? { id: idSugerido } : {}),
             ...escalares,
+            organizacaoId: sessao.organizacaoId,
             responsavelId: d.responsavelId || sessao.id,
             ...filhos,
           },
@@ -241,9 +276,15 @@ periciasRouter.post(
 periciasRouter.delete(
   '/:id',
   rota(async (req, res) => {
-    const fotos = await prisma.foto.findMany({ where: { periciaId: parametro(req, 'id') } })
+    const pericia = await prisma.pericia.findFirst({
+      where: { id: parametro(req, 'id'), organizacaoId: sessaoDe(req).organizacaoId },
+      select: { id: true },
+    })
+    if (!pericia) throw naoEncontrado('Perícia')
 
-    await prisma.pericia.delete({ where: { id: parametro(req, 'id') } })
+    const fotos = await prisma.foto.findMany({ where: { periciaId: pericia.id } })
+
+    await prisma.pericia.delete({ where: { id: pericia.id } })
     await Promise.all(fotos.map((f) => apagarUpload(f.arquivo)))
 
     res.status(204).end()

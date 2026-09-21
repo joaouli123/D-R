@@ -4,6 +4,7 @@ import { exigirSessao, sessaoDe } from '../auth.js'
 import { naoEncontrado, parametro, rota, semPermissao } from '../erros.js'
 import { quesitoParaApi } from '../mappers.js'
 import { prisma } from '../prisma.js'
+import { ehEquipePrincipal } from '../tenancy.js'
 
 // ============================================================
 // MÓDULO K — Quesitos técnicos (item 17).
@@ -66,8 +67,18 @@ quesitosRouter.post(
 
     const existente = d.id ? await prisma.quesito.findUnique({ where: { id: d.id } }) : null
 
+    // O quesito PESSOAL de outro usuário não existe para quem não é o dono —
+    // nem de outra equipe, nem da mesma.
+    if (existente && existente.usuarioId !== null && existente.usuarioId !== sessao.id) {
+      throw naoEncontrado('Quesito')
+    }
+
     if (!existente) {
-      const total = await prisma.quesito.count()
+      // Conta só o que este usuário enxerga; o total do banco inteiro
+      // entregaria quantos quesitos as outras equipes cadastraram.
+      const total = await prisma.quesito.count({
+        where: { OR: [{ usuarioId: null }, { usuarioId: sessao.id }] },
+      })
       const criado = await prisma.quesito.create({
         data: {
           ...(d.id ? { id: d.id } : {}),
@@ -87,10 +98,25 @@ quesitosRouter.post(
     }
 
     const ehGlobal = existente.usuarioId === null
-    const ehDono = existente.usuarioId === sessao.id
 
-    if (!ehGlobal && !ehDono) {
-      throw semPermissao('Este quesito pertence a outro usuário.')
+    if (ehGlobal && !ehEquipePrincipal(sessao.organizacaoId)) {
+      // O banco global é UM só, compartilhado por todas as equipes: se uma
+      // equipe cliente mexesse nele, mudaria o quesito de todas as outras.
+      // Só a contagem de uso passa em silêncio (a tela a envia a cada uso).
+      const mudou =
+        d.tema !== existente.tema ||
+        d.origem !== existente.origem ||
+        d.pergunta !== existente.pergunta ||
+        (d.respostaPadrao || null) !== existente.respostaPadrao ||
+        d.favorito !== existente.favorito
+      if (mudou) {
+        throw semPermissao(
+          'O banco global de quesitos é mantido pela equipe principal. ' +
+            'Cadastre um quesito próprio se precisar de outra redação ou resposta.',
+        )
+      }
+      res.json(quesitoParaApi(existente))
+      return
     }
     if (ehGlobal && sessao.perfil !== 'admin' && d.pergunta !== existente.pergunta) {
       throw semPermissao(

@@ -15,6 +15,21 @@ const {
 } = await import('../src/catalogo-epis.js')
 const { criarEpisRouter } = await import('../src/routes/epis.js')
 const { tratarErros } = await import('../src/erros.js')
+const { definirBuscaDeUsuarioDaSessao } = await import('../src/auth.js')
+const { ORGANIZACAO_RAIZ_ID } = await import('../src/tenancy.js')
+// A sessão é conferida no banco a cada requisição; aqui, sem PostgreSQL,
+// a consulta devolve um administrador fixo.
+definirBuscaDeUsuarioDaSessao(async (id) =>
+  id === 'smoke-user'
+    ? {
+        id,
+        email: 'smoke@example.test',
+        perfil: 'admin',
+        organizacaoId: ORGANIZACAO_RAIZ_ID,
+        ativo: true,
+      }
+    : null,
+)
 type EpiCatalogoComAplicacoes = import('../src/catalogo-epis.js').EpiCatalogoComAplicacoes
 
 const migracao = (await readFile(

@@ -9,6 +9,7 @@ import type {
   TextoBiblioteca,
   Usuario,
 } from '@prisma/client'
+import { ehEquipePrincipal } from './tenancy.js'
 
 // ============================================================
 // Tradução Prisma → formato consumido pelo frontend
@@ -51,6 +52,10 @@ export function usuarioParaApi(u: Usuario) {
     assinaturaUrl: u.assinaturaArquivo ? urlDaFoto(u.assinaturaArquivo) : undefined,
     ativo: u.ativo,
     ultimoAcesso: u.ultimoAcesso?.toISOString(),
+    // Equipe do usuário (multi-tenant). `equipePrincipal` deixa a tela decidir
+    // sem conhecer o id fixo da raiz: só ela edita o CAEPI e os quesitos globais.
+    organizacaoId: u.organizacaoId,
+    equipePrincipal: ehEquipePrincipal(u.organizacaoId),
   }
 }
 

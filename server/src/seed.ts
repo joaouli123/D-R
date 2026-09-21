@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import 'dotenv/config'
 import { QUESITOS_BASE } from './quesitos-base.js'
+import { ORGANIZACAO_RAIZ_ID } from './tenancy.js'
 
 const prisma = new PrismaClient()
 
@@ -115,6 +116,15 @@ async function main() {
     throw new Error('ADMIN_SENHA deve ter pelo menos 8 caracteres.')
   }
 
+  // ---------- Equipe principal ----------
+  // A migração multitenant_equipes já insere esta linha; o upsert cobre o banco
+  // criado por outro caminho (db push) e nunca renomeia uma equipe existente.
+  await prisma.organizacao.upsert({
+    where: { id: ORGANIZACAO_RAIZ_ID },
+    update: {},
+    create: { id: ORGANIZACAO_RAIZ_ID, nome: 'D&R Perícia Elite' },
+  })
+
   // ---------- Administrador ----------
   // Por padrão o seed nunca mexe na senha de um usuário que já existe
   // (o admin pode tê-la trocado pela própria UI). ADMIN_RESET_SENHA=true
@@ -133,6 +143,7 @@ async function main() {
       titulo: 'Engenheiro de Segurança do Trabalho',
       registroProfissional: process.env.ADMIN_REGISTRO ?? '',
       ativo: true,
+      organizacaoId: ORGANIZACAO_RAIZ_ID,
     },
   })
   console.log(`✓ administrador: ${admin.email}`)
@@ -168,18 +179,19 @@ async function main() {
 
   // ---------- Demonstração (opcional) ----------
   if (process.env.SEED_DEMO === 'true') {
-    await seedDemo(admin.id)
+    await seedDemo(admin.id, admin.organizacaoId)
   }
 }
 
-async function seedDemo(responsavelId: string) {
-  if ((await prisma.empresa.count()) > 0) {
+async function seedDemo(responsavelId: string, organizacaoId: string) {
+  if ((await prisma.empresa.count({ where: { organizacaoId } })) > 0) {
     console.log('· dados de demonstração já existem — nada a fazer')
     return
   }
 
   const ferrante = await prisma.empresa.create({
     data: {
+      organizacaoId,
       razaoSocial: 'Metalúrgica Ferrante Indústria e Comércio Ltda.',
       nomeFantasia: 'Ferrante Metais',
       cnpj: '12.345.678/0001-90',
@@ -200,6 +212,7 @@ async function seedDemo(responsavelId: string) {
 
   await prisma.pericia.create({
     data: {
+      organizacaoId,
       numeroProcesso: '1001234-56.2025.5.02.0071',
       vara: '71ª Vara do Trabalho de São Paulo',
       comarca: 'São Paulo/SP',

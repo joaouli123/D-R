@@ -26,6 +26,37 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ---------------- Equipes (multi-tenant) ----------------
+
+/// Uma equipe é um inquilino: empresas, perícias e documentos pertencem a uma
+/// equipe e só quem é dela os enxerga.
+///
+/// A hierarquia (`paiId`) NÃO abre dados para cima. O administrador da equipe-mãe
+/// cria e administra os ACESSOS das equipes filhas (usuários, senhas, ativação),
+/// mas não lê o conteúdo delas — o isolamento entre equipes é total.
+///
+/// Existe uma equipe raiz de id fixo (ORGANIZACAO_RAIZ_ID em src/tenancy.ts): é
+/// a do perito titular do sistema e onde a migração colocou tudo o que já existia.
+model Organizacao {
+  id           String   @id @default(uuid())
+  nome         String
+  paiId        String?
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  // Restrict: uma equipe com filhas não some — as filhas ficariam sem pai.
+  pai    Organizacao?  @relation("HierarquiaDeEquipes", fields: [paiId], references: [id], onDelete: Restrict)
+  filhas Organizacao[] @relation("HierarquiaDeEquipes")
+
+  usuarios   Usuario[]
+  empresas   Empresa[]
+  pericias   Pericia[]
+  documentos DocumentoGerado[]
+
+  @@index([paiId])
+  @@map("organizacoes")
+}
+
 // ---------------- Módulo A — Acesso ----------------
 
 enum Perfil {
@@ -54,11 +85,17 @@ model Usuario {
   criadoEm             DateTime  @default(now())
   atualizadoEm         DateTime  @updatedAt
 
+  /// Equipe do usuário. Fixa depois da criação: mover alguém de equipe levaria
+  /// junto a autoria de perícias e documentos que a equipe de origem enxerga.
+  organizacaoId String
+  organizacao   Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Restrict)
+
   pericias   Pericia[]
   textos     TextoBiblioteca[]
   quesitos   Quesito[]
   documentos DocumentoGerado[]
 
+  @@index([organizacaoId])
   @@map("usuarios")
 }
 
@@ -68,7 +105,7 @@ model Empresa {
   id              String   @id @default(uuid())
   razaoSocial     String
   nomeFantasia    String?
-  cnpj            String   @unique
+  cnpj            String
   cnae            String?
   grauRisco       String?
   endereco        String   @default("")
@@ -85,9 +122,14 @@ model Empresa {
   criadoEm        DateTime @default(now())
   atualizadoEm    DateTime @updatedAt
 
+  organizacaoId String
+  organizacao   Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Restrict)
+
   reclamadas    Reclamada[]
   participantes Participante[]
 
+  // O mesmo CNPJ pode ser cliente de duas equipes: cada uma tem o seu cadastro.
+  @@unique([organizacaoId, cnpj])
   @@map("empresas")
 }
 
@@ -136,6 +178,9 @@ model Pericia {
   responsavelId String
   responsavel   Usuario @relation(fields: [responsavelId], references: [id], onDelete: Restrict)
 
+  organizacaoId String
+  organizacao   Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Restrict)
+
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
@@ -145,6 +190,7 @@ model Pericia {
   documentos    DocumentoGerado[]
 
   @@index([responsavelId])
+  @@index([organizacaoId])
   @@index([numeroProcesso])
   @@map("pericias")
 }
@@ -355,11 +401,15 @@ model DocumentoGerado {
   criadoPor   Usuario  @relation(fields: [criadoPorId], references: [id], onDelete: Restrict)
   pericia     Pericia? @relation(fields: [periciaId], references: [id], onDelete: SetNull)
 
+  organizacaoId String
+  organizacao   Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Restrict)
+
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
   @@index([periciaId])
   @@index([criadoPorId])
+  @@index([organizacaoId])
   @@map("documentos")
 }
 

@@ -43,6 +43,22 @@ export function rota<T extends Request>(
   }
 }
 
+// Como a pessoa chama o campo que deu duplicidade. Os demais aparecem como vieram.
+const NOME_DO_CAMPO: Record<string, string> = { cnpj: 'CNPJ', email: 'e-mail' }
+
+/**
+ * Traduz o `target` de um P2002 para a mensagem. `organizacaoId` participa de
+ * índices únicos por equipe (o CNPJ só é único DENTRO da equipe) e é detalhe
+ * interno: não pode aparecer na tela. Se o Prisma mandar o nome da restrição em
+ * vez da lista de campos, cai no genérico.
+ */
+export function camposDaDuplicidade(alvo: unknown): string {
+  const campos = (Array.isArray(alvo) ? alvo : [])
+    .filter((c): c is string => typeof c === 'string' && c !== 'organizacaoId')
+    .map((c) => NOME_DO_CAMPO[c] ?? c)
+  return campos.length > 0 ? campos.join(', ') : 'registro'
+}
+
 export function tratarErros(
   erro: unknown,
   req: Request,
@@ -111,8 +127,7 @@ export function tratarErros(
   if (erro instanceof Prisma.PrismaClientKnownRequestError) {
     // P2002 — violação de unicidade (ex.: CNPJ ou e-mail já cadastrado)
     if (erro.code === 'P2002') {
-      const campos = (erro.meta?.target as string[] | undefined)?.join(', ') ?? 'registro'
-      res.status(409).json({ erro: `Já existe um cadastro com este ${campos}.` })
+      res.status(409).json({ erro: `Já existe um cadastro com este ${camposDaDuplicidade(erro.meta?.target)}.` })
       return
     }
     // P2003 — violação de chave estrangeira (ex.: excluir empresa em uso)

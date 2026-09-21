@@ -42,6 +42,22 @@ const { criarBuscadorNrrsf } = await import('../src/services/caepi/nrrsf.js')
 const { criarColheita } = await import('../src/services/caepi/colheita.js')
 const { criarCaepiRouter } = await import('../src/routes/caepi.js')
 const { tratarErros } = await import('../src/erros.js')
+const { definirBuscaDeUsuarioDaSessao } = await import('../src/auth.js')
+const { ORGANIZACAO_RAIZ_ID } = await import('../src/tenancy.js')
+
+// A sessão é conferida no banco a cada requisição; sem PostgreSQL, a consulta
+// devolve estes três usuários: admin e perito da equipe principal, e um admin
+// de uma equipe cliente (que lê o CAEPI, mas não pode alterá-lo).
+const EQUIPE_CLIENTE_ID = '00000000-0000-4000-8000-0000000000c1'
+const usuariosDoSmoke = {
+  'smoke-user': { email: 'smoke@example.test', perfil: 'admin', organizacaoId: ORGANIZACAO_RAIZ_ID },
+  'smoke-perito': { email: 'perito@example.test', perfil: 'perito', organizacaoId: ORGANIZACAO_RAIZ_ID },
+  'smoke-cliente': { email: 'cliente@example.test', perfil: 'admin', organizacaoId: EQUIPE_CLIENTE_ID },
+} as const
+definirBuscaDeUsuarioDaSessao(async (id) => {
+  const usuario = usuariosDoSmoke[id as keyof typeof usuariosDoSmoke]
+  return usuario ? { id, ...usuario, ativo: true } : null
+})
 
 type LinhaCaepi = import('../src/services/caepi/csv.js').LinhaCaepi
 type RegistroCa = import('../src/services/caepi/mapear.js').RegistroCa
@@ -894,6 +910,29 @@ try {
     headers: { cookie: `dr_sessao=${tokenPerito}` },
   })
   assert.equal(comoPerito.status, 403, 'trocar a base oficial é ação de admin, não de perito')
+
+  // A base do CAEPI é uma só, lida por todas as equipes. Um administrador de
+  // equipe CLIENTE lê, mas não pode trocá-la nem mexer no NRRsf que o laudo de
+  // todo mundo usa — só a equipe principal.
+  const tokenCliente = jwt.sign(
+    { id: 'smoke-cliente', email: 'cliente@example.test', perfil: 'admin' },
+    process.env.JWT_SECRET as string,
+  )
+  const comoEquipeCliente = await fetch(`${base}/caepi/importar?nome=RelatorioCA.csv.gz`, {
+    method: 'POST',
+    headers: { cookie: `dr_sessao=${tokenCliente}` },
+  })
+  assert.equal(comoEquipeCliente.status, 403, 'admin de equipe cliente não troca a base oficial')
+  const atenuacaoDeCliente = await fetch(`${base}/caepi/cas/014168/atenuacao`, {
+    method: 'PATCH',
+    headers: { cookie: `dr_sessao=${tokenCliente}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nrrsfDb: 17 }),
+  })
+  assert.equal(atenuacaoDeCliente.status, 403, 'NRRsf da base compartilhada só a equipe principal edita')
+  const consultaDeCliente = await fetch(`${base}/caepi/status`, {
+    headers: { cookie: `dr_sessao=${tokenCliente}` },
+  })
+  assert.equal(consultaDeCliente.status, 200, 'a equipe cliente continua podendo consultar o CAEPI')
 
   const semNome = await pedir('/caepi/importar', { method: 'POST' })
   assert.equal(semNome.status, 422, 'sem o nome do arquivo não dá para saber se veio comprimido')

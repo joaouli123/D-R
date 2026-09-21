@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { exigirPerfil, exigirSessao, sessaoDe } from '../auth.js'
+import { exigirEquipePrincipal, exigirPerfil, exigirSessao, sessaoDe } from '../auth.js'
 import { ErroHttp, parametro, rota } from '../erros.js'
 import { descomprimirCsvCaepi, pareceComprimido } from '../services/caepi/arquivo.js'
 import { colheitaNrrsf, type Colheita } from '../services/caepi/colheita.js'
@@ -97,9 +97,14 @@ export function criarCaepiRouter(
   //
   // O corpo é o arquivo cru, em fluxo. Nada de multipart: são 21 MB
   // que não têm por que passar por buffer intermediário.
+  //
+  // A base do CAEPI é UMA só, compartilhada por todas as equipes: carregá-la
+  // (ou apagá-la) muda o parecer de todo mundo. Por isso só o administrador da
+  // equipe principal importa; as demais equipes apenas leem.
   caepiRouter.post(
     '/importar',
     exigirPerfil('admin'),
+    exigirEquipePrincipal,
     rota(async (req, res) => {
       const { nome } = importacaoSchema.parse(req.query)
       if (!/\.(csv|gz)$/i.test(nome)) {
@@ -218,8 +223,13 @@ export function criarCaepiRouter(
 
   // NRRsf preenchido pelo perito. Gravado com fonte PERITO, que é o
   // que faz a sincronização do MTE nunca sobrescrever este valor.
+  //
+  // O valor é gravado na base COMPARTILHADA (uma linha por CA, lida por todas as
+  // equipes): se uma equipe cliente pudesse mudá-lo, alteraria o parecer das
+  // outras. Só a equipe principal edita.
   caepiRouter.patch(
     '/cas/:numero/atenuacao',
+    exigirEquipePrincipal,
     rota(async (req, res) => {
       const numeroCa = exigirNumeroCa(parametro(req, 'numero'))
       const corpo = atenuacaoSchema.parse(req.body)

@@ -10,7 +10,7 @@ vi.mock('../env.js', () => ({
 vi.mock('../prisma.js', () => ({ prisma: {} }))
 
 const exigirSessaoMock = vi.hoisted(() => vi.fn())
-vi.mock('../auth.js', () => ({ exigirSessao: exigirSessaoMock }))
+vi.mock('../auth.js', () => ({ exigirSessao: exigirSessaoMock, sessaoDe: vi.fn() }))
 
 const { agentePertenceAoTecnico, exigirSessaoDrenandoUpload } = await import('./fotos.js')
 

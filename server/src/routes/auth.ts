@@ -45,7 +45,12 @@ authRouter.post(
       data: { ultimoAcesso: new Date() },
     })
 
-    emitirSessao(res, { id: usuario.id, email: usuario.email, perfil: usuario.perfil })
+    emitirSessao(res, {
+      id: usuario.id,
+      email: usuario.email,
+      perfil: usuario.perfil,
+      organizacaoId: usuario.organizacaoId,
+    })
     res.json(usuarioParaApi(atualizado))
   }),
 )

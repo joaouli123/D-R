@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import type { Response } from 'express'
 import multer from 'multer'
 import { describe, expect, it, vi } from 'vitest'
@@ -80,5 +81,46 @@ describe('tratarErros — envio de arquivos', () => {
     }))
     expect(visto.status).toBe(413)
     expect(visto.corpo?.erro).toMatch(/grandes demais/i)
+  })
+})
+
+// ============================================================
+// Duplicidade (P2002). O CNPJ da empresa é único POR EQUIPE, então o índice é
+// (organizacaoId, cnpj) e o `target` do Prisma traz os dois. A mensagem não
+// pode entregar o nome interno "organizacaoId" ao usuário.
+// ============================================================
+
+function duplicidade(target: unknown) {
+  return tratar(
+    new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      code: 'P2002',
+      clientVersion: 'teste',
+      meta: { target },
+    }),
+  )
+}
+
+describe('tratarErros — duplicidade (P2002)', () => {
+  it('CNPJ repetido na mesma equipe diz "CNPJ" e não vaza organizacaoId', () => {
+    const visto = duplicidade(['organizacaoId', 'cnpj'])
+
+    expect(visto.status).toBe(409)
+    expect(visto.corpo?.erro).toBe('Já existe um cadastro com este CNPJ.')
+  })
+
+  it('e-mail repetido diz "e-mail"', () => {
+    expect(duplicidade(['email']).corpo?.erro).toBe('Já existe um cadastro com este e-mail.')
+  })
+
+  it('campo desconhecido aparece como veio', () => {
+    expect(duplicidade(['chave']).corpo?.erro).toBe('Já existe um cadastro com este chave.')
+  })
+
+  it('sem lista de campos (nome da restrição, ou nada) cai no genérico', () => {
+    expect(duplicidade('Empresa_organizacaoId_cnpj_key').corpo?.erro).toBe(
+      'Já existe um cadastro com este registro.',
+    )
+    expect(duplicidade(undefined).corpo?.erro).toBe('Já existe um cadastro com este registro.')
+    expect(duplicidade(['organizacaoId']).corpo?.erro).toBe('Já existe um cadastro com este registro.')
   })
 })

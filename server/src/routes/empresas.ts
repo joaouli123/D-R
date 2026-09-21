@@ -1,10 +1,15 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { exigirSessao } from '../auth.js'
-import { ErroHttp, parametro, rota } from '../erros.js'
+import { exigirSessao, sessaoDe } from '../auth.js'
+import { ErroHttp, naoEncontrado, parametro, rota } from '../erros.js'
 import { empresaParaApi } from '../mappers.js'
 import { prisma } from '../prisma.js'
 import { apagarUpload } from '../services/armazenamento.js'
+
+// Multi-tenant: as empresas pertencem à EQUIPE do usuário. Toda consulta leva
+// `organizacaoId` da sessão — que nunca é `undefined` (o Prisma trataria como
+// "sem filtro" e devolveria as empresas de todo mundo). Um id de outra equipe
+// responde 404, como se não existisse.
 
 export const empresasRouter = Router()
 empresasRouter.use(exigirSessao)
@@ -37,11 +42,14 @@ const corpo = z.object({
 
 const vazioParaNulo = (v?: string) => (v?.trim() ? v.trim() : null)
 
-/** GET /empresas */
+/** GET /empresas — as da equipe do usuário. */
 empresasRouter.get(
   '/',
-  rota(async (_req, res) => {
-    const empresas = await prisma.empresa.findMany({ orderBy: { razaoSocial: 'asc' } })
+  rota(async (req, res) => {
+    const empresas = await prisma.empresa.findMany({
+      where: { organizacaoId: sessaoDe(req).organizacaoId },
+      orderBy: { razaoSocial: 'asc' },
+    })
     res.json(empresas.map(empresaParaApi))
   }),
 )
@@ -51,6 +59,7 @@ empresasRouter.post(
   '/',
   rota(async (req, res) => {
     const d = corpo.parse(req.body)
+    const { organizacaoId } = sessaoDe(req)
 
     const dados = {
       razaoSocial: d.razaoSocial,
@@ -71,11 +80,31 @@ empresasRouter.post(
       ramoAtividade: vazioParaNulo(d.ramoAtividade),
     }
 
-    const existente = d.id ? await prisma.empresa.findUnique({ where: { id: d.id } }) : null
+    // Só enxerga como "existente" o que é da própria equipe. Se o id do corpo
+    // existir em outra equipe, vira uma criação nova (o id do cliente é
+    // ignorado nesse caso) — nunca uma edição da empresa alheia.
+    const existente = d.id
+      ? await prisma.empresa.findFirst({ where: { id: d.id, organizacaoId } })
+      : null
+
+    // O CNPJ é único POR EQUIPE: duas equipes podem cadastrar a mesma empresa.
+    const repetida = await prisma.empresa.findFirst({
+      where: { organizacaoId, cnpj: d.cnpj, ...(existente ? { NOT: { id: existente.id } } : {}) },
+      select: { id: true },
+    })
+    if (repetida) throw new ErroHttp(409, 'Já existe uma empresa cadastrada com este CNPJ.')
+
+    // O id sugerido pelo cliente só vale se ninguém, em nenhuma equipe, já o usa.
+    const idSugerido =
+      !existente && d.id && (await prisma.empresa.count({ where: { id: d.id } })) === 0
+        ? d.id
+        : undefined
 
     const empresa = existente
       ? await prisma.empresa.update({ where: { id: existente.id }, data: dados })
-      : await prisma.empresa.create({ data: { ...dados, ...(d.id ? { id: d.id } : {}) } })
+      : await prisma.empresa.create({
+          data: { ...dados, organizacaoId, ...(idSugerido ? { id: idSugerido } : {}) },
+        })
 
     res.status(existente ? 200 : 201).json(empresaParaApi(empresa))
   }),
@@ -102,21 +131,27 @@ empresasRouter.post(
  * é tocada aqui, e as empresas que ela cita continuam protegidas.
  * Rascunho sem nenhuma reclamada não entra: não prende ninguém, e
  * apagá-lo seria ir além do que a tela ofereceu.
+ *
+ * Tudo isso vale só para a EQUIPE do usuário: a limpeza de uma nunca
+ * alcança os cadastros de outra.
  */
 empresasRouter.delete(
   '/',
   rota(async (req, res) => {
+    const { organizacaoId } = sessaoDe(req)
     let rascunhosExcluidos = 0
 
     if (req.query.rascunhos === '1') {
       const presos = await prisma.pericia.findMany({
-        where: { status: 'rascunho', reclamadas: { some: {} } },
+        where: { organizacaoId, status: 'rascunho', reclamadas: { some: {} } },
         select: { id: true, fotos: { select: { arquivo: true } } },
       })
 
       if (presos.length > 0) {
         const ids = presos.map((p) => p.id)
-        const { count } = await prisma.pericia.deleteMany({ where: { id: { in: ids } } })
+        const { count } = await prisma.pericia.deleteMany({
+          where: { id: { in: ids }, organizacaoId },
+        })
         rascunhosExcluidos = count
         // Os arquivos só saem depois que o banco confirmou: o registro
         // é a verdade, e foto órfã em disco custa menos que foto
@@ -126,6 +161,7 @@ empresasRouter.delete(
     }
 
     const empresas = await prisma.empresa.findMany({
+      where: { organizacaoId },
       orderBy: { razaoSocial: 'asc' },
       select: {
         id: true,
@@ -139,7 +175,7 @@ empresasRouter.delete(
     const emUso = empresas.filter((e) => e._count.reclamadas > 0)
 
     const { count } = await prisma.empresa.deleteMany({
-      where: { id: { in: livres.map((e) => e.id) } },
+      where: { id: { in: livres.map((e) => e.id) }, organizacaoId },
     })
 
     res.json({
@@ -163,7 +199,13 @@ empresasRouter.delete(
 empresasRouter.delete(
   '/:id',
   rota(async (req, res) => {
-    const vinculos = await prisma.reclamada.count({ where: { empresaId: parametro(req, 'id') } })
+    const { organizacaoId } = sessaoDe(req)
+    const id = parametro(req, 'id')
+
+    const empresa = await prisma.empresa.findFirst({ where: { id, organizacaoId }, select: { id: true } })
+    if (!empresa) throw naoEncontrado('Empresa')
+
+    const vinculos = await prisma.reclamada.count({ where: { empresaId: empresa.id } })
     if (vinculos > 0) {
       throw new ErroHttp(
         409,
@@ -171,7 +213,7 @@ empresasRouter.delete(
       )
     }
 
-    await prisma.empresa.delete({ where: { id: parametro(req, 'id') } })
+    await prisma.empresa.delete({ where: { id: empresa.id } })
     res.status(204).end()
   }),
 )

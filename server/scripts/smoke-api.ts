@@ -13,7 +13,28 @@ import jwt from 'jsonwebtoken'
 process.env.DATABASE_URL ??= 'postgresql://smoke:smoke@127.0.0.1:5432/smoke'
 process.env.JWT_SECRET ??= 'smoke-test-secret-with-at-least-32-characters'
 
-const [{ criarApp }, { env }] = await Promise.all([import('../src/app.js'), import('../src/env.js')])
+const [{ criarApp }, { env }, { definirBuscaDeUsuarioDaSessao }, { ORGANIZACAO_RAIZ_ID }] =
+  await Promise.all([
+    import('../src/app.js'),
+    import('../src/env.js'),
+    import('../src/auth.js'),
+    import('../src/tenancy.js'),
+  ])
+
+// A sessão passou a ser conferida no banco a cada requisição (é o que faz a
+// desativação valer na hora). Sem PostgreSQL neste smoke, a consulta é trocada
+// por um usuário fixo — o mesmo caminho do middleware, sem a ida ao banco.
+definirBuscaDeUsuarioDaSessao(async (id) =>
+  id === 'usuario-smoke'
+    ? {
+        id,
+        email: 'smoke@example.test',
+        perfil: 'perito',
+        organizacaoId: ORGANIZACAO_RAIZ_ID,
+        ativo: true,
+      }
+    : null,
+)
 
 interface Caso {
   nome: string
@@ -51,6 +72,7 @@ const CASOS: Caso[] = [
   { nome: 'quesitos exigem sessão', caminho: '/quesitos', statusEsperado: 401 },
   { nome: 'textos exigem sessão', caminho: '/textos', statusEsperado: 401 },
   { nome: 'usuários exigem sessão', caminho: '/usuarios', statusEsperado: 401 },
+  { nome: 'equipes exigem sessão', caminho: '/equipes', statusEsperado: 401 },
   { nome: 'quem sou eu sem sessão', caminho: '/auth/eu', statusEsperado: 401 },
   {
     nome: 'upload de fotos exige sessão',
@@ -96,6 +118,38 @@ const CASOS: Caso[] = [
     },
     statusEsperado: 422,
     contem: 'tecnico.agentes.0.valorMedido',
+  },
+
+  // Só o administrador gere equipes e usuários; um perito comum recebe 403 antes
+  // de qualquer consulta ao banco.
+  {
+    nome: 'equipes são só do administrador',
+    caminho: '/equipes',
+    cookie: sessaoTeste,
+    statusEsperado: 403,
+    contem: 'admin',
+  },
+  {
+    nome: 'criar equipe exige administrador',
+    caminho: '/equipes',
+    metodo: 'POST',
+    cookie: sessaoTeste,
+    corpo: { nome: 'Equipe qualquer' },
+    statusEsperado: 403,
+  },
+  {
+    nome: 'importar CAEPI exige administrador',
+    caminho: '/caepi/importar?nome=base.csv',
+    metodo: 'POST',
+    cookie: sessaoTeste,
+    statusEsperado: 403,
+  },
+  // Sessão de quem foi excluído/desativado: o token ainda é válido, o usuário não.
+  {
+    nome: 'token de usuário inexistente cai no login',
+    caminho: '/pericias',
+    cookie: `dr_sessao=${jwt.sign({ id: 'fantasma', email: 'x@example.test', perfil: 'admin' }, env.JWT_SECRET)}`,
+    statusEsperado: 401,
   },
 
   { nome: 'rota inexistente', caminho: '/nao-existe', statusEsperado: 404, contem: 'não encontrada' },
