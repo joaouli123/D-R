@@ -37,7 +37,7 @@ export interface UsuarioDaSessao {
   perfil: Perfil
   organizacaoId: string
   ativo: boolean
-  organizacao: { licencaId: string; licenca: { ativa: boolean } }
+  organizacao: { licencaId: string; licenca: { ativa: boolean; aguardandoAprovacao: boolean } }
 }
 
 export type BuscarUsuarioDaSessao = (id: string) => Promise<UsuarioDaSessao | null>
@@ -58,10 +58,12 @@ export const SELECAO_DA_SESSAO = {
   perfil: true,
   organizacaoId: true,
   ativo: true,
-  organizacao: { select: { licencaId: true, licenca: { select: { ativa: true } } } },
+  organizacao: { select: { licencaId: true, licenca: { select: { ativa: true, aguardandoAprovacao: true } } } },
 } as const
 
 export const LICENCA_SUSPENSA = 'A licença desta conta está suspensa. Procure o administrador.'
+export const LICENCA_AGUARDANDO =
+  'Seu cadastro foi recebido e está aguardando a aprovação do administrador. Você receberá acesso assim que ele for aprovado.'
 
 /** A sessão que o usuário lido do banco recebe. */
 export const sessaoDoUsuario = (u: UsuarioDaSessao): Sessao => ({
@@ -144,7 +146,9 @@ export function exigirSessao(req: Request, res: Response, next: NextFunction): v
             ? undefined
             : !usuario.ativo
               ? 'Este usuário foi desativado. Procure o administrador.'
-              : LICENCA_SUSPENSA,
+              : usuario.organizacao.licenca.aguardandoAprovacao
+                ? LICENCA_AGUARDANDO
+                : LICENCA_SUSPENSA,
         ),
       )
       return

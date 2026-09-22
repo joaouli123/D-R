@@ -566,7 +566,12 @@ export const auth = {
       await delay(null, 400)
       throw new ErroApi(401, 'E-mail ou senha inválidos.')
     }
-    if (!licencaMockDaEquipe(usuario.organizacaoId ?? mock.EQUIPE_PRINCIPAL_ID).ativa) {
+    const licencaDoLogin = licencaMockDaEquipe(usuario.organizacaoId ?? mock.EQUIPE_PRINCIPAL_ID)
+    if (licencaDoLogin.aguardandoAprovacao) {
+      await delay(null, 400)
+      throw new ErroApi(403, CADASTRO_AGUARDANDO)
+    }
+    if (!licencaDoLogin.ativa) {
       await delay(null, 400)
       throw new ErroApi(403, 'A licença desta conta está suspensa. Procure o administrador.')
     }
@@ -769,6 +774,37 @@ export const licencas = {
     ehRest
       ? http<void>(`/licencas/${id}`, { method: 'DELETE' })
       : delay(null).then(() => excluirLicencaMock(id)),
+}
+
+export const CADASTRO_AGUARDANDO =
+  'Seu cadastro foi recebido e está aguardando a aprovação do administrador. Você receberá acesso assim que ele for aprovado.'
+
+/**
+ * Cadastro público, sem login: a empresa pede a licença e o titular aprova
+ * depois na página Licenças. As consultas de CNPJ e CEP daqui são as abertas.
+ */
+export const cadastroPublico = {
+  enviar: (dados: LicencaParaCriar & { site?: string }): Promise<{ aguardandoAprovacao: true }> =>
+    ehRest
+      ? http<{ aguardandoAprovacao: true }>('/cadastro', { method: 'POST', body: JSON.stringify(dados) })
+      : delay(null).then(() => {
+          criarLicencaMock(dados, { aguardando: true })
+          return { aguardandoAprovacao: true as const }
+        }),
+  async cnpj(numero: string): Promise<DadosCnpj> {
+    if (!ehRest) {
+      await delay(null, 200)
+      throw new ErroApi(503, CONSULTA_SEM_BACKEND)
+    }
+    return http<DadosCnpj>(`/cadastro/cnpj/${encodeURIComponent(limparDocumento(numero))}`)
+  },
+  async cep(numero: string): Promise<DadosCep> {
+    if (!ehRest) {
+      await delay(null, 200)
+      throw new ErroApi(503, CONSULTA_SEM_BACKEND)
+    }
+    return http<DadosCep>(`/cadastro/cep/${encodeURIComponent(numero.replace(/\D/g, ''))}`)
+  },
 }
 
 function comUsuariosResolvidos(e: Equipe): Equipe {
@@ -1043,6 +1079,7 @@ function licencaMockComoApi(l: mock.LicencaMock): Licenca {
     documento: l.documento,
     ...Object.fromEntries(CAMPOS_DE_CADASTRO.map((campo) => [campo, l[campo]])),
     ativa: l.ativa,
+    aguardandoAprovacao: !!l.aguardandoAprovacao,
     principal,
     criadoEm: l.criadoEm,
     equipePrincipalId: entrada?.id,
@@ -1108,8 +1145,8 @@ function licencasMock(): Licenca[] {
   return mock.LICENCAS.map(licencaMockComoApi)
 }
 
-function criarLicencaMock(d: LicencaParaCriar): Licenca {
-  exigirTitularMock()
+function criarLicencaMock(d: LicencaParaCriar, { aguardando = false } = {}): Licenca {
+  if (!aguardando) exigirTitularMock()
   const nome = d.nome.trim()
   const email = d.admin.email.trim().toLowerCase()
   if (nome.length < 2) throw new ErroApi(422, 'Informe o nome da empresa.')
@@ -1129,7 +1166,8 @@ function criarLicencaMock(d: LicencaParaCriar): Licenca {
     nome,
     documento,
     ...cadastro,
-    ativa: true,
+    ativa: !aguardando,
+    aguardandoAprovacao: aguardando,
     criadoEm: new Date().toISOString(),
   }
   const equipe = { id: uid('eqp'), nome, paiId: mock.EQUIPE_PRINCIPAL_ID, licencaId: licenca.id }
@@ -1167,6 +1205,7 @@ function atualizarLicencaMock(id: string, d: LicencaParaEditar): Licenca {
   licenca.documento = documento
   Object.assign(licenca, cadastro)
   if (d.ativa !== undefined) licenca.ativa = d.ativa
+  if (d.ativa === true) licenca.aguardandoAprovacao = false
   return licencaMockComoApi(licenca)
 }
 

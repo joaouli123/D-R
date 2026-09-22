@@ -24,6 +24,7 @@ export interface LicencaMock extends CadastroDaLicenca {
   nome: string
   documento?: string
   ativa: boolean
+  aguardandoAprovacao?: boolean
   criadoEm: string
 }
 

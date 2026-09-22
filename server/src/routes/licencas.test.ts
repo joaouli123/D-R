@@ -13,6 +13,7 @@ const PRINCIPAL = '00000000-0000-4000-8000-000000000002'
 
 type Licenca = {
   id: string
+  aguardandoAprovacao?: boolean
   nome: string
   documento: string | null
   ativa: boolean
@@ -256,6 +257,19 @@ describe('rota de licenças — editar', () => {
 
     expect((await chamar('PATCH', `/licencas/${corpo.id}`, { ativa: false })).corpo.ativa).toBe(false)
     expect((await chamar('PATCH', `/licencas/${corpo.id}`, { ativa: true })).corpo.ativa).toBe(true)
+  })
+
+  it('ativar um cadastro público é aprová-lo', async () => {
+    const { criarLicenca } = await import('./licencas.js')
+    const criada = await criarLicenca(
+      { ...novaLicenca, documento: null, admin: { ...novaLicenca.admin, email: 'bia@beta.test' } } as never,
+      { aguardando: true },
+    )
+    const [antes] = (await chamar('GET', '/licencas')).corpo.filter((l: { id: string }) => l.id === criada.id)
+    expect(antes).toMatchObject({ ativa: false, aguardandoAprovacao: true })
+
+    const r = await chamar('PATCH', `/licencas/${criada.id}`, { ativa: true })
+    expect(r.corpo).toMatchObject({ ativa: true, aguardandoAprovacao: false })
   })
 
   it('a licença principal não pode ser suspensa', async () => {

@@ -44,6 +44,8 @@ export interface BuscaCnpjProps {
   required?: boolean
   id?: string
   className?: string
+  /** Quem consulta; o padrão exige login. O cadastro público passa a rota aberta. */
+  consultar?: (numero: string) => Promise<DadosCnpj>
 }
 
 const COR_DO_TOM: Record<TomDaSituacao, string> = {
@@ -62,6 +64,7 @@ export function BuscaCnpj({
   required = true,
   id,
   className,
+  consultar: consultarNaFonte = api.consultas.cnpj,
 }: BuscaCnpjProps) {
   const [buscando, setBuscando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -85,7 +88,7 @@ export function BuscaCnpj({
     setErro(null)
 
     try {
-      const encontrados = await api.consultas.cnpj(limpo)
+      const encontrados = await consultarNaFonte(limpo)
       if (pedido.current !== meu) return
       setDados(encontrados)
       setConsultado(limpo)

@@ -55,6 +55,8 @@ model Licenca {
   uf           String?
   /// Suspensa (`false`), ninguém da licença entra — os dados ficam intactos.
   ativa        Boolean  @default(true)
+  /// Veio do cadastro público e o titular ainda não aprovou (fica suspensa até lá).
+  aguardandoAprovacao Boolean @default(false)
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 

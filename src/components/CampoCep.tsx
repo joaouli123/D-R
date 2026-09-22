@@ -24,6 +24,8 @@ export interface CampoCepProps {
   /** Id do campo que recebe o cursor quando o endereço chega — em geral, o número. */
   focarAoPreencher?: string
   className?: string
+  /** Quem consulta; o padrão exige login. O cadastro público passa a rota aberta. */
+  consultar?: (numero: string) => Promise<DadosCep>
 }
 
 export function CampoCep({
@@ -34,6 +36,7 @@ export function CampoCep({
   id,
   focarAoPreencher,
   className,
+  consultar: consultarNaFonte = api.consultas.cep,
 }: CampoCepProps) {
   const [buscando, setBuscando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -48,7 +51,7 @@ export function CampoCep({
     setBuscando(true)
     setErro(null)
     try {
-      const dados = await api.consultas.cep(cep)
+      const dados = await consultarNaFonte(cep)
       if (pedido.current !== meu) return
       setEncontrado(dados)
       setConsultado(cep)

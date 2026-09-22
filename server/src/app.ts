@@ -4,6 +4,7 @@ import express, { type Express } from 'express'
 import { env } from './env.js'
 import { ErroHttp, tratarErros } from './erros.js'
 import { authRouter } from './routes/auth.js'
+import { cadastroRouter } from './routes/cadastro.js'
 import { caepiRouter } from './routes/caepi.js'
 import { consultasRouter } from './routes/consultas.js'
 import { documentosRouter } from './routes/documentos.js'
@@ -70,6 +71,7 @@ export function criarApp(): Express {
   })
 
   app.use('/auth', authRouter)
+  app.use('/cadastro', cadastroRouter)
   app.use('/usuarios', usuariosRouter)
   app.use('/equipes', equipesRouter)
   app.use('/licencas', licencasRouter)

@@ -5,6 +5,7 @@ import {
   emitirSessao,
   encerrarSessao,
   exigirSessao,
+  LICENCA_AGUARDANDO,
   LICENCA_SUSPENSA,
   SELECAO_DA_SESSAO,
   sessaoDe,
@@ -48,6 +49,7 @@ authRouter.post(
     if (!usuario.ativo) {
       throw new ErroHttp(403, 'Este usuário está inativo. Procure o administrador.')
     }
+    if (usuario.organizacao.licenca.aguardandoAprovacao) throw new ErroHttp(403, LICENCA_AGUARDANDO)
     if (!usuario.organizacao.licenca.ativa) throw new ErroHttp(403, LICENCA_SUSPENSA)
 
     const atualizado = await prisma.usuario.update({

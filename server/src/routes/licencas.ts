@@ -46,7 +46,7 @@ const texto = (max: number) =>
     .transform((v) => v || null)
 
 /** Contato e endereço do cliente — o que a Receita e o CEP ajudam a preencher. */
-const cadastro = {
+export const cadastro = {
   nomeFantasia: texto(160),
   email: z
     .union([z.string().trim().email('E-mail da empresa inválido.'), z.literal('')])
@@ -66,7 +66,7 @@ const cadastro = {
 }
 const CAMPOS_DE_CADASTRO = Object.keys(cadastro) as Array<keyof typeof cadastro>
 
-const corpoDeCriacao = z.object({
+export const corpoDeCriacao = z.object({
   nome: nomeDaLicenca,
   documento,
   ...cadastro,
@@ -91,7 +91,7 @@ const corpoDeEdicao = z.object({
  * O que já estava gravado e não mudou passa sem conferência: licença antiga
  * com número digitado errado não pode travar a troca do telefone.
  */
-async function documentoConferido(
+export async function documentoConferido(
   documento: string | null,
   { licencaId, anterior }: { licencaId?: string; anterior?: string | null } = {},
 ): Promise<string | null> {
@@ -153,6 +153,7 @@ async function listar(where: { id?: string } = {}) {
       documento: l.documento ?? undefined,
       ...Object.fromEntries(CAMPOS_DE_CADASTRO.map((campo) => [campo, l[campo] ?? undefined])),
       ativa: l.ativa,
+      aguardandoAprovacao: l.aguardandoAprovacao,
       principal: l.id === LICENCA_PRINCIPAL_ID,
       criadoEm: l.criadoEm.toISOString(),
       equipePrincipalId: entrada?.id,
@@ -166,7 +167,7 @@ async function listar(where: { id?: string } = {}) {
   })
 }
 
-async function uma(id: string) {
+export async function uma(id: string) {
   const [licenca] = await listar({ id })
   if (!licenca) throw new ErroHttp(404, 'Licença não encontrada.')
   return licenca
@@ -188,42 +189,54 @@ licencasRouter.get(
 licencasRouter.post(
   '/',
   rota(async (req, res) => {
-    const d = corpoDeCriacao.parse(req.body)
-    const email = d.admin.email.toLowerCase()
-
-    if (await prisma.usuario.findUnique({ where: { email }, select: { id: true } })) {
-      throw new ErroHttp(409, 'Já existe um usuário com este e-mail. Use outro para o administrador.')
-    }
-
-    const documentoFinal = await documentoConferido(d.documento)
-    const senhaHash = await bcrypt.hash(d.admin.senha, 12)
-    const licenca = await prisma.$transaction(async (tx) => {
-      const criada = await tx.licenca.create({
-        data: {
-          nome: d.nome,
-          documento: documentoFinal,
-          ...Object.fromEntries(CAMPOS_DE_CADASTRO.map((campo) => [campo, d[campo]])),
-        },
-      })
-      const equipe = await tx.organizacao.create({
-        data: { nome: d.nome, paiId: ORGANIZACAO_RAIZ_ID, licencaId: criada.id },
-      })
-      await tx.usuario.create({
-        data: {
-          nome: d.admin.nome,
-          email,
-          senhaHash,
-          perfil: 'admin',
-          ativo: true,
-          organizacaoId: equipe.id,
-        },
-      })
-      return criada
-    })
-
+    const licenca = await criarLicenca(corpoDeCriacao.parse(req.body))
     res.status(201).json(await uma(licenca.id))
   }),
 )
+
+/**
+ * Cria a licença, a equipe de entrada e o primeiro administrador — tudo ou
+ * nada. O cadastro público usa a mesma função com `aguardando`: a licença nasce
+ * suspensa e só abre quando o titular aprova.
+ */
+export async function criarLicenca(
+  d: z.infer<typeof corpoDeCriacao>,
+  { aguardando = false }: { aguardando?: boolean } = {},
+) {
+  const email = d.admin.email.toLowerCase()
+
+  if (await prisma.usuario.findUnique({ where: { email }, select: { id: true } })) {
+    throw new ErroHttp(409, 'Já existe um usuário com este e-mail. Use outro para o administrador.')
+  }
+
+  const documentoFinal = await documentoConferido(d.documento)
+  const senhaHash = await bcrypt.hash(d.admin.senha, 12)
+  const licenca = await prisma.$transaction(async (tx) => {
+    const criada = await tx.licenca.create({
+      data: {
+        nome: d.nome,
+        documento: documentoFinal,
+        ...Object.fromEntries(CAMPOS_DE_CADASTRO.map((campo) => [campo, d[campo]])),
+        ...(aguardando ? { ativa: false, aguardandoAprovacao: true } : {}),
+      },
+    })
+    const equipe = await tx.organizacao.create({
+      data: { nome: d.nome, paiId: ORGANIZACAO_RAIZ_ID, licencaId: criada.id },
+    })
+    await tx.usuario.create({
+      data: {
+        nome: d.admin.nome,
+        email,
+        senhaHash,
+        perfil: 'admin',
+        ativo: true,
+        organizacaoId: equipe.id,
+      },
+    })
+    return criada
+  })
+  return licenca
+}
 
 /** PATCH /licencas/:id — renomeia, troca o documento, suspende ou reativa. */
 licencasRouter.patch(
@@ -252,6 +265,8 @@ licencasRouter.patch(
             CAMPOS_DE_CADASTRO.filter(veio).map((campo) => [campo, d[campo]]),
           ),
           ...(d.ativa !== undefined ? { ativa: d.ativa } : {}),
+          // Ativar é também aprovar o cadastro público.
+          ...(d.ativa === true ? { aguardandoAprovacao: false } : {}),
         },
       })
       // A equipe de entrada acompanha o nome da licença — mas só se ainda tiver

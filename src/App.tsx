@@ -6,6 +6,7 @@ import { Button, PageLoader } from '@/components/ui'
 import { Logo } from '@/components/Logo'
 
 import Login from '@/pages/Login'
+import Cadastro from '@/pages/Cadastro'
 import Inicio from '@/pages/Inicio'
 import Pericias from '@/pages/Pericias'
 import PericiaEditor from '@/pages/PericiaEditor'
@@ -45,7 +46,13 @@ export default function App() {
 
   if (carregando) return <PageLoader />
   if (erroCarregamento) return <FalhaAoCarregar erro={erroCarregamento} tentarDeNovo={recarregar} />
-  if (!usuario) return <Login />
+  if (!usuario)
+    return (
+      <Routes>
+        <Route path="/cadastro" element={<Cadastro />} />
+        <Route path="*" element={<Login />} />
+      </Routes>
+    )
 
   return (
     <Routes>

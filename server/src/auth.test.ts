@@ -94,7 +94,7 @@ describe('exigirSessao', () => {
         perfil: true,
         organizacaoId: true,
         ativo: true,
-        organizacao: { select: { licencaId: true, licenca: { select: { ativa: true } } } },
+        organizacao: { select: { licencaId: true, licenca: { select: { ativa: true, aguardandoAprovacao: true } } } },
       },
     })
   })

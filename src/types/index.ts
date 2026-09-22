@@ -71,6 +71,8 @@ export interface Licenca extends CadastroDaLicenca {
   documento?: string
   /** Suspensa = ninguém da licença entra (e quem estava dentro cai). */
   ativa: boolean
+  /** Veio do cadastro público e ainda espera a aprovação do titular (fica suspensa até lá). */
+  aguardandoAprovacao?: boolean
   /** A do perito titular: não é suspensa nem excluída. */
   principal: boolean
   criadoEm: string

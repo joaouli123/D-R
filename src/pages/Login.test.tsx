@@ -3,6 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { useApp } from '@/store/AppStore'
+import { MemoryRouter } from 'react-router-dom'
 import Login from './Login'
 
 vi.mock('@/store/AppStore', () => ({ useApp: vi.fn() }))
@@ -13,7 +14,11 @@ describe('Login', () => {
   it('mantém o conteúdo institucional em um painel sem rolagem interna', () => {
     vi.mocked(useApp).mockReturnValue({ login: vi.fn() } as unknown as ReturnType<typeof useApp>)
 
-    render(<Login />)
+    render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>,
+    )
 
     const painel = screen.getByTestId('login-brand-panel')
     expect(painel.className).toContain('login-brand-panel')
@@ -25,9 +30,16 @@ describe('Login', () => {
   it('marca o formulário para o ajuste vertical de telas baixas', () => {
     vi.mocked(useApp).mockReturnValue({ login: vi.fn() } as unknown as ReturnType<typeof useApp>)
 
-    render(<Login />)
+    render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>,
+    )
 
     expect(screen.getByTestId('login-form-panel').className).toContain('login-form-panel')
     expect(screen.getByRole('heading', { name: 'Acessar o sistema' })).toBeDefined()
+    expect(screen.getByRole('link', { name: 'Cadastre sua empresa' }).getAttribute('href')).toBe(
+      '/cadastro',
+    )
   })
 })

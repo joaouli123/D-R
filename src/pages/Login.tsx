@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   AlertCircle,
   Building2,
@@ -100,7 +101,8 @@ export default function Login() {
           style={{ backgroundImage: `url(${loginBg})` }}
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-brand-900/95 via-brand-800/85 to-brand-900/95" />
-        <div className="pointer-events-none absolute inset-0 opacity-[0.07]"
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.07]"
           style={{
             backgroundImage:
               'radial-gradient(circle at 20% 20%, #fff 1px, transparent 1px), radial-gradient(circle at 70% 60%, #fff 1px, transparent 1px)',
@@ -119,8 +121,8 @@ export default function Login() {
               <span className="text-brand-200">em um só lugar.</span>
             </h2>
             <p className="text-[13.5px] leading-relaxed text-white/75">
-              Uma plataforma completa, com soluções específicas para Peritos e Assistentes
-              Técnicos, Profissionais de SST e Empresas.
+              Uma plataforma completa, com soluções específicas para Peritos e Assistentes Técnicos,
+              Profissionais de SST e Empresas.
             </p>
           </div>
 
@@ -161,8 +163,8 @@ export default function Login() {
           </div>
 
           <p className="login-brand-footer text-[12.5px] leading-relaxed text-white/60">
-            D&amp;R Perícia Trabalhista — tecnologia para trabalhar com mais agilidade, precisão
-            e segurança.
+            D&amp;R Perícia Trabalhista — tecnologia para trabalhar com mais agilidade, precisão e
+            segurança.
           </p>
         </div>
 
@@ -222,10 +224,16 @@ export default function Login() {
 
             <div className="flex items-center justify-between pt-1">
               <label className="flex cursor-pointer items-center gap-2 text-[13px] text-ink-600">
-                <input type="checkbox" className="h-4 w-4 rounded border-ink-300 accent-brand-700" />
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-ink-300 accent-brand-700"
+                />
                 Manter conectado
               </label>
-              <button type="button" className="text-[13px] font-semibold text-brand-700 hover:underline">
+              <button
+                type="button"
+                className="text-[13px] font-semibold text-brand-700 hover:underline"
+              >
                 Esqueci a senha
               </button>
             </div>
@@ -234,6 +242,13 @@ export default function Login() {
               Entrar
             </Button>
           </form>
+
+          <p className="mt-5 text-center text-[13px] text-ink-600">
+            Não tem conta?{' '}
+            <Link to="/cadastro" className="font-semibold text-brand-700 hover:underline">
+              Cadastre sua empresa
+            </Link>
+          </p>
 
           {API_MODE === 'mock' && (
             <div className="mt-6 rounded-lg border border-dashed border-ink-300 bg-ink-50 px-4 py-3 text-[12px] text-ink-500">
