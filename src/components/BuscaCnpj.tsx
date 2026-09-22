@@ -1,18 +1,31 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { AlertTriangle, Building2, Search } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import * as api from '@/services/api'
 import type { DadosCnpj } from '@/services/api'
-import { cnpjCompleto, digitos, resumoDaReceita, situacaoIrregular } from '@/lib/consultas'
-import { maskCNPJ } from '@/lib/utils'
+import {
+  cnpjValido,
+  limparDocumento,
+  mascararCnpj,
+  mascararCpfCnpj,
+  situacaoDoDocumento,
+  type TomDaSituacao,
+} from '@/lib/cadastro'
+import { resumoDaReceita, situacaoIrregular } from '@/lib/consultas'
+import { cn } from '@/lib/utils'
 
 // ============================================================
-// Campo de CNPJ que traz o cadastro da empresa junto.
+// Campo de CNPJ (ou de CPF ou CNPJ) que traz o cadastro da empresa junto.
 //
-// Completou os 14 dígitos num cadastro em branco, a consulta sai
-// sozinha — é o que o perito faria em seguida, de qualquer forma. Num
-// cadastro já preenchido ela só sai pelo botão, e aí sobrescreve: ali
-// o pedido é explícito, "atualize com o que está na Receita".
+// A máscara e o aviso embaixo acompanham a digitação: o campo diz na hora
+// se o número é CPF ou CNPJ, quanto falta e se o dígito verificador fecha.
+// O CNPJ alfanumérico (com letras, emitido desde julho de 2026) entra igual.
+//
+// Fechou um CNPJ válido num cadastro em branco, a consulta sai sozinha — é
+// o que o perito faria em seguida, de qualquer forma. Num cadastro já
+// preenchido ela só sai pelo botão, e aí sobrescreve: ali o pedido é
+// explícito, "atualize com o que está na Receita". CPF não tem consulta
+// pública; os dados vão à mão.
 //
 // Falha de consulta nunca trava o cadastro: a mensagem explica o que
 // houve e os campos seguem editáveis à mão.
@@ -26,10 +39,30 @@ export interface BuscaCnpjProps {
   onDados: (dados: DadosCnpj, origem: OrigemConsulta) => void
   /** Cadastro ainda em branco: pode buscar assim que o número fechar. */
   autoBuscar?: boolean
+  /** O cadastro admite pessoa física: o mesmo campo recebe CPF ou CNPJ. */
+  aceitarCpf?: boolean
+  required?: boolean
+  id?: string
   className?: string
 }
 
-export function BuscaCnpj({ valor, onChange, onDados, autoBuscar = false, className }: BuscaCnpjProps) {
+const COR_DO_TOM: Record<TomDaSituacao, string> = {
+  neutro: 'text-ink-500',
+  ok: 'text-emerald-700',
+  aviso: 'text-amber-700',
+  erro: 'text-red-600',
+}
+
+export function BuscaCnpj({
+  valor,
+  onChange,
+  onDados,
+  autoBuscar = false,
+  aceitarCpf = false,
+  required = true,
+  id,
+  className,
+}: BuscaCnpjProps) {
   const [buscando, setBuscando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [dados, setDados] = useState<DadosCnpj | null>(null)
@@ -37,15 +70,15 @@ export function BuscaCnpj({ valor, onChange, onDados, autoBuscar = false, classN
   const [consultado, setConsultado] = useState<string | null>(null)
   /** Descarta resposta de consulta antiga que chegou fora de ordem. */
   const pedido = useRef(0)
+  const statusId = useId()
 
-  const completo = cnpjCompleto(valor)
+  const situacao = situacaoDoDocumento(valor, { aceitarCpf })
+  const podeConsultar = situacao.tipo === 'cnpj' && situacao.valido
+  const rotulo = aceitarCpf ? 'CPF ou CNPJ' : 'CNPJ'
 
   async function consultar(numero: string, origem: OrigemConsulta) {
-    const limpo = digitos(numero)
-    if (!cnpjCompleto(limpo)) {
-      setErro('Informe os 14 dígitos do CNPJ.')
-      return
-    }
+    const limpo = limparDocumento(numero)
+    if (!cnpjValido(limpo)) return
 
     const meu = ++pedido.current
     setBuscando(true)
@@ -70,33 +103,41 @@ export function BuscaCnpj({ valor, onChange, onDados, autoBuscar = false, classN
   }
 
   function mudar(bruto: string) {
-    const mascarado = maskCNPJ(bruto)
+    const mascarado = aceitarCpf ? mascararCpfCnpj(bruto) : mascararCnpj(bruto)
     onChange(mascarado)
 
-    const limpo = digitos(mascarado)
+    const limpo = limparDocumento(mascarado)
     if (limpo !== consultado) {
       setErro(null)
       setDados(null)
     }
-    if (autoBuscar && !buscando && cnpjCompleto(limpo) && limpo !== consultado) {
+    if (autoBuscar && !buscando && cnpjValido(limpo) && limpo !== consultado) {
       void consultar(limpo, 'automatica')
     }
   }
+
+  const dica = aceitarCpf
+    ? 'Digite só os números: o campo reconhece se é CPF ou CNPJ.'
+    : 'Digite só os números; o CNPJ com letras também vale.'
+  const busca = autoBuscar ? ' Com o CNPJ completo, os dados vêm da Receita Federal.' : ''
 
   return (
     <div className={className}>
       <div className="flex items-end gap-2">
         <div className="min-w-0 flex-1">
           <Input
-            label="CNPJ"
-            required
-            aria-label="CNPJ"
+            id={id}
+            label={rotulo}
+            required={required}
+            aria-label={rotulo}
             value={valor}
             onChange={(e) => mudar(e.target.value)}
-            placeholder="00.000.000/0000-00"
-            {...(autoBuscar
-              ? { hint: 'Ao completar os 14 dígitos, os dados vêm da Receita Federal.' }
-              : {})}
+            placeholder={aceitarCpf ? 'CPF ou CNPJ' : '00.000.000/0000-00'}
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            aria-invalid={situacao.tom === 'erro' || undefined}
+            aria-describedby={statusId}
           />
         </div>
         <Button
@@ -105,12 +146,33 @@ export function BuscaCnpj({ valor, onChange, onDados, autoBuscar = false, classN
           className="mb-[1px] shrink-0"
           icon={<Search size={15} />}
           loading={buscando}
-          disabled={!completo}
+          disabled={!podeConsultar}
           onClick={() => void consultar(valor, 'manual')}
         >
           Buscar na Receita
         </Button>
       </div>
+
+      <p id={statusId} aria-live="polite" className={cn('mt-1 text-xs', COR_DO_TOM[situacao.tom])}>
+        {buscando ? (
+          <span className="text-ink-500">Consultando a Receita Federal…</span>
+        ) : situacao.tipo ? (
+          <>
+            <span className="mr-1.5 rounded bg-ink-100 px-1.5 py-px text-[11px] font-semibold text-ink-700">
+              {situacao.tipo === 'cpf' ? 'CPF' : 'CNPJ'}
+            </span>
+            {situacao.mensagem}
+            {situacao.tipo === 'cpf' && situacao.valido
+              ? ' Não há consulta pública de CPF: preencha os dados à mão.'
+              : ''}
+          </>
+        ) : (
+          <span className="text-ink-500">
+            {dica}
+            {busca}
+          </span>
+        )}
+      </p>
 
       {erro && (
         <p role="alert" className="mt-2 flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-800">

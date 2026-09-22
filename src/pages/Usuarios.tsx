@@ -11,12 +11,14 @@ import {
 } from 'lucide-react'
 import { Badge, Button, Card, Input, Modal, PageLoader, Select, useToast } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
+import { CamposSenha } from '@/components/CamposSenha'
 import { useApp } from '@/store/AppStore'
 import * as api from '@/services/api'
 import { ErroApi, mensagemDeErro } from '@/services/api'
 import type { UsuarioParaSalvar } from '@/services/api'
 import type { Equipe, PerfilUsuario, Usuario } from '@/types'
 import { PERFIL, iniciaisDe } from '@/lib/perfis'
+import { emailValido, mascararTelefone, problemaNaSenha } from '@/lib/cadastro'
 import { cn, formatDateTime } from '@/lib/utils'
 
 // ============================================================
@@ -477,6 +479,7 @@ function ModalUsuario({
     // Quem nasce sem escolha é assistente: o perfil de menos poder.
     perfil: (editando?.perfil ?? 'assistente') as PerfilUsuario,
     senha: '',
+    confirmacao: '',
     titulo: editando?.titulo ?? '',
     registroProfissional: editando?.registroProfissional ?? '',
     telefone: editando?.telefone ?? '',
@@ -494,8 +497,13 @@ function ModalUsuario({
       setErro('Nome e e-mail são obrigatórios.')
       return
     }
-    if (!editando && form.senha.length < 8) {
-      setErro('Defina uma senha inicial com pelo menos 8 caracteres.')
+    if (!emailValido(form.email)) {
+      setErro('E-mail inválido.')
+      return
+    }
+    const problemaDaSenha = editando ? null : problemaNaSenha(form.senha, form.confirmacao)
+    if (problemaDaSenha) {
+      setErro(problemaDaSenha)
       return
     }
 
@@ -577,14 +585,13 @@ function ModalUsuario({
         </Select>
         {!editando && (
           <div className="sm:col-span-2">
-            <Input
-              label="Senha inicial"
-              type="password"
-              required
-              autoComplete="new-password"
-              value={form.senha}
-              onChange={campo('senha')}
-              hint="Mínimo 8 caracteres. Repasse à pessoa por um canal seguro — ela pode trocar depois em Configurações › Meu perfil."
+            <CamposSenha
+              rotulo="Senha inicial"
+              senha={form.senha}
+              confirmacao={form.confirmacao}
+              onSenha={(senha) => setForm((atual) => ({ ...atual, senha }))}
+              onConfirmacao={(confirmacao) => setForm((atual) => ({ ...atual, confirmacao }))}
+              hint="Repasse à pessoa por um canal seguro — ela pode trocar depois em Configurações › Meu perfil."
             />
           </div>
         )}
@@ -600,7 +607,14 @@ function ModalUsuario({
           value={form.registroProfissional}
           onChange={campo('registroProfissional')}
         />
-        <Input label="Telefone" value={form.telefone} onChange={campo('telefone')} />
+        <Input
+          label="Telefone"
+          type="tel"
+          inputMode="tel"
+          placeholder="(00) 00000-0000"
+          value={form.telefone}
+          onChange={(e) => setForm((atual) => ({ ...atual, telefone: mascararTelefone(e.target.value) }))}
+        />
       </div>
       <AvisoDeErro mensagem={erro} />
     </Modal>

@@ -655,7 +655,7 @@ describe('licenças — as empresas clientes, só para o perito titular', () => 
   })
 
   it('renomear leva o nome para a equipe de entrada, e CNPJ vazio apaga o CNPJ', async () => {
-    await esperar(api.licencas.atualizar(LIC_ALFA, { documento: '12.345.678/0001-90' }))
+    await esperar(api.licencas.atualizar(LIC_ALFA, { documento: '11.222.333/0001-81' }))
 
     const depois = await esperar(api.licencas.atualizar(LIC_ALFA, { nome: 'Alfa Segurança', documento: '' }))
 
@@ -664,6 +664,35 @@ describe('licenças — as empresas clientes, só para o perito titular', () => 
     const arvore = await esperar(api.equipes.listar())
     // A equipe de entrada tinha o mesmo nome da licença, então acompanha; a filial não muda.
     expect(arvore.map((e) => e.nome)).toEqual(['Alfa Segurança', 'Alfa · Filial Campinas'])
+  })
+
+  it('confere o CPF ou CNPJ e guarda o cadastro já formatado', async () => {
+    const invalido = await falha(api.licencas.atualizar(LIC_ALFA, { documento: '11.222.333/0001-80' }))
+    expect(invalido.status).toBe(422)
+
+    const depois = await esperar(
+      api.licencas.atualizar(LIC_ALFA, { documento: '11222333000181', cidade: ' Campinas ', uf: 'sp' }),
+    )
+    expect(depois).toMatchObject({ documento: '11.222.333/0001-81', cidade: 'Campinas', uf: 'SP' })
+
+    const cpf = await esperar(api.licencas.atualizar(LIC_ALFA, { documento: '52998224725' }))
+    expect(cpf.documento).toBe('529.982.247-25')
+
+    const alfanumerico = await esperar(api.licencas.atualizar(LIC_ALFA, { documento: '12abc34501de35' }))
+    expect(alfanumerico.documento).toBe('12.ABC.345/01DE-35')
+  })
+
+  it('o mesmo CNPJ não entra em duas licenças', async () => {
+    await esperar(api.licencas.atualizar(LIC_ALFA, { documento: '11.222.333/0001-81' }))
+    const erro = await falha(
+      api.licencas.criar({
+        nome: 'Gama Consultoria',
+        documento: '11222333000181',
+        admin: { nome: 'Paula Souza', email: 'paula@gama.com.br', senha: 'senha-segura' },
+      }),
+    )
+    expect(erro.status).toBe(409)
+    expect(erro.message).toContain('Laboratório Alfa')
   })
 
   it('licença que não existe dá 404 com a mensagem certa', async () => {

@@ -1,4 +1,5 @@
 import type {
+  CadastroDaLicenca,
   DocumentoGerado,
   Empresa,
   Pericia,
@@ -18,7 +19,7 @@ export const EQUIPE_PRINCIPAL_ID = 'eqp-1'
 /** A licença do perito titular — o dono da plataforma. */
 export const LICENCA_PRINCIPAL_ID = 'lic-1'
 
-export interface LicencaMock {
+export interface LicencaMock extends CadastroDaLicenca {
   id: string
   nome: string
   documento?: string
@@ -35,7 +36,9 @@ export const LICENCAS: LicencaMock[] = [
   {
     id: 'lic-2',
     nome: 'Laboratório Alfa Segurança',
-    documento: '12.345.678/0001-90',
+    documento: '12.345.678/0001-95',
+    cidade: 'Campinas',
+    uf: 'SP',
     ativa: true,
     criadoEm: '2026-09-21T09:00:00',
   },
@@ -138,7 +141,7 @@ export const EMPRESAS: Empresa[] = [
     id: 'emp-1',
     razaoSocial: 'Metalúrgica Ferrante Indústria e Comércio Ltda.',
     nomeFantasia: 'Ferrante Metais',
-    cnpj: '12.345.678/0001-90',
+    cnpj: '12.345.678/0001-95',
     cnae: '25.39-0-01',
     grauRisco: '3',
     endereco: 'Rodovia Anhanguera, km 32',

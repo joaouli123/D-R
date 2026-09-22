@@ -1,5 +1,6 @@
 import * as mock from '@/mocks/db'
 import type {
+  CadastroDaLicenca,
   DocumentoGerado,
   EpiSelecionado,
   Empresa,
@@ -14,6 +15,13 @@ import type {
 } from '@/types'
 import { QUESITOS } from '@/content/quesitos'
 import { formatDate, uid } from '@/lib/utils'
+import {
+  emailValido,
+  formatarDocumento,
+  limparDocumento,
+  problemaNoDocumento,
+  rotuloDoDocumento,
+} from '@/lib/cadastro'
 
 // ============================================================
 // CAMADA DE API — ponto único de integração com o backend.
@@ -717,13 +725,27 @@ export const equipes = {
 }
 
 /** O que a tela manda ao criar uma licença: a empresa e o primeiro administrador dela. */
-export interface LicencaParaCriar {
+export interface LicencaParaCriar extends CadastroDaLicenca {
   nome: string
   documento?: string
   admin: { nome: string; email: string; senha: string }
 }
 
-export type LicencaParaEditar = Partial<Pick<Licenca, 'nome' | 'documento' | 'ativa'>>
+/** Campo que não vai fica como está; o que vai vazio é apagado. */
+export type LicencaParaEditar = Partial<Pick<Licenca, 'nome' | 'documento' | 'ativa'>> & CadastroDaLicenca
+
+const CAMPOS_DE_CADASTRO = [
+  'nomeFantasia',
+  'email',
+  'telefone',
+  'cep',
+  'endereco',
+  'numero',
+  'complemento',
+  'bairro',
+  'cidade',
+  'uf',
+] as const satisfies ReadonlyArray<keyof CadastroDaLicenca>
 
 /**
  * Licenças — as empresas clientes da plataforma. Só o administrador da equipe
@@ -1019,6 +1041,7 @@ function licencaMockComoApi(l: mock.LicencaMock): Licenca {
     id: l.id,
     nome: l.nome,
     documento: l.documento,
+    ...Object.fromEntries(CAMPOS_DE_CADASTRO.map((campo) => [campo, l[campo]])),
     ativa: l.ativa,
     principal,
     criadoEm: l.criadoEm,
@@ -1048,6 +1071,38 @@ function licencaMockExistente(id: string): mock.LicencaMock {
   return licenca
 }
 
+/** O mesmo que o servidor faz com o contato e o endereço: vazio some, UF em maiúsculas. */
+function cadastroConferidoMock(d: CadastroDaLicenca): CadastroDaLicenca {
+  const email = d.email?.trim()
+  if (email && !emailValido(email)) throw new ErroApi(422, 'E-mail da empresa inválido.')
+  const uf = d.uf?.trim()
+  if (uf && !/^[A-Za-z]{2}$/.test(uf)) throw new ErroApi(422, 'UF deve ter 2 letras.')
+  const conferido: CadastroDaLicenca = {}
+  for (const campo of CAMPOS_DE_CADASTRO) {
+    if (!(campo in d)) continue
+    const valor = d[campo]?.trim() || undefined
+    conferido[campo] = campo === 'uf' ? valor?.toUpperCase() : valor
+  }
+  return conferido
+}
+
+/** Dígito verificador e duplicidade, como no servidor; o que não mudou passa. */
+function documentoConferidoMock(documento: string | undefined, atual?: mock.LicencaMock): string | undefined {
+  const limpo = limparDocumento(documento)
+  if (!limpo) return undefined
+  if (atual?.documento && limparDocumento(atual.documento) === limpo) return atual.documento
+  const problema = problemaNoDocumento(limpo)
+  if (problema) throw new ErroApi(422, problema)
+  const repetida = mock.LICENCAS.find((l) => l !== atual && limparDocumento(l.documento) === limpo)
+  if (repetida) {
+    throw new ErroApi(
+      409,
+      `O ${rotuloDoDocumento(limpo)} ${formatarDocumento(limpo)} já é da licença "${repetida.nome}".`,
+    )
+  }
+  return formatarDocumento(limpo)
+}
+
 function licencasMock(): Licenca[] {
   exigirTitularMock()
   return mock.LICENCAS.map(licencaMockComoApi)
@@ -1066,11 +1121,14 @@ function criarLicencaMock(d: LicencaParaCriar): Licenca {
   if (mock.USUARIOS.some((u) => u.email.toLowerCase() === email)) {
     throw new ErroApi(409, 'Já existe um usuário com este e-mail. Use outro para o administrador.')
   }
+  const cadastro = cadastroConferidoMock(d)
+  const documento = documentoConferidoMock(d.documento)
 
   const licenca: mock.LicencaMock = {
     id: uid('lic'),
     nome,
-    documento: d.documento?.trim() || undefined,
+    documento,
+    ...cadastro,
     ativa: true,
     criadoEm: new Date().toISOString(),
   }
@@ -1095,6 +1153,8 @@ function atualizarLicencaMock(id: string, d: LicencaParaEditar): Licenca {
   if (licenca.id === mock.LICENCA_PRINCIPAL_ID && d.ativa === false) {
     throw new ErroApi(400, 'A licença principal não pode ser suspensa.')
   }
+  const cadastro = cadastroConferidoMock(d)
+  const documento = 'documento' in d ? documentoConferidoMock(d.documento, licenca) : licenca.documento
   if (d.nome !== undefined) {
     const nome = d.nome.trim()
     if (nome.length < 2) throw new ErroApi(422, 'Informe o nome da empresa.')
@@ -1104,7 +1164,8 @@ function atualizarLicencaMock(id: string, d: LicencaParaEditar): Licenca {
     if (entrada && entrada.nome === licenca.nome) entrada.nome = nome
     licenca.nome = nome
   }
-  if ('documento' in d) licenca.documento = d.documento?.trim() || undefined
+  licenca.documento = documento
+  Object.assign(licenca, cadastro)
   if (d.ativa !== undefined) licenca.ativa = d.ativa
   return licencaMockComoApi(licenca)
 }
@@ -1265,7 +1326,8 @@ export const consultas = {
       await delay(null, 200)
       throw new ErroApi(503, CONSULTA_SEM_BACKEND)
     }
-    return http<DadosCnpj>(`/consultas/cnpj/${encodeURIComponent(numero.replace(/\D/g, ''))}`)
+    // Letras também: o CNPJ alfanumérico.
+    return http<DadosCnpj>(`/consultas/cnpj/${encodeURIComponent(limparDocumento(numero))}`)
   },
 
   async processo(numero: string): Promise<DadosProcesso> {

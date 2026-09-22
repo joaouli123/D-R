@@ -47,13 +47,23 @@ const AURORA: DadosCnpj = {
 
 function Campo({
   autoBuscar = true,
+  aceitarCpf = false,
   onDados = vi.fn(),
 }: {
   autoBuscar?: boolean
+  aceitarCpf?: boolean
   onDados?: (dados: DadosCnpj, origem: 'automatica' | 'manual') => void
 }) {
   const [valor, setValor] = useState('')
-  return <BuscaCnpj valor={valor} onChange={setValor} onDados={onDados} autoBuscar={autoBuscar} />
+  return (
+    <BuscaCnpj
+      valor={valor}
+      onChange={setValor}
+      onDados={onDados}
+      autoBuscar={autoBuscar}
+      aceitarCpf={aceitarCpf}
+    />
+  )
 }
 
 const campo = () => screen.getByRole('textbox', { name: 'CNPJ' })
@@ -140,6 +150,49 @@ describe('BuscaCnpj', () => {
     await screen.findByText(/METALURGICA AURORA LTDA/)
 
     expect(screen.getByText(/Grau de risco NR-04: 4 · classe CNAE 25.11-0/)).toBeDefined()
+  })
+
+  it('dígito verificador errado: avisa na hora e não consulta', async () => {
+    const user = userEvent.setup()
+    render(<Campo />)
+
+    await user.type(campo(), '1122233300018')
+    expect(screen.getByText(/Falta 1 dígito/)).toBeDefined()
+    await user.type(campo(), '0')
+
+    expect(screen.getByText(/dígito verificador não confere/)).toBeDefined()
+    expect(campo().getAttribute('aria-invalid')).toBe('true')
+    expect(consultarCnpj).not.toHaveBeenCalled()
+  })
+
+  it('CNPJ com letras entra formatado e é consultado igual', async () => {
+    const user = userEvent.setup()
+    consultarCnpj.mockResolvedValue({ ...AURORA, cnpj: '12ABC34501DE35', cnpjFormatado: '12.ABC.345/01DE-35' })
+    render(<Campo />)
+
+    await user.type(campo(), '12abc34501de35')
+
+    expect((campo() as HTMLInputElement).value).toBe('12.ABC.345/01DE-35')
+    expect(await screen.findByText(/METALURGICA AURORA LTDA/)).toBeDefined()
+    expect(consultarCnpj).toHaveBeenCalledWith('12ABC34501DE35')
+  })
+
+  it('CPF ou CNPJ: reconhece o tipo enquanto digita e troca a máscara', async () => {
+    const user = userEvent.setup()
+    render(<Campo aceitarCpf />)
+    const documento = () => screen.getByRole('textbox', { name: 'CPF ou CNPJ' })
+
+    await user.type(documento(), '52998224725')
+    expect((documento() as HTMLInputElement).value).toBe('529.982.247-25')
+    expect(screen.getByText('CPF')).toBeDefined()
+    expect(screen.getByText(/CPF válido\. Não há consulta pública de CPF/)).toBeDefined()
+    expect(consultarCnpj).not.toHaveBeenCalled()
+
+    await user.clear(documento())
+    await user.type(documento(), '112223330001')
+    expect((documento() as HTMLInputElement).value).toBe('11.222.333/0001')
+    expect(screen.getByText('CNPJ')).toBeDefined()
+    expect(screen.getByText(/Faltam 2 dígitos/)).toBeDefined()
   })
 
   it('empresa baixada é apontada — pode não ser a reclamada do processo', async () => {

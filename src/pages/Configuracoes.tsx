@@ -33,6 +33,7 @@ import { PERFIL, iniciaisDe } from '@/lib/perfis'
 import { recusaPorTamanho } from '@/lib/limitesUpload'
 import { prepararFotosParaEnvio } from '@/lib/prepararFotos'
 import { formatDateTime } from '@/lib/utils'
+import { mascararTelefone } from '@/lib/cadastro'
 
 // ============================================================
 // MÓDULO A — Gestão de Usuários + preferências do sistema
@@ -214,8 +215,11 @@ export default function Configuracoes() {
               />
               <Input
                 label="Telefone"
+                type="tel"
+                inputMode="tel"
+                placeholder="(00) 00000-0000"
                 value={perfilLocal.telefone ?? ''}
-                onChange={(e) => setPerfilLocal({ ...perfilLocal, telefone: e.target.value })}
+                onChange={(e) => setPerfilLocal({ ...perfilLocal, telefone: mascararTelefone(e.target.value) })}
               />
               <div className="sm:col-span-2 flex justify-between gap-2 border-t border-ink-100 pt-4">
                 <Button variant="outline" icon={<KeyRound size={15} />} onClick={() => setSenhaAberta(true)}>

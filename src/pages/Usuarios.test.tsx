@@ -251,6 +251,7 @@ describe('Usuários e equipes — cadastrar', () => {
     await user.type(d.getByRole('textbox', { name: /^E-mail/ }), 'bruno@alfa.com.br')
     await user.selectOptions(d.getByRole('combobox', { name: 'Perfil' }), 'perito')
     await user.type(d.getByLabelText(/^Senha inicial/), 'senhaforte1')
+    await user.type(d.getByLabelText(/^Repetir senha/), 'senhaforte1')
     await user.click(d.getByRole('button', { name: 'Cadastrar' }))
 
     await waitFor(() => expect(chamadas.salvar).toHaveBeenCalledTimes(1))
@@ -298,6 +299,33 @@ describe('Usuários e equipes — cadastrar', () => {
     expect(chamadas.salvar).not.toHaveBeenCalled()
   })
 
+  it('pede a senha repetida e não cadastra se não conferir', async () => {
+    const user = userEvent.setup()
+    await montar()
+
+    await user.click(within(regiao('D&R Perícia Elite')).getByRole('button', { name: 'Novo usuário' }))
+    const d = within(dialogo())
+    await user.type(d.getByRole('textbox', { name: /^Nome/ }), 'Bruno')
+    await user.type(d.getByRole('textbox', { name: /^E-mail/ }), 'bruno@x.com.br')
+    await user.type(d.getByLabelText(/^Senha inicial/), 'senhaforte1')
+    await user.type(d.getByLabelText(/^Repetir senha/), 'senhaforte2')
+    expect(d.getByText('As senhas não conferem.')).toBeTruthy()
+    await user.click(d.getByRole('button', { name: 'Cadastrar' }))
+
+    expect(d.getByRole('alert').textContent).toContain('As senhas não conferem')
+    expect(chamadas.salvar).not.toHaveBeenCalled()
+  })
+
+  it('formata o telefone enquanto digita', async () => {
+    const user = userEvent.setup()
+    await montar()
+
+    await user.click(within(regiao('D&R Perícia Elite')).getByRole('button', { name: 'Novo usuário' }))
+    const telefone = within(dialogo()).getByRole('textbox', { name: /^Telefone/ }) as HTMLInputElement
+    await user.type(telefone, '1133224455')
+    expect(telefone.value).toBe('(11) 3322-4455')
+  })
+
   it('exige nome e e-mail', async () => {
     const user = userEvent.setup()
     await montar()
@@ -319,6 +347,7 @@ describe('Usuários e equipes — cadastrar', () => {
     await user.type(d.getByRole('textbox', { name: /^Nome/ }), 'Bruno')
     await user.type(d.getByRole('textbox', { name: /^E-mail/ }), 'henrique@exemplo.com.br')
     await user.type(d.getByLabelText(/^Senha inicial/), 'senhaforte1')
+    await user.type(d.getByLabelText(/^Repetir senha/), 'senhaforte1')
     await user.click(d.getByRole('button', { name: 'Cadastrar' }))
 
     expect((await d.findByRole('alert')).textContent).toContain('Já existe um usuário com este e-mail.')

@@ -24,7 +24,7 @@ import {
   fotosImpressasEmOrdem,
   linhasDoBloco,
   intervaloDoPeriodo,
-  mascaraCnpj,
+  documentoDaEmpresa,
   mascaraCpf,
   montarApresentacaoAgente,
   numeradorDeSecoes,
@@ -457,8 +457,8 @@ export async function htmlDoParecer(
   <table class="ficha-processual"><tbody>
     ${linha('Processo nº', esc(pericia.numeroProcesso))}
     ${linha('Reclamante', `${esc(pericia.reclamante)}${pericia.cpfReclamante ? ` — CPF: ${esc(mascaraCpf(pericia.cpfReclamante))}` : ''}`)}
-    ${linha('Reclamada', principal ? `${esc(principal.razaoSocial)} — CNPJ ${esc(mascaraCnpj(principal.cnpj))}` : '—')}
-    ${solidarias.map((e) => linha('Reclamada', `${esc(e.razaoSocial)} — CNPJ ${esc(mascaraCnpj(e.cnpj))}`)).join('')}
+    ${linha('Reclamada', principal ? `${esc(principal.razaoSocial)} — ${esc(documentoDaEmpresa(principal.cnpj))}` : '—')}
+    ${solidarias.map((e) => linha('Reclamada', `${esc(e.razaoSocial)} — ${esc(documentoDaEmpresa(e.cnpj))}`)).join('')}
   </tbody></table>`
 
   // O período avaliado só entra quando a data de ajuizamento existe:

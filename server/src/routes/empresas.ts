@@ -5,6 +5,12 @@ import { ErroHttp, naoEncontrado, parametro, rota } from '../erros.js'
 import { empresaParaApi } from '../mappers.js'
 import { prisma } from '../prisma.js'
 import { apagarUpload } from '../services/armazenamento.js'
+import {
+  formatarDocumento,
+  limparDocumento,
+  problemaNoDocumento,
+  tipoDoDocumento,
+} from '../services/documento-fiscal.js'
 
 // Multi-tenant: as empresas pertencem à LICENÇA do usuário e todas as equipes
 // dela as compartilham. Toda consulta leva `licencaId` da sessão — que nunca é
@@ -20,11 +26,13 @@ const corpo = z.object({
   id: z.string().optional(),
   razaoSocial: z.string().trim().min(1, 'Informe a razão social.'),
   nomeFantasia: opcional,
+  // CPF entra também: reclamada pode ser pessoa física (empregador doméstico,
+  // produtor rural). O campo segue se chamando `cnpj` no banco e na API.
   cnpj: z
     .string()
     .trim()
-    .min(1, 'Informe o CNPJ.')
-    .refine((v) => v.replace(/\D/g, '').length === 14, 'CNPJ deve ter 14 dígitos.'),
+    .min(1, 'Informe o CPF ou o CNPJ.')
+    .refine((v) => tipoDoDocumento(v) !== null, 'Informe um CPF (11 dígitos) ou um CNPJ (14 caracteres).'),
   cnae: opcional,
   grauRisco: z.enum(['1', '2', '3', '4']).optional(),
   endereco: z.string().trim().default(''),
@@ -61,10 +69,25 @@ empresasRouter.post(
     const d = corpo.parse(req.body)
     const { organizacaoId, licencaId } = sessaoDe(req)
 
+    // Só o que já existe na licença conta como edição (ver abaixo).
+    const existente = d.id
+      ? await prisma.empresa.findFirst({ where: { id: d.id, licencaId } })
+      : null
+
+    // Dígito verificador só no número novo ou trocado: cadastro antigo com
+    // número errado continua podendo ser editado no resto.
+    const mesmoNumero =
+      !!existente && limparDocumento(existente.cnpj) === limparDocumento(d.cnpj)
+    if (!mesmoNumero) {
+      const problema = problemaNoDocumento(d.cnpj)
+      if (problema) throw new ErroHttp(422, problema)
+    }
+    const cnpj = mesmoNumero && existente ? existente.cnpj : formatarDocumento(d.cnpj)
+
     const dados = {
       razaoSocial: d.razaoSocial,
       nomeFantasia: vazioParaNulo(d.nomeFantasia),
-      cnpj: d.cnpj,
+      cnpj,
       cnae: vazioParaNulo(d.cnae),
       grauRisco: d.grauRisco ?? null,
       endereco: d.endereco,
@@ -80,19 +103,26 @@ empresasRouter.post(
       ramoAtividade: vazioParaNulo(d.ramoAtividade),
     }
 
-    // Só enxerga como "existente" o que é da própria licença. Se o id do corpo
+    // `existente` só enxerga o que é da própria licença. Se o id do corpo
     // existir em outra licença, vira uma criação nova (o id do cliente é
     // ignorado nesse caso) — nunca uma edição da empresa alheia.
-    const existente = d.id
-      ? await prisma.empresa.findFirst({ where: { id: d.id, licencaId } })
-      : null
 
-    // O CNPJ é único POR LICENÇA: duas licenças podem cadastrar a mesma empresa.
-    const repetida = await prisma.empresa.findFirst({
-      where: { licencaId, cnpj: d.cnpj, ...(existente ? { NOT: { id: existente.id } } : {}) },
-      select: { id: true },
-    })
-    if (repetida) throw new ErroHttp(409, 'Já existe uma empresa cadastrada com este CNPJ.')
+    // O documento é único POR LICENÇA: duas licenças podem cadastrar a mesma
+    // empresa. A comparação ignora a máscara ("11222333000181" é o mesmo
+    // número de "11.222.333/0001-81").
+    const limpo = limparDocumento(cnpj)
+    const repetida = (
+      await prisma.empresa.findMany({
+        where: { licencaId, ...(existente ? { NOT: { id: existente.id } } : {}) },
+        select: { cnpj: true },
+      })
+    ).some((e) => limparDocumento(e.cnpj) === limpo)
+    if (repetida) {
+      throw new ErroHttp(
+        409,
+        `Já existe uma empresa cadastrada com este ${tipoDoDocumento(limpo) === 'cpf' ? 'CPF' : 'CNPJ'}.`,
+      )
+    }
 
     // O id sugerido pelo cliente só vale se ninguém, em nenhuma licença, já o usa.
     const idSugerido =

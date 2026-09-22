@@ -1,11 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { BadgeCheck, EyeOff, Pencil, Plus, Power, Trash2 } from 'lucide-react'
-import { Badge, Button, Card, Input, Modal, PageLoader, useToast } from '@/components/ui'
+import { Badge, Button, Card, Input, Modal, PageLoader, Select, useToast } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
+import { BuscaCnpj, type OrigemConsulta } from '@/components/BuscaCnpj'
+import { CampoCep } from '@/components/CampoCep'
+import { CamposSenha } from '@/components/CamposSenha'
 import * as api from '@/services/api'
-import { mensagemDeErro } from '@/services/api'
-import type { Licenca } from '@/types'
-import { cn, formatDate, maskCNPJ } from '@/lib/utils'
+import { mensagemDeErro, type DadosCnpj } from '@/services/api'
+import type { CadastroDaLicenca, Licenca } from '@/types'
+import {
+  cpfValido,
+  emailValido,
+  formatarDocumento,
+  limparDocumento,
+  mascararCep,
+  mascararTelefone,
+  problemaNaSenha,
+  problemaNoDocumento,
+  rotuloDoDocumento,
+} from '@/lib/cadastro'
+import { enderecoDoCep } from '@/lib/consultas'
+import { cn, formatDate, UFS } from '@/lib/utils'
 
 // ============================================================
 // Licenças — só o perito titular (administrador da equipe principal)
@@ -173,6 +188,7 @@ function CartaoLicenca({
     ['Perícias', l.pericias],
     ['Documentos', l.documentos],
   ]
+  const local = [l.cidade, l.uf].filter(Boolean).join('/')
 
   return (
     <Card
@@ -199,7 +215,10 @@ function CartaoLicenca({
               <Badge tone={l.ativa ? 'green' : 'red'}>{l.ativa ? 'Ativa' : 'Suspensa'}</Badge>
             </div>
             <p className="mt-0.5 text-[13px] text-ink-500">
-              {l.documento ? `CNPJ ${l.documento} · ` : ''}Criada em {formatDate(l.criadoEm)}
+              {l.documento
+                ? `${rotuloDoDocumento(l.documento)} ${formatarDocumento(l.documento)} · `
+                : ''}
+              {local ? `${local} · ` : ''}Criada em {formatDate(l.criadoEm)}
             </p>
           </div>
         </div>
@@ -286,6 +305,228 @@ function AvisoDeErro({ mensagem }: { mensagem: string | null }) {
   )
 }
 
+// ---------------- Dados da empresa cliente ----------------
+
+/** Como o formulário guarda a empresa: tudo texto, vazio = sem dado. */
+interface FormDaEmpresa {
+  documento: string
+  nome: string
+  nomeFantasia: string
+  telefone: string
+  email: string
+  cep: string
+  endereco: string
+  numero: string
+  complemento: string
+  bairro: string
+  cidade: string
+  uf: string
+}
+
+const CAMPOS_DE_CADASTRO = [
+  'nomeFantasia',
+  'email',
+  'telefone',
+  'cep',
+  'endereco',
+  'numero',
+  'complemento',
+  'bairro',
+  'cidade',
+  'uf',
+] as const satisfies ReadonlyArray<keyof CadastroDaLicenca & keyof FormDaEmpresa>
+
+const EMPRESA_EM_BRANCO: FormDaEmpresa = {
+  documento: '',
+  nome: '',
+  nomeFantasia: '',
+  telefone: '',
+  email: '',
+  cep: '',
+  endereco: '',
+  numero: '',
+  complemento: '',
+  bairro: '',
+  cidade: '',
+  uf: '',
+}
+
+function formDaLicenca(l: Licenca): FormDaEmpresa {
+  const form: FormDaEmpresa = { ...EMPRESA_EM_BRANCO, nome: l.nome, documento: l.documento ?? '' }
+  for (const campo of CAMPOS_DE_CADASTRO) form[campo] = l[campo] ?? ''
+  return form
+}
+
+/**
+ * Contato e endereço para a API. Na criação o vazio nem vai; na edição vai
+ * como '' — é o que o servidor entende como "apagar".
+ */
+function cadastroParaEnviar(form: FormDaEmpresa, { comVazios }: { comVazios: boolean }): CadastroDaLicenca {
+  const saida: CadastroDaLicenca = {}
+  for (const campo of CAMPOS_DE_CADASTRO) {
+    const valor = form[campo].trim()
+    if (valor || comVazios) saida[campo] = valor
+  }
+  return saida
+}
+
+/**
+ * O que o servidor recusaria, dito antes de chamar. O documento só é
+ * conferido se for novo: licença antiga com número errado segue editável.
+ */
+function problemaNaEmpresa(form: FormDaEmpresa, documentoAnterior?: string): string | null {
+  if (form.nome.trim().length < 2) return 'Informe o nome da empresa.'
+  const documento = limparDocumento(form.documento)
+  if (documento && documento !== limparDocumento(documentoAnterior)) {
+    const problema = problemaNoDocumento(documento)
+    if (problema) return problema
+  }
+  if (form.email.trim() && !emailValido(form.email)) return 'E-mail da empresa inválido.'
+  return null
+}
+
+/**
+ * CPF ou CNPJ primeiro: o CNPJ traz da Receita o nome, o contato e o
+ * endereço. Depois o CEP, antes da rua, que também preenche o que sabe.
+ */
+function CamposDaEmpresa({
+  form,
+  onChange,
+  autoBuscar,
+  hintDoNome,
+}: {
+  form: FormDaEmpresa
+  onChange: (atualizar: (atual: FormDaEmpresa) => FormDaEmpresa) => void
+  autoBuscar: boolean
+  hintDoNome?: string
+}) {
+  const idNumero = `${useId()}-numero`
+  const campo =
+    (chave: keyof FormDaEmpresa, mascara?: (valor: string) => string) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      const valor = mascara ? mascara(e.target.value) : e.target.value
+      onChange((atual) => ({ ...atual, [chave]: valor }))
+    }
+
+  function preencherDaReceita(dados: DadosCnpj, origem: OrigemConsulta) {
+    const vindos: Array<[keyof FormDaEmpresa, string | null]> = [
+      ['nome', dados.razaoSocial],
+      ['nomeFantasia', dados.nomeFantasia],
+      ['telefone', dados.telefone],
+      ['email', dados.email?.toLowerCase() ?? null],
+      ['cep', dados.cep ? mascararCep(dados.cep) : null],
+      ['endereco', dados.endereco],
+      ['numero', dados.numero],
+      ['complemento', dados.complemento],
+      ['bairro', dados.bairro],
+      ['cidade', dados.cidade],
+      ['uf', dados.uf?.toUpperCase() ?? null],
+    ]
+    // Automática só completa o que está vazio; pelo botão, a Receita manda.
+    onChange((atual) => {
+      const novo = { ...atual }
+      for (const [chave, valor] of vindos) {
+        if (!valor?.trim()) continue
+        if (origem === 'manual' || !atual[chave].trim()) novo[chave] = valor.trim()
+      }
+      return novo
+    })
+  }
+
+  const pessoaFisica = cpfValido(form.documento)
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-6">
+      <BuscaCnpj
+        className="sm:col-span-6"
+        aceitarCpf
+        required={false}
+        autoBuscar={autoBuscar}
+        valor={form.documento}
+        onChange={(documento) => onChange((atual) => ({ ...atual, documento }))}
+        onDados={preencherDaReceita}
+      />
+      <div className="sm:col-span-3">
+        <Input
+          label={pessoaFisica ? 'Nome completo' : 'Nome da empresa'}
+          required
+          value={form.nome}
+          onChange={campo('nome')}
+          hint={hintDoNome}
+        />
+      </div>
+      <div className="sm:col-span-3">
+        <Input label="Nome fantasia" value={form.nomeFantasia} onChange={campo('nomeFantasia')} />
+      </div>
+      <div className="sm:col-span-2">
+        <Input
+          label="Telefone"
+          type="tel"
+          inputMode="tel"
+          placeholder="(00) 00000-0000"
+          value={form.telefone}
+          onChange={campo('telefone', mascararTelefone)}
+        />
+      </div>
+      <div className="sm:col-span-4">
+        <Input
+          label="E-mail da empresa"
+          type="email"
+          autoComplete="off"
+          value={form.email}
+          onChange={campo('email')}
+        />
+      </div>
+
+      <p className="border-t border-ink-200 pt-4 text-sm font-semibold text-ink-900 sm:col-span-6">
+        Endereço
+      </p>
+      <CampoCep
+        className="sm:col-span-2"
+        valor={form.cep}
+        onChange={(cep) => onChange((atual) => ({ ...atual, cep }))}
+        onEndereco={(dados) => onChange((atual) => ({ ...atual, ...enderecoDoCep(dados) }))}
+        focarAoPreencher={idNumero}
+      />
+      <div className="sm:col-span-4">
+        <Input
+          label="Endereço"
+          placeholder="Rua, avenida, rodovia…"
+          value={form.endereco}
+          onChange={campo('endereco')}
+        />
+      </div>
+      <div className="sm:col-span-2">
+        <Input id={idNumero} label="Número" value={form.numero} onChange={campo('numero')} />
+      </div>
+      <div className="sm:col-span-4">
+        <Input
+          label="Complemento"
+          placeholder="Sala, bloco, galpão…"
+          value={form.complemento}
+          onChange={campo('complemento')}
+        />
+      </div>
+      <div className="sm:col-span-2">
+        <Input label="Bairro" value={form.bairro} onChange={campo('bairro')} />
+      </div>
+      <div className="sm:col-span-3">
+        <Input label="Cidade" value={form.cidade} onChange={campo('cidade')} />
+      </div>
+      <div className="sm:col-span-1">
+        <Select label="UF" value={form.uf} onChange={campo('uf')}>
+          <option value="">—</option>
+          {UFS.map((uf) => (
+            <option key={uf} value={uf}>
+              {uf}
+            </option>
+          ))}
+        </Select>
+      </div>
+    </div>
+  )
+}
+
 // ---------------- Nova licença ----------------
 
 function ModalCriar({
@@ -295,27 +536,24 @@ function ModalCriar({
   onFechar: () => void
   onConcluido: (mensagem: string) => Promise<void>
 }) {
-  const [form, setForm] = useState({ nome: '', documento: '', adminNome: '', email: '', senha: '' })
+  const [empresa, setEmpresa] = useState<FormDaEmpresa>(EMPRESA_EM_BRANCO)
+  const [admin, setAdmin] = useState({ nome: '', email: '', senha: '', confirmacao: '' })
   const [ocupado, setOcupado] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
-  const campo = (chave: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((atual) => ({
-      ...atual,
-      [chave]: chave === 'documento' ? maskCNPJ(e.target.value) : e.target.value,
-    }))
+  const doAdmin = (chave: keyof typeof admin) => (valor: string) =>
+    setAdmin((atual) => ({ ...atual, [chave]: valor }))
 
   async function criar() {
-    if (form.nome.trim().length < 2) {
-      setErro('Informe o nome da empresa.')
-      return
-    }
-    if (!form.adminNome.trim() || !form.email.trim()) {
-      setErro('Informe o nome e o e-mail do administrador da licença.')
-      return
-    }
-    if (form.senha.length < 8) {
-      setErro('Defina uma senha inicial com pelo menos 8 caracteres.')
+    const problema =
+      problemaNaEmpresa(empresa) ??
+      (!admin.nome.trim() || !admin.email.trim()
+        ? 'Informe o nome e o e-mail do administrador da licença.'
+        : !emailValido(admin.email)
+          ? 'E-mail do administrador inválido.'
+          : problemaNaSenha(admin.senha, admin.confirmacao))
+    if (problema) {
+      setErro(problema)
       return
     }
 
@@ -323,9 +561,10 @@ function ModalCriar({
     setErro(null)
     try {
       await api.licencas.criar({
-        nome: form.nome.trim(),
-        documento: form.documento.trim() || undefined,
-        admin: { nome: form.adminNome.trim(), email: form.email.trim(), senha: form.senha },
+        nome: empresa.nome.trim(),
+        documento: empresa.documento.trim() || undefined,
+        ...cadastroParaEnviar(empresa, { comVazios: false }),
+        admin: { nome: admin.nome.trim(), email: admin.email.trim(), senha: admin.senha },
       })
     } catch (e) {
       setErro(mensagemDeErro(e, 'Não foi possível criar a licença.'))
@@ -333,7 +572,7 @@ function ModalCriar({
       return
     }
     await onConcluido(
-      `Licença ${form.nome.trim()} criada. Repasse o e-mail e a senha a ${form.adminNome.trim()}.`,
+      `Licença ${empresa.nome.trim()} criada. Repasse o e-mail e a senha a ${admin.nome.trim()}.`,
     )
   }
 
@@ -341,6 +580,7 @@ function ModalCriar({
     <Modal
       open
       onClose={onFechar}
+      size="lg"
       title="Nova licença"
       subtitle="Uma empresa cliente, com acesso e trabalho isolados das demais."
       footer={
@@ -354,40 +594,39 @@ function ModalCriar({
         </>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Input label="Nome da empresa" required value={form.nome} onChange={campo('nome')} />
-        <Input
-          label="CNPJ"
-          inputMode="numeric"
-          value={form.documento}
-          onChange={campo('documento')}
-        />
-        <div className="border-t border-ink-200 pt-4 sm:col-span-2">
+      <CamposDaEmpresa form={empresa} onChange={setEmpresa} autoBuscar={!empresa.nome.trim()} />
+
+      <div className="mt-4 grid gap-4 border-t border-ink-200 pt-4 sm:grid-cols-2">
+        <div className="sm:col-span-2">
           <p className="text-sm font-semibold text-ink-900">Primeiro administrador</p>
           <p className="text-[13px] text-ink-500">
             Entra com este e-mail e cadastra os demais usuários e equipes da licença.
           </p>
         </div>
-        <div className="sm:col-span-2">
-          <Input label="Nome" required value={form.adminNome} onChange={campo('adminNome')} />
-        </div>
         <Input
-          label="E-mail"
+          label="Nome"
+          required
+          value={admin.nome}
+          onChange={(e) => doAdmin('nome')(e.target.value)}
+        />
+        <Input
+          label="E-mail de acesso"
           type="email"
           required
           autoComplete="off"
-          value={form.email}
-          onChange={campo('email')}
+          value={admin.email}
+          onChange={(e) => doAdmin('email')(e.target.value)}
         />
-        <Input
-          label="Senha inicial"
-          type="password"
-          required
-          autoComplete="new-password"
-          value={form.senha}
-          onChange={campo('senha')}
-          hint="Mínimo 8 caracteres. A pessoa pode trocar depois em Configurações › Meu perfil."
-        />
+        <div className="sm:col-span-2">
+          <CamposSenha
+            rotulo="Senha inicial"
+            senha={admin.senha}
+            confirmacao={admin.confirmacao}
+            onSenha={doAdmin('senha')}
+            onConfirmacao={doAdmin('confirmacao')}
+            hint="A pessoa pode trocar depois em Configurações › Meu perfil."
+          />
+        </div>
       </div>
       <AvisoDeErro mensagem={erro} />
     </Modal>
@@ -405,21 +644,24 @@ function ModalEditar({
   onFechar: () => void
   onConcluido: (mensagem: string) => Promise<void>
 }) {
-  const [nome, setNome] = useState(licenca.nome)
-  const [documento, setDocumento] = useState(licenca.documento ?? '')
+  const [empresa, setEmpresa] = useState<FormDaEmpresa>(() => formDaLicenca(licenca))
   const [ocupado, setOcupado] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
   async function salvar() {
-    if (nome.trim().length < 2) {
-      setErro('Informe o nome da empresa.')
+    const problema = problemaNaEmpresa(empresa, licenca.documento)
+    if (problema) {
+      setErro(problema)
       return
     }
     setOcupado(true)
     setErro(null)
     try {
-      // Documento vazio vai como '' — é o que o servidor entende como "apagar".
-      await api.licencas.atualizar(licenca.id, { nome: nome.trim(), documento: documento.trim() })
+      await api.licencas.atualizar(licenca.id, {
+        nome: empresa.nome.trim(),
+        documento: empresa.documento.trim(),
+        ...cadastroParaEnviar(empresa, { comVazios: true }),
+      })
     } catch (e) {
       setErro(mensagemDeErro(e, 'Não foi possível salvar a licença.'))
       setOcupado(false)
@@ -432,7 +674,7 @@ function ModalEditar({
     <Modal
       open
       onClose={onFechar}
-      size="sm"
+      size="lg"
       title="Editar licença"
       subtitle={licenca.nome}
       footer={
@@ -446,21 +688,12 @@ function ModalEditar({
         </>
       }
     >
-      <div className="space-y-4">
-        <Input
-          label="Nome da empresa"
-          required
-          value={nome}
-          onChange={(e) => setNome(e.target.value)}
-          hint="A equipe de entrada acompanha o nome novo, se ainda tiver o antigo."
-        />
-        <Input
-          label="CNPJ"
-          inputMode="numeric"
-          value={documento}
-          onChange={(e) => setDocumento(maskCNPJ(e.target.value))}
-        />
-      </div>
+      <CamposDaEmpresa
+        form={empresa}
+        onChange={setEmpresa}
+        autoBuscar={!empresa.nome.trim()}
+        hintDoNome="A equipe de entrada acompanha o nome novo, se ainda tiver o antigo."
+      />
       <AvisoDeErro mensagem={erro} />
     </Modal>
   )

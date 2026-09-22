@@ -1,6 +1,7 @@
 import { Fragment } from 'react'
 import type { Empresa, Pericia, SecaoFoto, Usuario } from '@/types'
-import { extenso, formatDate, maskCNPJ, maskCPF } from '@/lib/utils'
+import { extenso, formatDate, maskCPF } from '@/lib/utils'
+import { formatarDocumento, rotuloDoDocumento } from '@/lib/cadastro'
 import {
   dadosPapel,
   participanteAusente,
@@ -480,7 +481,7 @@ export function DocumentoPreview({
               <th>Reclamada</th>
               <td>
                 {empresaPrincipal
-                  ? `${empresaPrincipal.razaoSocial} — CNPJ ${maskCNPJ(empresaPrincipal.cnpj)}`
+                  ? `${empresaPrincipal.razaoSocial} — ${rotuloDoDocumento(empresaPrincipal.cnpj)} ${formatarDocumento(empresaPrincipal.cnpj)}`
                   : '—'}
               </td>
             </tr>
@@ -488,7 +489,7 @@ export function DocumentoPreview({
               <tr key={e.id}>
                 <th>Reclamada</th>
                 <td>
-                  {e.razaoSocial} — CNPJ {maskCNPJ(e.cnpj)}
+                  {e.razaoSocial} — {rotuloDoDocumento(e.cnpj)} {formatarDocumento(e.cnpj)}
                 </td>
               </tr>
             ))}

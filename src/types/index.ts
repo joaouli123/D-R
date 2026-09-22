@@ -43,6 +43,20 @@ export interface Usuario {
   equipePrincipal?: boolean
 }
 
+/** Contato e endereço da empresa cliente — o que a Receita e o CEP ajudam a preencher. */
+export interface CadastroDaLicenca {
+  nomeFantasia?: string
+  email?: string
+  telefone?: string
+  cep?: string
+  endereco?: string
+  numero?: string
+  complemento?: string
+  bairro?: string
+  cidade?: string
+  uf?: string
+}
+
 /**
  * Uma licença: a empresa cliente que assina a plataforma. É ela que isola o
  * trabalho — empresas, perícias e documentos são da licença, compartilhados
@@ -50,10 +64,10 @@ export interface Usuario {
  * licença principal) cria e gere licenças; a tela mostra QUANTO há em cada
  * uma, nunca O QUE há.
  */
-export interface Licenca {
+export interface Licenca extends CadastroDaLicenca {
   id: UUID
   nome: string
-  /** CNPJ ou CPF de quem contratou, como o titular digitou. */
+  /** CNPJ ou CPF de quem contratou, sempre com a máscara. */
   documento?: string
   /** Suspensa = ninguém da licença entra (e quem estava dentro cai). */
   ativa: boolean

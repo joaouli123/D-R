@@ -11,7 +11,23 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 const RAIZ = '00000000-0000-4000-8000-000000000001'
 const PRINCIPAL = '00000000-0000-4000-8000-000000000002'
 
-type Licenca = { id: string; nome: string; documento: string | null; ativa: boolean; criadoEm: Date }
+type Licenca = {
+  id: string
+  nome: string
+  documento: string | null
+  ativa: boolean
+  criadoEm: Date
+  nomeFantasia?: string | null
+  email?: string | null
+  telefone?: string | null
+  cep?: string | null
+  endereco?: string | null
+  numero?: string | null
+  complemento?: string | null
+  bairro?: string | null
+  cidade?: string | null
+  uf?: string | null
+}
 type Equipe = { id: string; nome: string; paiId: string | null; licencaId: string }
 type Usuario = {
   id: string
@@ -49,9 +65,15 @@ vi.mock('../prisma.js', () => {
   }
   const prisma = {
     licenca: {
-      findMany: async ({ where }: { where?: { id?: string } }) =>
+      findMany: async ({
+        where,
+      }: {
+        where?: { id?: string; documento?: { not: null }; NOT?: { id: string } }
+      }) =>
         banco.licencas
           .filter((l) => !where?.id || l.id === where.id)
+          .filter((l) => !where?.documento || l.documento !== null)
+          .filter((l) => !where?.NOT || l.id !== where.NOT.id)
           .map((l) => ({
             ...l,
             _count: {
@@ -158,7 +180,7 @@ async function chamar(metodo: string, caminho: string, corpo?: unknown, cabecalh
 
 const novaLicenca = {
   nome: 'Laboratório Alfa',
-  documento: '12.345.678/0001-90',
+  documento: '12.345.678/0001-95',
   admin: { nome: 'Ana Alfa', email: 'Ana@Alfa.test', senha: 'senha-forte-1' },
 }
 
@@ -192,7 +214,7 @@ describe('rota de licenças — criar', () => {
     expect(r.status).toBe(201)
     expect(r.corpo).toMatchObject({
       nome: 'Laboratório Alfa',
-      documento: '12.345.678/0001-90',
+      documento: '12.345.678/0001-95',
       ativa: true,
       principal: false,
       equipes: 1,
@@ -255,6 +277,108 @@ describe('rota de licenças — editar', () => {
 
   it('licença inexistente é 404', async () => {
     expect((await chamar('PATCH', '/licencas/nao-existe', { nome: 'X X' })).status).toBe(404)
+  })
+})
+
+describe('rota de licenças — cadastro da empresa cliente', () => {
+  const endereco = {
+    nomeFantasia: 'Alfa Lab',
+    email: 'contato@alfa.test',
+    telefone: '(11) 3333-4444',
+    cep: '01310-100',
+    endereco: 'Avenida Paulista',
+    numero: '1000',
+    complemento: 'Conj. 12',
+    bairro: 'Bela Vista',
+    cidade: 'São Paulo',
+    uf: 'sp',
+  }
+
+  it('grava contato e endereço, e a edição mexe só no que veio', async () => {
+    const { status, corpo } = await chamar('POST', '/licencas', { ...novaLicenca, ...endereco })
+
+    expect(status).toBe(201)
+    expect(corpo).toMatchObject({ ...endereco, uf: 'SP' })
+
+    const r = await chamar('PATCH', `/licencas/${corpo.id}`, { telefone: '', numero: '1001' })
+    expect(r.status).toBe(200)
+    expect(r.corpo.telefone).toBeUndefined()
+    expect(r.corpo).toMatchObject({ numero: '1001', cidade: 'São Paulo', documento: '12.345.678/0001-95' })
+  })
+
+  it('o documento vai para o banco com a máscara, seja CNPJ, CNPJ alfanumérico ou CPF', async () => {
+    const sem = await chamar('POST', '/licencas', { ...novaLicenca, documento: '12345678000195' })
+    expect(sem.corpo.documento).toBe('12.345.678/0001-95')
+
+    const alfa = await chamar('POST', '/licencas', {
+      ...novaLicenca,
+      documento: '12abc34501de35',
+      admin: { ...novaLicenca.admin, email: 'b@alfa.test' },
+    })
+    expect(alfa.status).toBe(201)
+    expect(alfa.corpo.documento).toBe('12.ABC.345/01DE-35')
+
+    const cpf = await chamar('POST', '/licencas', {
+      ...novaLicenca,
+      documento: '52998224725',
+      admin: { ...novaLicenca.admin, email: 'c@alfa.test' },
+    })
+    expect(cpf.status).toBe(201)
+    expect(cpf.corpo.documento).toBe('529.982.247-25')
+  })
+
+  it('dígito verificador errado é 422 e nada é criado', async () => {
+    const r = await chamar('POST', '/licencas', { ...novaLicenca, documento: '12.345.678/0001-90' })
+
+    expect(r.status).toBe(422)
+    expect(r.corpo.erro).toMatch(/não confere/)
+    expect(banco.licencas).toHaveLength(1)
+    expect(banco.usuarios).toHaveLength(1)
+  })
+
+  it('o mesmo documento em duas licenças é 409, com ou sem máscara', async () => {
+    await chamar('POST', '/licencas', novaLicenca)
+
+    const r = await chamar('POST', '/licencas', {
+      ...novaLicenca,
+      nome: 'Beta',
+      documento: '12345678000195',
+      admin: { ...novaLicenca.admin, email: 'beta@beta.test' },
+    })
+
+    expect(r.status).toBe(409)
+    expect(r.corpo.erro).toBe('O CNPJ 12.345.678/0001-95 já é da licença "Laboratório Alfa".')
+    expect(banco.licencas).toHaveLength(2)
+  })
+
+  it('na edição, o próprio documento passa e o de outra licença não', async () => {
+    const alfa = (await chamar('POST', '/licencas', novaLicenca)).corpo
+    const beta = (
+      await chamar('POST', '/licencas', {
+        ...novaLicenca,
+        nome: 'Beta',
+        documento: '11.222.333/0001-81',
+        admin: { ...novaLicenca.admin, email: 'beta@beta.test' },
+      })
+    ).corpo
+
+    expect((await chamar('PATCH', `/licencas/${alfa.id}`, { documento: '12345678000195' })).status).toBe(200)
+    expect((await chamar('PATCH', `/licencas/${beta.id}`, { documento: '12.345.678/0001-95' })).status).toBe(409)
+    expect((await chamar('PATCH', `/licencas/${beta.id}`, { documento: '' })).corpo.documento).toBeUndefined()
+  })
+
+  it('licença antiga com documento que não confere continua editável', async () => {
+    banco.licencas.push({ id: 'lic-velha', nome: 'Velha', documento: '12.345.678/0001-90', ativa: true, criadoEm: new Date(0) })
+
+    expect((await chamar('PATCH', '/licencas/lic-velha', { telefone: '(11) 2222-3333' })).status).toBe(200)
+    const r = await chamar('PATCH', '/licencas/lic-velha', { nome: 'Velha Ltda', documento: '12.345.678/0001-90' })
+    expect(r.status).toBe(200)
+    expect(r.corpo.documento).toBe('12.345.678/0001-90')
+  })
+
+  it('UF que não tem 2 letras e e-mail inválido são recusados', async () => {
+    expect((await chamar('POST', '/licencas', { ...novaLicenca, uf: 'São Paulo' })).status).toBe(422)
+    expect((await chamar('POST', '/licencas', { ...novaLicenca, email: 'sem-arroba' })).status).toBe(422)
   })
 })
 

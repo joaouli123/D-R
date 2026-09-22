@@ -1,6 +1,7 @@
-import type { DadosCnpj, DadosProcesso } from '@/services/api'
+import type { DadosCep, DadosCnpj, DadosProcesso } from '@/services/api'
 import type { Empresa, Pericia } from '@/types'
 import { formatDate } from '@/lib/utils'
+import { limparDocumento, mascararCep } from '@/lib/cadastro'
 
 // ============================================================
 // Regras de preenchimento a partir das fontes públicas.
@@ -26,7 +27,8 @@ import { formatDate } from '@/lib/utils'
 
 export const digitos = (valor: string) => (valor ?? '').replace(/\D/g, '')
 
-export const cnpjCompleto = (valor: string) => digitos(valor).length === 14
+/** 14 caracteres — 12 letras ou números e 2 dígitos, pelo CNPJ alfanumérico. */
+export const cnpjCompleto = (valor: string) => /^[0-9A-Z]{12}\d{2}$/.test(limparDocumento(valor))
 
 export const numeroProcessoCompleto = (valor: string) => digitos(valor).length === 20
 
@@ -158,4 +160,27 @@ export function outrasInstancias(dados: DadosProcesso): string[] {
       [instancia.grauRotulo, instancia.orgao, instancia.classe].filter(Boolean).join(' · '),
     )
     .filter((linha) => !!linha)
+}
+
+/**
+ * O que o CEP muda no endereço. Aqui o CEP manda: foi digitado agora, de
+ * propósito, então o que ele trouxer substitui o que estava. O que não vier
+ * (CEP geral de cidade pequena não tem rua nem bairro) fica como está.
+ */
+export function enderecoDoCep(dados: DadosCep): {
+  cep: string
+  endereco?: string
+  bairro?: string
+  cidade?: string
+  uf?: string
+} {
+  const preenchido = (valor: string | null | undefined) => (valor?.trim() ? valor.trim() : undefined)
+  const patch = {
+    cep: mascararCep(dados.cep),
+    endereco: preenchido(dados.logradouro),
+    bairro: preenchido(dados.bairro),
+    cidade: preenchido(dados.cidade),
+    uf: preenchido(dados.uf)?.toUpperCase(),
+  }
+  return Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) as typeof patch
 }

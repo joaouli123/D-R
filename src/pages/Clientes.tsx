@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/layout/AppLayout'
 import { empresaVazia, ModalEmpresa } from '@/components/ModalEmpresa'
 import { useApp } from '@/store/AppStore'
 import type { Empresa, StatusPericia } from '@/types'
+import { formatarDocumento, rotuloDoDocumento } from '@/lib/cadastro'
 
 const STATUS: Record<StatusPericia, string> = {
   rascunho: 'Rascunho',
@@ -210,8 +211,8 @@ export default function Clientes() {
 
               <dl className="mt-3 space-y-1.5 text-[13px]">
                 <div className="flex gap-2">
-                  <dt className="w-16 shrink-0 text-ink-400">CNPJ</dt>
-                  <dd className="font-mono text-[12px] text-ink-700">{e.cnpj}</dd>
+                  <dt className="w-16 shrink-0 text-ink-400">{rotuloDoDocumento(e.cnpj)}</dt>
+                  <dd className="font-mono text-[12px] text-ink-700">{formatarDocumento(e.cnpj)}</dd>
                 </div>
                 <div className="flex gap-2">
                   <dt className="w-16 shrink-0 text-ink-400">CNAE</dt>

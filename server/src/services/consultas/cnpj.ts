@@ -20,6 +20,7 @@
 // ============================================================
 
 import { ErroHttp } from '../../erros.js'
+import { cnpjValido as cnpjConfere, limparDocumento, tipoDoDocumento } from '../documento-fiscal.js'
 import { buscarJson, criarCache, FonteIndisponivel, type OpcoesBusca } from './fonte.js'
 import { municipioPorCodigo } from './ibge.js'
 import { grauDeRiscoDoCnae, type GrauRisco } from './nr04.js'
@@ -55,10 +56,13 @@ export interface DadosCnpj {
   fonte: string
 }
 
-/** Só os dígitos, e apenas se forem 14. */
+/**
+ * Letras e números em maiúsculas, e apenas se tiver a forma de um CNPJ —
+ * o numérico de sempre ou o alfanumérico (12 posições livres e 2 dígitos).
+ */
 export function normalizarCnpj(bruto: string): string | null {
-  const digitos = (bruto ?? '').replace(/\D/g, '')
-  return digitos.length === 14 ? digitos : null
+  const limpo = limparDocumento(bruto)
+  return tipoDoDocumento(limpo) === 'cnpj' ? limpo : null
 }
 
 /**
@@ -70,21 +74,7 @@ export function normalizarCnpj(bruto: string): string | null {
  */
 export function cnpjValido(numero: string): boolean {
   const s = normalizarCnpj(numero)
-  if (!s || /^(\d)\1{13}$/.test(s)) return false
-
-  const digito = (parcial: string): number => {
-    let soma = 0
-    let peso = parcial.length - 7
-    for (const caractere of parcial) {
-      soma += Number(caractere) * peso--
-      if (peso < 2) peso = 9
-    }
-    const resto = soma % 11
-    return resto < 2 ? 0 : 11 - resto
-  }
-
-  const base = s.slice(0, 12)
-  return digito(base) === Number(s[12]) && digito(base + s[12]) === Number(s[13])
+  return !!s && cnpjConfere(s)
 }
 
 export function formatarCnpj(numero: string): string {
@@ -179,7 +169,7 @@ export interface OpcoesConsultaCnpj extends Pick<OpcoesBusca, 'buscar' | 'tempoL
 
 export async function consultarCnpj(bruto: string, opcoes: OpcoesConsultaCnpj = {}): Promise<DadosCnpj> {
   const numero = normalizarCnpj(bruto)
-  if (!numero) throw new ErroHttp(422, 'Informe os 14 dígitos do CNPJ.')
+  if (!numero) throw new ErroHttp(422, 'Informe os 14 caracteres do CNPJ.')
   if (!cnpjValido(numero)) {
     throw new ErroHttp(
       422,
@@ -204,7 +194,8 @@ export async function consultarCnpj(bruto: string, opcoes: OpcoesConsultaCnpj = 
     throw erro
   })
 
-  if (status === 404) {
+  // 400: a fonte ainda não reconhece o formato (CNPJ alfanumérico novo).
+  if (status === 404 || status === 400) {
     throw new ErroHttp(
       404,
       `CNPJ ${formatarCnpj(numero)} não consta no cadastro público da Receita Federal. Confira o número ou preencha à mão.`,

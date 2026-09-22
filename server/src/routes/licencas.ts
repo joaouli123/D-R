@@ -5,6 +5,12 @@ import { exigirEquipePrincipal, exigirPerfil, exigirSessao } from '../auth.js'
 import { ErroHttp, parametro, rota } from '../erros.js'
 import { prisma } from '../prisma.js'
 import { apagarUpload } from '../services/armazenamento.js'
+import {
+  formatarDocumento,
+  limparDocumento,
+  problemaNoDocumento,
+  rotuloDoDocumento,
+} from '../services/documento-fiscal.js'
 import { LICENCA_PRINCIPAL_ID, ORGANIZACAO_RAIZ_ID } from '../tenancy.js'
 
 // ============================================================
@@ -30,9 +36,40 @@ const documento = z
   .optional()
   .transform((v) => v || null)
 
+/** Texto opcional: vazio vira `null`, que é como o banco guarda "sem dado". */
+const texto = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .transform((v) => v || null)
+
+/** Contato e endereço do cliente — o que a Receita e o CEP ajudam a preencher. */
+const cadastro = {
+  nomeFantasia: texto(160),
+  email: z
+    .union([z.string().trim().email('E-mail da empresa inválido.'), z.literal('')])
+    .optional()
+    .transform((v) => v || null),
+  telefone: texto(30),
+  cep: texto(9),
+  endereco: texto(200),
+  numero: texto(20),
+  complemento: texto(120),
+  bairro: texto(120),
+  cidade: texto(120),
+  uf: z
+    .union([z.string().trim().regex(/^[A-Za-z]{2}$/, 'UF deve ter 2 letras.'), z.literal('')])
+    .optional()
+    .transform((v) => (v ? v.toUpperCase() : null)),
+}
+const CAMPOS_DE_CADASTRO = Object.keys(cadastro) as Array<keyof typeof cadastro>
+
 const corpoDeCriacao = z.object({
   nome: nomeDaLicenca,
   documento,
+  ...cadastro,
   admin: z.object({
     nome: z.string().trim().min(1, 'Informe o nome do administrador.'),
     email: z.string().email('E-mail do administrador inválido.'),
@@ -43,8 +80,41 @@ const corpoDeCriacao = z.object({
 const corpoDeEdicao = z.object({
   nome: nomeDaLicenca.optional(),
   documento,
+  ...cadastro,
   ativa: z.boolean().optional(),
 })
+
+/**
+ * O documento como vai para o banco — sempre com a máscara —, depois de
+ * conferir o dígito verificador e que nenhuma outra licença já o usa.
+ *
+ * O que já estava gravado e não mudou passa sem conferência: licença antiga
+ * com número digitado errado não pode travar a troca do telefone.
+ */
+async function documentoConferido(
+  documento: string | null,
+  { licencaId, anterior }: { licencaId?: string; anterior?: string | null } = {},
+): Promise<string | null> {
+  if (!documento) return null
+  const limpo = limparDocumento(documento)
+  if (anterior && limparDocumento(anterior) === limpo) return anterior
+
+  const problema = problemaNoDocumento(documento)
+  if (problema) throw new ErroHttp(422, problema)
+
+  const outras = await prisma.licenca.findMany({
+    where: { documento: { not: null }, ...(licencaId ? { NOT: { id: licencaId } } : {}) },
+    select: { nome: true, documento: true },
+  })
+  const repetida = outras.find((l) => limparDocumento(l.documento) === limpo)
+  if (repetida) {
+    throw new ErroHttp(
+      409,
+      `O ${rotuloDoDocumento(limpo)} ${formatarDocumento(limpo)} já é da licença "${repetida.nome}".`,
+    )
+  }
+  return formatarDocumento(limpo)
+}
 
 /**
  * A equipe que nasceu com a licença. Na principal é a raiz; nas clientes é a
@@ -81,6 +151,7 @@ async function listar(where: { id?: string } = {}) {
       id: l.id,
       nome: l.nome,
       documento: l.documento ?? undefined,
+      ...Object.fromEntries(CAMPOS_DE_CADASTRO.map((campo) => [campo, l[campo] ?? undefined])),
       ativa: l.ativa,
       principal: l.id === LICENCA_PRINCIPAL_ID,
       criadoEm: l.criadoEm.toISOString(),
@@ -124,9 +195,16 @@ licencasRouter.post(
       throw new ErroHttp(409, 'Já existe um usuário com este e-mail. Use outro para o administrador.')
     }
 
+    const documentoFinal = await documentoConferido(d.documento)
     const senhaHash = await bcrypt.hash(d.admin.senha, 12)
     const licenca = await prisma.$transaction(async (tx) => {
-      const criada = await tx.licenca.create({ data: { nome: d.nome, documento: d.documento } })
+      const criada = await tx.licenca.create({
+        data: {
+          nome: d.nome,
+          documento: documentoFinal,
+          ...Object.fromEntries(CAMPOS_DE_CADASTRO.map((campo) => [campo, d[campo]])),
+        },
+      })
       const equipe = await tx.organizacao.create({
         data: { nome: d.nome, paiId: ORGANIZACAO_RAIZ_ID, licencaId: criada.id },
       })
@@ -158,12 +236,21 @@ licencasRouter.patch(
       throw new ErroHttp(400, 'A licença principal não pode ser suspensa.')
     }
 
+    // Campo que não veio no corpo fica como está; o que veio vazio é apagado.
+    const veio = (campo: string) => campo in req.body
+    const documentoFinal = veio('documento')
+      ? await documentoConferido(d.documento, { licencaId: atual.id, anterior: atual.documento })
+      : undefined
+
     await prisma.$transaction(async (tx) => {
       await tx.licenca.update({
         where: { id: atual.id },
         data: {
           ...(d.nome !== undefined ? { nome: d.nome } : {}),
-          ...('documento' in req.body ? { documento: d.documento } : {}),
+          ...(documentoFinal !== undefined ? { documento: documentoFinal } : {}),
+          ...Object.fromEntries(
+            CAMPOS_DE_CADASTRO.filter(veio).map((campo) => [campo, d[campo]]),
+          ),
           ...(d.ativa !== undefined ? { ativa: d.ativa } : {}),
         },
       })

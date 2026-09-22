@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import Licencas from './Licencas'
 import { ToastProvider } from '@/components/ui'
-import { ErroApi } from '@/services/api'
+import { ErroApi, type DadosCep, type DadosCnpj } from '@/services/api'
 import type { Licenca } from '@/types'
 
 // ============================================================
@@ -22,6 +22,8 @@ const chamadas = vi.hoisted(() => ({
   criar: vi.fn(),
   atualizar: vi.fn(),
   excluir: vi.fn(),
+  cnpj: vi.fn(),
+  cep: vi.fn(),
 }))
 
 vi.mock('@/services/api', async (importOriginal) => ({
@@ -32,6 +34,7 @@ vi.mock('@/services/api', async (importOriginal) => ({
     atualizar: chamadas.atualizar,
     excluir: chamadas.excluir,
   },
+  consultas: { cnpj: chamadas.cnpj, cep: chamadas.cep },
 }))
 vi.mock('@/components/layout/AppLayout', () => ({
   PageHeader: ({ title, action }: { title: string; action?: React.ReactNode }) => (
@@ -70,7 +73,9 @@ const lista = (): Licenca[] => [
   licenca({
     id: 'lic-2',
     nome: 'Laboratório Alfa',
-    documento: '12.345.678/0001-90',
+    documento: '12.345.678/0001-95',
+    cidade: 'Campinas',
+    uf: 'SP',
     equipes: 2,
     usuarios: 3,
     empresas: 2,
@@ -80,6 +85,43 @@ const lista = (): Licenca[] => [
   }),
   licenca({ id: 'lic-3', nome: 'Beta Engenharia', ativa: false, equipes: 1, usuarios: 2 }),
 ]
+
+const RECEITA: DadosCnpj = {
+  cnpj: '11222333000181',
+  cnpjFormatado: '11.222.333/0001-81',
+  razaoSocial: 'GAMA CONSULTORIA LTDA',
+  nomeFantasia: 'Gama',
+  situacao: 'ATIVA',
+  situacaoDesde: '2015-03-02',
+  cnae: '7119703',
+  cnaeDescricao: 'Serviços de desenho técnico',
+  grauRisco: '1',
+  grauRiscoClasse: '71.19-7',
+  naturezaJuridica: 'Sociedade Empresária Limitada',
+  porte: 'ME',
+  abertura: '2015-03-02',
+  endereco: 'Rua das Flores',
+  numero: '120',
+  complemento: 'Sala 4',
+  bairro: 'Centro',
+  cidade: 'Campinas',
+  uf: 'SP',
+  cep: '13010-111',
+  telefone: '(19) 3232-1000',
+  email: 'CONTATO@GAMA.COM.BR',
+  consultadoEm: '2026-09-22T12:00:00.000Z',
+  fonte: 'Receita Federal (via BrasilAPI)',
+}
+
+const CORREIOS: DadosCep = {
+  cep: '01310100',
+  logradouro: 'Avenida Paulista',
+  bairro: 'Bela Vista',
+  cidade: 'São Paulo',
+  uf: 'SP',
+  enderecoCompleto: 'Avenida Paulista, Bela Vista, São Paulo/SP',
+  fonte: 'ViaCEP (via BrasilAPI)',
+}
 
 const regiao = (nome: string) => screen.getByRole('region', { name: `Licença ${nome}` })
 const dialogo = () => screen.getByRole('dialog')
@@ -101,7 +143,25 @@ beforeEach(() => {
   chamadas.criar.mockResolvedValue(undefined)
   chamadas.atualizar.mockResolvedValue(undefined)
   chamadas.excluir.mockResolvedValue(undefined)
+  chamadas.cnpj.mockResolvedValue(RECEITA)
+  chamadas.cep.mockResolvedValue(CORREIOS)
 })
+
+/** Preenche o primeiro administrador — a parte que não muda entre os testes. */
+async function preencherAdmin(
+  user: ReturnType<typeof userEvent.setup>,
+  d: ReturnType<typeof within>,
+  {
+    email = 'paula@gama.com.br',
+    senha = 'senha-segura',
+    repetir = senha,
+  }: { email?: string; senha?: string; repetir?: string } = {},
+) {
+  await user.type(d.getByRole('textbox', { name: /^Nome$/ }), 'Paula Souza')
+  await user.type(d.getByRole('textbox', { name: /^E-mail de acesso/ }), email)
+  await user.type(d.getByLabelText(/^Senha inicial/), senha)
+  if (repetir) await user.type(d.getByLabelText(/^Repetir senha/), repetir)
+}
 
 afterEach(cleanup)
 
@@ -118,7 +178,7 @@ describe('Licenças — o que aparece', () => {
     expect(principal.getByText('Dinoel Ribeiro')).toBeTruthy()
 
     const alfa = within(regiao('Laboratório Alfa'))
-    expect(alfa.getByText(/CNPJ 12\.345\.678\/0001-90/)).toBeTruthy()
+    expect(alfa.getByText(/CNPJ 12\.345\.678\/0001-95 · Campinas\/SP · Criada em/)).toBeTruthy()
     expect(alfa.getByText(/carlos@alfa\.com\.br/)).toBeTruthy()
 
     expect(within(regiao('Beta Engenharia')).getByText('Suspensa')).toBeTruthy()
@@ -159,10 +219,8 @@ describe('Licenças — criar', () => {
     await user.click(screen.getByRole('button', { name: 'Nova licença' }))
     const d = within(dialogo())
     await user.type(d.getByRole('textbox', { name: /^Nome da empresa/ }), 'Gama Consultoria')
-    await user.type(d.getByRole('textbox', { name: /^CNPJ/ }), '11222333000181')
-    await user.type(d.getByRole('textbox', { name: /^Nome$/ }), 'Paula Souza')
-    await user.type(d.getByRole('textbox', { name: /^E-mail/ }), 'paula@gama.com.br')
-    await user.type(d.getByLabelText(/^Senha inicial/), 'senha-segura')
+    await user.type(d.getByRole('textbox', { name: /^CPF ou CNPJ/ }), '11222333000181')
+    await preencherAdmin(user, d)
     await user.click(d.getByRole('button', { name: 'Criar licença' }))
 
     await waitFor(() =>
@@ -175,6 +233,131 @@ describe('Licenças — criar', () => {
     expect(await screen.findByText(/Licença Gama Consultoria criada/)).toBeTruthy()
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(chamadas.listar).toHaveBeenCalledTimes(2)
+    // Nome já digitado: a Receita só é consultada pelo botão.
+    expect(chamadas.cnpj).not.toHaveBeenCalled()
+  })
+
+  it('com o CNPJ digitado primeiro, traz da Receita o nome, o contato e o endereço', async () => {
+    const user = userEvent.setup()
+    await montar()
+
+    await user.click(screen.getByRole('button', { name: 'Nova licença' }))
+    const d = within(dialogo())
+    const documento = d.getByRole('textbox', { name: /^CPF ou CNPJ/ })
+    await user.type(documento, '11222333000181')
+
+    expect((documento as HTMLInputElement).value).toBe('11.222.333/0001-81')
+    await waitFor(() => expect(chamadas.cnpj).toHaveBeenCalledWith('11222333000181'))
+    await waitFor(() =>
+      expect((d.getByRole('textbox', { name: /^Nome da empresa/ }) as HTMLInputElement).value).toBe(
+        'GAMA CONSULTORIA LTDA',
+      ),
+    )
+    const valor = (nome: RegExp) => (d.getByRole('textbox', { name: nome }) as HTMLInputElement).value
+    expect(valor(/^Nome fantasia/)).toBe('Gama')
+    expect(valor(/^Telefone/)).toBe('(19) 3232-1000')
+    expect(valor(/^E-mail da empresa/)).toBe('contato@gama.com.br')
+    expect(valor(/^CEP/)).toBe('13010-111')
+    expect(valor(/^Endereço/)).toBe('Rua das Flores')
+    expect(valor(/^Número/)).toBe('120')
+    expect(valor(/^Complemento/)).toBe('Sala 4')
+    expect(valor(/^Bairro/)).toBe('Centro')
+    expect(valor(/^Cidade/)).toBe('Campinas')
+    expect((d.getByRole('combobox', { name: /^UF/ }) as HTMLSelectElement).value).toBe('SP')
+    // O CEP que veio da Receita não dispara outra consulta.
+    expect(chamadas.cep).not.toHaveBeenCalled()
+
+    await preencherAdmin(user, d)
+    await user.click(d.getByRole('button', { name: 'Criar licença' }))
+
+    await waitFor(() =>
+      expect(chamadas.criar).toHaveBeenCalledWith({
+        nome: 'GAMA CONSULTORIA LTDA',
+        documento: '11.222.333/0001-81',
+        nomeFantasia: 'Gama',
+        email: 'contato@gama.com.br',
+        telefone: '(19) 3232-1000',
+        cep: '13010-111',
+        endereco: 'Rua das Flores',
+        numero: '120',
+        complemento: 'Sala 4',
+        bairro: 'Centro',
+        cidade: 'Campinas',
+        uf: 'SP',
+        admin: { nome: 'Paula Souza', email: 'paula@gama.com.br', senha: 'senha-segura' },
+      }),
+    )
+  })
+
+  it('o CEP vem antes da rua e preenche o endereço sozinho', async () => {
+    const user = userEvent.setup()
+    await montar()
+
+    await user.click(screen.getByRole('button', { name: 'Nova licença' }))
+    const d = within(dialogo())
+    const cep = d.getByRole('textbox', { name: /^CEP/ })
+    const rua = d.getByRole('textbox', { name: /^Endereço/ })
+    expect(cep.compareDocumentPosition(rua) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    await user.type(cep, '01310100')
+
+    expect((cep as HTMLInputElement).value).toBe('01310-100')
+    await waitFor(() => expect((rua as HTMLInputElement).value).toBe('Avenida Paulista'))
+    expect(chamadas.cep).toHaveBeenCalledWith('01310100')
+    const valor = (nome: RegExp) => (d.getByRole('textbox', { name: nome }) as HTMLInputElement).value
+    expect(valor(/^Bairro/)).toBe('Bela Vista')
+    expect(valor(/^Cidade/)).toBe('São Paulo')
+    expect((d.getByRole('combobox', { name: /^UF/ }) as HTMLSelectElement).value).toBe('SP')
+    // O que sobra digitar é o número: o cursor já está lá.
+    expect(document.activeElement).toBe(d.getByRole('textbox', { name: /^Número/ }))
+  })
+
+  it('reconhece o CPF na hora e troca o rótulo do nome', async () => {
+    const user = userEvent.setup()
+    await montar()
+
+    await user.click(screen.getByRole('button', { name: 'Nova licença' }))
+    const d = within(dialogo())
+    const documento = d.getByRole('textbox', { name: /^CPF ou CNPJ/ })
+    await user.type(documento, '52998224725')
+
+    expect((documento as HTMLInputElement).value).toBe('529.982.247-25')
+    expect(d.getByText(/Não há consulta pública de CPF/)).toBeTruthy()
+    expect(d.getByRole('textbox', { name: /^Nome completo/ })).toBeTruthy()
+    expect(chamadas.cnpj).not.toHaveBeenCalled()
+  })
+
+  it('recusa CNPJ com dígito errado antes de chamar o servidor', async () => {
+    const user = userEvent.setup()
+    await montar()
+
+    await user.click(screen.getByRole('button', { name: 'Nova licença' }))
+    const d = within(dialogo())
+    await user.type(d.getByRole('textbox', { name: /^Nome da empresa/ }), 'Gama Consultoria')
+    await user.type(d.getByRole('textbox', { name: /^CPF ou CNPJ/ }), '11222333000180')
+    expect(d.getByRole('textbox', { name: /^CPF ou CNPJ/ }).getAttribute('aria-invalid')).toBe('true')
+    await preencherAdmin(user, d)
+    await user.click(d.getByRole('button', { name: 'Criar licença' }))
+
+    expect(d.getByRole('alert').textContent).toMatch(/CNPJ/)
+    expect(chamadas.criar).not.toHaveBeenCalled()
+  })
+
+  it('pede a senha repetida e recusa quando não confere', async () => {
+    const user = userEvent.setup()
+    await montar()
+
+    await user.click(screen.getByRole('button', { name: 'Nova licença' }))
+    const d = within(dialogo())
+    await user.type(d.getByRole('textbox', { name: /^Nome da empresa/ }), 'Gama Consultoria')
+    await preencherAdmin(user, d, { senha: 'senha-segura', repetir: 'senha-errada' })
+
+    expect(d.getByText('As senhas não conferem.')).toBeTruthy()
+    expect(d.getByLabelText(/^Repetir senha/).getAttribute('aria-invalid')).toBe('true')
+    await user.click(d.getByRole('button', { name: 'Criar licença' }))
+
+    expect(d.getByRole('alert').textContent).toContain('As senhas não conferem')
+    expect(chamadas.criar).not.toHaveBeenCalled()
   })
 
   it('recusa senha curta antes de chamar o servidor', async () => {
@@ -184,9 +367,8 @@ describe('Licenças — criar', () => {
     await user.click(screen.getByRole('button', { name: 'Nova licença' }))
     const d = within(dialogo())
     await user.type(d.getByRole('textbox', { name: /^Nome da empresa/ }), 'Gama Consultoria')
-    await user.type(d.getByRole('textbox', { name: /^Nome$/ }), 'Paula Souza')
-    await user.type(d.getByRole('textbox', { name: /^E-mail/ }), 'paula@gama.com.br')
-    await user.type(d.getByLabelText(/^Senha inicial/), '123')
+    await preencherAdmin(user, d, { senha: '123' })
+    expect(d.getByText(/Faltam 5 caracteres/)).toBeTruthy()
     await user.click(d.getByRole('button', { name: 'Criar licença' }))
 
     expect(d.getByRole('alert').textContent).toContain('pelo menos 8 caracteres')
@@ -203,9 +385,7 @@ describe('Licenças — criar', () => {
     await user.click(screen.getByRole('button', { name: 'Nova licença' }))
     const d = within(dialogo())
     await user.type(d.getByRole('textbox', { name: /^Nome da empresa/ }), 'Gama Consultoria')
-    await user.type(d.getByRole('textbox', { name: /^Nome$/ }), 'Paula Souza')
-    await user.type(d.getByRole('textbox', { name: /^E-mail/ }), 'carlos@alfa.com.br')
-    await user.type(d.getByLabelText(/^Senha inicial/), 'senha-segura')
+    await preencherAdmin(user, d, { email: 'carlos@alfa.com.br' })
     await user.click(d.getByRole('button', { name: 'Criar licença' }))
 
     expect((await d.findByRole('alert')).textContent).toContain('Já existe um usuário com este e-mail')
@@ -220,14 +400,20 @@ describe('Licenças — editar, suspender e reativar', () => {
 
     await user.click(within(regiao('Laboratório Alfa')).getByRole('button', { name: 'Editar' }))
     const d = within(dialogo())
+    expect((d.getByRole('textbox', { name: /^Cidade/ }) as HTMLInputElement).value).toBe('Campinas')
     const nome = d.getByRole('textbox', { name: /^Nome da empresa/ })
     await user.clear(nome)
     await user.type(nome, 'Alfa Segurança')
-    await user.clear(d.getByRole('textbox', { name: /^CNPJ/ }))
+    await user.clear(d.getByRole('textbox', { name: /^CPF ou CNPJ/ }))
+    await user.clear(d.getByRole('textbox', { name: /^Cidade/ }))
     await user.click(d.getByRole('button', { name: 'Salvar' }))
 
+    // Vazio vai como '' — é o que o servidor entende como "apagar".
     await waitFor(() =>
-      expect(chamadas.atualizar).toHaveBeenCalledWith('lic-2', { nome: 'Alfa Segurança', documento: '' }),
+      expect(chamadas.atualizar).toHaveBeenCalledWith(
+        'lic-2',
+        expect.objectContaining({ nome: 'Alfa Segurança', documento: '', cidade: '', uf: 'SP' }),
+      ),
     )
     expect(await screen.findByText('Licença atualizada.')).toBeTruthy()
   })

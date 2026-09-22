@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -38,6 +38,7 @@ import { BibliotecaDrawer } from '@/components/BibliotecaDrawer'
 import { BuscaProcesso } from '@/components/BuscaProcesso'
 import { CampoHonorarios } from '@/components/CampoHonorarios'
 import type { OrigemConsulta } from '@/components/BuscaCnpj'
+import { CampoCep } from '@/components/CampoCep'
 import { DocumentoPreview } from '@/components/DocumentoPreview'
 import { FolhasA4 } from '@/components/FolhasA4'
 import { AgenteNr15Fields } from '@/components/AgenteNr15Fields'
@@ -79,6 +80,7 @@ import {
 } from '@/content/textosPadrao'
 import { erroCas } from '@/lib/cas'
 import { patchDoProcesso } from '@/lib/consultas'
+import { cpfValido, limparDocumento, mascararCpf } from '@/lib/cadastro'
 import {
   LIMITE_FOTOS_POR_ENVIO,
   recusaPorQuantidade,
@@ -480,7 +482,7 @@ export default function PericiaEditor() {
    */
   const [alvoFoco, setAlvoFoco] = useState<string | null>(null)
   const [secaoFotoAtual, setSecaoFotoAtual] = useState<SecaoFoto>('ambiente')
-  const [consultandoCep, setConsultandoCep] = useState(false)
+  const idNumeroVistoria = `${useId()}-numero-vistoria`
 
   // A perícia do store entra na tela ao carregar e ao trocar de perícia pela
   // rota — depois disso, quem manda é a tela. Adotar TODA mudança do store
@@ -565,25 +567,6 @@ export default function PericiaEditor() {
         ? 'Vara, comarca e data de ajuizamento atualizadas com os dados do CNJ.'
         : 'Vara, comarca e data de ajuizamento preenchidas pela base pública do CNJ.',
     )
-  }
-
-  async function buscarCepDaVistoria() {
-    const cep = p.cepVistoria?.replace(/\D/g, '') ?? ''
-    if (cep.length !== 8) {
-      toast('Informe os 8 dígitos do CEP da vistoria.', 'error')
-      return
-    }
-
-    setConsultandoCep(true)
-    try {
-      const dados = await api.consultas.cep(cep)
-      set({ cepVistoria: dados.cep, localVistoria: dados.enderecoCompleto })
-      toast('Endereço da vistoria preenchido pela consulta de CEP.')
-    } catch (erro) {
-      toast(erro instanceof Error ? erro.message : 'Não foi possível consultar o CEP.', 'error')
-    } finally {
-      setConsultandoCep(false)
-    }
   }
 
   const setT = (patch: Partial<Pericia['tecnico']>) =>
@@ -1402,8 +1385,15 @@ export default function PericiaEditor() {
               />
               <Input
                 label="CPF"
+                inputMode="numeric"
+                placeholder="000.000.000-00"
                 value={p.cpfReclamante}
-                onChange={(e) => set({ cpfReclamante: e.target.value })}
+                onChange={(e) => set({ cpfReclamante: mascararCpf(e.target.value) })}
+                error={
+                  limparDocumento(p.cpfReclamante).length === 11 && !cpfValido(p.cpfReclamante)
+                    ? 'CPF inválido: o dígito verificador não confere.'
+                    : undefined
+                }
               />
               <Input
                 label="Função Inicial"
@@ -1715,29 +1705,15 @@ export default function PericiaEditor() {
                 value={p.horaFimVistoria ?? ''}
                 onChange={(e) => set({ horaFimVistoria: e.target.value })}
               />
-              <Input
+              {/* O CEP antes do endereço: fechou os 8 dígitos, o endereço vem sozinho. */}
+              <CampoCep
                 label="CEP da vistoria"
-                value={p.cepVistoria ?? ''}
-                onChange={(e) => set({ cepVistoria: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    void buscarCepDaVistoria()
-                  }
-                }}
-                placeholder="00000-000"
-                maxLength={9}
+                className="sm:col-span-2"
+                valor={p.cepVistoria ?? ''}
+                onChange={(cepVistoria) => set({ cepVistoria })}
+                onEndereco={(dados) => set({ localVistoria: dados.enderecoCompleto })}
+                focarAoPreencher={idNumeroVistoria}
               />
-              <div className="flex items-end">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  disabled={consultandoCep}
-                  onClick={() => void buscarCepDaVistoria()}
-                >
-                  {consultandoCep ? 'Consultando...' : 'Buscar CEP'}
-                </Button>
-              </div>
               <Input
                 label="Endereço completo da vistoria"
                 className="sm:col-span-2"
@@ -1747,6 +1723,7 @@ export default function PericiaEditor() {
                 hint="Preenchido pelo CEP e editável para acrescentar complemento."
               />
               <Input
+                id={idNumeroVistoria}
                 label="Número"
                 value={p.numeroVistoria ?? ''}
                 onChange={(e) => set({ numeroVistoria: e.target.value })}

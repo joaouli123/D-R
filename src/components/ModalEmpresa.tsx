@@ -1,10 +1,18 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Button, Input, Modal, Select, useToast } from '@/components/ui'
 import { BuscaCnpj, type OrigemConsulta } from '@/components/BuscaCnpj'
+import { CampoCep } from '@/components/CampoCep'
 import { useApp } from '@/store/AppStore'
 import type { DadosCnpj } from '@/services/api'
 import type { Empresa } from '@/types'
-import { patchDaReceita } from '@/lib/consultas'
+import {
+  cpfValido,
+  emailValido,
+  limparDocumento,
+  mascararTelefone,
+  problemaNoDocumento,
+} from '@/lib/cadastro'
+import { enderecoDoCep, patchDaReceita } from '@/lib/consultas'
 import { uid, UFS } from '@/lib/utils'
 
 // ============================================================
@@ -54,6 +62,10 @@ export function ModalEmpresa({ inicial, titulo, subtitulo, onFechar, onSalvo }: 
   const toast = useToast()
   const [empresa, setEmpresa] = useState<Empresa>(inicial)
   const [salvando, setSalvando] = useState(false)
+  const idNumero = `${useId()}-numero`
+  // Reclamada pessoa física (empregador doméstico, produtor rural): o mesmo
+  // campo aceita o CPF, e a razão social vira o nome da pessoa.
+  const pessoaFisica = cpfValido(empresa.cnpj)
 
   const set = (patch: Partial<Empresa>) => setEmpresa((e) => ({ ...e, ...patch }))
 
@@ -76,7 +88,21 @@ export function ModalEmpresa({ inicial, titulo, subtitulo, onFechar, onSalvo }: 
 
   async function salvar() {
     if (!empresa.razaoSocial.trim() || !empresa.cnpj.trim()) {
-      toast('Razão social e CNPJ são obrigatórios.', 'error')
+      toast(`${pessoaFisica ? 'Nome' : 'Razão social'} e CPF/CNPJ são obrigatórios.`, 'error')
+      return
+    }
+    // Número que já estava gravado não é reconferido: cadastro antigo com
+    // dígito errado segue editável. Número novo ou trocado, sim.
+    const problema =
+      limparDocumento(empresa.cnpj) !== limparDocumento(inicial.cnpj)
+        ? problemaNoDocumento(empresa.cnpj)
+        : null
+    if (problema) {
+      toast(problema, 'error')
+      return
+    }
+    if (empresa.contatoEmail?.trim() && !emailValido(empresa.contatoEmail)) {
+      toast('E-mail de contato inválido.', 'error')
       return
     }
 
@@ -119,11 +145,12 @@ export function ModalEmpresa({ inicial, titulo, subtitulo, onFechar, onSalvo }: 
           onChange={(cnpj) => set({ cnpj })}
           onDados={aplicarDadosDaReceita}
           autoBuscar={!empresa.razaoSocial.trim()}
+          aceitarCpf
         />
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
-            label="Razão social"
+            label={pessoaFisica ? 'Nome completo' : 'Razão social'}
             required
             value={empresa.razaoSocial}
             onChange={(e) => set({ razaoSocial: e.target.value })}
@@ -158,38 +185,56 @@ export function ModalEmpresa({ inicial, titulo, subtitulo, onFechar, onSalvo }: 
             <option value="3">3</option>
             <option value="4">4</option>
           </Select>
-          <Input
-            label="Ramo de atividade"
-            className="sm:col-span-2"
-            value={empresa.ramoAtividade}
-            onChange={(e) => set({ ramoAtividade: e.target.value })}
-            hint="Texto reaproveitado na seção 'Descrição da Empresa' do parecer."
-          />
+          <div className="sm:col-span-2">
+            <Input
+              label="Ramo de atividade"
+              value={empresa.ramoAtividade}
+              onChange={(e) => set({ ramoAtividade: e.target.value })}
+              hint="Texto reaproveitado na seção 'Descrição da Empresa' do parecer."
+            />
+          </div>
         </div>
 
         <div className="border-t border-ink-100 pt-4">
           <p className="section-title mb-3">Endereço</p>
+          {/* O CEP antes da rua: fechou os 8 dígitos, o endereço vem sozinho. */}
           <div className="grid gap-4 sm:grid-cols-6">
-            <Input
-              label="Logradouro"
-              className="sm:col-span-4"
-              value={empresa.endereco}
-              onChange={(e) => set({ endereco: e.target.value })}
-            />
-            <Input label="Número" value={empresa.numero} onChange={(e) => set({ numero: e.target.value })} />
-            <Input label="CEP" value={empresa.cep} onChange={(e) => set({ cep: e.target.value })} />
-            <Input
-              label="Bairro"
+            <CampoCep
               className="sm:col-span-2"
-              value={empresa.bairro}
-              onChange={(e) => set({ bairro: e.target.value })}
+              valor={empresa.cep ?? ''}
+              onChange={(cep) => set({ cep })}
+              onEndereco={(dados) => set(enderecoDoCep(dados))}
+              focarAoPreencher={idNumero}
             />
-            <Input
-              label="Cidade"
-              className="sm:col-span-3"
-              value={empresa.cidade}
-              onChange={(e) => set({ cidade: e.target.value })}
-            />
+            <div className="sm:col-span-4">
+              <Input
+                label="Logradouro"
+                value={empresa.endereco}
+                onChange={(e) => set({ endereco: e.target.value })}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Input
+                id={idNumero}
+                label="Número"
+                value={empresa.numero}
+                onChange={(e) => set({ numero: e.target.value })}
+              />
+            </div>
+            <div className="sm:col-span-4">
+              <Input
+                label="Complemento"
+                placeholder="Sala, bloco, galpão…"
+                value={empresa.complemento ?? ''}
+                onChange={(e) => set({ complemento: e.target.value })}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Input label="Bairro" value={empresa.bairro} onChange={(e) => set({ bairro: e.target.value })} />
+            </div>
+            <div className="sm:col-span-3">
+              <Input label="Cidade" value={empresa.cidade} onChange={(e) => set({ cidade: e.target.value })} />
+            </div>
             <Select label="UF" value={empresa.uf} onChange={(e) => set({ uf: e.target.value })}>
               {UFS.map((uf) => (
                 <option key={uf}>{uf}</option>
@@ -214,8 +259,11 @@ export function ModalEmpresa({ inicial, titulo, subtitulo, onFechar, onSalvo }: 
             />
             <Input
               label="Telefone"
+              type="tel"
+              inputMode="tel"
+              placeholder="(00) 00000-0000"
               value={empresa.contatoTelefone}
-              onChange={(e) => set({ contatoTelefone: e.target.value })}
+              onChange={(e) => set({ contatoTelefone: mascararTelefone(e.target.value) })}
             />
           </div>
         </div>

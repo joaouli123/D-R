@@ -4,6 +4,8 @@
 // de um grau de insalubridade divirja entre os dois formatos.
 // ============================================================
 
+import { tipoDoDocumento } from './documento-fiscal.js'
+
 /**
  * Identidade visual, espelhando tailwind.config.js do frontend.
  * O documento gerado tem de sair com a mesma marca da tela, então
@@ -347,11 +349,19 @@ export function intervaloDoPeriodo(periodo: PeriodoAvaliacaoDocumento): string {
 // Formatam apenas quando a contagem de dígitos bate; caso contrário devolvem
 // o valor original limpo (ou "—"), para nunca inventar um número inválido.
 
-/** "12345678000190" → "12.345.678/0001-90" */
+/** "12345678000190" → "12.345.678/0001-90"; vale também para o CNPJ alfanumérico. */
 export function mascaraCnpj(valor?: string | null): string {
-  const d = (valor ?? '').replace(/\D/g, '')
-  if (d.length !== 14) return (valor ?? '').trim() || '—'
-  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
+  const s = (valor ?? '').toUpperCase().replace(/[^0-9A-Z]/g, '')
+  if (!/^[0-9A-Z]{12}\d{2}$/.test(s)) return (valor ?? '').trim() || '—'
+  return `${s.slice(0, 2)}.${s.slice(2, 5)}.${s.slice(5, 8)}/${s.slice(8, 12)}-${s.slice(12)}`
+}
+
+/**
+ * "CNPJ 12.345.678/0001-90" ou "CPF 529.982.247-25": a reclamada pode ser
+ * pessoa física, e o documento sai com o rótulo que corresponde ao número.
+ */
+export function documentoDaEmpresa(valor?: string | null): string {
+  return tipoDoDocumento(valor) === 'cpf' ? `CPF ${mascaraCpf(valor)}` : `CNPJ ${mascaraCnpj(valor)}`
 }
 
 /** "12345678900" → "123.456.789-00" */

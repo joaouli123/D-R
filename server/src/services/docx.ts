@@ -45,7 +45,7 @@ import {
   fotosImpressasEmOrdem,
   intervaloDoPeriodo,
   linhasDoBloco,
-  mascaraCnpj,
+  documentoDaEmpresa,
   mascaraCpf,
   montarApresentacaoAgente,
   numeradorDeSecoes,
@@ -780,8 +780,8 @@ async function docParecer(
   const fichasDaCapa: [string, string][] = [
     ['Processo nº', pericia.numeroProcesso],
     ['Reclamante', `${pericia.reclamante}${pericia.cpfReclamante ? ` — CPF: ${mascaraCpf(pericia.cpfReclamante)}` : ''}`],
-    ['Reclamada', principal ? `${principal.razaoSocial} — CNPJ ${mascaraCnpj(principal.cnpj)}` : '—'],
-    ...solidarias.map((e): [string, string] => ['Reclamada', `${e.razaoSocial} — CNPJ ${mascaraCnpj(e.cnpj)}`]),
+    ['Reclamada', principal ? `${principal.razaoSocial} — ${documentoDaEmpresa(principal.cnpj)}` : '—'],
+    ...solidarias.map((e): [string, string] => ['Reclamada', `${e.razaoSocial} — ${documentoDaEmpresa(e.cnpj)}`]),
   ]
 
   // Folha de rosto (pedido do perito): a identificação desce para perto do

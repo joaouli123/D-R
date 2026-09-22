@@ -40,8 +40,19 @@ datasource db {
 model Licenca {
   id           String   @id @default(uuid())
   nome         String
-  /// CNPJ ou CPF da empresa cliente, só para identificação.
+  /// CNPJ ou CPF da empresa cliente, como digitado (com máscara).
   documento    String?
+  /// Cadastro do cliente: vem da Receita pelo CNPJ e do CEP pelo endereço.
+  nomeFantasia String?
+  email        String?
+  telefone     String?
+  cep          String?
+  endereco     String?
+  numero       String?
+  complemento  String?
+  bairro       String?
+  cidade       String?
+  uf           String?
   /// Suspensa (`false`), ninguém da licença entra — os dados ficam intactos.
   ativa        Boolean  @default(true)
   criadoEm     DateTime @default(now())
