@@ -240,12 +240,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       persistir: (id: string) => Promise<unknown>,
     ) {
       return async (id: string): Promise<void> => {
-        const anterior = lista
+        const indice = lista.findIndex((x) => x.id === id)
+        const removido = lista[indice]
         setter((atual) => atual.filter((x) => x.id !== id))
         try {
           await persistir(id)
         } catch (e) {
-          setter(anterior)
+          // Devolve só o item que falhou. Restaurar a lista inteira de antes
+          // ressuscitaria o que outra exclusão, feita em seguida, já apagou
+          // no servidor.
+          if (removido) {
+            setter((atual) => {
+              if (atual.some((x) => x.id === id)) return atual
+              // Volta para antes de quem vinha logo depois dele, para não pular de lugar.
+              const seguinte = lista.slice(indice + 1).find((x) => atual.some((y) => y.id === x.id))
+              const posicao = seguinte ? atual.findIndex((y) => y.id === seguinte.id) : atual.length
+              return [...atual.slice(0, posicao), removido, ...atual.slice(posicao)]
+            })
+          }
           throw e
         }
       }

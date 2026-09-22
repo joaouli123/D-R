@@ -49,6 +49,23 @@ export default function Pericias() {
 
   const contar = (s: StatusPericia) => pericias.filter((p) => p.status === s).length
 
+  /**
+   * Só diz "excluída" depois que o servidor confirma. Antes o aviso saía
+   * na hora e a falha era engolida: a perícia voltava para a lista, as
+   * empresas continuavam presas a ela e o perito jurava que tinha apagado.
+   */
+  async function excluir() {
+    if (!confirmar) return
+    try {
+      await removerPericia(confirmar.id)
+      toast('Perícia excluída.', 'info')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Não foi possível excluir a perícia.', 'error')
+    } finally {
+      setConfirmar(null)
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -76,6 +93,7 @@ export default function Pericias() {
             { value: 'em_andamento', label: 'Em andamento', count: contar('em_andamento') },
             { value: 'rascunho', label: 'Rascunhos', count: contar('rascunho') },
             { value: 'concluida', label: 'Concluídas', count: contar('concluida') },
+            { value: 'entregue', label: 'Entregues', count: contar('entregue') },
           ]}
         />
         <div className="relative p-3">
@@ -198,11 +216,7 @@ export default function Pericias() {
             </Button>
             <Button
               variant="danger"
-              onClick={() => {
-                if (confirmar) removerPericia(confirmar.id)
-                toast('Perícia excluída.', 'info')
-                setConfirmar(null)
-              }}
+              onClick={() => void excluir()}
             >
               Excluir
             </Button>

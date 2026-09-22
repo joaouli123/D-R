@@ -6,7 +6,14 @@ import { useToast } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { empresaVazia, ModalEmpresa } from '@/components/ModalEmpresa'
 import { useApp } from '@/store/AppStore'
-import type { Empresa } from '@/types'
+import type { Empresa, StatusPericia } from '@/types'
+
+const STATUS: Record<StatusPericia, string> = {
+  rascunho: 'Rascunho',
+  em_andamento: 'Em andamento',
+  concluida: 'Concluída',
+  entregue: 'Entregue',
+}
 
 // ============================================================
 // MÓDULO B — Cadastro de Empresas (reutilizável entre processos)
@@ -16,12 +23,15 @@ import type { Empresa } from '@/types'
 // ============================================================
 
 export default function Clientes() {
-  const { empresas, removerEmpresa, limparEmpresas, pericias } = useApp()
+  const { empresas, removerEmpresa, limparEmpresas, pericias, removerPericia } = useApp()
   const toast = useToast()
   const navigate = useNavigate()
   const [busca, setBusca] = useState('')
   const [editando, setEditando] = useState<Empresa | null>(null)
   const [confirmar, setConfirmar] = useState<Empresa | null>(null)
+  /** Na exclusão de uma empresa em processo: apagar também os processos que a citam. */
+  const [levarProcessos, setLevarProcessos] = useState(false)
+  const [excluindo, setExcluindo] = useState(false)
   const [confirmarLimpeza, setConfirmarLimpeza] = useState(false)
   const [limpando, setLimpando] = useState(false)
   const [levarRascunhos, setLevarRascunhos] = useState(false)
@@ -37,8 +47,9 @@ export default function Clientes() {
     )
   }, [empresas, busca])
 
-  const usosDe = (id: string) =>
-    pericias.filter((p) => p.reclamadas.some((r) => r.empresaId === id)).length
+  const processosDe = (id: string) =>
+    pericias.filter((p) => p.reclamadas.some((r) => r.empresaId === id))
+  const usosDe = (id: string) => processosDe(id).length
 
   /**
    * As perícias que seguram algum cadastro. Dizer só "3 empresas serão
@@ -53,18 +64,42 @@ export default function Clientes() {
   const rascunhosPrendendo = prendendo.filter((p) => p.status === 'rascunho')
   const presas = empresas.filter((e) => usosDe(e.id) > 0)
 
+  function fecharExclusao() {
+    setConfirmar(null)
+    setLevarProcessos(false)
+  }
+
+  /**
+   * A empresa citada em processo só sai depois dele. Quando o perito marca
+   * que os processos vão junto, eles saem primeiro, um por vez — se um
+   * falhar, a empresa fica, e o aviso diz qual foi o problema.
+   */
   async function excluir() {
     if (!confirmar) return
+    const processos = processosDe(confirmar.id)
+    setExcluindo(true)
     try {
+      if (levarProcessos) {
+        for (const p of processos) await removerPericia(p.id)
+      }
       await removerEmpresa(confirmar.id)
-      toast('Empresa excluída.', 'info')
-      setConfirmar(null)
+      toast(
+        levarProcessos && processos.length > 0
+          ? `Empresa excluída, com ${processos.length === 1 ? 'o processo que a citava' : `os ${processos.length} processos que a citavam`}.`
+          : 'Empresa excluída.',
+        'info',
+      )
     } catch (e) {
       // O servidor recusa excluir empresa citada como reclamada.
       toast(e instanceof Error ? e.message : 'Não foi possível excluir.', 'error')
-      setConfirmar(null)
+    } finally {
+      setExcluindo(false)
+      fecharExclusao()
     }
   }
+
+  const processosDoConfirmar = confirmar ? processosDe(confirmar.id) : []
+  const presaEmProcesso = processosDoConfirmar.length > 0
 
   /**
    * Apaga os cadastros de teste de uma vez, para começar a operação
@@ -282,16 +317,21 @@ export default function Clientes() {
 
       <Modal
         open={!!confirmar}
-        onClose={() => setConfirmar(null)}
+        onClose={() => !excluindo && fecharExclusao()}
         title="Excluir empresa"
         size="sm"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setConfirmar(null)}>
+            <Button variant="ghost" disabled={excluindo} onClick={fecharExclusao}>
               Cancelar
             </Button>
-            <Button variant="danger" onClick={() => void excluir()}>
-              Excluir
+            {/* Presa a processo, o servidor recusaria: o botão espera a escolha. */}
+            <Button
+              variant="danger"
+              disabled={excluindo || (presaEmProcesso && !levarProcessos)}
+              onClick={() => void excluir()}
+            >
+              {excluindo ? 'Excluindo…' : 'Excluir'}
             </Button>
           </>
         }
@@ -299,12 +339,46 @@ export default function Clientes() {
         <p className="text-sm text-ink-600">
           Deseja realmente excluir <strong>{confirmar?.razaoSocial}</strong>?
         </p>
-        {confirmar && usosDe(confirmar.id) > 0 && (
-          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-[13px] text-amber-800">
-            Esta empresa é reclamada em {usosDe(confirmar.id)}{' '}
-            {usosDe(confirmar.id) === 1 ? 'processo' : 'processos'} e não poderá ser excluída — um
-            parecer já emitido não pode perder a identificação da parte.
-          </p>
+        {presaEmProcesso && (
+          <>
+            {/*
+              Dizer só "reclamada em 1 processo" deixava o perito procurando:
+              ele apagava um processo, a empresa continuava presa a outro e
+              não havia como saber qual. Aqui o processo vem pelo nome.
+            */}
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-[13px] text-amber-800">
+              <p>
+                Esta empresa é reclamada em {processosDoConfirmar.length}{' '}
+                {processosDoConfirmar.length === 1 ? 'processo' : 'processos'} e só pode ser
+                excluída junto com {processosDoConfirmar.length === 1 ? 'ele' : 'eles'} — um
+                parecer não pode perder a identificação da parte.
+              </p>
+              <ul className="mt-2 space-y-1">
+                {processosDoConfirmar.map((p) => (
+                  <li key={p.id} className="flex flex-wrap items-baseline gap-x-1.5">
+                    <span className="font-medium">{p.reclamante || '(sem reclamante)'}</span>
+                    <span className="font-mono text-[12px] text-amber-700">
+                      {p.numeroProcesso || '(sem número)'}
+                    </span>
+                    <Badge tone="amber">{STATUS[p.status]}</Badge>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="mt-3 border-t border-ink-100 pt-3">
+              <Checkbox
+                checked={levarProcessos}
+                disabled={excluindo}
+                onChange={(evento) => setLevarProcessos(evento.target.checked)}
+                label={
+                  processosDoConfirmar.length === 1
+                    ? 'Excluir também este processo'
+                    : `Excluir também estes ${processosDoConfirmar.length} processos`
+                }
+                description="O processo sai de Perícias, com fotos e participantes. Documentos já gerados continuam no histórico."
+              />
+            </div>
+          </>
         )}
       </Modal>
 

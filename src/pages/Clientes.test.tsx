@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -22,6 +22,7 @@ vi.mock('@/components/layout/AppLayout', () => ({
 
 const removerEmpresa = vi.fn()
 const limparEmpresas = vi.fn()
+const removerPericia = vi.fn()
 
 const empresa = (id: string, razaoSocial: string): Empresa => ({
   id,
@@ -49,6 +50,7 @@ function montar(empresas: Empresa[], pericias: Pericia[] = []) {
     pericias,
     removerEmpresa,
     limparEmpresas,
+    removerPericia,
   } as unknown as ReturnType<typeof useApp>)
 
   render(
@@ -63,6 +65,7 @@ function montar(empresas: Empresa[], pericias: Pericia[] = []) {
 beforeEach(() => {
   removerEmpresa.mockReset()
   limparEmpresas.mockReset()
+  removerPericia.mockReset()
 })
 
 afterEach(cleanup)
@@ -165,5 +168,67 @@ describe('Clientes — limpeza dos cadastros de teste', () => {
 
     expect(await screen.findByText('Banco indisponível.')).toBeDefined()
     expect(screen.getByRole('button', { name: 'Apagar cadastros' })).toBeDefined()
+  })
+})
+
+describe('Clientes — excluir uma empresa presa a processo', () => {
+  /** Abre a janela de exclusão da única empresa da lista. */
+  async function abrirExclusao(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: 'Excluir' }))
+    return screen.getByRole('dialog')
+  }
+
+  it('sem processo, exclui direto', async () => {
+    const user = userEvent.setup()
+    removerEmpresa.mockResolvedValue(undefined)
+    montar([empresa('e1', 'ALFA LTDA')])
+
+    const janela = await abrirExclusao(user)
+    expect(within(janela).queryByRole('checkbox')).toBeNull()
+    await user.click(within(janela).getByRole('button', { name: 'Excluir' }))
+
+    expect(removerEmpresa).toHaveBeenCalledWith('e1')
+    expect(removerPericia).not.toHaveBeenCalled()
+    expect(await screen.findByText('Empresa excluída.')).toBeDefined()
+  })
+
+  it('nomeia o processo que prende a empresa e não deixa excluir às cegas', async () => {
+    const user = userEvent.setup()
+    montar([empresa('e1', 'ADZ INDUSTRIA LTDA')], [periciaCom('e1')])
+
+    const janela = await abrirExclusao(user)
+
+    expect(within(janela).getByText('FULANO DE TAL')).toBeDefined()
+    expect(within(janela).getByText('1000675-40.2026.5.02.0264')).toBeDefined()
+    expect(within(janela).getByText('Concluída')).toBeDefined()
+    expect(within(janela).getByRole('button', { name: 'Excluir' }).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('marcado, apaga o processo primeiro e depois a empresa', async () => {
+    const user = userEvent.setup()
+    const ordem: string[] = []
+    removerPericia.mockImplementation(async (id: string) => void ordem.push(`pericia:${id}`))
+    removerEmpresa.mockImplementation(async (id: string) => void ordem.push(`empresa:${id}`))
+    montar([empresa('e1', 'ADZ INDUSTRIA LTDA')], [periciaCom('e1')])
+
+    const janela = await abrirExclusao(user)
+    await user.click(within(janela).getByRole('checkbox', { name: /Excluir também este processo/ }))
+    await user.click(within(janela).getByRole('button', { name: 'Excluir' }))
+
+    expect(ordem).toEqual(['pericia:per-e1', 'empresa:e1'])
+    expect(await screen.findByText('Empresa excluída, com o processo que a citava.')).toBeDefined()
+  })
+
+  it('se o processo não sai, a empresa fica e o motivo aparece', async () => {
+    const user = userEvent.setup()
+    removerPericia.mockRejectedValue(new Error('Sessão expirada.'))
+    montar([empresa('e1', 'ADZ INDUSTRIA LTDA')], [periciaCom('e1')])
+
+    const janela = await abrirExclusao(user)
+    await user.click(within(janela).getByRole('checkbox'))
+    await user.click(within(janela).getByRole('button', { name: 'Excluir' }))
+
+    expect(await screen.findByText('Sessão expirada.')).toBeDefined()
+    expect(removerEmpresa).not.toHaveBeenCalled()
   })
 })
