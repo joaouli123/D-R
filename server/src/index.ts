@@ -6,7 +6,7 @@ import { colheitaNrrsf } from './services/caepi/colheita.js'
 import { encerrarBrowser } from './services/pdf.js'
 
 // ============================================================
-// D&R Perícia Elite — API REST
+// DR Perícias Trabalhista — API REST
 // Contrato consumido por src/services/api.ts do frontend.
 // ============================================================
 
@@ -17,7 +17,7 @@ async function iniciar() {
   await prisma.$connect()
 
   const servidor = criarApp().listen(env.PORT, () => {
-    console.log(`\n  D&R Perícia Elite — API`)
+    console.log(`\n  DR Perícias Trabalhista — API`)
     console.log(`  ▸ porta ........ ${env.PORT}`)
     console.log(`  ▸ ambiente ..... ${env.NODE_ENV}`)
     console.log(`  ▸ uploads ...... ${PASTA_UPLOADS}`)

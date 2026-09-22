@@ -12,6 +12,7 @@ import { gerarDocx } from '../services/docx.js'
 import { type TecnicoJson } from '../services/documento-comum.js'
 import { enviarDocumento } from '../services/email.js'
 import { concatenarPdf, gerarPdf } from '../services/pdf.js'
+import { textoDoRodape } from '../services/rodape.js'
 import { idDoSignatario } from '../services/signatario-documento.js'
 import { mensagemPendencias, pendenciasVarredura } from '../services/varredura-normativa.js'
 
@@ -89,10 +90,7 @@ async function carregarContexto(id: string, licencaId: string) {
   return { documento, pericia: pericia as PericiaCompleta | null, empresas, perito }
 }
 
-function exigirConclusoesNr15(
-  documento: { tipo: string },
-  pericia: PericiaCompleta | null,
-): void {
+function exigirConclusoesNr15(documento: { tipo: string }, pericia: PericiaCompleta | null): void {
   if (!pericia || (documento.tipo !== 'parecer' && documento.tipo !== 'laudo')) return
   // Uma recusa só, com a mesma frase que a tela mostra. A conclusão
   // individual de cada avaliação NR-15 já é cobrada aqui dentro — antes
@@ -152,7 +150,8 @@ documentosRouter.post(
       const daLicenca = await prisma.pericia.count({
         where: { id: dados.periciaId, licencaId: sessao.licencaId },
       })
-      if (!daLicenca) throw new ErroHttp(422, 'A perícia deste documento não existe na sua licença.')
+      if (!daLicenca)
+        throw new ErroHttp(422, 'A perícia deste documento não existe na sua licença.')
     }
 
     // Só enxerga como "existente" o que é da própria licença. Um id de outra
@@ -260,7 +259,7 @@ documentosRouter.post(
     exigirConclusoesNr15(documento, pericia)
 
     const html = await montarHtml(documento, pericia, empresas, perito)
-    let pdf = await gerarPdf(html)
+    let pdf = await gerarPdf(html, textoDoRodape(documento.tipo, perito))
     let aviso: string | undefined
 
     if (documento.anexoExternoArquivo) {
@@ -347,7 +346,7 @@ documentosRouter.post(
     // O PDF anexado é gerado na hora — o destinatário sempre recebe
     // a versão mais recente do documento.
     const html = await montarHtml(documento, pericia, empresas, perito)
-    let pdf = await gerarPdf(html)
+    let pdf = await gerarPdf(html, textoDoRodape(documento.tipo, perito))
 
     if (documento.anexoExternoArquivo) {
       const anexo = await lerUpload(documento.anexoExternoArquivo).catch(() => null)

@@ -26,7 +26,7 @@ export const LOGO_OFICIAL_DATA_URI =
   `data:image/png;base64,${LOGO_OFICIAL_PNG.toString('base64')}`
 
 export const LOGO_OFICIAL_ALT =
-  'Logo oficial D&R Perícia Trabalhista — Engenharia de Segurança e Higiene Ocupacional'
+  'Logo oficial DR Perícias Trabalhista — Engenharia de Segurança e Higiene Ocupacional'
 
 /** Formatos que o Word aceita embutir E que o navegador do PDF renderiza. */
 const TIPO_POR_EXTENSAO: Record<string, 'jpg' | 'png' | 'gif' | 'bmp'> = {

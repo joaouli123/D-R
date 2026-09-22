@@ -1,5 +1,5 @@
 // ============================================================
-// D&R Perícia — Modelo de dados (frontend)
+// DR Perícias Trabalhista — Modelo de dados (frontend)
 // Espelha o escopo da Proposta Comercial v1.1 (Módulos A–J)
 // + Módulo K (Quesitos) e Módulo L (Manifestação/Impugnação/Esclarecimento)
 // ============================================================

@@ -550,7 +550,7 @@ export default function Quesitos() {
                 <header className="mb-10 border-b-2 border-brand-700 pb-5 text-center">
                   <Logo size="lg" perito={usuario} />
                   <p className="mt-3 text-[9pt] font-bold uppercase tracking-[0.2em] text-navy-600">
-                    Plataforma Inteligente de Perícia Trabalhista
+                    DR Perícias Trabalhista
                   </p>
                 </header>
 

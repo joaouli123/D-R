@@ -14,8 +14,9 @@ import { cn } from '@/lib/utils'
 // Sem layout para medir (os testes, em jsdom), fica o documento corrido.
 // ============================================================
 
-/** Mesmo texto do rodapé do PDF (server/src/services/pdf.ts) e do DOCX. */
-const RODAPE = '© D&R Perícia Trabalhista — Propriedade intelectual exclusiva e protegida.'
+/** Mesmo texto do rodapé do PDF (textoDoRodape em server/src/services/pdf.ts) e do DOCX. */
+export const RODAPE_DA_MARCA =
+  '© DR Perícias Trabalhista — Propriedade intelectual exclusiva e protegida.'
 /** 210 mm em pixels de CSS (96 px por polegada). */
 const LARGURA_FOLHA_PX = (210 / 25.4) * 96
 /** Quanto esperar por fonte e imagem antes de paginar assim mesmo. */
@@ -25,7 +26,7 @@ const ATRASO_MS = 200
 /** Imagem que ainda não carregou quando as folhas ficaram prontas: repagina, até este tanto. */
 const MAX_REPAGINACOES_POR_IMAGEM = 3
 
-function novaFolha(destino: HTMLElement): Folha {
+function novaFolha(destino: HTMLElement, textoDoRodape: string): Folha {
   const folha = document.createElement('div')
   folha.className = 'folha-a4'
   folha.setAttribute('role', 'group')
@@ -34,7 +35,7 @@ function novaFolha(destino: HTMLElement): Folha {
   const rodape = document.createElement('div')
   rodape.className = 'folha-a4__rodape'
   const marca = document.createElement('span')
-  marca.textContent = RODAPE
+  marca.textContent = textoDoRodape
   const numero = document.createElement('span')
   numero.className = 'folha-a4__numero'
   rodape.append(marca, numero)
@@ -56,10 +57,22 @@ function esperarRecursos(raiz: HTMLElement): Promise<unknown> {
         }),
     ),
   ])
-  return Promise.race([prontos, new Promise((resolve) => window.setTimeout(resolve, ESPERA_RECURSOS_MS))])
+  return Promise.race([
+    prontos,
+    new Promise((resolve) => window.setTimeout(resolve, ESPERA_RECURSOS_MS)),
+  ])
 }
 
-export function FolhasA4({ children, className }: { children: ReactNode; className?: string }) {
+export function FolhasA4({
+  children,
+  className,
+  rodape = RODAPE_DA_MARCA,
+}: {
+  children: ReactNode
+  className?: string
+  /** No laudo, só o nome do profissional. */
+  rodape?: string
+}) {
   const raizRef = useRef<HTMLDivElement>(null)
   const fonteRef = useRef<HTMLDivElement>(null)
   const janelaRef = useRef<HTMLDivElement>(null)
@@ -115,7 +128,7 @@ export function FolhasA4({ children, className }: { children: ReactNode; classNa
       document.body.appendChild(obra)
       let novas: Folha[] | null = null
       try {
-        novas = paginar(documento, () => novaFolha(obra))
+        novas = paginar(documento, () => novaFolha(obra, rodape))
       } catch (erro) {
         console.error('Não foi possível dividir a prévia em folhas A4.', erro)
       }
@@ -149,7 +162,12 @@ export function FolhasA4({ children, className }: { children: ReactNode; classNa
       repaginacoesPorImagem = 0
       agendar()
     })
-    mudancas.observe(fonte, { subtree: true, childList: true, characterData: true, attributes: true })
+    mudancas.observe(fonte, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+    })
     const tamanho = new ResizeObserver(ajustarEscala)
     tamanho.observe(raiz)
     tamanho.observe(folhas)
@@ -161,7 +179,7 @@ export function FolhasA4({ children, className }: { children: ReactNode; classNa
       mudancas.disconnect()
       tamanho.disconnect()
     }
-  }, [])
+  }, [rodape])
 
   return (
     <div ref={raizRef} className={cn('folhas-a4', paginado && 'paginado', className)}>

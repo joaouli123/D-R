@@ -122,12 +122,12 @@ async function main() {
   await prisma.licenca.upsert({
     where: { id: LICENCA_PRINCIPAL_ID },
     update: {},
-    create: { id: LICENCA_PRINCIPAL_ID, nome: 'D&R Perícia Elite' },
+    create: { id: LICENCA_PRINCIPAL_ID, nome: 'DR Perícias Trabalhista' },
   })
   await prisma.organizacao.upsert({
     where: { id: ORGANIZACAO_RAIZ_ID },
     update: {},
-    create: { id: ORGANIZACAO_RAIZ_ID, nome: 'D&R Perícia Elite', licencaId: LICENCA_PRINCIPAL_ID },
+    create: { id: ORGANIZACAO_RAIZ_ID, nome: 'DR Perícias Trabalhista', licencaId: LICENCA_PRINCIPAL_ID },
   })
 
   // ---------- Administrador ----------

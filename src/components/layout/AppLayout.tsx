@@ -194,7 +194,7 @@ export function AppLayout() {
 
         <div className="border-t border-white/10 px-4 py-3">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-white/40">Versão 1.0</p>
-          <p className="mt-0.5 text-[11px] text-white/50">Plataforma Inteligente de Perícia</p>
+          <p className="mt-0.5 text-[11px] text-white/50">DR Perícias Trabalhista</p>
         </div>
       </aside>
 

@@ -1,6 +1,6 @@
 # D&R Perícia Elite
 
-**Plataforma Inteligente de Perícia Trabalhista** — Elaboração de documentos técnicos com agilidade e precisão.
+**DR Perícias Trabalhista** — Elaboração de documentos técnicos com agilidade e precisão.
 
 Sistema descrito na *Proposta Comercial de Desenvolvimento v1.1* (UX Code), incluindo os módulos novos levantados posteriormente pelo Contratante: **Quesitos (item 17)** e **Manifestação/Impugnação/Esclarecimento (item 18)**.
 

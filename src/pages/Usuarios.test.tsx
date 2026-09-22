@@ -74,14 +74,14 @@ const RAFAEL = usuario('usr-7', 'Rafael Dias', { ativo: false, organizacaoId: 'e
 const arvore = (): Equipe[] => [
   {
     id: 'eqp-1',
-    nome: 'D&R Perícia Elite',
+    nome: 'DR Perícias Trabalhista',
     paiId: null,
     nivel: 0,
     propria: true,
     principal: true,
     podeExcluir: false,
     licencaId: 'lic-1',
-    licencaNome: 'D&R Perícia Elite',
+    licencaNome: 'DR Perícias Trabalhista',
     inicioDaLicenca: false,
     usuarios: [DINOEL, HENRIQUE],
   },
@@ -129,7 +129,7 @@ async function montar() {
       </ToastProvider>
     </MemoryRouter>,
   )
-  await screen.findByRole('region', { name: 'Equipe D&R Perícia Elite' })
+  await screen.findByRole('region', { name: 'Equipe DR Perícias Trabalhista' })
 }
 
 beforeEach(() => {
@@ -150,7 +150,7 @@ describe('Usuários e equipes — o que aparece', () => {
   it('mostra cada equipe da hierarquia com os seus usuários e só eles', async () => {
     await montar()
 
-    const principal = within(regiao('D&R Perícia Elite'))
+    const principal = within(regiao('DR Perícias Trabalhista'))
     expect(principal.getByText('Dinoel Ribeiro')).toBeTruthy()
     expect(principal.getByText('Henrique Alves')).toBeTruthy()
     expect(principal.queryByText('Carlos Tavares')).toBeNull()
@@ -166,7 +166,7 @@ describe('Usuários e equipes — o que aparece', () => {
   it('marca a equipe do administrador e a principal, e resume os números', async () => {
     await montar()
 
-    const principal = within(regiao('D&R Perícia Elite'))
+    const principal = within(regiao('DR Perícias Trabalhista'))
     expect(principal.getByText('Sua equipe')).toBeTruthy()
     expect(principal.getByText('Equipe principal')).toBeTruthy()
     expect(within(regiao('Laboratório Alfa')).queryByText('Sua equipe')).toBeNull()
@@ -179,7 +179,7 @@ describe('Usuários e equipes — o que aparece', () => {
   it('não deixa o administrador desativar nem excluir o próprio acesso', async () => {
     await montar()
 
-    const principal = within(regiao('D&R Perícia Elite'))
+    const principal = within(regiao('DR Perícias Trabalhista'))
     expect(principal.getByText('(você)')).toBeTruthy()
     expect(
       (principal.getByRole('button', { name: 'Desativar Dinoel Ribeiro' }) as HTMLButtonElement)
@@ -231,7 +231,7 @@ describe('Usuários e equipes — o que aparece', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Servidor fora do ar.')
     await user.click(screen.getByRole('button', { name: 'Tentar de novo' }))
 
-    expect(await screen.findByRole('region', { name: 'Equipe D&R Perícia Elite' })).toBeTruthy()
+    expect(await screen.findByRole('region', { name: 'Equipe DR Perícias Trabalhista' })).toBeTruthy()
     expect(screen.queryByRole('alert')).toBeNull()
   })
 })
@@ -277,7 +277,7 @@ describe('Usuários e equipes — cadastrar', () => {
     const user = userEvent.setup()
     await montar()
 
-    await user.click(within(regiao('D&R Perícia Elite')).getByRole('button', { name: 'Novo usuário' }))
+    await user.click(within(regiao('DR Perícias Trabalhista')).getByRole('button', { name: 'Novo usuário' }))
 
     expect((within(dialogo()).getByRole('combobox', { name: 'Perfil' }) as HTMLSelectElement).value).toBe(
       'assistente',
@@ -288,7 +288,7 @@ describe('Usuários e equipes — cadastrar', () => {
     const user = userEvent.setup()
     await montar()
 
-    await user.click(within(regiao('D&R Perícia Elite')).getByRole('button', { name: 'Novo usuário' }))
+    await user.click(within(regiao('DR Perícias Trabalhista')).getByRole('button', { name: 'Novo usuário' }))
     const d = within(dialogo())
     await user.type(d.getByRole('textbox', { name: /^Nome/ }), 'Bruno')
     await user.type(d.getByRole('textbox', { name: /^E-mail/ }), 'bruno@x.com.br')
@@ -303,7 +303,7 @@ describe('Usuários e equipes — cadastrar', () => {
     const user = userEvent.setup()
     await montar()
 
-    await user.click(within(regiao('D&R Perícia Elite')).getByRole('button', { name: 'Novo usuário' }))
+    await user.click(within(regiao('DR Perícias Trabalhista')).getByRole('button', { name: 'Novo usuário' }))
     const d = within(dialogo())
     await user.type(d.getByRole('textbox', { name: /^Nome/ }), 'Bruno')
     await user.type(d.getByRole('textbox', { name: /^E-mail/ }), 'bruno@x.com.br')
@@ -320,7 +320,7 @@ describe('Usuários e equipes — cadastrar', () => {
     const user = userEvent.setup()
     await montar()
 
-    await user.click(within(regiao('D&R Perícia Elite')).getByRole('button', { name: 'Novo usuário' }))
+    await user.click(within(regiao('DR Perícias Trabalhista')).getByRole('button', { name: 'Novo usuário' }))
     const telefone = within(dialogo()).getByRole('textbox', { name: /^Telefone/ }) as HTMLInputElement
     await user.type(telefone, '1133224455')
     expect(telefone.value).toBe('(11) 3322-4455')
@@ -330,7 +330,7 @@ describe('Usuários e equipes — cadastrar', () => {
     const user = userEvent.setup()
     await montar()
 
-    await user.click(within(regiao('D&R Perícia Elite')).getByRole('button', { name: 'Novo usuário' }))
+    await user.click(within(regiao('DR Perícias Trabalhista')).getByRole('button', { name: 'Novo usuário' }))
     await user.click(within(dialogo()).getByRole('button', { name: 'Cadastrar' }))
 
     expect(within(dialogo()).getByRole('alert').textContent).toContain('Nome e e-mail')
@@ -342,7 +342,7 @@ describe('Usuários e equipes — cadastrar', () => {
     const user = userEvent.setup()
     await montar()
 
-    await user.click(within(regiao('D&R Perícia Elite')).getByRole('button', { name: 'Novo usuário' }))
+    await user.click(within(regiao('DR Perícias Trabalhista')).getByRole('button', { name: 'Novo usuário' }))
     const d = within(dialogo())
     await user.type(d.getByRole('textbox', { name: /^Nome/ }), 'Bruno')
     await user.type(d.getByRole('textbox', { name: /^E-mail/ }), 'henrique@exemplo.com.br')
@@ -390,7 +390,7 @@ describe('Usuários e equipes — editar e trocar a senha', () => {
     const user = userEvent.setup()
     await montar()
 
-    await user.click(within(regiao('D&R Perícia Elite')).getByRole('button', { name: 'Editar Dinoel Ribeiro' }))
+    await user.click(within(regiao('DR Perícias Trabalhista')).getByRole('button', { name: 'Editar Dinoel Ribeiro' }))
 
     const perfil = within(dialogo()).getByRole('combobox', { name: 'Perfil' }) as HTMLSelectElement
     expect(perfil.disabled).toBe(true)
@@ -442,7 +442,7 @@ describe('Usuários e equipes — desativar e reativar', () => {
     const user = userEvent.setup()
     await montar()
 
-    await user.click(within(regiao('D&R Perícia Elite')).getByRole('button', { name: 'Desativar Henrique Alves' }))
+    await user.click(within(regiao('DR Perícias Trabalhista')).getByRole('button', { name: 'Desativar Henrique Alves' }))
 
     await waitFor(() => expect(chamadas.salvar).toHaveBeenCalledTimes(1))
     expect(chamadas.salvar.mock.calls[0][0]).toMatchObject({
@@ -470,7 +470,7 @@ describe('Usuários e equipes — desativar e reativar', () => {
     const user = userEvent.setup()
     await montar()
 
-    await user.click(within(regiao('D&R Perícia Elite')).getByRole('button', { name: 'Desativar Henrique Alves' }))
+    await user.click(within(regiao('DR Perícias Trabalhista')).getByRole('button', { name: 'Desativar Henrique Alves' }))
 
     expect(await screen.findByText('Você não pode remover o próprio acesso.')).toBeTruthy()
   })
@@ -619,7 +619,7 @@ describe('Usuários e equipes — a hierarquia de equipes', () => {
     const opcoes = Array.from(
       (within(dialogo()).getByRole('combobox', { name: 'Fica abaixo de' }) as HTMLSelectElement).options,
     ).map((o) => o.textContent)
-    expect(opcoes).toEqual(['D&R Perícia Elite', '— Laboratório Alfa', '— — Alfa Campinas'])
+    expect(opcoes).toEqual(['DR Perícias Trabalhista', '— Laboratório Alfa', '— — Alfa Campinas'])
   })
 
   it('renomeia a equipe', async () => {

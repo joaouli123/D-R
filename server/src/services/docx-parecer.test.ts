@@ -4,7 +4,13 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { PericiaCompleta } from '../mappers.js'
 import { agentesNr15DeRegressao, anexosNr15DeRegressao } from './conclusoes-nr15.fixture.js'
-import { empresa, periciaAmbasSoNr16, periciaDeTeste, periciaSoPericulosidade, perito } from './parecer.fixture.js'
+import {
+  empresa,
+  periciaAmbasSoNr16,
+  periciaDeTeste,
+  periciaSoPericulosidade,
+  perito,
+} from './parecer.fixture.js'
 
 // Sem disco: `lerUpload` devolve um buffer vazio, o sharp falha e o
 // renderizador cai no ramo "imagem indisponível" — que ainda imprime a
@@ -14,10 +20,13 @@ vi.mock('./armazenamento.js', async () => {
   const { default: sharp } = await import('sharp')
   const assinatura = await sharp({
     create: { width: 600, height: 200, channels: 4, background: { r: 20, g: 30, b: 90, alpha: 1 } },
-  }).png().toBuffer()
+  })
+    .png()
+    .toBuffer()
   return {
     comoDataUri: async () => null,
-    lerUpload: async (arquivo: string) => (arquivo === 'assinatura.png' ? assinatura : Buffer.alloc(0)),
+    lerUpload: async (arquivo: string) =>
+      arquivo === 'assinatura.png' ? assinatura : Buffer.alloc(0),
   }
 })
 
@@ -68,7 +77,11 @@ describe('parecer em DOCX', () => {
       quesitosReclamante: '',
       quesitosReclamada: 'Não apresentado',
     })
-    const laudo = { ...documento, tipo: 'laudo', titulo: 'Laudo Técnico Pericial' } as DocumentoGerado
+    const laudo = {
+      ...documento,
+      tipo: 'laudo',
+      titulo: 'Laudo Técnico Pericial',
+    } as DocumentoGerado
 
     const xml = await xmlDoDocx(pericia, perito, laudo)
     const texto = (xml.match(/<w:t[^>]*>[^<]*<\/w:t>/g) ?? [])
@@ -81,14 +94,17 @@ describe('parecer em DOCX', () => {
     expect(texto).not.toContain('Quesitos do Reclamante')
     expect(texto).toContain('Outras respostas aos quesitos')
     expect(texto).toContain('Resposta legada do parecer.')
-    expect(texto.indexOf('Resposta legada do parecer.')).toBeGreaterThan(texto.indexOf('Quesitos da Reclamada'))
+    expect(texto.indexOf('Resposta legada do parecer.')).toBeGreaterThan(
+      texto.indexOf('Quesitos da Reclamada'),
+    )
   })
 
   it('não deixa caracteres de controle no XML: o Word recusa abrir o arquivo com eles', async () => {
     const pericia = periciaDeTeste()
     // Texto colado de PDF costuma trazer quebra de página (\f) e tabulação vertical (\v).
     Object.assign(pericia.tecnico as object, {
-      encerramento: 'Texto colado do PDF\fcom quebra de página\vno meio\x00 e nulo.\n\nSegundo parágrafo.',
+      encerramento:
+        'Texto colado do PDF\fcom quebra de página\vno meio\x00 e nulo.\n\nSegundo parágrafo.',
     })
 
     const xml = await xmlDoDocx(pericia)
@@ -105,7 +121,11 @@ describe('parecer em DOCX', () => {
       quesitosReclamante: '',
       quesitosReclamada: '',
     })
-    const laudo = { ...documento, tipo: 'laudo', titulo: 'Laudo Técnico Pericial' } as DocumentoGerado
+    const laudo = {
+      ...documento,
+      tipo: 'laudo',
+      titulo: 'Laudo Técnico Pericial',
+    } as DocumentoGerado
 
     const xml = await xmlDoDocx(pericia, perito, laudo)
     const texto = (xml.match(/<w:t[^>]*>[^<]*<\/w:t>/g) ?? [])
@@ -124,7 +144,11 @@ describe('parecer em DOCX', () => {
         'Primeiro parágrafo do encerramento.\n\nSegundo parágrafo do encerramento.\n\nDiante do exposto, o signatário coloca-se à disposição dos envolvidos.',
       honorariosPericiaisCentavos: 500_000,
     })
-    const laudo = { ...documento, tipo: 'laudo', titulo: 'Laudo Técnico Pericial' } as DocumentoGerado
+    const laudo = {
+      ...documento,
+      tipo: 'laudo',
+      titulo: 'Laudo Técnico Pericial',
+    } as DocumentoGerado
 
     const xml = await xmlDoDocx(pericia, perito, laudo)
     const texto = (xml.match(/<w:t[^>]*>[^<]*<\/w:t>/g) ?? [])
@@ -146,10 +170,15 @@ describe('parecer em DOCX', () => {
   it('sem honorários, o "Diante do exposto…" continua fechando o encerramento', async () => {
     const pericia = periciaDeTeste()
     Object.assign(pericia.tecnico as object, {
-      encerramento: 'Primeiro parágrafo do encerramento.\n\nDiante do exposto, o signatário coloca-se à disposição dos envolvidos.',
+      encerramento:
+        'Primeiro parágrafo do encerramento.\n\nDiante do exposto, o signatário coloca-se à disposição dos envolvidos.',
       honorariosPericiaisCentavos: undefined,
     })
-    const laudo = { ...documento, tipo: 'laudo', titulo: 'Laudo Técnico Pericial' } as DocumentoGerado
+    const laudo = {
+      ...documento,
+      tipo: 'laudo',
+      titulo: 'Laudo Técnico Pericial',
+    } as DocumentoGerado
 
     const xml = await xmlDoDocx(pericia, perito, laudo)
     const texto = (xml.match(/<w:t[^>]*>[^<]*<\/w:t>/g) ?? [])
@@ -157,7 +186,9 @@ describe('parecer em DOCX', () => {
       .join(' ')
 
     expect(texto).not.toContain('DOS HONORÁRIOS PERICIAIS')
-    expect(texto.indexOf('Diante do exposto')).toBeGreaterThan(texto.indexOf('Primeiro parágrafo do encerramento.'))
+    expect(texto.indexOf('Diante do exposto')).toBeGreaterThan(
+      texto.indexOf('Primeiro parágrafo do encerramento.'),
+    )
     expect(texto.lastIndexOf(perito.nome)).toBeGreaterThan(texto.indexOf('Diante do exposto'))
     expect(texto.match(/Diante do exposto/g)).toHaveLength(1)
   })
@@ -165,7 +196,11 @@ describe('parecer em DOCX', () => {
   it('imprime os honorários do Laudo depois do encerramento e antes da assinatura', async () => {
     const pericia = periciaDeTeste()
     Object.assign(pericia.tecnico as object, { honorariosPericiaisCentavos: 500_000 })
-    const laudo = { ...documento, tipo: 'laudo', titulo: 'Laudo Técnico Pericial' } as DocumentoGerado
+    const laudo = {
+      ...documento,
+      tipo: 'laudo',
+      titulo: 'Laudo Técnico Pericial',
+    } as DocumentoGerado
 
     const xml = await xmlDoDocx(pericia, perito, laudo)
     const texto = (xml.match(/<w:t[^>]*>[^<]*<\/w:t>/g) ?? [])
@@ -182,10 +217,16 @@ describe('parecer em DOCX', () => {
   })
 
   const LEGENDA_AGENTE = 'Visor do equipamento na avaliação química'
-  const fotoDoAgente = (agenteId: string, id = 'foto-agente', legenda = LEGENDA_AGENTE) => ({
-    id, periciaId: 'per-1', secao: 'documentos', agenteId,
-    ordem: 3, arquivo: `${id}.jpg`, legenda,
-  }) as never
+  const fotoDoAgente = (agenteId: string, id = 'foto-agente', legenda = LEGENDA_AGENTE) =>
+    ({
+      id,
+      periciaId: 'per-1',
+      secao: 'documentos',
+      agenteId,
+      ordem: 3,
+      arquivo: `${id}.jpg`,
+      legenda,
+    }) as never
   const laudo = { ...documento, tipo: 'laudo', titulo: 'Laudo Técnico Pericial' } as DocumentoGerado
   // No DOCX, entre o número e a legenda vem o aviso "imagem indisponível" (o
   // disco não existe nestes testes); por isso a legenda é lida logo depois do número.
@@ -199,18 +240,21 @@ describe('parecer em DOCX', () => {
     ['Parecer', documento],
   ] as const
 
-  it.each(documentos)('no %s, coloca a foto vinculada depois da tabela do respectivo agente sem duplicação', async (_nome, doc) => {
-    const pericia = periciaDeTeste()
-    pericia.fotos.push(fotoDoAgente('agn-1'))
+  it.each(documentos)(
+    'no %s, coloca a foto vinculada depois da tabela do respectivo agente sem duplicação',
+    async (_nome, doc) => {
+      const pericia = periciaDeTeste()
+      pericia.fotos.push(fotoDoAgente('agn-1'))
 
-    const texto = await textoDoDocx(pericia, doc)
-    const quadro = texto.indexOf('10.1.1. Óleos minerais')
-    const foto = texto.indexOf(LEGENDA_AGENTE)
+      const texto = await textoDoDocx(pericia, doc)
+      const quadro = texto.indexOf('10.1.1. Óleos minerais')
+      const foto = texto.indexOf(LEGENDA_AGENTE)
 
-    expect(quadro).toBeGreaterThan(-1)
-    expect(foto).toBeGreaterThan(quadro)
-    expect(texto.split(LEGENDA_AGENTE)).toHaveLength(2)
-  })
+      expect(quadro).toBeGreaterThan(-1)
+      expect(foto).toBeGreaterThan(quadro)
+      expect(texto.split(LEGENDA_AGENTE)).toHaveLength(2)
+    },
+  )
 
   it('no Parecer, a foto do agente ganha o número seguinte ao das seções', async () => {
     const pericia = periciaDeTeste()
@@ -223,46 +267,58 @@ describe('parecer em DOCX', () => {
     expect(texto).not.toContain('Fotografia 4')
   })
 
-  it.each(documentos)('%s: numera a foto do agente depois das fotos das seções, mesmo gravada em "documentos"', async (_nome, doc) => {
-    const pericia = periciaDeTeste()
-    pericia.fotos.push(
-      fotoDoAgente('agn-1'),
-      { id: 'fot-produto', periciaId: 'per-1', secao: 'produtos', ordem: 1, arquivo: 'fot-produto.jpg', legenda: 'Rótulo do produto' } as never,
-    )
+  it.each(documentos)(
+    '%s: numera a foto do agente depois das fotos das seções, mesmo gravada em "documentos"',
+    async (_nome, doc) => {
+      const pericia = periciaDeTeste()
+      pericia.fotos.push(fotoDoAgente('agn-1'), {
+        id: 'fot-produto',
+        periciaId: 'per-1',
+        secao: 'produtos',
+        ordem: 1,
+        arquivo: 'fot-produto.jpg',
+        legenda: 'Rótulo do produto',
+      } as never)
 
-    const texto = await textoDoDocx(pericia, doc)
+      const texto = await textoDoDocx(pericia, doc)
 
-    expect(legendaDaFoto(texto, 3)).toContain('Rótulo do produto')
-    expect(legendaDaFoto(texto, 4)).toContain(LEGENDA_AGENTE)
-  })
+      expect(legendaDaFoto(texto, 3)).toContain('Rótulo do produto')
+      expect(legendaDaFoto(texto, 4)).toContain(LEGENDA_AGENTE)
+    },
+  )
 
-  it.each(documentos)('%s: não gasta número com foto de agente que já não está no documento', async (_nome, doc) => {
-    const pericia = periciaDeTeste()
-    pericia.fotos.push(
-      fotoDoAgente('agn-removido', 'foto-orfa', 'Foto de agente excluído'),
-      fotoDoAgente('agn-1'),
-    )
+  it.each(documentos)(
+    '%s: não gasta número com foto de agente que já não está no documento',
+    async (_nome, doc) => {
+      const pericia = periciaDeTeste()
+      pericia.fotos.push(
+        fotoDoAgente('agn-removido', 'foto-orfa', 'Foto de agente excluído'),
+        fotoDoAgente('agn-1'),
+      )
 
-    const texto = await textoDoDocx(pericia, doc)
+      const texto = await textoDoDocx(pericia, doc)
 
-    expect(texto).not.toContain('Foto de agente excluído')
-    expect(legendaDaFoto(texto, 3)).toContain(LEGENDA_AGENTE)
-    expect(texto).not.toContain('Fotografia 4')
-  })
+      expect(texto).not.toContain('Foto de agente excluído')
+      expect(legendaDaFoto(texto, 3)).toContain(LEGENDA_AGENTE)
+      expect(texto).not.toContain('Fotografia 4')
+    },
+  )
 
-  it.each(documentos)('%s: foto de agente NR-16 sai depois do quadro dele no item 10, uma vez só', async (_nome, doc) => {
-    const pericia = periciaSoPericulosidade()
-    pericia.fotos.push(fotoDoAgente('agn-nr16', 'foto-nr16', 'Sinalização da área de risco'))
+  it.each(documentos)(
+    '%s: foto de agente NR-16 sai depois do quadro dele no item 10, uma vez só',
+    async (_nome, doc) => {
+      const pericia = periciaSoPericulosidade()
+      pericia.fotos.push(fotoDoAgente('agn-nr16', 'foto-nr16', 'Sinalização da área de risco'))
 
-    const texto = await textoDoDocx(pericia, doc)
-    const quadro = texto.indexOf('10.1.1. Inflamáveis – Avaliação, Resultado e Conclusão')
-    const foto = texto.indexOf('Sinalização da área de risco')
+      const texto = await textoDoDocx(pericia, doc)
+      const quadro = texto.indexOf('10.1.1. Inflamáveis – Avaliação, Resultado e Conclusão')
+      const foto = texto.indexOf('Sinalização da área de risco')
 
-    expect(quadro).toBeGreaterThan(-1)
-    expect(foto).toBeGreaterThan(quadro)
-    expect(texto.split('Sinalização da área de risco')).toHaveLength(2)
-  })
-
+      expect(quadro).toBeGreaterThan(-1)
+      expect(foto).toBeGreaterThan(quadro)
+      expect(texto.split('Sinalização da área de risco')).toHaveLength(2)
+    },
+  )
 
   it('imprime o quadro compacto da varredura normativa', async () => {
     const pericia = periciaDeTeste()
@@ -378,7 +434,8 @@ describe('parecer em DOCX', () => {
     ;(pericia as { modalidade: string }).modalidade = 'ambas'
     Object.assign(pericia.tecnico as object, {
       criterioAvaliacaoPericulosidade: 'Critério qualitativo.',
-      riscoAlegadoPericulosidade: 'Sustenta a parte Reclamante que laborava no abastecimento de veículos.',
+      riscoAlegadoPericulosidade:
+        'Sustenta a parte Reclamante que laborava no abastecimento de veículos.',
     })
 
     const texto = await textoDoDocx(pericia)
@@ -394,13 +451,15 @@ describe('parecer em DOCX', () => {
 
   it('fecha o item 10 com o quadro Sem Risco, e o rol dos anexos dentro dele', async () => {
     const pericia = periciaSoPericulosidade()
-    ;(pericia.tecnico as unknown as { agentes: unknown[] }).agentes = [{
-      id: 'nr16-sem-risco',
-      nome: 'Sem risco',
-      tipo: 'periculosidade',
-      criterio: 'qualitativo',
-      resultadoPericulosidade: 'nao_caracterizada',
-    }]
+    ;(pericia.tecnico as unknown as { agentes: unknown[] }).agentes = [
+      {
+        id: 'nr16-sem-risco',
+        nome: 'Sem risco',
+        tipo: 'periculosidade',
+        criterio: 'qualitativo',
+        resultadoPericulosidade: 'nao_caracterizada',
+      },
+    ]
 
     const texto = await textoDoDocx(pericia)
 
@@ -504,19 +563,24 @@ describe('parecer em DOCX', () => {
 
   it('encolhe o espaço da capa quando a apresentação é longa', async () => {
     const pericia = periciaDeTeste()
-    ;(pericia.tecnico as unknown as { apresentacao: string }).apresentacao =
-      Array.from({ length: 6 }, () => 'Texto longo de apresentação e qualificação técnica do perito. '.repeat(5)).join('\n')
+    ;(pericia.tecnico as unknown as { apresentacao: string }).apresentacao = Array.from(
+      { length: 6 },
+      () => 'Texto longo de apresentação e qualificação técnica do perito. '.repeat(5),
+    ).join('\n')
 
     const xml = await xmlDoDocx(pericia)
-    const identificacao = (xml.match(/<w:p>[\s\S]*?<\/w:p>|<w:p [\s\S]*?<\/w:p>/g) ?? [])
-      .find((p) => p.includes('IDENTIFICAÇÃO DAS PARTES'))!
+    const identificacao = (xml.match(/<w:p>[\s\S]*?<\/w:p>|<w:p [\s\S]*?<\/w:p>/g) ?? []).find(
+      (p) => p.includes('IDENTIFICAÇÃO DAS PARTES'),
+    )!
     expect(Number(identificacao.match(/w:before="(\d+)"/)?.[1])).toBeLessThan(1000)
   })
 
   it('prende a data à assinatura e centraliza a linha', async () => {
     const xml = await xmlDoDocx()
     const paragrafos = xml.match(/<w:p>[\s\S]*?<\/w:p>|<w:p [\s\S]*?<\/w:p>/g) ?? []
-    const indiceNome = paragrafos.findIndex((p) => p.includes('Dinoel Ribeiro da Silva') && p.includes('<w:pBdr>'))
+    const indiceNome = paragrafos.findIndex(
+      (p) => p.includes('Dinoel Ribeiro da Silva') && p.includes('<w:pBdr>'),
+    )
     const nome = paragrafos[indiceNome]!
     // Sem assinatura manuscrita, a data vem logo antes da linha.
     const data = paragrafos[indiceNome - 1]!
@@ -531,9 +595,14 @@ describe('parecer em DOCX', () => {
   })
 
   it('embute a assinatura manuscrita acima da linha', async () => {
-    const xml = await xmlDoDocx(periciaDeTeste(), { ...perito, assinaturaArquivo: 'assinatura.png' })
+    const xml = await xmlDoDocx(periciaDeTeste(), {
+      ...perito,
+      assinaturaArquivo: 'assinatura.png',
+    })
     const paragrafos = xml.match(/<w:p>[\s\S]*?<\/w:p>|<w:p [\s\S]*?<\/w:p>/g) ?? []
-    const indiceImagem = paragrafos.findIndex((p) => p.includes('Assinatura de Dinoel Ribeiro da Silva'))
+    const indiceImagem = paragrafos.findIndex((p) =>
+      p.includes('Assinatura de Dinoel Ribeiro da Silva'),
+    )
 
     expect(indiceImagem).toBeGreaterThan(0)
     expect(paragrafos[indiceImagem]).toContain('<w:keepNext/>')
@@ -571,13 +640,32 @@ describe('parecer em DOCX', () => {
   })
 
   it('usa o mesmo rodapé do PDF, com a paginação na margem direita', async () => {
-    const zip = await JSZip.loadAsync(await gerarDocx(documento, periciaDeTeste(), [empresa], perito))
+    const zip = await JSZip.loadAsync(
+      await gerarDocx(documento, periciaDeTeste(), [empresa], perito),
+    )
     const arquivo = Object.keys(zip.files).find((nome) => /^word\/footer\d*\.xml$/.test(nome))!
     const xml = await zip.file(arquivo)!.async('string')
 
-    expect(xml).toContain('© D&amp;R Perícia Trabalhista — Propriedade intelectual exclusiva e protegida.')
+    expect(xml).toContain(
+      '© DR Perícias Trabalhista — Propriedade intelectual exclusiva e protegida.',
+    )
     expect(xml).toMatch(/<w:tab w:val="right" w:pos="9070"\/>/)
     expect(xml).toContain('Página ')
     expect(xml).not.toContain('D&amp;R Perícia — Página')
+  })
+
+  it('no laudo, o rodapé traz só o nome do profissional, sem a plataforma', async () => {
+    const laudo = {
+      ...documento,
+      tipo: 'laudo',
+      titulo: 'Laudo Técnico Pericial',
+    } as DocumentoGerado
+    const zip = await JSZip.loadAsync(await gerarDocx(laudo, periciaDeTeste(), [empresa], perito))
+    const arquivo = Object.keys(zip.files).find((nome) => /^word\/footer\d*\.xml$/.test(nome))!
+    const xml = await zip.file(arquivo)!.async('string')
+
+    expect(xml).toContain(`>${perito.nome}<`)
+    expect(xml).not.toContain('DR Perícias Trabalhista')
+    expect(xml).toContain('Página ')
   })
 })

@@ -189,8 +189,8 @@ beforeEach(() => {
   banco.seq = 0
   banco.apagados = []
   banco.conteudo = {}
-  banco.licencas = [{ id: PRINCIPAL, nome: 'D&R Perícia Elite', documento: null, ativa: true, criadoEm: new Date(0) }]
-  banco.equipes = [{ id: RAIZ, nome: 'D&R Perícia Elite', paiId: null, licencaId: PRINCIPAL }]
+  banco.licencas = [{ id: PRINCIPAL, nome: 'DR Perícias Trabalhista', documento: null, ativa: true, criadoEm: new Date(0) }]
+  banco.equipes = [{ id: RAIZ, nome: 'DR Perícias Trabalhista', paiId: null, licencaId: PRINCIPAL }]
   banco.usuarios = [
     { id: 'dinoel', nome: 'Dinoel', email: 'dinoel@dr.test', perfil: 'admin', ativo: true, organizacaoId: RAIZ },
   ]

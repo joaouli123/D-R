@@ -163,7 +163,7 @@ export default function Login() {
           </div>
 
           <p className="login-brand-footer text-[12.5px] leading-relaxed text-white/60">
-            D&amp;R Perícia Trabalhista — tecnologia para trabalhar com mais agilidade, precisão e
+            DR Perícias Trabalhista — tecnologia para trabalhar com mais agilidade, precisão e
             segurança.
           </p>
         </div>
@@ -261,7 +261,7 @@ export default function Login() {
           )}
 
           <p className="mt-8 text-center text-[11px] text-ink-400">
-            © 2026 D&amp;R Perícia · Plataforma Inteligente de Perícia Trabalhista
+            © 2026 DR Perícias Trabalhista
           </p>
         </div>
       </div>

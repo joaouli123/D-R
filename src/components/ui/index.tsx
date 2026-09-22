@@ -3,7 +3,7 @@ import { AlertTriangle, Check, ChevronDown, Info, Loader2, X } from 'lucide-reac
 import { cn } from '@/lib/utils'
 
 // ============================================================
-// Design System — D&R Perícia
+// Design System — DR Perícias Trabalhista
 // ============================================================
 
 // ---------------- Button ----------------

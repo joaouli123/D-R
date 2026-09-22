@@ -20,7 +20,7 @@
 // ============================================================
 
 /** Identificação enviada às fontes públicas. */
-export const AGENTE = 'D&R Pericia Elite/1.0 (+https://drpericiatrabalhista.com.br)'
+export const AGENTE = 'DR-Pericias-Trabalhista/1.0 (+https://drpericiatrabalhista.com.br)'
 
 export interface RespostaFonte {
   status: number

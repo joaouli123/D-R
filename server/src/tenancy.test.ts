@@ -15,7 +15,7 @@ import {
 // externa (outra árvore, sem ligação com a principal)
 const PRINCIPAL = ORGANIZACAO_RAIZ_ID
 const equipes: Array<NoDeEquipe & { nome: string }> = [
-  { id: PRINCIPAL, paiId: null, nome: 'D&R Perícia Elite' },
+  { id: PRINCIPAL, paiId: null, nome: 'DR Perícias Trabalhista' },
   { id: 'escritorio', paiId: PRINCIPAL, nome: 'Escritório Beta' },
   { id: 'clinica', paiId: PRINCIPAL, nome: 'Clínica Alfa' },
   { id: 'clinica-sul', paiId: 'clinica', nome: 'Clínica Alfa — Sul' },

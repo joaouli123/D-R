@@ -33,7 +33,7 @@ export interface LicencaMock extends CadastroDaLicenca {
  * conteúdo de exemplo (empresas, perícias, documentos) é da principal.
  */
 export const LICENCAS: LicencaMock[] = [
-  { id: LICENCA_PRINCIPAL_ID, nome: 'D&R Perícia Elite', ativa: true, criadoEm: '2026-01-05T10:00:00' },
+  { id: LICENCA_PRINCIPAL_ID, nome: 'DR Perícias Trabalhista', ativa: true, criadoEm: '2026-01-05T10:00:00' },
   {
     id: 'lic-2',
     nome: 'Laboratório Alfa Segurança',
@@ -58,7 +58,7 @@ export interface EquipeMock {
  * dá para excluir).
  */
 export const EQUIPES: EquipeMock[] = [
-  { id: EQUIPE_PRINCIPAL_ID, nome: 'D&R Perícia Elite', paiId: null, licencaId: LICENCA_PRINCIPAL_ID },
+  { id: EQUIPE_PRINCIPAL_ID, nome: 'DR Perícias Trabalhista', paiId: null, licencaId: LICENCA_PRINCIPAL_ID },
   { id: 'eqp-2', nome: 'Laboratório Alfa Segurança', paiId: EQUIPE_PRINCIPAL_ID, licencaId: 'lic-2' },
   { id: 'eqp-3', nome: 'Alfa · Filial Campinas', paiId: 'eqp-2', licencaId: 'lic-2' },
 ]

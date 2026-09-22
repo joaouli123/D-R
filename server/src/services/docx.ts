@@ -1,4 +1,5 @@
 import type { DocumentoGerado, Empresa, Usuario } from '@prisma/client'
+import { textoDoRodape } from './rodape.js'
 import {
   AlignmentType,
   BorderStyle,
@@ -60,7 +61,11 @@ import {
   ATUACAO,
 } from './documento-comum.js'
 import { separarFechoDoEncerramento, textoHonorariosPericiais } from './honorarios.js'
-import { exibirQuadroVarredura, normalizarVarredura, type AnexoVarreduraDocumento } from './varredura-normativa.js'
+import {
+  exibirQuadroVarredura,
+  normalizarVarredura,
+  type AnexoVarreduraDocumento,
+} from './varredura-normativa.js'
 
 // ============================================================
 // MÓDULO H — Exportação em formato editável (.docx).
@@ -92,9 +97,7 @@ const COLUNAS_FICHA = [2864, 6086] as const
 // quebra de página (\f) e tabulação vertical (\v): viram espaço; os demais
 // somem.
 function textoValidoParaXml(t: string): string {
-  return t
-    .replace(/[\x0b\x0c]/g, ' ')
-    .replace(/[\x00-\x08\x0e-\x1f]/g, '')
+  return t.replace(/[\x0b\x0c]/g, ' ').replace(/[\x00-\x08\x0e-\x1f]/g, '')
 }
 
 const texto = (
@@ -238,16 +241,23 @@ const blocos = (t?: string | null): Paragraph[] => {
  * itálico no meio — a voz da parte não pode se confundir com a do perito.
  */
 const blocosTranscricao = (t?: string | null): Paragraph[] => {
-  const linhas = (t ?? '').split('\n').map((linha) => linha.trim()).filter(Boolean)
-  return linhas.map((linha, indice) => new Paragraph({
-    alignment: AlignmentType.JUSTIFIED,
-    indent: { firstLine: RECUO_PRIMEIRA_LINHA },
-    spacing: { after: 60, line: ENTRELINHA },
-    children: [texto(
-      `${indice === 0 ? '“' : ''}${linha}${indice === linhas.length - 1 ? '”' : ''}`,
-      { italico: true },
-    )],
-  }))
+  const linhas = (t ?? '')
+    .split('\n')
+    .map((linha) => linha.trim())
+    .filter(Boolean)
+  return linhas.map(
+    (linha, indice) =>
+      new Paragraph({
+        alignment: AlignmentType.JUSTIFIED,
+        indent: { firstLine: RECUO_PRIMEIRA_LINHA },
+        spacing: { after: 60, line: ENTRELINHA },
+        children: [
+          texto(`${indice === 0 ? '“' : ''}${linha}${indice === linhas.length - 1 ? '”' : ''}`, {
+            italico: true,
+          }),
+        ],
+      }),
+  )
 }
 
 const blocosEstruturados = (t?: string | null): Paragraph[] => {
@@ -311,13 +321,16 @@ function celula(
     // observados dentro de uma célula só, e um `\n` cru dentro do TextRun
     // sairia como espaço simples no Word — a lista viraria texto corrido, só
     // no DOCX, enquanto PDF e tela mostravam item a item.
-    children: opcoes.paragrafos ?? conteudo.split('\n').map((linha) =>
-      new Paragraph({
-        keepNext: opcoes.manterComProxima,
-        spacing: { after: 0 },
-        children: [texto(linha, { negrito: opcoes.negrito ?? opcoes.cabecalho, tamanho: 20 })],
-      }),
-    ),
+    children:
+      opcoes.paragrafos ??
+      conteudo.split('\n').map(
+        (linha) =>
+          new Paragraph({
+            keepNext: opcoes.manterComProxima,
+            spacing: { after: 0 },
+            children: [texto(linha, { negrito: opcoes.negrito ?? opcoes.cabecalho, tamanho: 20 })],
+          }),
+      ),
   })
 }
 
@@ -346,15 +359,27 @@ const linhaConclusaoAgente = (observacao: string) =>
         width: { size: LARGURA_TABELA_DXA, type: WidthType.DXA },
         columnSpan: 2,
         margins: { top: 100, bottom: 100, left: 120, right: 120 },
-        children: observacao.trim().split('\n').map((linha, indice) =>
-          new Paragraph({
-            spacing: { after: 0 },
-            children: [
-              ...(indice === 0 ? [texto('Conclusão: ', { negrito: true, tamanho: 20, cor: MARCA.documentoTitulo })] : []),
-              texto(linha, { tamanho: 20 }),
-            ],
-          }),
-        ),
+        children: observacao
+          .trim()
+          .split('\n')
+          .map(
+            (linha, indice) =>
+              new Paragraph({
+                spacing: { after: 0 },
+                children: [
+                  ...(indice === 0
+                    ? [
+                        texto('Conclusão: ', {
+                          negrito: true,
+                          tamanho: 20,
+                          cor: MARCA.documentoTitulo,
+                        }),
+                      ]
+                    : []),
+                  texto(linha, { tamanho: 20 }),
+                ],
+              }),
+          ),
       }),
     ],
   })
@@ -414,7 +439,14 @@ async function figuraDocx(
         indent: { size: RECUO_TABELA_DXA, type: WidthType.DXA },
         columnWidths: [LARGURA_TABELA_DXA],
         layout: TableLayoutType.FIXED,
-        borders: { top: semBorda, bottom: semBorda, left: semBorda, right: semBorda, insideHorizontal: semBorda, insideVertical: semBorda },
+        borders: {
+          top: semBorda,
+          bottom: semBorda,
+          left: semBorda,
+          right: semBorda,
+          insideHorizontal: semBorda,
+          insideVertical: semBorda,
+        },
         rows: [
           new TableRow({
             cantSplit: true,
@@ -462,7 +494,12 @@ async function figuraDocx(
         alignment: AlignmentType.CENTER,
         keepLines: true,
         spacing: { before: 120, after: 180 },
-        children: [texto(`${titulo} – imagem indisponível. ${descricaoComFonte}`, { italico: true, tamanho: 18 })],
+        children: [
+          texto(`${titulo} – imagem indisponível. ${descricaoComFonte}`, {
+            italico: true,
+            tamanho: 18,
+          }),
+        ],
       }),
     ]
   }
@@ -490,11 +527,15 @@ function assinatura(
   dataAssinatura: string = hoje(),
   opcoes: { espacado?: boolean } = {},
 ): Paragraph[] {
-  const titulos = (perito?.titulo ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean)
-  const registros = (perito?.registroProfissional ?? '').split(/\r?\n|;/).map((linha) => linha.trim()).filter(Boolean)
-  const espacoAposData = manuscrita
-    ? (opcoes.espacado ? 240 : 120)
-    : (opcoes.espacado ? 1000 : 360)
+  const titulos = (perito?.titulo ?? '')
+    .split(/\r?\n|;/)
+    .map((linha) => linha.trim())
+    .filter(Boolean)
+  const registros = (perito?.registroProfissional ?? '')
+    .split(/\r?\n|;/)
+    .map((linha) => linha.trim())
+    .filter(Boolean)
+  const espacoAposData = manuscrita ? (opcoes.espacado ? 240 : 120) : opcoes.espacado ? 1000 : 360
   return [
     new Paragraph({
       alignment: AlignmentType.CENTER,
@@ -503,24 +544,26 @@ function assinatura(
       children: [texto(`${cidade || 'São Paulo/SP'}, ${extenso(dataAssinatura)}.`)],
     }),
     ...(manuscrita
-      ? [new Paragraph({
-          alignment: AlignmentType.CENTER,
-          keepNext: true,
-          keepLines: true,
-          spacing: { before: 0, after: 0 },
-          children: [
-            new ImageRun({
-              type: 'png',
-              data: manuscrita.dados,
-              transformation: { width: manuscrita.largura, height: manuscrita.altura },
-              altText: {
-                title: 'Assinatura',
-                description: `Assinatura de ${perito?.nome ?? 'perito'}`,
-                name: 'Assinatura',
-              },
-            }),
-          ],
-        })]
+      ? [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            keepNext: true,
+            keepLines: true,
+            spacing: { before: 0, after: 0 },
+            children: [
+              new ImageRun({
+                type: 'png',
+                data: manuscrita.dados,
+                transformation: { width: manuscrita.largura, height: manuscrita.altura },
+                altText: {
+                  title: 'Assinatura',
+                  description: `Assinatura de ${perito?.nome ?? 'perito'}`,
+                  name: 'Assinatura',
+                },
+              }),
+            ],
+          }),
+        ]
       : []),
     new Paragraph({
       alignment: AlignmentType.CENTER,
@@ -530,17 +573,23 @@ function assinatura(
       spacing: { after: 0 },
       children: [texto(perito?.nome ?? '—', { negrito: true })],
     }),
-    ...titulos.map((linha) => new Paragraph({
-      alignment: AlignmentType.CENTER,
-      keepNext: true,
-      spacing: { after: 0 },
-      children: [texto(linha, { tamanho: 20 })],
-    })),
-    ...registros.map((linha, indice) => new Paragraph({
-      alignment: AlignmentType.CENTER,
-      keepNext: indice < registros.length - 1,
-      children: [texto(linha, { tamanho: 20 })],
-    })),
+    ...titulos.map(
+      (linha) =>
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          keepNext: true,
+          spacing: { after: 0 },
+          children: [texto(linha, { tamanho: 20 })],
+        }),
+    ),
+    ...registros.map(
+      (linha, indice) =>
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          keepNext: indice < registros.length - 1,
+          children: [texto(linha, { tamanho: 20 })],
+        }),
+    ),
   ]
 }
 
@@ -549,10 +598,7 @@ const enderecamento = (vara?: string | null): Paragraph[] => [
   pSemRecuo((vara ?? '').toUpperCase(), true),
 ]
 
-const enderecamentoDoParecer = (
-  vara?: string | null,
-  comarca?: string | null,
-): Paragraph[] => {
+const enderecamentoDoParecer = (vara?: string | null, comarca?: string | null): Paragraph[] => {
   const destino = [vara, comarca].filter(Boolean).join(' — ').toUpperCase()
   const linhas = [`EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA ${destino}`]
 
@@ -567,10 +613,10 @@ const enderecamentoDoParecer = (
 }
 
 /**
- * Mesmo rodapé do PDF (RODAPE em pdf.ts): o aviso de propriedade à
- * esquerda e a paginação encostada na margem direita.
+ * Mesmo rodapé do PDF (textoDoRodape em pdf.ts): a marca, ou no laudo só o
+ * nome do profissional, à esquerda e a paginação na margem direita.
  */
-function rodape(): Footer {
+function rodape(textoDoRodape: string): Footer {
   return new Footer({
     children: [
       new Paragraph({
@@ -579,8 +625,13 @@ function rodape(): Footer {
         border: { top: { style: BorderStyle.SINGLE, size: 6, color: MARCA.documentoTitulo } },
         spacing: { before: 80 },
         children: [
-          texto('© D&R Perícia Trabalhista — Propriedade intelectual exclusiva e protegida.', { tamanho: 16 }),
-          new TextRun({ children: [new Tab(), 'Página '], color: MARCA.documentoTexto, font: FONTE, size: 16 }),
+          texto(textoDoRodape, { tamanho: 16 }),
+          new TextRun({
+            children: [new Tab(), 'Página '],
+            color: MARCA.documentoTexto,
+            font: FONTE,
+            size: 16,
+          }),
           new TextRun({ children: [PageNumber.CURRENT], font: FONTE, size: 16 }),
           texto(' de ', { tamanho: 16 }),
           new TextRun({ children: [PageNumber.TOTAL_PAGES], font: FONTE, size: 16 }),
@@ -619,7 +670,11 @@ function marcaDoPerito(marca: MarcaDoDocumento): Paragraph {
   })
 }
 
-function montarDocumento(filhos: (Paragraph | Table)[], marca: MarcaDoDocumento): Document {
+function montarDocumento(
+  filhos: (Paragraph | Table)[],
+  marca: MarcaDoDocumento,
+  textoDoRodape: string,
+): Document {
   return new Document({
     styles: { default: { document: { run: { font: FONTE, size: CORPO } } } },
     // Numeração nativa das listas com marcador da matriz do perito. Fica
@@ -657,7 +712,7 @@ function montarDocumento(filhos: (Paragraph | Table)[], marca: MarcaDoDocumento)
             margin: { top: 1701, right: 1134, bottom: 1134, left: 1701, footer: 567 },
           },
         },
-        footers: { default: rodape() },
+        footers: { default: rodape(textoDoRodape) },
         children: [marcaDoPerito(marca), ...filhos],
       },
     ],
@@ -673,7 +728,8 @@ const ALTURA_UTIL_TWIPS = 16838 - 1701 - 1134
 const ESPACO_MAXIMO_CAPA = 3515
 
 /** Linhas que um texto ocupa, a tantos caracteres por linha. */
-const linhasDe = (textoLinha: string, porLinha: number) => Math.max(1, Math.ceil(textoLinha.length / porLinha))
+const linhasDe = (textoLinha: string, porLinha: number) =>
+  Math.max(1, Math.ceil(textoLinha.length / porLinha))
 
 /**
  * Espaço acima de "IDENTIFICAÇÃO DAS PARTES" na folha de rosto do DOCX.
@@ -684,13 +740,21 @@ const linhasDe = (textoLinha: string, porLinha: number) => Math.max(1, Math.ceil
  * pessimista de propósito (poucos caracteres por linha, folga no fim): se a
  * capa transbordasse, o item 1 — que abre folha nova — iria para a folha 3.
  */
-function espacoDaCapa(pericia: PericiaCompleta, marca: MarcaDoDocumento, fichas: string[], titulo: string): number {
+function espacoDaCapa(
+  pericia: PericiaCompleta,
+  marca: MarcaDoDocumento,
+  fichas: string[],
+  titulo: string,
+): number {
   const LINHA_CORPO = 414 // 12pt com a entrelinha 1,5 do corpo
   const logo = marca.altura * 15 + 380
-  const enderecamentoCapa = linhasDe(
-    `EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA ${[pericia.vara, pericia.comarca].filter(Boolean).join(' — ')}`,
-    53,
-  ) * LINHA_CORPO + 290
+  const enderecamentoCapa =
+    linhasDe(
+      `EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DO TRABALHO DA ${[pericia.vara, pericia.comarca].filter(Boolean).join(' — ')}`,
+      53,
+    ) *
+      LINHA_CORPO +
+    290
   const subtitulos = 2 * 600
   const ficha = fichas.reduce((total, valor) => total + 140 + linhasDe(valor, 52) * 250, 0)
   const tituloCapa = 510 + linhasDe(titulo, 30) * 440 + 380
@@ -701,7 +765,9 @@ function espacoDaCapa(pericia: PericiaCompleta, marca: MarcaDoDocumento, fichas:
     .filter(Boolean)
     .reduce((total, linha) => total + linhasDe(linha, 71) * LINHA_CORPO + 120, 0)
   const folga = 700
-  const livre = ALTURA_UTIL_TWIPS - (logo + enderecamentoCapa + subtitulos + ficha + tituloCapa + apresentacao + folga)
+  const livre =
+    ALTURA_UTIL_TWIPS -
+    (logo + enderecamentoCapa + subtitulos + ficha + tituloCapa + apresentacao + folga)
   return Math.max(220, Math.min(ESPACO_MAXIMO_CAPA, livre))
 }
 
@@ -739,34 +805,43 @@ async function docParecer(
   // apenas o que sai, na ordem em que sai.
   const agentesComQuadro = [
     ...(temInsalubridade ? agentesNr15.map((agente) => agente.id) : []),
-    ...(temPericulosidade ? quadrosNr16DoItem10(agentesNr16, '10').map((quadro) => quadro.agente.id) : []),
+    ...(temPericulosidade
+      ? quadrosNr16DoItem10(agentesNr16, '10').map((quadro) => quadro.agente.id)
+      : []),
   ]
-  const { secoes: fotosDeSecao, porAgente: fotosDosAgentes, numeroDaFoto } = fotosImpressasEmOrdem(
-    pericia.fotos,
-    agentesComQuadro,
-  )
+  const {
+    secoes: fotosDeSecao,
+    porAgente: fotosDosAgentes,
+    numeroDaFoto,
+  } = fotosImpressasEmOrdem(pericia.fotos, agentesComQuadro)
   const figurasDasFotos = async (fotos: typeof fotosDeSecao) => {
     const elementos: (Paragraph | Table)[] = []
     for (const foto of fotos) {
-      elementos.push(...(await figuraDocx(foto.arquivo, foto.legenda, numeroDaFoto.get(foto.id) ?? 0)))
+      elementos.push(
+        ...(await figuraDocx(foto.arquivo, foto.legenda, numeroDaFoto.get(foto.id) ?? 0)),
+      )
     }
     return elementos
   }
-  const fotosDasSecoes = async (secoes: string[]) => figurasDasFotos(
-    fotosDeSecao.filter((foto) => secoes.includes(foto.secao)),
-  )
-  const fotosDoAgente = async (agenteId: string) => figurasDasFotos(fotosDosAgentes.get(agenteId) ?? [])
+  const fotosDasSecoes = async (secoes: string[]) =>
+    figurasDasFotos(fotosDeSecao.filter((foto) => secoes.includes(foto.secao)))
+  const fotosDoAgente = async (agenteId: string) =>
+    figurasDasFotos(fotosDosAgentes.get(agenteId) ?? [])
 
-  const tituloAnalise = pericia.modalidade === 'insalubridade'
-    ? 'ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS'
-    : pericia.modalidade === 'periculosidade'
-      ? 'ANÁLISE TÉCNICA DAS ATIVIDADES E RISCOS IDENTIFICADOS'
-      : 'ANÁLISE TÉCNICA DOS AGENTES, ATIVIDADES E RISCOS IDENTIFICADOS'
+  const tituloAnalise =
+    pericia.modalidade === 'insalubridade'
+      ? 'ANÁLISE TÉCNICA DOS AGENTES IDENTIFICADOS'
+      : pericia.modalidade === 'periculosidade'
+        ? 'ANÁLISE TÉCNICA DAS ATIVIDADES E RISCOS IDENTIFICADOS'
+        : 'ANÁLISE TÉCNICA DOS AGENTES, ATIVIDADES E RISCOS IDENTIFICADOS'
   const conclusaoNr15 =
     t.conclusaoInsalubridade?.trim() ||
-    (pericia.modalidade === 'insalubridade' || !t.conclusaoPericulosidade?.trim() ? t.conclusao : '')
+    (pericia.modalidade === 'insalubridade' || !t.conclusaoPericulosidade?.trim()
+      ? t.conclusao
+      : '')
   const conclusaoNr16 =
-    t.conclusaoPericulosidade?.trim() || (pericia.modalidade === 'periculosidade' ? t.conclusao : '')
+    t.conclusaoPericulosidade?.trim() ||
+    (pericia.modalidade === 'periculosidade' ? t.conclusao : '')
   const encerramento = t.encerramento?.trim() || t.observacoesAdicionais
 
   // Mesmo contador do HTML: as seções finais são condicionais e o
@@ -779,16 +854,33 @@ async function docParecer(
 
   const fichasDaCapa: [string, string][] = [
     ['Processo nº', pericia.numeroProcesso],
-    ['Reclamante', `${pericia.reclamante}${pericia.cpfReclamante ? ` — CPF: ${mascaraCpf(pericia.cpfReclamante)}` : ''}`],
-    ['Reclamada', principal ? `${principal.razaoSocial} — ${documentoDaEmpresa(principal.cnpj)}` : '—'],
-    ...solidarias.map((e): [string, string] => ['Reclamada', `${e.razaoSocial} — ${documentoDaEmpresa(e.cnpj)}`]),
+    [
+      'Reclamante',
+      `${pericia.reclamante}${pericia.cpfReclamante ? ` — CPF: ${mascaraCpf(pericia.cpfReclamante)}` : ''}`,
+    ],
+    [
+      'Reclamada',
+      principal ? `${principal.razaoSocial} — ${documentoDaEmpresa(principal.cnpj)}` : '—',
+    ],
+    ...solidarias.map((e): [string, string] => [
+      'Reclamada',
+      `${e.razaoSocial} — ${documentoDaEmpresa(e.cnpj)}`,
+    ]),
   ]
 
   // Folha de rosto (pedido do perito): a identificação desce para perto do
   // meio da folha e o item 1 abre a folha 2. Espelha `.capa` do PDF.
   const filhos: (Paragraph | Table)[] = [
     ...enderecamentoDoParecer(pericia.vara, pericia.comarca),
-    h3('IDENTIFICAÇÃO DAS PARTES', espacoDaCapa(pericia, marca, fichasDaCapa.map(([, valor]) => valor), titulo)),
+    h3(
+      'IDENTIFICAÇÃO DAS PARTES',
+      espacoDaCapa(
+        pericia,
+        marca,
+        fichasDaCapa.map(([, valor]) => valor),
+        titulo,
+      ),
+    ),
     tabela(fichasDaCapa.map(([rotulo, valor]) => fichaLinha(rotulo, valor))),
     h1(titulo, true, false, 510),
     h3('APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA'),
@@ -798,8 +890,13 @@ async function docParecer(
     tabela([
       fichaLinha('Função Inicial', pericia.funcaoReclamante || '—'),
       fichaLinha('Data de admissão', data(pericia.admissao)),
-      fichaLinha('Data de desligamento', pericia.demissao ? data(pericia.demissao) : 'Contrato vigente'),
-      ...(pericia.dataAjuizamento ? [fichaLinha('Ajuizamento da ação', data(pericia.dataAjuizamento))] : []),
+      fichaLinha(
+        'Data de desligamento',
+        pericia.demissao ? data(pericia.demissao) : 'Contrato vigente',
+      ),
+      ...(pericia.dataAjuizamento
+        ? [fichaLinha('Ajuizamento da ação', data(pericia.dataAjuizamento))]
+        : []),
       ...(periodo ? [fichaLinha('Período avaliado', intervaloDoPeriodo(periodo))] : []),
     ]),
     h2(num.secao('DA DILIGÊNCIA TÉCNICA PERICIAL')),
@@ -810,28 +907,36 @@ async function docParecer(
 
   if (pericia.participantes.length) {
     filhos.push(
-      tabela([
-        new TableRow({
-          tableHeader: true,
-          children: [
-            celula('Nome do Participante', { cabecalho: true, larguraDxa: 2685 }),
-            celula('Qualificação / Representação', { cabecalho: true, larguraDxa: 2864 }),
-            celula('Atuação no Ato', { cabecalho: true, larguraDxa: 3401 }),
-          ],
-        }),
-        ...pericia.participantes.map((pt) => pt.papel === 'parte_reclamante_ausente'
-          ? new TableRow({ children: [celula(TEXTO_AUSENCIA_RECLAMANTE, { columnSpan: 3 })] })
-          : new TableRow({
-              children: [
-                celula(pt.nome, { larguraDxa: 2685 }),
-                celula(qualificacaoParticipanteDocumento(
-                  pt.papel,
-                  pt.empresaId ? porId.get(pt.empresaId)?.razaoSocial : undefined,
-                ), { larguraDxa: 2864 }),
-                celula(ATUACAO[pt.papel] ?? '—', { larguraDxa: 3401 }),
-              ],
-            })),
-      ], [2685, 2864, 3401]),
+      tabela(
+        [
+          new TableRow({
+            tableHeader: true,
+            children: [
+              celula('Nome do Participante', { cabecalho: true, larguraDxa: 2685 }),
+              celula('Qualificação / Representação', { cabecalho: true, larguraDxa: 2864 }),
+              celula('Atuação no Ato', { cabecalho: true, larguraDxa: 3401 }),
+            ],
+          }),
+          ...pericia.participantes.map((pt) =>
+            pt.papel === 'parte_reclamante_ausente'
+              ? new TableRow({ children: [celula(TEXTO_AUSENCIA_RECLAMANTE, { columnSpan: 3 })] })
+              : new TableRow({
+                  children: [
+                    celula(pt.nome, { larguraDxa: 2685 }),
+                    celula(
+                      qualificacaoParticipanteDocumento(
+                        pt.papel,
+                        pt.empresaId ? porId.get(pt.empresaId)?.razaoSocial : undefined,
+                      ),
+                      { larguraDxa: 2864 },
+                    ),
+                    celula(ATUACAO[pt.papel] ?? '—', { larguraDxa: 3401 }),
+                  ],
+                }),
+          ),
+        ],
+        [2685, 2864, 3401],
+      ),
     )
   }
 
@@ -854,7 +959,10 @@ async function docParecer(
     ...blocos(t.descricaoPostoTrabalho || t.descricaoAmbiente),
   )
   filhos.push(...(await fotosDasSecoes(['atividades'])))
-  filhos.push(h3(num.sub('Máquinas, Ferramentas e Equipamentos Utilizados')), ...blocos(t.maquinasFerramentas))
+  filhos.push(
+    h3(num.sub('Máquinas, Ferramentas e Equipamentos Utilizados')),
+    ...blocos(t.maquinasFerramentas),
+  )
   filhos.push(...(await fotosDasSecoes(['equipamentos'])))
   filhos.push(h3(num.sub('Constatações da Vistoria Pericial')), ...blocos(t.informacoesLevantadas))
   filhos.push(...(await fotosDasSecoes(['documentos', 'epi'])))
@@ -888,20 +996,31 @@ async function docParecer(
               children: [texto('Atividades', { negrito: true, tamanho: 20 })],
             }),
             ...(atividades.length
-              ? atividades.map((atividade) => new Paragraph({
-                  bullet: { level: 0 },
-                  spacing: { after: 20, line: 260 },
-                  children: [texto(atividade, { tamanho: 20 })],
-                }))
-              : [new Paragraph({ spacing: { after: 0 }, children: [texto('—', { tamanho: 20 })] })]),
+              ? atividades.map(
+                  (atividade) =>
+                    new Paragraph({
+                      bullet: { level: 0 },
+                      spacing: { after: 20, line: 260 },
+                      children: [texto(atividade, { tamanho: 20 })],
+                    }),
+                )
+              : [
+                  new Paragraph({ spacing: { after: 0 }, children: [texto('—', { tamanho: 20 })] }),
+                ]),
           ]
 
           return [
             new TableRow({
               cantSplit: true,
               children: [
-                celula(`Função: ${pr.funcao}`, { cabecalho: true, larguraDxa: largurasPeriodos[0] }),
-                celula(`Setor: ${pr.setor || '—'}`, { cabecalho: true, larguraDxa: largurasPeriodos[1] }),
+                celula(`Função: ${pr.funcao}`, {
+                  cabecalho: true,
+                  larguraDxa: largurasPeriodos[0],
+                }),
+                celula(`Setor: ${pr.setor || '—'}`, {
+                  cabecalho: true,
+                  larguraDxa: largurasPeriodos[1],
+                }),
                 celula(`Período: ${data(pr.inicio)} a ${pr.fim ? data(pr.fim) : 'atual'}`, {
                   cabecalho: true,
                   larguraDxa: largurasPeriodos[2],
@@ -925,12 +1044,15 @@ async function docParecer(
     )
   }
 
-  const rotuloNatureza = (tipo?: string) => ({
-    fisico: 'Agente Físico',
-    quimico: 'Agente Químico',
-    biologico: 'Agente Biológico',
-    periculosidade: 'Atividade ou Operação Perigosa',
-  } as Record<string, string>)[tipo ?? ''] ?? 'Agente'
+  const rotuloNatureza = (tipo?: string) =>
+    (
+      ({
+        fisico: 'Agente Físico',
+        quimico: 'Agente Químico',
+        biologico: 'Agente Biológico',
+        periculosidade: 'Atividade ou Operação Perigosa',
+      }) as Record<string, string>
+    )[tipo ?? ''] ?? 'Agente'
 
   /**
    * A tabela do agente. A conclusão fecha a tabela SÓ no item 10
@@ -948,23 +1070,23 @@ async function docParecer(
       ? [linhaConclusaoAgente(agente.observacao ?? '')]
       : []
     if (agente.identificadoNaAtividade === false) {
-      return opcoes.comConclusao && conclusaoDoAgente.length
-        ? [tabela(conclusaoDoAgente)]
-        : []
+      return opcoes.comConclusao && conclusaoDoAgente.length ? [tabela(conclusaoDoAgente)] : []
     }
     const conclusao = opcoes.comConclusao ? conclusaoDoAgente : []
-    return [tabela([
-      new TableRow({
-        tableHeader: true,
-        cantSplit: true,
-        children: [
-          celula('Propriedade', { cabecalho: true, larguraDxa: COLUNAS_FICHA[0] }),
-          celula('Informação', { cabecalho: true, larguraDxa: COLUNAS_FICHA[1] }),
-        ],
-      }),
-      ...linhas,
-      ...conclusao,
-    ])]
+    return [
+      tabela([
+        new TableRow({
+          tableHeader: true,
+          cantSplit: true,
+          children: [
+            celula('Propriedade', { cabecalho: true, larguraDxa: COLUNAS_FICHA[0] }),
+            celula('Informação', { cabecalho: true, larguraDxa: COLUNAS_FICHA[1] }),
+          ],
+        }),
+        ...linhas,
+        ...conclusao,
+      ]),
+    ]
   }
 
   const adicionarAgentes = (lista: typeof agentes, prefixo?: string) => {
@@ -977,33 +1099,50 @@ async function docParecer(
           : h3(apresentacao.titulo),
         ...quadroDoAgente(
           agente,
-          apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor, false, item.destaque)),
+          apresentacao.linhas.map((item) =>
+            fichaLinha(item.rotulo, item.valor, false, item.destaque),
+          ),
         ),
       )
     }
   }
 
   const adicionarVarredura = (norma: string, itens: AnexoVarreduraDocumento[]) => {
-    const rotulo = (status: AnexoVarreduraDocumento['status']) => ({
-      sem_exposicao: 'Sem exposição', exposicao_identificada: 'Avaliação da suposta exposição',
-      nao_aplicavel: 'Não aplicável', nao_avaliado: 'Pendente',
-    })[status]
-    filhos.push(tabela([
-      new TableRow({ tableHeader: true, cantSplit: true, children: [
-        celula('Anexo', { cabecalho: true }), celula('Agente / risco avaliado', { cabecalho: true }),
-        celula(`Resultado da varredura ${norma}`, { cabecalho: true }),
-      ] }),
-      ...itens.map((item) => new TableRow({ cantSplit: true, children: [
-        celula(item.numero), celula(item.tema), celula(rotulo(item.status)),
-      ] })),
-    ]))
+    const rotulo = (status: AnexoVarreduraDocumento['status']) =>
+      ({
+        sem_exposicao: 'Sem exposição',
+        exposicao_identificada: 'Avaliação da suposta exposição',
+        nao_aplicavel: 'Não aplicável',
+        nao_avaliado: 'Pendente',
+      })[status]
+    filhos.push(
+      tabela([
+        new TableRow({
+          tableHeader: true,
+          cantSplit: true,
+          children: [
+            celula('Anexo', { cabecalho: true }),
+            celula('Agente / risco avaliado', { cabecalho: true }),
+            celula(`Resultado da varredura ${norma}`, { cabecalho: true }),
+          ],
+        }),
+        ...itens.map(
+          (item) =>
+            new TableRow({
+              cantSplit: true,
+              children: [celula(item.numero), celula(item.tema), celula(rotulo(item.status))],
+            }),
+        ),
+      ]),
+    )
   }
 
   if (temInsalubridade) {
     const cabecalho = num.sub('NR-15 — Avaliação da Exposição Ocupacional')
     const numero = cabecalho.split('. ')[0]
     filhos.push(h3(cabecalho))
-    if (exibeVarredura.nr15) adicionarVarredura('NR-15', [...varredura.nr15, ...varredura.nr15Complementares])
+    if (exibeVarredura.nr15)
+      adicionarVarredura('NR-15', [...varredura.nr15, ...varredura.nr15Complementares])
     adicionarAgentes(agentesNr15, numero)
   }
   if (temPericulosidade) {
@@ -1011,7 +1150,10 @@ async function docParecer(
     const numero = cabecalho.split('. ')[0]
     filhos.push(h3(cabecalho))
     if (exibeVarredura.nr16) adicionarVarredura('NR-16', varredura.nr16)
-    filhos.push(h4(`${numero}.1. Critério de Avaliação`), ...blocos(t.criterioAvaliacaoPericulosidade))
+    filhos.push(
+      h4(`${numero}.1. Critério de Avaliação`),
+      ...blocos(t.criterioAvaliacaoPericulosidade),
+    )
     if (t.riscoAlegadoPericulosidade?.trim()) {
       filhos.push(
         h4(`${numero}.2. Risco de Periculosidade Alegado pela Parte Reclamante`),
@@ -1035,10 +1177,16 @@ async function docParecer(
       filhos.push(h4(`${numero}.1. Alegações do Reclamante`), ...blocos(t.alegacoesReclamante))
     }
     if (t.informacoesReclamada?.trim()) {
-      filhos.push(h4(`${numero}.2. Informações prestadas pela Reclamada`), ...blocos(t.informacoesReclamada))
+      filhos.push(
+        h4(`${numero}.2. Informações prestadas pela Reclamada`),
+        ...blocos(t.informacoesReclamada),
+      )
     }
     if (t.consideracoesDivergencias?.trim()) {
-      filhos.push(h3(num.sub('Considerações sobre as divergências fáticas')), ...blocos(t.consideracoesDivergencias))
+      filhos.push(
+        h3(num.sub('Considerações sobre as divergências fáticas')),
+        ...blocos(t.consideracoesDivergencias),
+      )
     }
   }
 
@@ -1051,9 +1199,11 @@ async function docParecer(
   // modalidade já os tinha excluído. Ficavam proteções órfãs, atribuídas a
   // um agente que o leitor não encontrava em lugar nenhum.
   let numeroProtecao = 1
-  for (const agente of agentes.filter((item) =>
-    item.identificadoNaAtividade !== false
-    && (item.tipo === 'periculosidade' ? temPericulosidade : temInsalubridade))) {
+  for (const agente of agentes.filter(
+    (item) =>
+      item.identificadoNaAtividade !== false &&
+      (item.tipo === 'periculosidade' ? temPericulosidade : temInsalubridade),
+  )) {
     const apresentacao = montarApresentacaoAgente(agente)
     if (!apresentacao.protecoes.length) continue
     filhos.push(h3(apresentacao.titulo))
@@ -1062,16 +1212,21 @@ async function docParecer(
         ? `Proteção ${numeroProtecao++}`
         : protecao.titulo
       filhos.push(
-        new Paragraph({ keepNext: true, spacing: { before: 140, after: 60 }, children: [texto(tituloProtecao, { negrito: true, tamanho: 20 })] }),
-        tabela(protecao.linhas.map((item, indice, linhas) => fichaLinha(item.rotulo, item.valor, indice < linhas.length - 1, item.destaque))),
+        new Paragraph({
+          keepNext: true,
+          spacing: { before: 140, after: 60 },
+          children: [texto(tituloProtecao, { negrito: true, tamanho: 20 })],
+        }),
+        tabela(
+          protecao.linhas.map((item, indice, linhas) =>
+            fichaLinha(item.rotulo, item.valor, indice < linhas.length - 1, item.destaque),
+          ),
+        ),
       )
     }
   }
 
-  filhos.push(
-    h2(num.secao('DAS PROTEÇÕES COLETIVAS')),
-    ...blocos(t.protecoesColetivas),
-  )
+  filhos.push(h2(num.secao('DAS PROTEÇÕES COLETIVAS')), ...blocos(t.protecoesColetivas))
 
   const cabecalhoAnalise = num.secao(tituloAnalise)
   const numeroAnalise = cabecalhoAnalise.split('. ')[0]
@@ -1099,7 +1254,9 @@ async function docParecer(
         ...quadroDoAgente(
           agente,
           [
-            ...apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor, false, item.destaque)),
+            ...apresentacao.linhas.map((item) =>
+              fichaLinha(item.rotulo, item.valor, false, item.destaque),
+            ),
             ...(protecoes ? [fichaLinha('Proteções associadas', protecoes)] : []),
           ],
           { comConclusao: true },
@@ -1120,31 +1277,47 @@ async function docParecer(
     if (!prefixo || !lista.length) return
     filhos.push(h3(`${prefixo}. NR-16 — Avaliação das Atividades e Operações Perigosas`))
     for (const quadro of quadrosNr16DoItem10(lista, prefixo)) {
-      const apresentacao = quadro.agente.identificadoNaAtividade !== false
-        ? montarApresentacaoAgente(quadro.agente, { conclusiva: true })
-        : null
+      const apresentacao =
+        quadro.agente.identificadoNaAtividade !== false
+          ? montarApresentacaoAgente(quadro.agente, { conclusiva: true })
+          : null
       filhos.push(
         h4(`${quadro.numero}. ${quadro.titulo}`),
         ...(apresentacao
-          ? [tabela(apresentacao.linhas.map((item) => fichaLinha(item.rotulo, item.valor, false, item.destaque)))]
+          ? [
+              tabela(
+                apresentacao.linhas.map((item) =>
+                  fichaLinha(item.rotulo, item.valor, false, item.destaque),
+                ),
+              ),
+            ]
           : []),
       )
       filhos.push(...(await fotosDoAgente(quadro.agente.id)))
     }
   }
 
-  await adicionarQuadrosDeAnalise(agentesNr15, 'NR-15 — Avaliação da Exposição Ocupacional', numeroAnaliseNr15)
+  await adicionarQuadrosDeAnalise(
+    agentesNr15,
+    'NR-15 — Avaliação da Exposição Ocupacional',
+    numeroAnaliseNr15,
+  )
   await adicionarQuadrosNr16(agentesNr16, numeroAnaliseNr16)
   // Só os quadros: o texto livre da análise técnica saiu do formulário e do
   // documento (pedido do perito). `t.analiseTecnica` segue gravado nas
   // perícias antigas, mas não é mais impresso — igual ao PDF e à prévia.
-  if (temInsalubridade) filhos.push(h2(num.secao('NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr15))
-  if (temPericulosidade) filhos.push(h2(num.secao('NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr16))
+  if (temInsalubridade)
+    filhos.push(h2(num.secao('NR-15 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr15))
+  if (temPericulosidade)
+    filhos.push(h2(num.secao('NR-16 — CONCLUSÃO E FUNDAMENTAÇÃO')), ...blocos(conclusaoNr16))
   // No Laudo, o texto antigo (`respostasQuesitos`) segue impresso depois dos
   // grupos por origem: nenhuma resposta gravada pode sumir do documento.
-  const blocosQuesitos: BlocoQuesitosLaudoDocumento[] = tipoDocumento === 'laudo'
-    ? blocosQuesitosDoLaudoDocumento(t)
-    : t.respostasQuesitos?.trim() ? [{ chave: 'respostasQuesitos', texto: t.respostasQuesitos }] : []
+  const blocosQuesitos: BlocoQuesitosLaudoDocumento[] =
+    tipoDocumento === 'laudo'
+      ? blocosQuesitosDoLaudoDocumento(t)
+      : t.respostasQuesitos?.trim()
+        ? [{ chave: 'respostasQuesitos', texto: t.respostasQuesitos }]
+        : []
   if (blocosQuesitos.length) {
     filhos.push(h2(num.secao('RESPOSTAS AOS QUESITOS TÉCNICOS')))
     for (const bloco of blocosQuesitos) {
@@ -1200,7 +1373,9 @@ function docQuesitos(
   filhos.push(h2('Quesitos e Respostas'))
 
   if (!itens.length) {
-    filhos.push(new Paragraph({ children: [texto('[Nenhum quesito respondido]', { italico: true })] }))
+    filhos.push(
+      new Paragraph({ children: [texto('[Nenhum quesito respondido]', { italico: true })] }),
+    )
   } else {
     itens.forEach((q, i) => {
       filhos.push(pSemRecuo(`${i + 1}. ${q.pergunta}`, true))
@@ -1266,7 +1441,11 @@ function docManifestacao(
     )
   }
 
-  filhos.push(h2('III — Requerimento'), ...blocosAteOFecho(c.encerramento), ...assinatura(perito, manuscrita, pericia?.comarca))
+  filhos.push(
+    h2('III — Requerimento'),
+    ...blocosAteOFecho(c.encerramento),
+    ...assinatura(perito, manuscrita, pericia?.comarca),
+  )
   return filhos
 }
 
@@ -1294,7 +1473,11 @@ function docEsclarecimento(
     filhos.push(...enderecamento(pericia.vara), tabela(linhas))
   }
 
-  filhos.push(h2('I — Da Intimação'), ...blocos(c.introducao), h2('II — Dos Esclarecimentos Prestados'))
+  filhos.push(
+    h2('I — Da Intimação'),
+    ...blocos(c.introducao),
+    h2('II — Dos Esclarecimentos Prestados'),
+  )
 
   if (c.pontos?.length) {
     c.pontos.forEach((pt, i) => {
@@ -1304,7 +1487,9 @@ function docEsclarecimento(
           alignment: AlignmentType.JUSTIFIED,
           indent: { firstLine: RECUO_PRIMEIRA_LINHA },
           spacing: { after: 120, line: ENTRELINHA },
-          children: [texto(pt.questionamento || '[questionamento não informado]', { italico: true })],
+          children: [
+            texto(pt.questionamento || '[questionamento não informado]', { italico: true }),
+          ],
         }),
         new Paragraph({
           alignment: AlignmentType.JUSTIFIED,
@@ -1321,7 +1506,11 @@ function docEsclarecimento(
     filhos.push(new Paragraph({ children: [texto('[Nenhum ponto informado]', { italico: true })] }))
   }
 
-  filhos.push(h2('III — Conclusão'), ...blocosAteOFecho(c.conclusao), ...assinatura(perito, manuscrita, pericia?.comarca))
+  filhos.push(
+    h2('III — Conclusão'),
+    ...blocosAteOFecho(c.conclusao),
+    ...assinatura(perito, manuscrita, pericia?.comarca),
+  )
   return filhos
 }
 
@@ -1359,5 +1548,5 @@ export async function gerarDocx(
       break
   }
 
-  return Packer.toBuffer(montarDocumento(filhos, marca))
+  return Packer.toBuffer(montarDocumento(filhos, marca, textoDoRodape(doc.tipo, perito)))
 }

@@ -1,4 +1,5 @@
 import { PDFDocument } from 'pdf-lib'
+import { RODAPE_DA_MARCA } from './rodape.js'
 import puppeteer, { type Browser } from 'puppeteer'
 import { env } from '../env.js'
 import { ErroHttp } from '../erros.js'
@@ -48,13 +49,23 @@ export async function encerrarBrowser(): Promise<void> {
   await browser?.close().catch(() => undefined)
 }
 
+function escaparHtml(t: string): string {
+  return t
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
 // O rodapé ocupa a largura da folha; o recuo o alinha às margens do texto.
-const RODAPE = `
+function rodapeHtml(texto: string): string {
+  return `
   <div style="width:100%;font-family:Arial,sans-serif;font-size:8pt;color:#656155;padding:0 2cm 0 3cm;
               display:flex;justify-content:space-between;align-items:center;">
-    <span>© D&amp;R Perícia Trabalhista — Propriedade intelectual exclusiva e protegida.</span>
+    <span>${escaparHtml(texto)}</span>
     <span>Página <span class="pageNumber"></span> de <span class="totalPages"></span></span>
   </div>`
+}
 
 /**
  * Área útil da folha A4 com as margens da ABNT, em pixels CSS (96 dpi):
@@ -72,7 +83,9 @@ const LARGURA_UTIL_A4_PX = (160 / 25.4) * 96
  * para o callback continuar tipado sem trazer o DOM inteiro.
  */
 declare const document: {
-  querySelector(seletor: string): { scrollHeight: number; classList: { add(classe: string): void } } | null
+  querySelector(
+    seletor: string,
+  ): { scrollHeight: number; classList: { add(classe: string): void } } | null
 }
 
 /**
@@ -82,7 +95,7 @@ declare const document: {
  * embutido (as fotos viram data URI), e um documento nunca deve
  * disparar requisição externa a partir do servidor.
  */
-export async function gerarPdf(html: string): Promise<Buffer> {
+export async function gerarPdf(html: string, rodape: string = RODAPE_DA_MARCA): Promise<Buffer> {
   const browser = await obterBrowser()
   const page = await browser.newPage()
 
@@ -117,7 +130,10 @@ export async function gerarPdf(html: string): Promise<Buffer> {
     // quebra menos, a capa mede mais baixa e um caso limítrofe "cabe" na
     // medição e estoura na impressão — foi o que aconteceu com oito
     // reclamadas. A medição só vale na largura em que o Chromium vai imprimir.
-    await page.setViewport({ width: Math.round(LARGURA_UTIL_A4_PX), height: Math.round(ALTURA_UTIL_A4_PX) })
+    await page.setViewport({
+      width: Math.round(LARGURA_UTIL_A4_PX),
+      height: Math.round(ALTURA_UTIL_A4_PX),
+    })
     await page.emulateMediaType('print')
     await page.evaluate((alturaUtilPx) => {
       const capa = document.querySelector('.capa')
@@ -130,7 +146,7 @@ export async function gerarPdf(html: string): Promise<Buffer> {
       preferCSSPageSize: true,
       displayHeaderFooter: true,
       headerTemplate: '<span></span>',
-      footerTemplate: RODAPE,
+      footerTemplate: rodapeHtml(rodape),
       // Margens da ABNT (NBR 14724), as mesmas do @page de documento-html.ts.
       margin: { top: '3cm', right: '2cm', bottom: '2cm', left: '3cm' },
       timeout: 60_000,

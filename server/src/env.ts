@@ -60,7 +60,7 @@ const schema = z.object({
   BREVO_SMTP_PORT: z.coerce.number().int().positive().default(587),
   BREVO_SMTP_USER: z.string().optional(),
   BREVO_SMTP_PASSWORD: z.string().optional(),
-  EMAIL_REMETENTE: z.string().default('D&R Perícia <nao-responda@drpericiatrabalhista.com.br>'),
+  EMAIL_REMETENTE: z.string().default('DR Perícias Trabalhista <nao-responda@drpericiatrabalhista.com.br>'),
 })
 
 const parsed = schema.safeParse(process.env)

@@ -61,7 +61,7 @@ const licenca = (extra: Partial<Licenca> & Pick<Licenca, 'id' | 'nome'>): Licenc
 const lista = (): Licenca[] => [
   licenca({
     id: 'lic-1',
-    nome: 'D&R Perícia Elite',
+    nome: 'DR Perícias Trabalhista',
     principal: true,
     equipes: 2,
     usuarios: 4,
@@ -134,7 +134,7 @@ async function montar() {
       </ToastProvider>
     </MemoryRouter>,
   )
-  await screen.findByRole('region', { name: 'Licença D&R Perícia Elite' })
+  await screen.findByRole('region', { name: 'Licença DR Perícias Trabalhista' })
 }
 
 beforeEach(() => {
@@ -171,7 +171,7 @@ describe('Licenças — o que aparece', () => {
 
     expect(screen.getByText(/3 licenças · 2 ativas/)).toBeTruthy()
 
-    const principal = within(regiao('D&R Perícia Elite'))
+    const principal = within(regiao('DR Perícias Trabalhista'))
     expect(principal.getByText('Principal')).toBeTruthy()
     expect(principal.getByText('Ativa')).toBeTruthy()
     expect(principal.getByText('41')).toBeTruthy()
@@ -188,7 +188,7 @@ describe('Licenças — o que aparece', () => {
   it('a licença principal não se suspende nem se exclui', async () => {
     await montar()
 
-    const principal = within(regiao('D&R Perícia Elite'))
+    const principal = within(regiao('DR Perícias Trabalhista'))
     expect(principal.queryByRole('button', { name: 'Suspender' })).toBeNull()
     expect(principal.queryByRole('button', { name: /^Excluir a licença/ })).toBeNull()
     expect(principal.getByRole('button', { name: 'Editar' })).toBeTruthy()

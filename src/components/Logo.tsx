@@ -7,7 +7,7 @@ import logoMte from '@/assets/orgaos/mte.png'
 
 /** Alt fixo da arte embutida — o teste de marca depende dele. */
 export const LOGO_PADRAO_ALT =
-  'D&R Perícia Trabalhista — Engenharia de Segurança e Higiene Ocupacional'
+  'DR Perícias Trabalhista — Engenharia de Segurança e Higiene Ocupacional'
 
 /** O mínimo que a marca precisa saber sobre o dono dela. */
 export interface DonoDaMarca {

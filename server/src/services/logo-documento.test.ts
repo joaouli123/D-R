@@ -54,7 +54,7 @@ describe('logo do perito no documento', () => {
     const html = await htmlDoParecer(periciaDeTeste(), [empresa], perito, 'Parecer')
 
     expect(html).toContain(`<img class="logo-oficial" src="${LOGO_OFICIAL_DATA_URI}"`)
-    expect(html).toContain('D&amp;R Perícia Trabalhista')
+    expect(html).toContain('DR Perícias Trabalhista')
   })
 
   it('o DOCX embute o arquivo da logo, e nao um link para ele', async () => {

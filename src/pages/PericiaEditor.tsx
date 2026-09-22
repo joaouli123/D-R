@@ -81,11 +81,7 @@ import {
 import { erroCas } from '@/lib/cas'
 import { patchDoProcesso } from '@/lib/consultas'
 import { cpfValido, limparDocumento, mascararCpf } from '@/lib/cadastro'
-import {
-  LIMITE_FOTOS_POR_ENVIO,
-  recusaPorQuantidade,
-  recusaPorTamanho,
-} from '@/lib/limitesUpload'
+import { LIMITE_FOTOS_POR_ENVIO, recusaPorQuantidade, recusaPorTamanho } from '@/lib/limitesUpload'
 import { prepararFotosParaEnvio } from '@/lib/prepararFotos'
 import { aplicarAnexo, referenciaNr15PorId } from '@/lib/nr15'
 import {
@@ -102,7 +98,11 @@ import { dadosAssinatura } from '@/lib/assinaturaDocumento'
 import { responsavelDaPericia } from '@/lib/responsavelPericia'
 import { comEmpresaVinculada, empresasLivres, opcoesDaLinha } from '@/lib/reclamadas'
 import { uid } from '@/lib/utils'
-import { blocosQuesitosDoLaudo, camposQuesitosDoLaudo, TITULO_QUESITOS_LEGADOS } from '@/lib/quesitosLaudo'
+import {
+  blocosQuesitosDoLaudo,
+  camposQuesitosDoLaudo,
+  TITULO_QUESITOS_LEGADOS,
+} from '@/lib/quesitosLaudo'
 import { numerarItensFinais } from '@/lib/numeracaoFinal'
 import {
   anexoLegalNr15,
@@ -408,7 +408,8 @@ export default function PericiaEditor() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const toast = useToast()
-  const { usuario, usuarios, empresas, pericias, salvarPericia, salvarDocumento, documentos } = useApp()
+  const { usuario, usuarios, empresas, pericias, salvarPericia, salvarDocumento, documentos } =
+    useApp()
 
   // Qualquer valor que não seja 'laudo' cai no Parecer: o parâmetro vem da URL
   // e um valor solto chegaria à busca do documento e ao POST.
@@ -524,7 +525,9 @@ export default function PericiaEditor() {
       if (!novos.length) return atual
       return {
         ...atual,
-        ...Object.fromEntries(novos.map((avaliacao) => [avaliacao.id, !avaliacaoCompleta(avaliacao)])),
+        ...Object.fromEntries(
+          novos.map((avaliacao) => [avaliacao.id, !avaliacaoCompleta(avaliacao)]),
+        ),
       }
     })
     // Depende só da lista de agentes: quem entra é id novo, e o resto do
@@ -573,12 +576,11 @@ export default function PericiaEditor() {
     setP((v) => ({ ...v, tecnico: { ...v.tecnico, ...patch } }))
 
   /** Atualizações simultâneas do CAEPI não podem recolocar o estado antigo de outro agente. */
-  const transformarAgentes = (
-    transformar: (agentes: AgenteAvaliado[]) => AgenteAvaliado[],
-  ) => setP((v) => ({
-    ...v,
-    tecnico: { ...v.tecnico, agentes: transformar(v.tecnico.agentes) },
-  }))
+  const transformarAgentes = (transformar: (agentes: AgenteAvaliado[]) => AgenteAvaliado[]) =>
+    setP((v) => ({
+      ...v,
+      tecnico: { ...v.tecnico, agentes: transformar(v.tecnico.agentes) },
+    }))
 
   const adicionarAgente = (agente: AgenteAvaliado) => {
     transformarAgentes((agentes) => [...agentes, agente])
@@ -614,21 +616,32 @@ export default function PericiaEditor() {
   function registrarExposicao(anexoId: string): string {
     marcarVarredura(anexoId, 'exposicao_identificada')
 
-    const existente = p.tecnico.agentes.find((agente) => agente.tipo !== 'periculosidade' && (
-      anexoId === 'ANEXO_13A'
-        ? agente.anexoNr15 === 'ANEXO_13A'
-        : anexoLegalNr15(agente.anexoNr15) === anexoId
-    ))
+    const existente = p.tecnico.agentes.find(
+      (agente) =>
+        agente.tipo !== 'periculosidade' &&
+        (anexoId === 'ANEXO_13A'
+          ? agente.anexoNr15 === 'ANEXO_13A'
+          : anexoLegalNr15(agente.anexoNr15) === anexoId),
+    )
     if (existente) {
       definirCartaoAberto(existente.id, true)
       return idCartaoAgente(existente.id)
     }
 
-    const tipo = anexoId === 'ANEXO_11' || anexoId === 'ANEXO_12' || anexoId === 'ANEXO_13' || anexoId === 'ANEXO_13A'
-      ? 'quimico'
-      : anexoId === 'ANEXO_14' ? 'biologico' : 'fisico'
+    const tipo =
+      anexoId === 'ANEXO_11' ||
+      anexoId === 'ANEXO_12' ||
+      anexoId === 'ANEXO_13' ||
+      anexoId === 'ANEXO_13A'
+        ? 'quimico'
+        : anexoId === 'ANEXO_14'
+          ? 'biologico'
+          : 'fisico'
     if (ANEXOS_NR15.some((anexo) => anexo.id === anexoId)) {
-      const nova = aplicarAnexo({ id: uid('agn'), nome: '', tipo, criterio: 'qualitativo' } as AgenteAvaliado, anexoId)
+      const nova = aplicarAnexo(
+        { id: uid('agn'), nome: '', tipo, criterio: 'qualitativo' } as AgenteAvaliado,
+        anexoId,
+      )
       adicionarAgente(nova)
       return idCartaoAgente(nova.id)
     }
@@ -638,18 +651,28 @@ export default function PericiaEditor() {
     // lá o anexo segue pendente — e cada clique criava mais uma avaliação em
     // branco. Agora reaproveita a que está esperando a escolha e leva o
     // perito direto ao campo.
-    const emBranco = p.tecnico.agentes.find((agente) =>
-      agente.tipo === tipo && !agente.anexoNr15 && !agente.nome?.trim())
+    const emBranco = p.tecnico.agentes.find(
+      (agente) => agente.tipo === tipo && !agente.anexoNr15 && !agente.nome?.trim(),
+    )
     const idAvaliacao = emBranco?.id ?? uid('agn')
     if (emBranco) definirCartaoAberto(emBranco.id, true)
-    else adicionarAgente({ id: idAvaliacao, nome: '', tipo, criterio: 'qualitativo' } as AgenteAvaliado)
+    else
+      adicionarAgente({
+        id: idAvaliacao,
+        nome: '',
+        tipo,
+        criterio: 'qualitativo',
+      } as AgenteAvaliado)
     return `agente-${idAvaliacao}-anexoNr15`
   }
 
   function novaAvaliacaoNr16(): string {
     const idAvaliacao = uid('ris')
     adicionarAgente({
-      id: idAvaliacao, nome: '', tipo: 'periculosidade', criterio: 'qualitativo',
+      id: idAvaliacao,
+      nome: '',
+      tipo: 'periculosidade',
+      criterio: 'qualitativo',
     } as AgenteAvaliado)
     return idAvaliacao
   }
@@ -666,7 +689,11 @@ export default function PericiaEditor() {
       setAlvoFoco(idCartaoAgente(novaAvaliacaoNr16()))
       return
     }
-    if (pendencia.motivo === 'sem avaliação detalhada' && pendencia.norma === 'NR-15' && pendencia.anexoId) {
+    if (
+      pendencia.motivo === 'sem avaliação detalhada' &&
+      pendencia.norma === 'NR-15' &&
+      pendencia.anexoId
+    ) {
       setAlvoFoco(registrarExposicao(pendencia.anexoId))
       return
     }
@@ -676,9 +703,10 @@ export default function PericiaEditor() {
   const atualizarAgente = (
     idAgente: string,
     transformar: (agente: AgenteAvaliado) => AgenteAvaliado,
-  ) => transformarAgentes((agentes) =>
-    agentes.map((agente) => agente.id === idAgente ? transformar(agente) : agente),
-  )
+  ) =>
+    transformarAgentes((agentes) =>
+      agentes.map((agente) => (agente.id === idAgente ? transformar(agente) : agente)),
+    )
 
   // As fotos da medição pertencem à avaliação: excluí-la sem elas deixaria
   // imagens órfãs no servidor, fora de qualquer tabela. Por isso a exclusão
@@ -687,7 +715,9 @@ export default function PericiaEditor() {
   const removerAgente = async (idAgente: string) => {
     const fotosDoAgente = pRef.current.fotos.filter((foto) => foto.agenteId === idAgente)
     if (fotosDoAgente.length) {
-      const nome = pRef.current.tecnico.agentes.find((agente) => agente.id === idAgente)?.nome?.trim() || 'Esta avaliação'
+      const nome =
+        pRef.current.tecnico.agentes.find((agente) => agente.id === idAgente)?.nome?.trim() ||
+        'Esta avaliação'
       const confirmado = window.confirm(
         `${nome} tem ${fotosDoAgente.length} foto(s) de medição vinculada(s). Excluir a avaliação também exclui essas fotos. Deseja continuar?`,
       )
@@ -725,22 +755,29 @@ export default function PericiaEditor() {
     // Parecer e Laudo partem da mesma perícia: o que o outro tipo de documento
     // deixou gravado é padrão, não edição do administrador.
     const doOutroTipo = ehAdministrador
-      ? textosPadraoDaPericia(p, usuario, empresaPrincipal, tipoDoc === 'laudo' ? 'parecer' : 'laudo')
+      ? textosPadraoDaPericia(
+          p,
+          usuario,
+          empresaPrincipal,
+          tipoDoc === 'laudo' ? 'parecer' : 'laudo',
+        )
       : {}
     const patch = ehAdministrador
       ? patchDeTextosPadrao(p.tecnico, padroes, padroesAplicados.current, doOutroTipo)
-      : Object.fromEntries(
-          CAMPOS_COM_TEXTO_PADRAO
-            .filter((campo) => p.tecnico[campo] !== padroes[campo])
-            .map((campo) => [campo, padroes[campo]]),
-        ) as Partial<Record<CampoComTextoPadrao, string>>
+      : (Object.fromEntries(
+          CAMPOS_COM_TEXTO_PADRAO.filter((campo) => p.tecnico[campo] !== padroes[campo]).map(
+            (campo) => [campo, padroes[campo]],
+          ),
+        ) as Partial<Record<CampoComTextoPadrao, string>>)
     padroesAplicados.current = padroes
     if (Object.keys(patch).length) setT(patch)
   }, [p, usuario, empresaPrincipal, ehAdministrador, tipoDoc])
 
   /** O campo, quando ele é um dos que têm texto padrão; senão, null. */
   const campoPadraoDe = (campo: string): CampoComTextoPadrao | null =>
-    (CAMPOS_COM_TEXTO_PADRAO as readonly string[]).includes(campo) ? (campo as CampoComTextoPadrao) : null
+    (CAMPOS_COM_TEXTO_PADRAO as readonly string[]).includes(campo)
+      ? (campo as CampoComTextoPadrao)
+      : null
 
   /** Devolve o campo ao texto padrão e volta a mantê-lo sincronizado. */
   function restaurarTextoPadrao(campo: CampoComTextoPadrao) {
@@ -769,7 +806,9 @@ export default function PericiaEditor() {
   // visível do editor — e numeram os subitens do 7.2 pela POSIÇÃO nessa
   // lista. Quem manda no crachá e no hint tem de ser este índice, ou o
   // editor promete um número que o arquivo assinado não usa.
-  const agentesNr15Editor = p.tecnico.agentes.filter((avaliacao) => avaliacao.tipo !== 'periculosidade')
+  const agentesNr15Editor = p.tecnico.agentes.filter(
+    (avaliacao) => avaliacao.tipo !== 'periculosidade',
+  )
   // ------------------------------------------------------------
   // A lista da tela, quebrada por função quando há vínculo.
   //
@@ -813,10 +852,12 @@ export default function PericiaEditor() {
   // Do item 11 em diante o número depende do que vai ao papel: quesitos e
   // honorários só existem quando preenchidos. É a mesma conta da prévia e dos
   // arquivos, para o título de cada cartão prometer o número que o documento usa.
-  const temQuesitosNoDocumento = tipoDoc === 'laudo'
-    ? blocosQuesitosDoLaudo(p.tecnico).length > 0
-    : Boolean(p.tecnico.respostasQuesitos?.trim())
-  const temHonorariosNoDocumento = tipoDoc === 'laudo' && (p.tecnico.honorariosPericiaisCentavos ?? 0) > 0
+  const temQuesitosNoDocumento =
+    tipoDoc === 'laudo'
+      ? blocosQuesitosDoLaudo(p.tecnico).length > 0
+      : Boolean(p.tecnico.respostasQuesitos?.trim())
+  const temHonorariosNoDocumento =
+    tipoDoc === 'laudo' && (p.tecnico.honorariosPericiaisCentavos ?? 0) > 0
   const itensFinais = numerarItensFinais({
     modalidade: p.modalidade,
     temQuesitos: temQuesitosNoDocumento,
@@ -824,11 +865,13 @@ export default function PericiaEditor() {
   })
   // Vazio, o cartão dos quesitos não tem número (a seção não é impressa); o da
   // biblioteca mostra o que ele receberia ao ser preenchido.
-  const numeroQuesitosSeImpresso = itensFinais.quesitos ?? numerarItensFinais({
-    modalidade: p.modalidade,
-    temQuesitos: true,
-    temHonorarios: temHonorariosNoDocumento,
-  }).quesitos
+  const numeroQuesitosSeImpresso =
+    itensFinais.quesitos ??
+    numerarItensFinais({
+      modalidade: p.modalidade,
+      temQuesitos: true,
+      temHonorarios: temHonorariosNoDocumento,
+    }).quesitos
   const vinculoPrincipal = p.reclamadas.find((item) => item.principal)
   const vinculosEnvolvidos = p.reclamadas.filter((item) => !item.principal && item.empresaId)
   const nomeDaEmpresa = (empresaId?: string) =>
@@ -848,17 +891,20 @@ export default function PericiaEditor() {
     {
       chave: 'reclamada_principal',
       titulo: 'Parte Reclamada Principal',
-      descricao: nomeDaEmpresa(vinculoPrincipal?.empresaId) ?? 'Defina uma reclamada principal para adicionar participantes.',
+      descricao:
+        nomeDaEmpresa(vinculoPrincipal?.empresaId) ??
+        'Defina uma reclamada principal para adicionar participantes.',
       empresaId: vinculoPrincipal?.empresaId,
       desabilitado: !vinculoPrincipal?.empresaId,
     },
     {
       chave: 'reclamadas_envolvidas',
       titulo: 'Parte Reclamada Envolvida no Processo',
-      descricao: vinculosEnvolvidos
-        .map((item) => nomeDaEmpresa(item.empresaId))
-        .filter(Boolean)
-        .join(' • ') || 'Adicione outra empresa reclamada para vincular seus representantes.',
+      descricao:
+        vinculosEnvolvidos
+          .map((item) => nomeDaEmpresa(item.empresaId))
+          .filter(Boolean)
+          .join(' • ') || 'Adicione outra empresa reclamada para vincular seus representantes.',
       empresaId: vinculosEnvolvidos[0]?.empresaId,
       desabilitado: vinculosEnvolvidos.length === 0,
     },
@@ -1100,7 +1146,10 @@ export default function PericiaEditor() {
       } catch {
         // As fotos JÁ estão gravadas. Dizer "falha ao enviar" aqui faria o
         // perito reenviar e duplicar as imagens.
-        toast('As fotos foram gravadas, mas a lista da perícia não foi atualizada. Salve o rascunho antes de sair.', 'error')
+        toast(
+          'As fotos foram gravadas, mas a lista da perícia não foi atualizada. Salve o rascunho antes de sair.',
+          'error',
+        )
       }
     } catch (e) {
       toast(api.mensagemDeErro(e, 'Falha ao enviar as fotos.'), 'error')
@@ -1147,11 +1196,20 @@ export default function PericiaEditor() {
       <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50/50 p-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-ink-800">Evidências fotográficas da avaliação</p>
-            <p className="text-xs text-ink-500">Fotos da medição feitas na vistoria, do arquivo ou direto da câmera do celular. Ficam vinculadas somente a este agente e saem no {tipoDoc === 'laudo' ? 'Laudo' : 'Parecer'} logo abaixo da tabela correspondente.</p>
+            <p className="text-sm font-semibold text-ink-800">
+              Evidências fotográficas da avaliação
+            </p>
+            <p className="text-xs text-ink-500">
+              Fotos da medição feitas na vistoria, do arquivo ou direto da câmera do celular. Ficam
+              vinculadas somente a este agente e saem no {tipoDoc === 'laudo' ? 'Laudo' : 'Parecer'}{' '}
+              logo abaixo da tabela correspondente.
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <label htmlFor={idUpload} className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-navy-700 bg-white px-3 py-1.5 text-xs font-semibold text-navy-800 hover:bg-navy-50">
+            <label
+              htmlFor={idUpload}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-navy-700 bg-white px-3 py-1.5 text-xs font-semibold text-navy-800 hover:bg-navy-50"
+            >
               <ImagePlus size={14} /> Enviar fotos
             </label>
             <input
@@ -1161,9 +1219,15 @@ export default function PericiaEditor() {
               accept="image/*"
               multiple
               className="hidden"
-              onChange={(e) => { aoSelecionar(e.target.files); e.target.value = '' }}
+              onChange={(e) => {
+                aoSelecionar(e.target.files)
+                e.target.value = ''
+              }}
             />
-            <label htmlFor={idCamera} className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-navy-700 bg-white px-3 py-1.5 text-xs font-semibold text-navy-800 hover:bg-navy-50">
+            <label
+              htmlFor={idCamera}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-navy-700 bg-white px-3 py-1.5 text-xs font-semibold text-navy-800 hover:bg-navy-50"
+            >
               <Camera size={14} /> Usar câmera
             </label>
             <input
@@ -1173,7 +1237,10 @@ export default function PericiaEditor() {
               accept="image/*"
               capture="environment"
               className="hidden"
-              onChange={(e) => { aoSelecionar(e.target.files); e.target.value = '' }}
+              onChange={(e) => {
+                aoSelecionar(e.target.files)
+                e.target.value = ''
+              }}
             />
           </div>
         </div>
@@ -1186,11 +1253,13 @@ export default function PericiaEditor() {
                 </div>
                 <input
                   value={foto.legenda}
-                  onChange={(e) => set({
-                    fotos: p.fotos.map((item) => item.id === foto.id
-                      ? { ...item, legenda: e.target.value }
-                      : item),
-                  })}
+                  onChange={(e) =>
+                    set({
+                      fotos: p.fotos.map((item) =>
+                        item.id === foto.id ? { ...item, legenda: e.target.value } : item,
+                      ),
+                    })
+                  }
                   placeholder="Legenda da medição"
                   className="mt-2 w-full rounded border border-ink-200 px-2 py-1 text-[12px] focus:border-brand-600"
                 />
@@ -1218,7 +1287,11 @@ export default function PericiaEditor() {
     return (
       <Card key="quesitos-do-laudo">
         <CardHeader
-          title={itensFinais.quesitos ? `${itensFinais.quesitos}. Respostas aos Quesitos Técnicos` : 'Respostas aos Quesitos Técnicos'}
+          title={
+            itensFinais.quesitos
+              ? `${itensFinais.quesitos}. Respostas aos Quesitos Técnicos`
+              : 'Respostas aos Quesitos Técnicos'
+          }
           subtitle="Campos opcionais do Laudo Pericial. Mantenha perguntas, respostas, numeração e quebras de linha ao colar o conteúdo dos autos. Sem nenhum texto, a seção não é impressa."
           icon={<FileText size={18} />}
         />
@@ -1236,7 +1309,11 @@ export default function PericiaEditor() {
                     size="sm"
                     variant="outline"
                     disabled={jaTemTexto}
-                    title={jaTemTexto ? 'Este campo já tem texto. Apague-o antes de marcar como não apresentado.' : undefined}
+                    title={
+                      jaTemTexto
+                        ? 'Este campo já tem texto. Apague-o antes de marcar como não apresentado.'
+                        : undefined
+                    }
                     onClick={() => setT({ [grupo.campo]: 'Não apresentado' })}
                   >
                     Não apresentado
@@ -1258,7 +1335,8 @@ export default function PericiaEditor() {
                 {TITULO_QUESITOS_LEGADOS}
               </label>
               <p className="text-xs text-ink-500">
-                Texto salvo antes de as respostas serem separadas por origem. Continua saindo no Laudo, depois dos grupos acima: passe-o para o campo certo ou mantenha aqui.
+                Texto salvo antes de as respostas serem separadas por origem. Continua saindo no
+                Laudo, depois dos grupos acima: passe-o para o campo certo ou mantenha aqui.
               </p>
               <Textarea
                 id="respostasQuesitos"
@@ -1310,13 +1388,25 @@ export default function PericiaEditor() {
       <PageHeader
         breadcrumb={id ? 'Editar perícia' : `Novo ${nomeDocumento}`}
         title={p.numeroProcesso || `Novo ${nomeDocumento}`}
-        description={p.reclamante ? `${p.reclamante} · ${p.vara}` : 'Preencha os dados do processo para começar.'}
+        description={
+          p.reclamante
+            ? `${p.reclamante} · ${p.vara}`
+            : 'Preencha os dados do processo para começar.'
+        }
         action={
           <>
-            <Button variant="ghost" icon={<ArrowLeft size={16} />} onClick={() => navigate('/pericias')}>
+            <Button
+              variant="ghost"
+              icon={<ArrowLeft size={16} />}
+              onClick={() => navigate('/pericias')}
+            >
               Voltar
             </Button>
-            <Button variant="outline" icon={<Save size={16} />} onClick={() => void salvarRascunho()}>
+            <Button
+              variant="outline"
+              icon={<Save size={16} />}
+              onClick={() => void salvarRascunho()}
+            >
               Salvar rascunho
             </Button>
           </>
@@ -1331,7 +1421,11 @@ export default function PericiaEditor() {
       {passo === 0 && (
         <div className="space-y-4">
           <Card>
-            <CardHeader title="Dados do processo" subtitle="Referência no documento: item 1" icon={<FileText size={18} />} />
+            <CardHeader
+              title="Dados do processo"
+              subtitle="Referência no documento: item 1"
+              icon={<FileText size={18} />}
+            />
             <div className="grid gap-4 p-5 sm:grid-cols-2">
               <BuscaProcesso
                 className="sm:col-span-2"
@@ -1465,13 +1559,16 @@ export default function PericiaEditor() {
             <div className="space-y-3 p-5">
               {p.reclamadas.length === 0 && (
                 <p className="text-sm text-ink-500">
-                  Nenhuma reclamada vinculada. Clique em <strong>Adicionar</strong> para escolher uma
-                  empresa já cadastrada, ou em <strong>Cadastrar empresa</strong> — a nova entra
+                  Nenhuma reclamada vinculada. Clique em <strong>Adicionar</strong> para escolher
+                  uma empresa já cadastrada, ou em <strong>Cadastrar empresa</strong> — a nova entra
                   vinculada direto neste processo.
                 </p>
               )}
               {p.reclamadas.map((r, i) => (
-                <div key={r.id} className="flex flex-wrap items-end gap-3 rounded-lg border border-ink-200 p-3">
+                <div
+                  key={r.id}
+                  className="flex flex-wrap items-end gap-3 rounded-lg border border-ink-200 p-3"
+                >
                   <Select
                     label={`Reclamada ${i + 1}`}
                     className="min-w-[240px] flex-1"
@@ -1565,7 +1662,9 @@ export default function PericiaEditor() {
                   >
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <h4 id={tituloId} className="font-semibold text-ink-900">{grupo.titulo}</h4>
+                        <h4 id={tituloId} className="font-semibold text-ink-900">
+                          {grupo.titulo}
+                        </h4>
                         <p className="text-xs text-ink-500">{grupo.descricao}</p>
                       </div>
                       <Button
@@ -1595,9 +1694,11 @@ export default function PericiaEditor() {
                       {participantes.map((pt) => (
                         <div
                           key={pt.id}
-                          className={`grid gap-3 rounded-lg border border-ink-200 bg-white p-3 ${grupo.chave === 'reclamadas_envolvidas'
-                            ? 'md:grid-cols-2 xl:grid-cols-[0.9fr_1fr_1fr_1.25fr_auto]'
-                            : 'sm:grid-cols-[1fr_1fr_1.25fr_auto]'}`}
+                          className={`grid gap-3 rounded-lg border border-ink-200 bg-white p-3 ${
+                            grupo.chave === 'reclamadas_envolvidas'
+                              ? 'md:grid-cols-2 xl:grid-cols-[0.9fr_1fr_1fr_1.25fr_auto]'
+                              : 'sm:grid-cols-[1fr_1fr_1.25fr_auto]'
+                          }`}
                         >
                           {grupo.chave === 'reclamadas_envolvidas' && (
                             <Select
@@ -1606,21 +1707,26 @@ export default function PericiaEditor() {
                               onChange={(e) =>
                                 set({
                                   participantes: p.participantes.map((x) =>
-                                    x.id === pt.id ? { ...x, empresaId: e.target.value || undefined } : x,
+                                    x.id === pt.id
+                                      ? { ...x, empresaId: e.target.value || undefined }
+                                      : x,
                                   ),
                                 })
                               }
                             >
                               {vinculosEnvolvidos.map((reclamada, indice) => (
                                 <option key={reclamada.id} value={reclamada.empresaId}>
-                                  {indice + 2}ª Reclamada — {nomeDaEmpresa(reclamada.empresaId) ?? 'Empresa não identificada'}
+                                  {indice + 2}ª Reclamada —{' '}
+                                  {nomeDaEmpresa(reclamada.empresaId) ?? 'Empresa não identificada'}
                                 </option>
                               ))}
                             </Select>
                           )}
                           {participanteAusente(pt) ? (
                             <div className="sm:col-span-1">
-                              <span className="mb-1.5 block text-sm font-medium text-ink-700">Registro</span>
+                              <span className="mb-1.5 block text-sm font-medium text-ink-700">
+                                Registro
+                              </span>
                               <div className="flex min-h-10 items-center rounded-md border border-navy-200 bg-navy-50 px-3 py-2 text-sm text-navy-800">
                                 {TEXTO_AUSENCIA_RECLAMANTE}
                               </div>
@@ -1644,22 +1750,31 @@ export default function PericiaEditor() {
                             onChange={(e) =>
                               set({
                                 participantes: p.participantes.map((x) =>
-                                  x.id === pt.id ? {
-                                    ...x,
-                                    papel: e.target.value as Participante['papel'],
-                                    nome: e.target.value === 'parte_reclamante_ausente' ? '' : x.nome,
-                                  } : x,
+                                  x.id === pt.id
+                                    ? {
+                                        ...x,
+                                        papel: e.target.value as Participante['papel'],
+                                        nome:
+                                          e.target.value === 'parte_reclamante_ausente'
+                                            ? ''
+                                            : x.nome,
+                                      }
+                                    : x,
                                 ),
                               })
                             }
                           >
                             {papeisDoGrupo(grupo.chave, pt.papel).map((pp) => (
-                              <option key={pp.value} value={pp.value}>{pp.label}</option>
+                              <option key={pp.value} value={pp.value}>
+                                {pp.label}
+                              </option>
                             ))}
                           </Select>
                           {!participanteAusente(pt) && (
                             <div>
-                              <span className="mb-1.5 block text-sm font-medium text-ink-700">Atuação no ato</span>
+                              <span className="mb-1.5 block text-sm font-medium text-ink-700">
+                                Atuação no ato
+                              </span>
                               <div className="flex min-h-10 items-center rounded-md border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-700">
                                 {dadosPapel(pt.papel).atuacao}
                               </div>
@@ -1669,7 +1784,9 @@ export default function PericiaEditor() {
                             variant="ghost"
                             className="mb-1 self-end text-red-600 hover:bg-red-50"
                             icon={<Trash2 size={15} />}
-                            onClick={() => set({ participantes: p.participantes.filter((x) => x.id !== pt.id) })}
+                            onClick={() =>
+                              set({ participantes: p.participantes.filter((x) => x.id !== pt.id) })
+                            }
                             aria-label="Remover participante"
                           />
                         </div>
@@ -1685,7 +1802,11 @@ export default function PericiaEditor() {
           </Card>
 
           <Card>
-            <CardHeader title="Vistoria" subtitle="Referência no documento: item 2" icon={<Camera size={18} />} />
+            <CardHeader
+              title="Vistoria"
+              subtitle="Referência no documento: item 2"
+              icon={<Camera size={18} />}
+            />
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-5">
               <Input
                 label="Data da vistoria"
@@ -1753,65 +1874,111 @@ export default function PericiaEditor() {
           */}
           {(
             [
-              { campo: 'apresentacao', secao: 'apresentacao', referencia: undefined, label: 'APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA', rows: 5 },
-              { campo: 'descricaoAmbiente', secao: 'ambiente', referencia: '3.1', label: '3.1. Instalações Físicas', rows: 6 },
-              { campo: 'descricaoPostoTrabalho', secao: 'ambiente', referencia: '6.1', label: '6.1. Descrição do Posto de Trabalho', rows: 6 },
-              { campo: 'maquinasFerramentas', secao: 'atividades', referencia: '6.2', label: '6.2. Máquinas, Ferramentas e Equipamentos Utilizados', rows: 5 },
-              { campo: 'produtosUtilizados', secao: 'atividades', referencia: '6.4', label: '6.4. Produtos Utilizados Habitualmente nas Atividades', rows: 5 },
-              { campo: 'atividadesFuncoes', secao: 'atividades', referencia: '7.1', label: '7.1. Atividades Efetivamente Exercidas', rows: 6 },
+              {
+                campo: 'apresentacao',
+                secao: 'apresentacao',
+                referencia: undefined,
+                label: 'APRESENTAÇÃO E QUALIFICAÇÃO TÉCNICA',
+                rows: 5,
+              },
+              {
+                campo: 'descricaoAmbiente',
+                secao: 'ambiente',
+                referencia: '3.1',
+                label: '3.1. Instalações Físicas',
+                rows: 6,
+              },
+              {
+                campo: 'descricaoPostoTrabalho',
+                secao: 'ambiente',
+                referencia: '6.1',
+                label: '6.1. Descrição do Posto de Trabalho',
+                rows: 6,
+              },
+              {
+                campo: 'maquinasFerramentas',
+                secao: 'atividades',
+                referencia: '6.2',
+                label: '6.2. Máquinas, Ferramentas e Equipamentos Utilizados',
+                rows: 5,
+              },
+              {
+                campo: 'produtosUtilizados',
+                secao: 'atividades',
+                referencia: '6.4',
+                label: '6.4. Produtos Utilizados Habitualmente nas Atividades',
+                rows: 5,
+              },
+              {
+                campo: 'atividadesFuncoes',
+                secao: 'atividades',
+                referencia: '7.1',
+                label: '7.1. Atividades Efetivamente Exercidas',
+                rows: 6,
+              },
             ] as const
           ).map((f) => {
             const campoPadrao = campoPadraoDe(f.campo)
             return (
-            <Card key={f.campo}>
-              <CardHeader
-                title={f.label}
-                subtitle={campoPadrao
-                  ? ehAdministrador
-                    ? 'Texto oficial da matriz — edição administrativa habilitada.'
-                    : 'Texto oficial da matriz — protegido contra alterações. Para ler inteiro: Biblioteca › Textos oficiais da matriz.'
-                  : undefined}
-                icon={<FileText size={18} />}
-                action={
-                  <div className="flex flex-wrap gap-2">
-                    {campoPadrao && ehAdministrador && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        icon={<RotateCcw size={14} />}
-                        onClick={() => restaurarTextoPadrao(campoPadrao)}
-                      >
-                        Texto padrão
-                      </Button>
-                    )}
-                    {(!campoPadrao || ehAdministrador) && <Button
-                      size="sm"
-                      variant="outline"
-                      icon={<BookOpen size={14} />}
-                      aria-label={f.referencia ? `Abrir biblioteca do item ${f.referencia}` : 'Abrir biblioteca da apresentação'}
-                      onClick={() => setBibliotecaPara({
-                        campo: f.campo,
-                        secao: f.secao,
-                        // Cataloga pela chave canônica; mostra o número impresso.
-                        referencia: CHAVE_BIBLIOTECA_POR_CAMPO[f.campo] ?? f.referencia,
-                        rotuloReferencia: f.referencia,
-                      })}
-                    >
-                      Biblioteca
-                    </Button>}
-                  </div>
-                }
-              />
-              <div className="p-5">
-                <Textarea
-                  rows={f.rows}
-                  value={(p.tecnico[f.campo] as string | undefined) ?? ''}
-                  readOnly={Boolean(campoPadrao && !ehAdministrador)}
-                  onChange={(e) => setT({ [f.campo]: e.target.value } as never)}
-                  placeholder="Digite ou insira um texto da sua biblioteca pessoal…"
+              <Card key={f.campo}>
+                <CardHeader
+                  title={f.label}
+                  subtitle={
+                    campoPadrao
+                      ? ehAdministrador
+                        ? 'Texto oficial da matriz — edição administrativa habilitada.'
+                        : 'Texto oficial da matriz — protegido contra alterações. Para ler inteiro: Biblioteca › Textos oficiais da matriz.'
+                      : undefined
+                  }
+                  icon={<FileText size={18} />}
+                  action={
+                    <div className="flex flex-wrap gap-2">
+                      {campoPadrao && ehAdministrador && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={<RotateCcw size={14} />}
+                          onClick={() => restaurarTextoPadrao(campoPadrao)}
+                        >
+                          Texto padrão
+                        </Button>
+                      )}
+                      {(!campoPadrao || ehAdministrador) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          icon={<BookOpen size={14} />}
+                          aria-label={
+                            f.referencia
+                              ? `Abrir biblioteca do item ${f.referencia}`
+                              : 'Abrir biblioteca da apresentação'
+                          }
+                          onClick={() =>
+                            setBibliotecaPara({
+                              campo: f.campo,
+                              secao: f.secao,
+                              // Cataloga pela chave canônica; mostra o número impresso.
+                              referencia: CHAVE_BIBLIOTECA_POR_CAMPO[f.campo] ?? f.referencia,
+                              rotuloReferencia: f.referencia,
+                            })
+                          }
+                        >
+                          Biblioteca
+                        </Button>
+                      )}
+                    </div>
+                  }
                 />
-              </div>
-            </Card>
+                <div className="p-5">
+                  <Textarea
+                    rows={f.rows}
+                    value={(p.tecnico[f.campo] as string | undefined) ?? ''}
+                    readOnly={Boolean(campoPadrao && !ehAdministrador)}
+                    onChange={(e) => setT({ [f.campo]: e.target.value } as never)}
+                    placeholder="Digite ou insira um texto da sua biblioteca pessoal…"
+                  />
+                </div>
+              </Card>
             )
           })}
 
@@ -1830,7 +1997,14 @@ export default function PericiaEditor() {
                     setT({
                       periodos: [
                         ...p.tecnico.periodos,
-                        { id: uid('prd'), funcao: '', inicio: '', fim: '', setor: '', descricaoAtividades: '' },
+                        {
+                          id: uid('prd'),
+                          funcao: '',
+                          inicio: '',
+                          fim: '',
+                          setor: '',
+                          descricaoAtividades: '',
+                        },
                       ] as PeriodoFuncao[],
                     })
                   }
@@ -1904,7 +2078,9 @@ export default function PericiaEditor() {
                     rows={4}
                     label="Atividades do período"
                     hint="Informe uma atividade por linha; o documento monta a lista automaticamente."
-                    placeholder={'Ex.:\nOperou a máquina impressora.\nAnalisou os clichês antes da impressão.'}
+                    placeholder={
+                      'Ex.:\nOperou a máquina impressora.\nAnalisou os clichês antes da impressão.'
+                    }
                     value={pr.descricaoAtividades ?? ''}
                     onChange={(e) =>
                       setT({
@@ -1929,11 +2105,13 @@ export default function PericiaEditor() {
         <div className="space-y-4">
           <Card>
             <CardHeader
-              title={p.modalidade === 'ambas'
-                ? 'Avaliações NR-15 (item 7.2) e NR-16 (item 7.3)'
-                : p.modalidade === 'insalubridade'
-                  ? '7.2. Avaliação da Exposição Ocupacional — NR-15'
-                  : `${numeroNr16Editor}. Avaliação das Atividades e Operações Perigosas — NR-16`}
+              title={
+                p.modalidade === 'ambas'
+                  ? 'Avaliações NR-15 (item 7.2) e NR-16 (item 7.3)'
+                  : p.modalidade === 'insalubridade'
+                    ? '7.2. Avaliação da Exposição Ocupacional — NR-15'
+                    : `${numeroNr16Editor}. Avaliação das Atividades e Operações Perigosas — NR-16`
+              }
               subtitle="A modalidade escolhida no processo define as matrizes NR-15 e NR-16 exibidas nesta etapa."
               icon={<FileText size={18} />}
               action={
@@ -1943,9 +2121,15 @@ export default function PericiaEditor() {
                       size="sm"
                       variant="outline"
                       icon={<Plus size={14} />}
-                      onClick={() => adicionarAgente({
-                        id: uid('agn'), nome: '', tipo: 'quimico', criterio: 'qualitativo', grau: 'medio',
-                      } as AgenteAvaliado)}
+                      onClick={() =>
+                        adicionarAgente({
+                          id: uid('agn'),
+                          nome: '',
+                          tipo: 'quimico',
+                          criterio: 'qualitativo',
+                          grau: 'medio',
+                        } as AgenteAvaliado)
+                      }
                     >
                       Novo agente NR-15
                     </Button>
@@ -1978,172 +2162,223 @@ export default function PericiaEditor() {
               {p.modalidade !== 'insalubridade' && (
                 <ResumoVarreduraNr16
                   itens={varreduraNormativa.nr16}
-                  onRegistrarAvaliacao={p.tecnico.agentes.some((avaliacao) => avaliacao.tipo === 'periculosidade')
-                    ? undefined
-                    : () => setAlvoFoco(idCartaoAgente(novaAvaliacaoNr16()))}
+                  onRegistrarAvaliacao={
+                    p.tecnico.agentes.some((avaliacao) => avaliacao.tipo === 'periculosidade')
+                      ? undefined
+                      : () => setAlvoFoco(idCartaoAgente(novaAvaliacaoNr16()))
+                  }
                 />
               )}
               {blocosDeAvaliacao.map((bloco, indiceBloco) => (
                 <div key={`${indiceBloco}-${bloco.rotulo ?? ''}`} className="space-y-3">
-                {bloco.rotulo && (
-                  <h3 className="flex items-center gap-2 pt-1 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
-                    <span className="h-px flex-1 bg-ink-200" aria-hidden="true" />
-                    {bloco.rotulo}
-                    <span className="h-px flex-1 bg-ink-200" aria-hidden="true" />
-                  </h3>
-                )}
-                {bloco.agentes.map((a) => {
-                if (a.tipo === 'periculosidade') {
-                  return (
-                    <div
-                      key={a.id}
-                      id={idCartaoAgente(a.id)}
-                      tabIndex={-1}
-                      className="rounded-lg border border-ink-200 border-l-4 border-l-amber-500 p-3 outline-none focus:ring-2 focus:ring-amber-400"
-                    >
-                      <SecaoColapsavel
-                        titulo={a.nome?.trim() || 'Nova avaliação NR-16'}
-                        resumo={resumoNr16(a)}
-                        aberto={cartaoAberto(a)}
-                        onAbertoChange={(aberto) => definirCartaoAberto(a.id, aberto)}
-                        acoes={
-                          <div className="flex items-center gap-2">
-                            {!cartaoAberto(a) && !nr16Completa(a) && (
-                              <Badge tone="amber">pendente</Badge>
-                            )}
-                            {/* O quadro da avaliação NR-16 não tem número próprio:
+                  {bloco.rotulo && (
+                    <h3 className="flex items-center gap-2 pt-1 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+                      <span className="h-px flex-1 bg-ink-200" aria-hidden="true" />
+                      {bloco.rotulo}
+                      <span className="h-px flex-1 bg-ink-200" aria-hidden="true" />
+                    </h3>
+                  )}
+                  {bloco.agentes.map((a) => {
+                    if (a.tipo === 'periculosidade') {
+                      return (
+                        <div
+                          key={a.id}
+                          id={idCartaoAgente(a.id)}
+                          tabIndex={-1}
+                          className="rounded-lg border border-ink-200 border-l-4 border-l-amber-500 p-3 outline-none focus:ring-2 focus:ring-amber-400"
+                        >
+                          <SecaoColapsavel
+                            titulo={a.nome?.trim() || 'Nova avaliação NR-16'}
+                            resumo={resumoNr16(a)}
+                            aberto={cartaoAberto(a)}
+                            onAbertoChange={(aberto) => definirCartaoAberto(a.id, aberto)}
+                            acoes={
+                              <div className="flex items-center gap-2">
+                                {!cartaoAberto(a) && !nr16Completa(a) && (
+                                  <Badge tone="amber">pendente</Badge>
+                                )}
+                                {/* O quadro da avaliação NR-16 não tem número próprio:
                                 ele sai dentro da tabela do item 7 e como quadro do
                                 item 10. O ".2" daqui apontava para o 7.3.2, que é a
                                 transcrição do risco alegado — outro campo. */}
-                            <Badge tone="navy">Itens {numeroNr16Editor} e {numeroAnaliseNr16Editor}</Badge>
-                            <Button
-                              variant="ghost"
-                              className="text-red-600 hover:bg-red-50"
-                              icon={<Trash2 size={15} />}
-                              onClick={() => void removerAgente(a.id)}
-                              aria-label="Remover avaliação NR-16"
+                                <Badge tone="navy">
+                                  Itens {numeroNr16Editor} e {numeroAnaliseNr16Editor}
+                                </Badge>
+                                <Button
+                                  variant="ghost"
+                                  className="text-red-600 hover:bg-red-50"
+                                  icon={<Trash2 size={15} />}
+                                  onClick={() => void removerAgente(a.id)}
+                                  aria-label="Remover avaliação NR-16"
+                                />
+                              </div>
+                            }
+                          >
+                            <SeletorFuncaoPosto
+                              agente={a}
+                              periodos={p.tecnico.periodos}
+                              onChange={(periodoId) =>
+                                atualizarAgente(a.id, (atual) => ({ ...atual, periodoId }))
+                              }
                             />
-                          </div>
-                        }
-                      >
-                        <SeletorFuncaoPosto
-                          agente={a}
-                          periodos={p.tecnico.periodos}
-                          onChange={(periodoId) => atualizarAgente(a.id, (atual) => ({ ...atual, periodoId }))}
-                        />
-                        <PericulosidadeNr16Fields
-                          avaliacao={a}
-                          onChange={(avaliacaoAtualizada) => atualizarAgente(a.id, () => avaliacaoAtualizada)}
-                        />
-                        {painelFotosDoAgente(a)}
-                        <BotaoInserirNoLaudo onInserir={() => definirCartaoAberto(a.id, false)} />
-                      </SecaoColapsavel>
-                    </div>
-                  )
-                }
-                const referenciaNormativaSelecionada = Boolean(a.referenciaNormativaId)
-                const regraAnexo = obterRegraAnexo(a.anexoNr15)
-                const agenteFixo = Boolean(regraAnexo?.agenteFixo)
-                const grauFixo = regraAnexo?.grausPermitidos.length === 1
-                const exibeCas = regraAnexo?.exibeCas ?? true
-                // O CAS só fica travado quando vem de quem o impõe: a substância
-                // do Anexo 11 (a lista traz o número) ou o agente fixo do Anexo
-                // 12. As atividades do Anexo 13 não trazem CAS — ali o perito
-                // registra o do composto específico, quando houver.
-                const casImposto = Boolean(referenciaNr15PorId(a.referenciaNormativaId)?.cas) || Boolean(regraAnexo?.casFixo)
-                // O número que sai no documento é posicional (documento-html.ts,
-                // docx.ts e DocumentoPreview.tsx usam `indice + 1` sobre a lista
-                // dos agentes NR-15).
-                const numeroAvaliacao = `7.2.${agentesNr15Editor.findIndex((item) => item.id === a.id) + 1}`
-                // Já a Biblioteca cataloga por natureza: REFERENCIAS_PARECER é
-                // fixo (7.2.1 Físico, 7.2.2 Químico, 7.2.3 Biológico) e é por ele
-                // que o filtro dos textos salvos casa.
-                const referenciaBiblioteca = a.tipo === 'biologico'
-                  ? '7.2.3'
-                  : a.tipo === 'quimico'
-                    ? '7.2.2'
-                    : '7.2.1'
-                return (
-                <div
-                  key={a.id}
-                  id={idCartaoAgente(a.id)}
-                  tabIndex={-1}
-                  className="rounded-lg border border-ink-200 border-l-4 border-l-navy-700 p-3 outline-none focus:ring-2 focus:ring-amber-400"
-                >
-                  <SecaoColapsavel
-                    titulo={a.nome?.trim() || regraAnexo?.agenteFixo || 'Novo agente NR-15'}
-                    resumo={resumoNr15(a)}
-                    aberto={cartaoAberto(a)}
-                    onAbertoChange={(aberto) => definirCartaoAberto(a.id, aberto)}
-                    acoes={
-                      <div className="flex shrink-0 items-center gap-2">
-                        {!cartaoAberto(a) && !nr15Completa(a) && (
-                          <Badge tone="amber">pendente</Badge>
-                        )}
-                        <Badge tone="navy">Item {numeroAvaliacao}</Badge>
-                        <Button
-                          variant="ghost"
-                          className="text-red-600 hover:bg-red-50"
-                          icon={<Trash2 size={15} />}
-                          onClick={() => void removerAgente(a.id)}
-                          aria-label="Remover agente"
-                        />
-                      </div>
+                            <PericulosidadeNr16Fields
+                              avaliacao={a}
+                              onChange={(avaliacaoAtualizada) =>
+                                atualizarAgente(a.id, () => avaliacaoAtualizada)
+                              }
+                            />
+                            {painelFotosDoAgente(a)}
+                            <BotaoInserirNoLaudo
+                              onInserir={() => definirCartaoAberto(a.id, false)}
+                            />
+                          </SecaoColapsavel>
+                        </div>
+                      )
                     }
-                  >
-                  <ol aria-label="Fluxo técnico do agente" className="mb-3 mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
-                    <li className="text-navy-700">Agente</li><li aria-hidden="true">→</li><li>Medição</li><li aria-hidden="true">→</li><li>Proteção</li><li aria-hidden="true">→</li><li>Conclusão</li>
-                  </ol>
-                  <SeletorFuncaoPosto
-                    agente={a}
-                    periodos={p.tecnico.periodos}
-                    onChange={(periodoId) => atualizarAgente(a.id, (atual) => ({ ...atual, periodoId }))}
-                  />
-                  <div className={`grid gap-3 ${exibeCas
-                    ? 'md:grid-cols-[minmax(220px,1.4fr)_minmax(120px,0.65fr)_minmax(230px,1fr)_minmax(130px,0.65fr)]'
-                    : 'md:grid-cols-[minmax(240px,1.5fr)_minmax(240px,1fr)_minmax(150px,0.7fr)]'}`}>
-                    <Input
-                      label="Agente"
-                      value={regraAnexo?.agenteFixo ?? a.nome}
-                      readOnly={referenciaNormativaSelecionada || agenteFixo}
-                      onChange={(e) => atualizarAgente(a.id, (atual) => ({ ...atual, nome: e.target.value }))}
-                    />
-                    {exibeCas && <Input
-                      label="CAS"
-                      value={a.cas ?? ''}
-                      disabled={casImposto}
-                      error={casImposto ? undefined : erroCas(a.cas)}
-                      onChange={(e) => atualizarAgente(a.id, (atual) => ({ ...atual, cas: e.target.value }))}
-                    />}
-                    <Select
-                      id={`agente-${a.id}-anexoNr15`}
-                      label="Anexo NR-15"
-                      value={a.anexoNr15 ?? ''}
-                      onChange={(e) => atualizarAgente(a.id, (atual) => aplicarAnexo(atual, e.target.value))}
-                    >
-                      <option value="">—</option>
-                      {ANEXOS_NR15.map((an) => (
-                        <option key={an.id} value={an.id}>
-                          {an.label}
-                        </option>
-                      ))}
-                    </Select>
-                    <Select
-                      label="Grau"
-                      value={a.grau ?? ''}
-                      disabled={referenciaNormativaSelecionada || grauFixo}
-                      onChange={(e) => atualizarAgente(a.id, (atual) => ({
-                        ...atual,
-                        grau: e.target.value as AgenteAvaliado['grau'],
-                      }))}
-                    >
-                      <option value="">— selecione —</option>
-                      {(regraAnexo?.grausPermitidos ?? ['minimo', 'medio', 'maximo', 'nao_caracterizado']).map((grau) => (
-                        <option key={grau} value={grau}>{ROTULOS_GRAU[grau]}</option>
-                      ))}
-                    </Select>
-                  </div>
-                  {/* A conclusão subiu para logo abaixo da identificação do
+                    const referenciaNormativaSelecionada = Boolean(a.referenciaNormativaId)
+                    const regraAnexo = obterRegraAnexo(a.anexoNr15)
+                    const agenteFixo = Boolean(regraAnexo?.agenteFixo)
+                    const grauFixo = regraAnexo?.grausPermitidos.length === 1
+                    const exibeCas = regraAnexo?.exibeCas ?? true
+                    // O CAS só fica travado quando vem de quem o impõe: a substância
+                    // do Anexo 11 (a lista traz o número) ou o agente fixo do Anexo
+                    // 12. As atividades do Anexo 13 não trazem CAS — ali o perito
+                    // registra o do composto específico, quando houver.
+                    const casImposto =
+                      Boolean(referenciaNr15PorId(a.referenciaNormativaId)?.cas) ||
+                      Boolean(regraAnexo?.casFixo)
+                    // O número que sai no documento é posicional (documento-html.ts,
+                    // docx.ts e DocumentoPreview.tsx usam `indice + 1` sobre a lista
+                    // dos agentes NR-15).
+                    const numeroAvaliacao = `7.2.${agentesNr15Editor.findIndex((item) => item.id === a.id) + 1}`
+                    // Já a Biblioteca cataloga por natureza: REFERENCIAS_PARECER é
+                    // fixo (7.2.1 Físico, 7.2.2 Químico, 7.2.3 Biológico) e é por ele
+                    // que o filtro dos textos salvos casa.
+                    const referenciaBiblioteca =
+                      a.tipo === 'biologico' ? '7.2.3' : a.tipo === 'quimico' ? '7.2.2' : '7.2.1'
+                    return (
+                      <div
+                        key={a.id}
+                        id={idCartaoAgente(a.id)}
+                        tabIndex={-1}
+                        className="rounded-lg border border-ink-200 border-l-4 border-l-navy-700 p-3 outline-none focus:ring-2 focus:ring-amber-400"
+                      >
+                        <SecaoColapsavel
+                          titulo={a.nome?.trim() || regraAnexo?.agenteFixo || 'Novo agente NR-15'}
+                          resumo={resumoNr15(a)}
+                          aberto={cartaoAberto(a)}
+                          onAbertoChange={(aberto) => definirCartaoAberto(a.id, aberto)}
+                          acoes={
+                            <div className="flex shrink-0 items-center gap-2">
+                              {!cartaoAberto(a) && !nr15Completa(a) && (
+                                <Badge tone="amber">pendente</Badge>
+                              )}
+                              <Badge tone="navy">Item {numeroAvaliacao}</Badge>
+                              <Button
+                                variant="ghost"
+                                className="text-red-600 hover:bg-red-50"
+                                icon={<Trash2 size={15} />}
+                                onClick={() => void removerAgente(a.id)}
+                                aria-label="Remover agente"
+                              />
+                            </div>
+                          }
+                        >
+                          <ol
+                            aria-label="Fluxo técnico do agente"
+                            className="mb-3 mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500"
+                          >
+                            <li className="text-navy-700">Agente</li>
+                            <li aria-hidden="true">→</li>
+                            <li>Medição</li>
+                            <li aria-hidden="true">→</li>
+                            <li>Proteção</li>
+                            <li aria-hidden="true">→</li>
+                            <li>Conclusão</li>
+                          </ol>
+                          <SeletorFuncaoPosto
+                            agente={a}
+                            periodos={p.tecnico.periodos}
+                            onChange={(periodoId) =>
+                              atualizarAgente(a.id, (atual) => ({ ...atual, periodoId }))
+                            }
+                          />
+                          <div
+                            className={`grid gap-3 ${
+                              exibeCas
+                                ? 'md:grid-cols-[minmax(220px,1.4fr)_minmax(120px,0.65fr)_minmax(230px,1fr)_minmax(130px,0.65fr)]'
+                                : 'md:grid-cols-[minmax(240px,1.5fr)_minmax(240px,1fr)_minmax(150px,0.7fr)]'
+                            }`}
+                          >
+                            <Input
+                              label="Agente"
+                              value={regraAnexo?.agenteFixo ?? a.nome}
+                              readOnly={referenciaNormativaSelecionada || agenteFixo}
+                              onChange={(e) =>
+                                atualizarAgente(a.id, (atual) => ({
+                                  ...atual,
+                                  nome: e.target.value,
+                                }))
+                              }
+                            />
+                            {exibeCas && (
+                              <Input
+                                label="CAS"
+                                value={a.cas ?? ''}
+                                disabled={casImposto}
+                                error={casImposto ? undefined : erroCas(a.cas)}
+                                onChange={(e) =>
+                                  atualizarAgente(a.id, (atual) => ({
+                                    ...atual,
+                                    cas: e.target.value,
+                                  }))
+                                }
+                              />
+                            )}
+                            <Select
+                              id={`agente-${a.id}-anexoNr15`}
+                              label="Anexo NR-15"
+                              value={a.anexoNr15 ?? ''}
+                              onChange={(e) =>
+                                atualizarAgente(a.id, (atual) =>
+                                  aplicarAnexo(atual, e.target.value),
+                                )
+                              }
+                            >
+                              <option value="">—</option>
+                              {ANEXOS_NR15.map((an) => (
+                                <option key={an.id} value={an.id}>
+                                  {an.label}
+                                </option>
+                              ))}
+                            </Select>
+                            <Select
+                              label="Grau"
+                              value={a.grau ?? ''}
+                              disabled={referenciaNormativaSelecionada || grauFixo}
+                              onChange={(e) =>
+                                atualizarAgente(a.id, (atual) => ({
+                                  ...atual,
+                                  grau: e.target.value as AgenteAvaliado['grau'],
+                                }))
+                              }
+                            >
+                              <option value="">— selecione —</option>
+                              {(
+                                regraAnexo?.grausPermitidos ?? [
+                                  'minimo',
+                                  'medio',
+                                  'maximo',
+                                  'nao_caracterizado',
+                                ]
+                              ).map((grau) => (
+                                <option key={grau} value={grau}>
+                                  {ROTULOS_GRAU[grau]}
+                                </option>
+                              ))}
+                            </Select>
+                          </div>
+                          {/* A conclusão subiu para logo abaixo da identificação do
                       agente. Ela ficava no fim do cartão, depois da medição,
                       dos EPIs e de dois blocos de texto normativo — e o
                       perito perguntou "em qual campo insiro o texto da
@@ -2151,100 +2386,123 @@ export default function PericiaEditor() {
                       o mais, ao fim de uma rolagem longa. Agora é a primeira
                       coisa depois do nome do agente, destacada e marcada
                       como obrigatória. */}
-                  <div className="mt-3 rounded-lg border border-brand-200 bg-brand-50/40 p-3">
-                    <Textarea
-                      id={idCampoPendente(a.id, 'observacao')}
-                      label="Conclusão da avaliação"
-                      required
-                      rows={4}
-                      value={a.observacao ?? ''}
-                      onChange={(e) => atualizarAgente(a.id, (atual) => ({
-                        ...atual,
-                        observacao: e.target.value,
-                      }))}
-                      placeholder="Registre a conclusão específica deste agente. Campo obrigatório para emitir o documento."
-                      hint={`Sai no item ${numeroAvaliacao} do documento, dentro desta avaliação. A conclusão do laudo inteiro é outro campo, na etapa "Conclusão do laudo".`}
-                    />
-                    <div className="mt-2 flex justify-end">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        icon={<BookOpen size={14} />}
-                        aria-label={`Abrir biblioteca da conclusão de ${a.nome || 'agente'}`}
-                        onClick={() => setBibliotecaPara({
-                          agenteId: a.id,
-                          secao: 'conclusao',
-                          referencia: referenciaBiblioteca,
-                          rotuloReferencia: numeroAvaliacao,
-                        })}
-                      >
-                        Biblioteca
-                      </Button>
-                    </div>
-                  </div>
-                  <AgenteNr15Fields
-                    agente={a}
-                    onChange={(agenteAtualizado) => atualizarAgente(a.id, () => agenteAtualizado)}
-                  />
-                  <div className="mt-3 rounded-lg border border-ink-200 bg-ink-50/60 p-3">
-                    <Checkbox
-                      label="Agente identificado na atividade"
-                      description="Desmarque quando o agente não estiver presente; o documento mostrará somente o título e a conclusão."
-                      checked={a.identificadoNaAtividade !== false}
-                      onChange={(e) => atualizarAgente(a.id, (atual) => ({
-                        ...atual,
-                        identificadoNaAtividade: e.target.checked,
-                      }))}
-                    />
-                  </div>
-                  <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    <Select
-                      label="Natureza"
-                      value={a.tipo}
-                      disabled={referenciaNormativaSelecionada || Boolean(regraAnexo?.tipoFixo)}
-                      onChange={(e) => atualizarAgente(a.id, (atual) => ({
-                        ...atual,
-                        tipo: e.target.value as AgenteAvaliado['tipo'],
-                      }))}
-                    >
-                      <option value="quimico">Químico</option>
-                      <option value="fisico">Físico</option>
-                      <option value="biologico">Biológico</option>
-                    </Select>
-                    <Select
-                      label="Critério"
-                      value={a.criterio}
-                      disabled={referenciaNormativaSelecionada || Boolean(regraAnexo?.criterioFixo)}
-                      onChange={(e) => atualizarAgente(a.id, (atual) => ({
-                        ...atual,
-                        criterio: e.target.value as AgenteAvaliado['criterio'],
-                      }))}
-                    >
-                      <option value="qualitativo">Qualitativo</option>
-                      <option value="quantitativo">Quantitativo</option>
-                      <option value="nao_aplicavel">Não aplicável</option>
-                    </Select>
-                  </div>
-                  <EpiSelector
-                    agente={a}
-                    dataReferencia={p.dataVistoria}
-                    onChange={(agenteAtualizado) => atualizarAgente(a.id, () => agenteAtualizado)}
-                  />
-                  {/* Sim ou Não, sem resposta pronta: a caixa de marcar não
+                          <div className="mt-3 rounded-lg border border-brand-200 bg-brand-50/40 p-3">
+                            <Textarea
+                              id={idCampoPendente(a.id, 'observacao')}
+                              label="Conclusão da avaliação"
+                              required
+                              rows={4}
+                              value={a.observacao ?? ''}
+                              onChange={(e) =>
+                                atualizarAgente(a.id, (atual) => ({
+                                  ...atual,
+                                  observacao: e.target.value,
+                                }))
+                              }
+                              placeholder="Registre a conclusão específica deste agente. Campo obrigatório para emitir o documento."
+                              hint={`Sai no item ${numeroAvaliacao} do documento, dentro desta avaliação. A conclusão do laudo inteiro é outro campo, na etapa "Conclusão do laudo".`}
+                            />
+                            <div className="mt-2 flex justify-end">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                icon={<BookOpen size={14} />}
+                                aria-label={`Abrir biblioteca da conclusão de ${a.nome || 'agente'}`}
+                                onClick={() =>
+                                  setBibliotecaPara({
+                                    agenteId: a.id,
+                                    secao: 'conclusao',
+                                    referencia: referenciaBiblioteca,
+                                    rotuloReferencia: numeroAvaliacao,
+                                  })
+                                }
+                              >
+                                Biblioteca
+                              </Button>
+                            </div>
+                          </div>
+                          <AgenteNr15Fields
+                            agente={a}
+                            onChange={(agenteAtualizado) =>
+                              atualizarAgente(a.id, () => agenteAtualizado)
+                            }
+                          />
+                          <div className="mt-3 rounded-lg border border-ink-200 bg-ink-50/60 p-3">
+                            <Checkbox
+                              label="Agente identificado na atividade"
+                              description="Desmarque quando o agente não estiver presente; o documento mostrará somente o título e a conclusão."
+                              checked={a.identificadoNaAtividade !== false}
+                              onChange={(e) =>
+                                atualizarAgente(a.id, (atual) => ({
+                                  ...atual,
+                                  identificadoNaAtividade: e.target.checked,
+                                }))
+                              }
+                            />
+                          </div>
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            <Select
+                              label="Natureza"
+                              value={a.tipo}
+                              disabled={
+                                referenciaNormativaSelecionada || Boolean(regraAnexo?.tipoFixo)
+                              }
+                              onChange={(e) =>
+                                atualizarAgente(a.id, (atual) => ({
+                                  ...atual,
+                                  tipo: e.target.value as AgenteAvaliado['tipo'],
+                                }))
+                              }
+                            >
+                              <option value="quimico">Químico</option>
+                              <option value="fisico">Físico</option>
+                              <option value="biologico">Biológico</option>
+                            </Select>
+                            <Select
+                              label="Critério"
+                              value={a.criterio}
+                              disabled={
+                                referenciaNormativaSelecionada || Boolean(regraAnexo?.criterioFixo)
+                              }
+                              onChange={(e) =>
+                                atualizarAgente(a.id, (atual) => ({
+                                  ...atual,
+                                  criterio: e.target.value as AgenteAvaliado['criterio'],
+                                }))
+                              }
+                            >
+                              <option value="qualitativo">Qualitativo</option>
+                              <option value="quantitativo">Quantitativo</option>
+                              <option value="nao_aplicavel">Não aplicável</option>
+                            </Select>
+                          </div>
+                          <EpiSelector
+                            agente={a}
+                            dataReferencia={p.dataVistoria}
+                            onChange={(agenteAtualizado) =>
+                              atualizarAgente(a.id, () => agenteAtualizado)
+                            }
+                          />
+                          {/* Sim ou Não, sem resposta pronta: a caixa de marcar não
                       distinguia "não é eficaz" de "ainda não respondi". */}
-                  <EficaciaEpiCampo
-                    agente={a}
-                    onChange={(epiEficaz) => atualizarAgente(a.id, (atual) => ({ ...atual, epiEficaz }))}
-                  />
-                  {painelFotosDoAgente(a)}
-                  <BotaoInserirNoLaudo onInserir={() => definirCartaoAberto(a.id, false)} />
-                  </SecaoColapsavel>
-                </div>
-              )})}
+                          <EficaciaEpiCampo
+                            agente={a}
+                            onChange={(epiEficaz) =>
+                              atualizarAgente(a.id, (atual) => ({ ...atual, epiEficaz }))
+                            }
+                          />
+                          {painelFotosDoAgente(a)}
+                          <BotaoInserirNoLaudo onInserir={() => definirCartaoAberto(a.id, false)} />
+                        </SecaoColapsavel>
+                      </div>
+                    )
+                  })}
                 </div>
               ))}
               {avaliacoesVisiveis.length === 0 && (
-                <p className="text-sm text-ink-500">Nenhuma avaliação cadastrada para a modalidade selecionada.</p>
+                <p className="text-sm text-ink-500">
+                  Nenhuma avaliação cadastrada para a modalidade selecionada.
+                </p>
               )}
             </div>
           </Card>
@@ -2304,27 +2562,44 @@ export default function PericiaEditor() {
                     <Badge tone="green">{p.fotos.filter((foto) => foto.agenteId).length}</Badge>
                   </div>
                   <div className="space-y-4">
-                    {[...new Set(p.fotos.flatMap((foto) => foto.agenteId ? [foto.agenteId] : []))].map((agenteId) => {
+                    {[
+                      ...new Set(p.fotos.flatMap((foto) => (foto.agenteId ? [foto.agenteId] : []))),
+                    ].map((agenteId) => {
                       const agente = p.tecnico.agentes.find((item) => item.id === agenteId)
                       const fotos = p.fotos.filter((foto) => foto.agenteId === agenteId)
                       return (
-                        <div key={agenteId} className="rounded-lg border border-sky-200 bg-sky-50/40 p-3">
+                        <div
+                          key={agenteId}
+                          className="rounded-lg border border-sky-200 bg-sky-50/40 p-3"
+                        >
                           <p className="mb-2 text-sm font-semibold text-ink-800">
-                            {agente?.nome?.trim() || 'Avaliação removida — fotos pendentes de revisão'}
+                            {agente?.nome?.trim() ||
+                              'Avaliação removida — fotos pendentes de revisão'}
                           </p>
                           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
                             {fotos.map((foto) => (
-                              <div key={foto.id} className="rounded-lg border border-ink-200 bg-white p-2">
+                              <div
+                                key={foto.id}
+                                className="rounded-lg border border-ink-200 bg-white p-2"
+                              >
                                 <div className="aspect-[4/3] overflow-hidden rounded bg-ink-100">
-                                  <img src={foto.url} alt={foto.legenda} className="h-full w-full object-cover" />
+                                  <img
+                                    src={foto.url}
+                                    alt={foto.legenda}
+                                    className="h-full w-full object-cover"
+                                  />
                                 </div>
                                 <input
                                   value={foto.legenda}
-                                  onChange={(e) => set({
-                                    fotos: p.fotos.map((item) => item.id === foto.id
-                                      ? { ...item, legenda: e.target.value }
-                                      : item),
-                                  })}
+                                  onChange={(e) =>
+                                    set({
+                                      fotos: p.fotos.map((item) =>
+                                        item.id === foto.id
+                                          ? { ...item, legenda: e.target.value }
+                                          : item,
+                                      ),
+                                    })
+                                  }
                                   placeholder="Legenda da medição"
                                   className="mt-2 w-full rounded border border-ink-200 px-2 py-1 text-[12px] focus:border-brand-600"
                                 />
@@ -2347,8 +2622,10 @@ export default function PericiaEditor() {
               {SECOES_FOTO.map((s) => {
                 // 'epi' não é mais selecionável (dobrada em 'documentos'),
                 // mas fotos legadas enviadas lá continuam visíveis aqui.
-                const fotos = p.fotos.filter((f) =>
-                  !f.agenteId && (f.secao === s.value || (s.value === 'documentos' && f.secao === 'epi')),
+                const fotos = p.fotos.filter(
+                  (f) =>
+                    !f.agenteId &&
+                    (f.secao === s.value || (s.value === 'documentos' && f.secao === 'epi')),
                 )
                 return (
                   <div key={s.value}>
@@ -2363,7 +2640,11 @@ export default function PericiaEditor() {
                         {fotos.map((f) => (
                           <div key={f.id} className="rounded-lg border border-ink-200 p-2">
                             <div className="aspect-[4/3] overflow-hidden rounded bg-ink-100">
-                              <img src={f.url} alt={f.legenda} className="h-full w-full object-cover" />
+                              <img
+                                src={f.url}
+                                alt={f.legenda}
+                                className="h-full w-full object-cover"
+                              />
                             </div>
                             <input
                               value={f.legenda}
@@ -2400,97 +2681,204 @@ export default function PericiaEditor() {
         <div className="space-y-4">
           {(
             [
-              { campo: 'normasReferencias', secao: 'generico', referencia: '4', label: '4. Critérios Técnicos para Avaliação Pericial', rows: 4 },
-              { campo: 'equipamentosAnalisados', secao: 'generico', referencia: '5', label: '5. Metodologia de Avaliação', rows: 4 },
-              { campo: 'informacoesLevantadas', secao: 'generico', referencia: '6.3', label: '6.3. Constatações da Vistoria Pericial', rows: 5 },
-              { campo: 'divergenciasFaticas', secao: 'generico', referencia: numeroDivergenciasEditor, label: `${numeroDivergenciasEditor}. Divergências Fáticas — resumo geral (opcional)`, rows: 4 },
-              { campo: 'alegacoesReclamante', secao: 'generico', referencia: `${numeroDivergenciasEditor}.1`, label: `${numeroDivergenciasEditor}.1. Alegações do Reclamante`, rows: 5 },
-              { campo: 'informacoesReclamada', secao: 'generico', referencia: `${numeroDivergenciasEditor}.2`, label: `${numeroDivergenciasEditor}.2. Informações prestadas pela Reclamada`, rows: 5 },
-              { campo: 'consideracoesDivergencias', secao: 'analise', referencia: numeroConsideracoesEditor, label: `${numeroConsideracoesEditor}. Considerações sobre as Divergências Fáticas`, rows: 6 },
-              { campo: 'criterioAvaliacaoPericulosidade', secao: 'analise', referencia: `${numeroNr16Editor}.1`, label: `${numeroNr16Editor}.1. NR-16 — Critério de Avaliação`, rows: 4 },
+              {
+                campo: 'normasReferencias',
+                secao: 'generico',
+                referencia: '4',
+                label: '4. Critérios Técnicos para Avaliação Pericial',
+                rows: 4,
+              },
+              {
+                campo: 'equipamentosAnalisados',
+                secao: 'generico',
+                referencia: '5',
+                label: '5. Metodologia de Avaliação',
+                rows: 4,
+              },
+              {
+                campo: 'informacoesLevantadas',
+                secao: 'generico',
+                referencia: '6.3',
+                label: '6.3. Constatações da Vistoria Pericial',
+                rows: 5,
+              },
+              {
+                campo: 'divergenciasFaticas',
+                secao: 'generico',
+                referencia: numeroDivergenciasEditor,
+                label: `${numeroDivergenciasEditor}. Divergências Fáticas — resumo geral (opcional)`,
+                rows: 4,
+              },
+              {
+                campo: 'alegacoesReclamante',
+                secao: 'generico',
+                referencia: `${numeroDivergenciasEditor}.1`,
+                label: `${numeroDivergenciasEditor}.1. Alegações do Reclamante`,
+                rows: 5,
+              },
+              {
+                campo: 'informacoesReclamada',
+                secao: 'generico',
+                referencia: `${numeroDivergenciasEditor}.2`,
+                label: `${numeroDivergenciasEditor}.2. Informações prestadas pela Reclamada`,
+                rows: 5,
+              },
+              {
+                campo: 'consideracoesDivergencias',
+                secao: 'analise',
+                referencia: numeroConsideracoesEditor,
+                label: `${numeroConsideracoesEditor}. Considerações sobre as Divergências Fáticas`,
+                rows: 6,
+              },
+              {
+                campo: 'criterioAvaliacaoPericulosidade',
+                secao: 'analise',
+                referencia: `${numeroNr16Editor}.1`,
+                label: `${numeroNr16Editor}.1. NR-16 — Critério de Avaliação`,
+                rows: 4,
+              },
               // Transcrição da inicial, e a folha de onde ela saiu. Não tem
               // texto padrão nem sugestão: o que vai aqui é a palavra da parte,
               // e o sistema não escreve pela parte.
-              { campo: 'riscoAlegadoPericulosidade', secao: 'analise', referencia: `${numeroNr16Editor}.2`, label: `${numeroNr16Editor}.2. NR-16 — Risco de Periculosidade Alegado pela Parte Reclamante`, rows: 5 },
-              { campo: 'notaTecnicaEpis', secao: 'analise', referencia: '8', label: '8. Dos Equipamentos de Proteção Individual (NR-06)', rows: 7 },
-              { campo: 'protecoesColetivas', secao: 'analise', referencia: '9', label: '9. Das Proteções Coletivas', rows: 5 },
+              {
+                campo: 'riscoAlegadoPericulosidade',
+                secao: 'analise',
+                referencia: `${numeroNr16Editor}.2`,
+                label: `${numeroNr16Editor}.2. NR-16 — Risco de Periculosidade Alegado pela Parte Reclamante`,
+                rows: 5,
+              },
+              {
+                campo: 'notaTecnicaEpis',
+                secao: 'analise',
+                referencia: '8',
+                label: '8. Dos Equipamentos de Proteção Individual (NR-06)',
+                rows: 7,
+              },
+              {
+                campo: 'protecoesColetivas',
+                secao: 'analise',
+                referencia: '9',
+                label: '9. Das Proteções Coletivas',
+                rows: 5,
+              },
               // O item 10 não tem mais caixa de texto (pedido do perito,
               // 17/09/2026): ele é montado só com as tabelas dos agentes, e a
               // conclusão de cada um já fecha a tabela dele.
-              { campo: 'conclusaoInsalubridade', secao: 'conclusao', referencia: `${itensFinais.conclusaoNr15}`, label: `${itensFinais.conclusaoNr15}. NR-15 — Conclusão e Fundamentação`, rows: 6 },
-              { campo: 'conclusaoPericulosidade', secao: 'conclusao', referencia: `${itensFinais.conclusaoNr16}`, label: `${itensFinais.conclusaoNr16}. NR-16 — Conclusão e Fundamentação`, rows: 6 },
-              { campo: 'respostasQuesitos', secao: 'conclusao', referencia: `${numeroQuesitosSeImpresso}`, label: itensFinais.quesitos ? `${itensFinais.quesitos}. Respostas aos Quesitos Técnicos` : 'Respostas aos Quesitos Técnicos', rows: 8 },
-              { campo: 'encerramento', secao: 'conclusao', referencia: `${itensFinais.encerramento}`, label: `${itensFinais.encerramento}. Encerramento`, rows: 5 },
+              {
+                campo: 'conclusaoInsalubridade',
+                secao: 'conclusao',
+                referencia: `${itensFinais.conclusaoNr15}`,
+                label: `${itensFinais.conclusaoNr15}. NR-15 — Conclusão e Fundamentação`,
+                rows: 6,
+              },
+              {
+                campo: 'conclusaoPericulosidade',
+                secao: 'conclusao',
+                referencia: `${itensFinais.conclusaoNr16}`,
+                label: `${itensFinais.conclusaoNr16}. NR-16 — Conclusão e Fundamentação`,
+                rows: 6,
+              },
+              {
+                campo: 'respostasQuesitos',
+                secao: 'conclusao',
+                referencia: `${numeroQuesitosSeImpresso}`,
+                label: itensFinais.quesitos
+                  ? `${itensFinais.quesitos}. Respostas aos Quesitos Técnicos`
+                  : 'Respostas aos Quesitos Técnicos',
+                rows: 8,
+              },
+              {
+                campo: 'encerramento',
+                secao: 'conclusao',
+                referencia: `${itensFinais.encerramento}`,
+                label: `${itensFinais.encerramento}. Encerramento`,
+                rows: 5,
+              },
             ] as const
-          ).filter((f) =>
-            (f.campo !== 'conclusaoInsalubridade' || p.modalidade !== 'periculosidade') &&
-            (f.campo !== 'conclusaoPericulosidade' || p.modalidade !== 'insalubridade') &&
-            // O critério da NR-16 acompanha a transcrição e a fonte: os três
-            // renderizadores só o imprimem sob `temPericulosidade`, então numa
-            // perícia só de insalubridade o card virava um "7.2.1" que colide
-            // com o 7.2 da NR-15 e nunca chega ao documento.
-            (f.campo !== 'criterioAvaliacaoPericulosidade' || p.modalidade !== 'insalubridade') &&
-            (f.campo !== 'riscoAlegadoPericulosidade' || p.modalidade !== 'insalubridade'),
-          ).map((f) => {
-            // No Laudo, as respostas são separadas por origem, no lugar em que o
-            // documento as imprime: depois das conclusões e antes do encerramento.
-            if (f.campo === 'respostasQuesitos' && tipoDoc === 'laudo') return cartaoQuesitosDoLaudo()
-            const campoPadrao = campoPadraoDe(f.campo)
-            return (
-            <Card key={f.campo}>
-              <CardHeader
-                title={f.label}
-                subtitle={campoPadrao
-                  ? ehAdministrador
-                    ? 'Texto oficial da matriz — edição administrativa habilitada.'
-                    : 'Texto oficial da matriz — protegido contra alterações. Para ler inteiro: Biblioteca › Textos oficiais da matriz.'
-                  : undefined}
-                icon={<FileText size={18} />}
-                action={
-                  <div className="flex flex-wrap gap-2">
-                    {campoPadrao && ehAdministrador && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        icon={<RotateCcw size={14} />}
-                        onClick={() => restaurarTextoPadrao(campoPadrao)}
-                      >
-                        Texto padrão
-                      </Button>
-                    )}
-                    {(!campoPadrao || ehAdministrador) && <Button
-                      size="sm"
-                      variant="outline"
-                      icon={<BookOpen size={14} />}
-                      aria-label={`Abrir biblioteca do item ${f.referencia}`}
-                      onClick={() => setBibliotecaPara({
-                        campo: f.campo,
-                        secao: f.secao,
-                        // Cataloga pela chave canônica; mostra o número impresso.
-                        referencia: CHAVE_BIBLIOTECA_POR_CAMPO[f.campo] ?? f.referencia,
-                        rotuloReferencia: f.referencia,
-                      })}
-                    >
-                      Biblioteca
-                    </Button>}
-                  </div>
-                }
-              />
-              <div className="p-5">
-                <Textarea
-                  rows={f.rows}
-                  value={(p.tecnico[f.campo] as string | undefined) ?? ''}
-                  readOnly={Boolean(campoPadrao && !ehAdministrador)}
-                  onChange={(e) => setT({ [f.campo]: e.target.value } as never)}
-                />
-              </div>
-            </Card>
+          )
+            .filter(
+              (f) =>
+                (f.campo !== 'conclusaoInsalubridade' || p.modalidade !== 'periculosidade') &&
+                (f.campo !== 'conclusaoPericulosidade' || p.modalidade !== 'insalubridade') &&
+                // O critério da NR-16 acompanha a transcrição e a fonte: os três
+                // renderizadores só o imprimem sob `temPericulosidade`, então numa
+                // perícia só de insalubridade o card virava um "7.2.1" que colide
+                // com o 7.2 da NR-15 e nunca chega ao documento.
+                (f.campo !== 'criterioAvaliacaoPericulosidade' ||
+                  p.modalidade !== 'insalubridade') &&
+                (f.campo !== 'riscoAlegadoPericulosidade' || p.modalidade !== 'insalubridade'),
             )
-          })}
+            .map((f) => {
+              // No Laudo, as respostas são separadas por origem, no lugar em que o
+              // documento as imprime: depois das conclusões e antes do encerramento.
+              if (f.campo === 'respostasQuesitos' && tipoDoc === 'laudo')
+                return cartaoQuesitosDoLaudo()
+              const campoPadrao = campoPadraoDe(f.campo)
+              return (
+                <Card key={f.campo}>
+                  <CardHeader
+                    title={f.label}
+                    subtitle={
+                      campoPadrao
+                        ? ehAdministrador
+                          ? 'Texto oficial da matriz — edição administrativa habilitada.'
+                          : 'Texto oficial da matriz — protegido contra alterações. Para ler inteiro: Biblioteca › Textos oficiais da matriz.'
+                        : undefined
+                    }
+                    icon={<FileText size={18} />}
+                    action={
+                      <div className="flex flex-wrap gap-2">
+                        {campoPadrao && ehAdministrador && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            icon={<RotateCcw size={14} />}
+                            onClick={() => restaurarTextoPadrao(campoPadrao)}
+                          >
+                            Texto padrão
+                          </Button>
+                        )}
+                        {(!campoPadrao || ehAdministrador) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            icon={<BookOpen size={14} />}
+                            aria-label={`Abrir biblioteca do item ${f.referencia}`}
+                            onClick={() =>
+                              setBibliotecaPara({
+                                campo: f.campo,
+                                secao: f.secao,
+                                // Cataloga pela chave canônica; mostra o número impresso.
+                                referencia: CHAVE_BIBLIOTECA_POR_CAMPO[f.campo] ?? f.referencia,
+                                rotuloReferencia: f.referencia,
+                              })
+                            }
+                          >
+                            Biblioteca
+                          </Button>
+                        )}
+                      </div>
+                    }
+                  />
+                  <div className="p-5">
+                    <Textarea
+                      rows={f.rows}
+                      value={(p.tecnico[f.campo] as string | undefined) ?? ''}
+                      readOnly={Boolean(campoPadrao && !ehAdministrador)}
+                      onChange={(e) => setT({ [f.campo]: e.target.value } as never)}
+                    />
+                  </div>
+                </Card>
+              )
+            })}
           {tipoDoc === 'laudo' && (
             <Card>
               <CardHeader
-                title={itensFinais.honorarios ? `${itensFinais.honorarios}. Dos Honorários Periciais` : 'Dos Honorários Periciais'}
+                title={
+                  itensFinais.honorarios
+                    ? `${itensFinais.honorarios}. Dos Honorários Periciais`
+                    : 'Dos Honorários Periciais'
+                }
                 subtitle="Proposta do perito para o item DOS HONORÁRIOS PERICIAIS do Laudo. O arbitramento final cabe ao Juízo."
                 icon={<FileText size={18} />}
               />
@@ -2528,7 +2916,11 @@ export default function PericiaEditor() {
               </div>
             </Card>
             <Card>
-              <CardHeader title="Título do documento" subtitle="Módulo G" icon={<FileText size={18} />} />
+              <CardHeader
+                title="Título do documento"
+                subtitle="Módulo G"
+                icon={<FileText size={18} />}
+              />
               <div className="space-y-3 p-5">
                 <Select value={titulo} onChange={(e) => setTitulo(e.target.value)}>
                   <option>Parecer Técnico da Reclamada</option>
@@ -2543,7 +2935,11 @@ export default function PericiaEditor() {
             </Card>
 
             <Card>
-              <CardHeader title="Anexo externo" subtitle="Módulo H" icon={<Paperclip size={18} />} />
+              <CardHeader
+                title="Anexo externo"
+                subtitle="Módulo H"
+                icon={<Paperclip size={18} />}
+              />
               <div className="p-5">
                 <input
                   ref={fileRef}
@@ -2567,7 +2963,11 @@ export default function PericiaEditor() {
                 {anexo && (
                   <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-navy-200 bg-navy-50 px-3 py-2">
                     <span className="truncate text-[12.5px] text-navy-800">{anexo}</span>
-                    <button onClick={() => void removerAnexo()} className="text-red-600" aria-label="Remover anexo">
+                    <button
+                      onClick={() => void removerAnexo()}
+                      className="text-red-600"
+                      aria-label="Remover anexo"
+                    >
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -2577,7 +2977,11 @@ export default function PericiaEditor() {
             </Card>
 
             <Card>
-              <CardHeader title="Exportar e enviar" subtitle="Módulos H e I" icon={<FileDown size={18} />} />
+              <CardHeader
+                title="Exportar e enviar"
+                subtitle="Módulos H e I"
+                icon={<FileDown size={18} />}
+              />
               <div className="space-y-2 p-5">
                 <Button
                   className="w-full"
@@ -2633,7 +3037,13 @@ export default function PericiaEditor() {
           </div>
 
           <div className="overflow-x-auto rounded-xl bg-ink-100 p-4 lg:p-6">
-            <FolhasA4>
+            <FolhasA4
+              rodape={
+                tipoDoc === 'laudo'
+                  ? (responsavelDaPericia(p, usuarios, usuario)?.nome.trim() ?? '')
+                  : undefined
+              }
+            >
               <DocumentoPreview
                 pericia={p}
                 empresas={empresas}
@@ -2699,7 +3109,9 @@ export default function PericiaEditor() {
           if (bibliotecaPara.agenteId) {
             atualizarAgente(bibliotecaPara.agenteId, (agente) => ({
               ...agente,
-              observacao: agente.observacao?.trim() ? `${agente.observacao}\n\n${conteudo}` : conteudo,
+              observacao: agente.observacao?.trim()
+                ? `${agente.observacao}\n\n${conteudo}`
+                : conteudo,
             }))
             toast('Texto inserido na conclusão do agente.')
             return

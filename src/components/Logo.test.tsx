@@ -7,7 +7,7 @@ describe('Logo oficial', () => {
     const html = renderToStaticMarkup(<Logo size="lg" showTagline />)
 
     expect(html).toContain('<img')
-    expect(html).toContain('alt="D&amp;R Perícia Trabalhista — Engenharia de Segurança e Higiene Ocupacional"')
+    expect(html).toContain('alt="DR Perícias Trabalhista — Engenharia de Segurança e Higiene Ocupacional"')
     expect(html).toContain('object-contain')
     expect(html).not.toContain('<span>D</span>')
   })
@@ -36,7 +36,7 @@ describe('Logo do perito', () => {
   it('perito sem logo volta para a arte embutida, com as dimensoes dela', () => {
     const html = renderToStaticMarkup(<Logo size="lg" perito={{ nome: 'Dinoel', logoUrl: undefined }} />)
 
-    expect(html).toContain('alt="D&amp;R Perícia Trabalhista — Engenharia de Segurança e Higiene Ocupacional"')
+    expect(html).toContain('alt="DR Perícias Trabalhista — Engenharia de Segurança e Higiene Ocupacional"')
     expect(html).toContain('width="1673"')
   })
 

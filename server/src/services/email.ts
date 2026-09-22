@@ -52,7 +52,7 @@ function corpoHtml(mensagem: string): string {
     ${paragrafos}
     <hr style="border:0;border-top:1px solid #DFDACC;margin:28px 0 14px">
     <p style="margin:0;font-family:Arial,sans-serif;font-size:11px;color:#8B8677">
-      Enviado pela plataforma D&amp;R Perícia — Plataforma Inteligente de Perícia Trabalhista.
+      Enviado pela plataforma DR Perícias Trabalhista.
     </p>
   </div>`
 }

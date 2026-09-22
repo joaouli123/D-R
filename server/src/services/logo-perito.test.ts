@@ -49,7 +49,7 @@ describe('marca do documento', () => {
     expect(marca.padrao).toBe(true)
     expect(marca.tipo).toBe('png')
     expect(marca.dataUri.startsWith('data:image/png;base64,')).toBe(true)
-    expect(marca.alt).toContain('D&R')
+    expect(marca.alt).toContain('DR Perícias Trabalhista')
   })
 
   it('perito que ainda nao subiu logo tambem usa a arte embutida', async () => {

@@ -132,7 +132,7 @@ describe('equipes.listar — a árvore que cada um enxerga', () => {
 
     const de_novo = await esperar(api.equipes.listar())
 
-    expect(de_novo[0].nome).toBe('D&R Perícia Elite')
+    expect(de_novo[0].nome).toBe('DR Perícias Trabalhista')
     expect(de_novo[0].usuarios.some((u) => u.nome === 'Adulterado')).toBe(false)
   })
 })
@@ -422,7 +422,7 @@ describe('equipes — criar, renomear e excluir', () => {
     expect(criada).toMatchObject({ nivel: 2, paiId: ALFA })
     const arvore = await esperar(api.equipes.listar())
     // A nova fica junto da família da Alfa, não no fim da lista solta.
-    expect(arvore.map((e) => e.nome).slice(0, 2)).toEqual(['D&R Perícia Elite', 'Laboratório Alfa Segurança'])
+    expect(arvore.map((e) => e.nome).slice(0, 2)).toEqual(['DR Perícias Trabalhista', 'Laboratório Alfa Segurança'])
   })
 
   it('as respostas de criar e renomear são cópias: mexer nelas não altera o que está guardado', async () => {
