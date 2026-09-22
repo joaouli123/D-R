@@ -22,6 +22,8 @@ const chamadas = vi.hoisted(() => ({
   criar: vi.fn(),
   atualizar: vi.fn(),
   excluir: vi.fn(),
+  aprovar: vi.fn(),
+  equipes: vi.fn(),
   cnpj: vi.fn(),
   cep: vi.fn(),
 }))
@@ -33,7 +35,9 @@ vi.mock('@/services/api', async (importOriginal) => ({
     criar: chamadas.criar,
     atualizar: chamadas.atualizar,
     excluir: chamadas.excluir,
+    aprovar: chamadas.aprovar,
   },
+  equipes: { listar: chamadas.equipes },
   consultas: { cnpj: chamadas.cnpj, cep: chamadas.cep },
 }))
 vi.mock('@/components/layout/AppLayout', () => ({
@@ -68,7 +72,9 @@ const lista = (): Licenca[] => [
     empresas: 12,
     pericias: 30,
     documentos: 41,
-    administradores: [{ id: 'usr-1', nome: 'Dinoel Ribeiro', email: 'dinoel@exemplo.com.br', ativo: true }],
+    administradores: [
+      { id: 'usr-1', nome: 'Dinoel Ribeiro', email: 'dinoel@exemplo.com.br', ativo: true },
+    ],
   }),
   licenca({
     id: 'lic-2',
@@ -81,7 +87,9 @@ const lista = (): Licenca[] => [
     empresas: 2,
     pericias: 1,
     documentos: 0,
-    administradores: [{ id: 'usr-5', nome: 'Carlos Tavares', email: 'carlos@alfa.com.br', ativo: true }],
+    administradores: [
+      { id: 'usr-5', nome: 'Carlos Tavares', email: 'carlos@alfa.com.br', ativo: true },
+    ],
   }),
   licenca({ id: 'lic-3', nome: 'Beta Engenharia', ativa: false, equipes: 1, usuarios: 2 }),
 ]
@@ -143,6 +151,16 @@ beforeEach(() => {
   chamadas.criar.mockResolvedValue(undefined)
   chamadas.atualizar.mockResolvedValue(undefined)
   chamadas.excluir.mockResolvedValue(undefined)
+  chamadas.aprovar.mockResolvedValue(undefined)
+  chamadas.equipes.mockResolvedValue([
+    {
+      id: 'eq-alfa',
+      nome: 'Laboratório Alfa',
+      licencaId: 'lic-2',
+      licencaNome: 'Laboratório Alfa',
+    },
+    { id: 'eq-delta', nome: 'Delta', licencaId: 'lic-4', licencaNome: 'Delta' },
+  ])
   chamadas.cnpj.mockResolvedValue(RECEITA)
   chamadas.cep.mockResolvedValue(CORREIOS)
 })
@@ -182,7 +200,9 @@ describe('Licenças — o que aparece', () => {
     expect(alfa.getByText(/carlos@alfa\.com\.br/)).toBeTruthy()
 
     expect(within(regiao('Beta Engenharia')).getByText('Suspensa')).toBeTruthy()
-    expect(within(regiao('Beta Engenharia')).getByText('Nenhum administrador cadastrado.')).toBeTruthy()
+    expect(
+      within(regiao('Beta Engenharia')).getByText('Nenhum administrador cadastrado.'),
+    ).toBeTruthy()
   })
 
   it('a licença principal não se suspende nem se exclui', async () => {
@@ -195,7 +215,9 @@ describe('Licenças — o que aparece', () => {
   })
 
   it('mostra o erro de carregamento e deixa tentar de novo', async () => {
-    chamadas.listar.mockRejectedValueOnce(new ErroApi(403, 'Só o administrador titular gere as licenças.'))
+    chamadas.listar.mockRejectedValueOnce(
+      new ErroApi(403, 'Só o administrador titular gere as licenças.'),
+    )
     const user = userEvent.setup()
     render(
       <MemoryRouter>
@@ -253,7 +275,8 @@ describe('Licenças — criar', () => {
         'GAMA CONSULTORIA LTDA',
       ),
     )
-    const valor = (nome: RegExp) => (d.getByRole('textbox', { name: nome }) as HTMLInputElement).value
+    const valor = (nome: RegExp) =>
+      (d.getByRole('textbox', { name: nome }) as HTMLInputElement).value
     expect(valor(/^Nome fantasia/)).toBe('Gama')
     expect(valor(/^Telefone/)).toBe('(19) 3232-1000')
     expect(valor(/^E-mail da empresa/)).toBe('contato@gama.com.br')
@@ -304,7 +327,8 @@ describe('Licenças — criar', () => {
     expect((cep as HTMLInputElement).value).toBe('01310-100')
     await waitFor(() => expect((rua as HTMLInputElement).value).toBe('Avenida Paulista'))
     expect(chamadas.cep).toHaveBeenCalledWith('01310100')
-    const valor = (nome: RegExp) => (d.getByRole('textbox', { name: nome }) as HTMLInputElement).value
+    const valor = (nome: RegExp) =>
+      (d.getByRole('textbox', { name: nome }) as HTMLInputElement).value
     expect(valor(/^Bairro/)).toBe('Bela Vista')
     expect(valor(/^Cidade/)).toBe('São Paulo')
     expect((d.getByRole('combobox', { name: /^UF/ }) as HTMLSelectElement).value).toBe('SP')
@@ -335,7 +359,9 @@ describe('Licenças — criar', () => {
     const d = within(dialogo())
     await user.type(d.getByRole('textbox', { name: /^Nome da empresa/ }), 'Gama Consultoria')
     await user.type(d.getByRole('textbox', { name: /^CPF ou CNPJ/ }), '11222333000180')
-    expect(d.getByRole('textbox', { name: /^CPF ou CNPJ/ }).getAttribute('aria-invalid')).toBe('true')
+    expect(d.getByRole('textbox', { name: /^CPF ou CNPJ/ }).getAttribute('aria-invalid')).toBe(
+      'true',
+    )
     await preencherAdmin(user, d)
     await user.click(d.getByRole('button', { name: 'Criar licença' }))
 
@@ -388,8 +414,57 @@ describe('Licenças — criar', () => {
     await preencherAdmin(user, d, { email: 'carlos@alfa.com.br' })
     await user.click(d.getByRole('button', { name: 'Criar licença' }))
 
-    expect((await d.findByRole('alert')).textContent).toContain('Já existe um usuário com este e-mail')
+    expect((await d.findByRole('alert')).textContent).toContain(
+      'Já existe um usuário com este e-mail',
+    )
     expect(screen.getByRole('dialog')).toBeTruthy()
+  })
+})
+
+describe('Licenças — aprovar cadastro público', () => {
+  const pendente = () =>
+    licenca({
+      id: 'lic-4',
+      nome: 'Delta',
+      ativa: false,
+      aguardandoAprovacao: true,
+      administradores: [{ id: 'usr-9', nome: 'Rui Delta', email: 'rui@delta.com.br', ativo: true }],
+    })
+
+  it('aprova como funcionário de uma equipe existente, com o perfil escolhido', async () => {
+    chamadas.listar.mockImplementation(async () => [...lista(), pendente()])
+    const user = userEvent.setup()
+    await montar()
+
+    await user.click(within(regiao('Delta')).getByRole('button', { name: /Aprovar/ }))
+    const d = within(dialogo())
+    await user.click(d.getByRole('radio', { name: /Funcionário de uma equipe/ }))
+    const equipe = (await d.findByRole('combobox', { name: /Equipe/ })) as HTMLSelectElement
+    // A própria licença pendente não aparece como destino.
+    expect(Array.from(equipe.options).map((o) => o.value)).toEqual(['', 'eq-alfa'])
+    await user.selectOptions(equipe, 'eq-alfa')
+    await user.selectOptions(d.getByRole('combobox', { name: /Perfil/ }), 'perito')
+    await user.click(d.getByRole('button', { name: 'Aprovar' }))
+
+    await waitFor(() =>
+      expect(chamadas.aprovar).toHaveBeenCalledWith('lic-4', {
+        como: 'equipe',
+        equipeId: 'eq-alfa',
+        perfil: 'perito',
+      }),
+    )
+  })
+
+  it('aprova como empresa dedicada', async () => {
+    chamadas.listar.mockImplementation(async () => [...lista(), pendente()])
+    const user = userEvent.setup()
+    await montar()
+
+    await user.click(within(regiao('Delta')).getByRole('button', { name: /Aprovar/ }))
+    await user.click(within(dialogo()).getByRole('button', { name: 'Aprovar' }))
+
+    await waitFor(() => expect(chamadas.aprovar).toHaveBeenCalledWith('lic-4', { como: 'empresa' }))
+    expect(chamadas.atualizar).not.toHaveBeenCalled()
   })
 })
 
@@ -450,7 +525,9 @@ describe('Licenças — excluir', () => {
     await montar()
 
     await user.click(
-      within(regiao('Beta Engenharia')).getByRole('button', { name: 'Excluir a licença Beta Engenharia' }),
+      within(regiao('Beta Engenharia')).getByRole('button', {
+        name: 'Excluir a licença Beta Engenharia',
+      }),
     )
     const d = within(dialogo())
     expect(d.getByText('1 equipe e 2 usuários')).toBeTruthy()
@@ -467,7 +544,9 @@ describe('Licenças — excluir', () => {
     await montar()
 
     await user.click(
-      within(regiao('Laboratório Alfa')).getByRole('button', { name: 'Excluir a licença Laboratório Alfa' }),
+      within(regiao('Laboratório Alfa')).getByRole('button', {
+        name: 'Excluir a licença Laboratório Alfa',
+      }),
     )
     const d = within(dialogo())
     expect(d.getByText(/2 empresas, 1 perícia e 0 documentos/)).toBeTruthy()
@@ -480,16 +559,23 @@ describe('Licenças — excluir', () => {
 
   it('mostra dentro do diálogo a recusa do servidor', async () => {
     chamadas.excluir.mockRejectedValueOnce(
-      new ErroApi(409, 'A licença "Beta Engenharia" tem 1 empresa(s). Para tirar o acesso sem perder nada, suspenda a licença.'),
+      new ErroApi(
+        409,
+        'A licença "Beta Engenharia" tem 1 empresa(s). Para tirar o acesso sem perder nada, suspenda a licença.',
+      ),
     )
     const user = userEvent.setup()
     await montar()
 
     await user.click(
-      within(regiao('Beta Engenharia')).getByRole('button', { name: 'Excluir a licença Beta Engenharia' }),
+      within(regiao('Beta Engenharia')).getByRole('button', {
+        name: 'Excluir a licença Beta Engenharia',
+      }),
     )
     await user.click(within(dialogo()).getByRole('button', { name: 'Excluir licença' }))
 
-    expect((await within(dialogo()).findByRole('alert')).textContent).toContain('suspenda a licença')
+    expect((await within(dialogo()).findByRole('alert')).textContent).toContain(
+      'suspenda a licença',
+    )
   })
 })

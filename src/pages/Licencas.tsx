@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BadgeCheck, Check, EyeOff, Pencil, Plus, Power, Trash2, X } from 'lucide-react'
-import { Badge, Button, Card, Input, Modal, PageLoader, useToast } from '@/components/ui'
+import { Badge, Button, Card, Input, Modal, PageLoader, Select, useToast } from '@/components/ui'
 import { PageHeader } from '@/components/layout/AppLayout'
 import { CamposSenha } from '@/components/CamposSenha'
 import {
@@ -13,7 +13,7 @@ import {
 } from '@/components/CamposDaEmpresa'
 import * as api from '@/services/api'
 import { mensagemDeErro } from '@/services/api'
-import type { Licenca } from '@/types'
+import type { Equipe, Licenca } from '@/types'
 import { emailValido, formatarDocumento, problemaNaSenha, rotuloDoDocumento } from '@/lib/cadastro'
 import { cn, formatDate } from '@/lib/utils'
 
@@ -32,6 +32,7 @@ type Dialogo =
   | { tipo: 'editar'; licenca: Licenca }
   | { tipo: 'suspender'; licenca: Licenca }
   | { tipo: 'excluir'; licenca: Licenca }
+  | { tipo: 'aprovar'; licenca: Licenca }
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
 
@@ -162,7 +163,11 @@ export default function Licencas() {
               reativando={reativando === l.id}
               onEditar={() => setDialogo({ tipo: 'editar', licenca: l })}
               onSuspender={() => setDialogo({ tipo: 'suspender', licenca: l })}
-              onReativar={() => void reativar(l)}
+              onReativar={() =>
+                l.aguardandoAprovacao
+                  ? setDialogo({ tipo: 'aprovar', licenca: l })
+                  : void reativar(l)
+              }
               onExcluir={() => setDialogo({ tipo: 'excluir', licenca: l })}
             />
           ))}
@@ -175,6 +180,9 @@ export default function Licencas() {
       )}
       {dialogo?.tipo === 'suspender' && (
         <ModalSuspender licenca={dialogo.licenca} onFechar={fechar} onConcluido={concluir} />
+      )}
+      {dialogo?.tipo === 'aprovar' && (
+        <ModalAprovar licenca={dialogo.licenca} onFechar={fechar} onConcluido={concluir} />
       )}
       {dialogo?.tipo === 'excluir' && (
         <ModalExcluir
@@ -586,6 +594,149 @@ function ModalSuspender({
             : `${plural(licenca.usuarios, 'usuário perde', 'usuários perdem')} o acesso na hora — quem estiver dentro é desconectado.`}
         </p>
         <p className="text-ink-500">Nada é apagado. Dá para reativar quando quiser.</p>
+      </div>
+      <AvisoDeErro mensagem={erro} />
+    </Modal>
+  )
+}
+
+// ---------------- Aprovar cadastro público ----------------
+
+const PERFIS_DO_FUNCIONARIO = [
+  { valor: 'assistente', rotulo: 'Assistente' },
+  { valor: 'perito', rotulo: 'Perito' },
+  { valor: 'admin', rotulo: 'Administrador' },
+] as const
+
+type PerfilDoFuncionario = (typeof PERFIS_DO_FUNCIONARIO)[number]['valor']
+
+function ModalAprovar({
+  licenca,
+  onFechar,
+  onConcluido,
+}: {
+  licenca: Licenca
+  onFechar: () => void
+  onConcluido: (mensagem: string) => Promise<void>
+}) {
+  const [como, setComo] = useState<'empresa' | 'equipe'>('empresa')
+  const [equipes, setEquipes] = useState<Equipe[] | null>(null)
+  const [equipeId, setEquipeId] = useState('')
+  const [perfil, setPerfil] = useState<PerfilDoFuncionario>('assistente')
+  const [ocupado, setOcupado] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const pessoa = licenca.administradores[0]
+
+  useEffect(() => {
+    api.equipes
+      .listar()
+      .then((todas) => setEquipes(todas.filter((e) => e.licencaId !== licenca.id)))
+      .catch((e) => setErro(mensagemDeErro(e, 'Não foi possível carregar as equipes.')))
+  }, [licenca.id])
+
+  async function aprovar() {
+    if (como === 'equipe' && !equipeId) {
+      setErro('Escolha a equipe em que a pessoa vai entrar.')
+      return
+    }
+    setOcupado(true)
+    setErro(null)
+    try {
+      await api.licencas.aprovar(
+        licenca.id,
+        como === 'empresa' ? { como } : { como, equipeId, perfil },
+      )
+    } catch (e) {
+      setErro(mensagemDeErro(e, 'Não foi possível aprovar o cadastro.'))
+      setOcupado(false)
+      return
+    }
+    const equipe = equipes?.find((e) => e.id === equipeId)
+    await onConcluido(
+      como === 'empresa'
+        ? `${licenca.nome} aprovada como empresa dedicada. Já dá para entrar.`
+        : `${pessoa?.nome ?? 'O cadastro'} entrou na equipe ${equipe?.nome ?? ''}. Já dá para entrar.`,
+    )
+  }
+
+  const opcao = (valor: 'empresa' | 'equipe', titulo: string, texto: string) => (
+    <label
+      className={cn(
+        'flex cursor-pointer gap-3 rounded-lg border p-3',
+        como === valor ? 'border-brand-600 bg-brand-50' : 'border-ink-200',
+      )}
+    >
+      <input
+        type="radio"
+        name="como-aprovar"
+        className="mt-1"
+        checked={como === valor}
+        onChange={() => setComo(valor)}
+      />
+      <span>
+        <span className="block text-[13.5px] font-semibold text-ink-900">{titulo}</span>
+        <span className="block text-[12.5px] text-ink-500">{texto}</span>
+      </span>
+    </label>
+  )
+
+  return (
+    <Modal
+      open
+      onClose={onFechar}
+      size="sm"
+      title="Aprovar cadastro"
+      subtitle={pessoa ? `${licenca.nome} · ${pessoa.nome} (${pessoa.email})` : licenca.nome}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onFechar} disabled={ocupado}>
+            Cancelar
+          </Button>
+          <Button loading={ocupado} onClick={() => void aprovar()}>
+            Aprovar
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {opcao(
+          'empresa',
+          'Empresa dedicada',
+          'Vira uma licença própria, isolada das demais; quem se cadastrou é o administrador dela.',
+        )}
+        {opcao(
+          'equipe',
+          'Funcionário de uma equipe',
+          'A pessoa entra numa equipe que já existe e trabalha com o que é dela. O cadastro da empresa é descartado.',
+        )}
+        {como === 'equipe' && (
+          <div className="grid gap-3">
+            <Select
+              label="Equipe"
+              value={equipeId}
+              onChange={(e) => setEquipeId(e.target.value)}
+              disabled={!equipes}
+            >
+              <option value="">{equipes ? 'Escolha…' : 'Carregando…'}</option>
+              {equipes?.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.nome === e.licencaNome ? e.nome : `${e.nome} — ${e.licencaNome}`}
+                </option>
+              ))}
+            </Select>
+            <Select
+              label="Perfil"
+              value={perfil}
+              onChange={(e) => setPerfil(e.target.value as PerfilDoFuncionario)}
+            >
+              {PERFIS_DO_FUNCIONARIO.map((p) => (
+                <option key={p.valor} value={p.valor}>
+                  {p.rotulo}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
       </div>
       <AvisoDeErro mensagem={erro} />
     </Modal>

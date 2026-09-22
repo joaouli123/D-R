@@ -119,7 +119,9 @@ function comTempoLimite(ms: number, init?: RequestInit): RequestInit {
 
 /** Distingue "demorou demais" de "a rede caiu" — a saída do perito é outra. */
 function ehEsperaEstourada(erro: unknown): boolean {
-  return erro instanceof DOMException && (erro.name === 'TimeoutError' || erro.name === 'AbortError')
+  return (
+    erro instanceof DOMException && (erro.name === 'TimeoutError' || erro.name === 'AbortError')
+  )
 }
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
@@ -260,9 +262,7 @@ function parametrosEpi(filtros: FiltrosEpi): string {
 
 export const epis = {
   listar: (filtros: FiltrosEpi = {}) =>
-    ehRest
-      ? http<EpiCatalogo[]>(`/epis${parametrosEpi(filtros)}`)
-      : delay([] as EpiCatalogo[]),
+    ehRest ? http<EpiCatalogo[]>(`/epis${parametrosEpi(filtros)}`) : delay([] as EpiCatalogo[]),
 }
 
 export function snapshotEpi(item: EpiCatalogo): EpiSelecionado {
@@ -455,9 +455,14 @@ export const caepi = {
       await delay(null, 200)
       throw new ErroApi(503, CAEPI_SEM_BACKEND)
     }
-    const filtros: FiltrosCa = { ...(em ? { em } : {}), ...(opcoes.forcarNrrsf ? { buscarNrrsf: 'forcar' as const } : {}) }
+    const filtros: FiltrosCa = {
+      ...(em ? { em } : {}),
+      ...(opcoes.forcarNrrsf ? { buscarNrrsf: 'forcar' as const } : {}),
+    }
     try {
-      return await http<FichaCa>(`/caepi/cas/${encodeURIComponent(numeroCa)}${parametrosCa(filtros)}`)
+      return await http<FichaCa>(
+        `/caepi/cas/${encodeURIComponent(numeroCa)}${parametrosCa(filtros)}`,
+      )
     } catch (e) {
       if (e instanceof ErroApi && e.status === 404) return null
       throw e
@@ -479,7 +484,10 @@ export const caepi = {
    * preenche. Grava com fonte PERITO, que é o que impede a atualização
    * do MTE de sobrescrever. `null` apaga (erro de digitação acontece).
    */
-  async salvarNrrsf(numeroCa: string, dados: { nrrsfDb: number | null; observacao?: string | null }) {
+  async salvarNrrsf(
+    numeroCa: string,
+    dados: { nrrsfDb: number | null; observacao?: string | null },
+  ) {
     if (!ehRest) {
       await delay(null, 200)
       throw new ErroApi(503, CAEPI_SEM_BACKEND)
@@ -516,11 +524,14 @@ export const caepi = {
       await delay(null, 200)
       throw new ErroApi(503, CAEPI_SEM_BACKEND)
     }
-    return http<ResultadoImportacaoCaepi>(`/caepi/importar?nome=${encodeURIComponent(arquivo.name)}`, {
-      method: 'POST',
-      body: arquivo,
-      headers: { 'Content-Type': 'application/octet-stream' },
-    })
+    return http<ResultadoImportacaoCaepi>(
+      `/caepi/importar?nome=${encodeURIComponent(arquivo.name)}`,
+      {
+        method: 'POST',
+        body: arquivo,
+        headers: { 'Content-Type': 'application/octet-stream' },
+      },
+    )
   },
 }
 
@@ -561,7 +572,9 @@ export const auth = {
         }),
       )
     }
-    const usuario = mock.USUARIOS.find((u) => u.email.toLowerCase() === email.toLowerCase() && u.ativo)
+    const usuario = mock.USUARIOS.find(
+      (u) => u.email.toLowerCase() === email.toLowerCase() && u.ativo,
+    )
     if (!usuario || senha.length < 4) {
       await delay(null, 400)
       throw new ErroApi(401, 'E-mail ou senha inválidos.')
@@ -628,7 +641,9 @@ export const usuarios = {
       : delay(usuariosDaLicencaMock(licencaDaSessaoMock().id)),
   salvar: (u: UsuarioParaSalvar) =>
     ehRest
-      ? http<Usuario>('/usuarios', { method: 'POST', body: JSON.stringify(u) }).then(comLogoResolvida)
+      ? http<Usuario>('/usuarios', { method: 'POST', body: JSON.stringify(u) }).then(
+          comLogoResolvida,
+        )
       : delay(null).then(() => salvarUsuarioMock(u)),
   /** O administrador redefine a senha de alguém do seu alcance. */
   redefinirSenha: (id: string, nova: string) =>
@@ -737,7 +752,8 @@ export interface LicencaParaCriar extends CadastroDaLicenca {
 }
 
 /** Campo que não vai fica como está; o que vai vazio é apagado. */
-export type LicencaParaEditar = Partial<Pick<Licenca, 'nome' | 'documento' | 'ativa'>> & CadastroDaLicenca
+export type LicencaParaEditar = Partial<Pick<Licenca, 'nome' | 'documento' | 'ativa'>> &
+  CadastroDaLicenca
 
 const CAMPOS_DE_CADASTRO = [
   'nomeFantasia',
@@ -774,7 +790,19 @@ export const licencas = {
     ehRest
       ? http<void>(`/licencas/${id}`, { method: 'DELETE' })
       : delay(null).then(() => excluirLicencaMock(id)),
+  /** Cadastro público: vira empresa dedicada ou funcionário de uma equipe existente. */
+  aprovar: (id: string, como: AprovacaoDeCadastro): Promise<void> =>
+    ehRest
+      ? http<unknown>(`/licencas/${id}/aprovar`, {
+          method: 'POST',
+          body: JSON.stringify(como),
+        }).then(() => undefined)
+      : delay(null).then(() => aprovarLicencaMock(id, como)),
 }
+
+export type AprovacaoDeCadastro =
+  | { como: 'empresa' }
+  | { como: 'equipe'; equipeId: string; perfil: 'admin' | 'perito' | 'assistente' }
 
 export const CADASTRO_AGUARDANDO =
   'Seu cadastro foi recebido e está aguardando a aprovação do administrador. Você receberá acesso assim que ele for aprovado.'
@@ -786,7 +814,10 @@ export const CADASTRO_AGUARDANDO =
 export const cadastroPublico = {
   enviar: (dados: LicencaParaCriar & { site?: string }): Promise<{ aguardandoAprovacao: true }> =>
     ehRest
-      ? http<{ aguardandoAprovacao: true }>('/cadastro', { method: 'POST', body: JSON.stringify(dados) })
+      ? http<{ aguardandoAprovacao: true }>('/cadastro', {
+          method: 'POST',
+          body: JSON.stringify(dados),
+        })
       : delay(null).then(() => {
           criarLicencaMock(dados, { aguardando: true })
           return { aguardandoAprovacao: true as const }
@@ -895,6 +926,7 @@ function arvoreMock(): Equipe[] {
       nome: equipe.nome,
       licencaId: equipe.licencaId,
       licencaNome: licencaMockDaEquipe(id).nome,
+      licencaAguardando: licencaMockDaEquipe(id).aguardandoAprovacao ?? false,
       inicioDaLicenca,
       // A mãe da equipe da sessão fica fora do alcance: não a revelamos.
       paiId: nivel === 0 ? null : equipe.paiId,
@@ -902,7 +934,10 @@ function arvoreMock(): Equipe[] {
       propria: id === sessaoMock.equipeId,
       principal: id === mock.EQUIPE_PRINCIPAL_ID,
       podeExcluir:
-        id !== sessaoMock.equipeId && !inicioDaLicenca && filhas.length === 0 && usuarios.length === 0,
+        id !== sessaoMock.equipeId &&
+        !inicioDaLicenca &&
+        filhas.length === 0 &&
+        usuarios.length === 0,
       usuarios,
     })
     filhas.forEach((f) => visitar(f.id, nivel + 1))
@@ -1124,7 +1159,10 @@ function cadastroConferidoMock(d: CadastroDaLicenca): CadastroDaLicenca {
 }
 
 /** Dígito verificador e duplicidade, como no servidor; o que não mudou passa. */
-function documentoConferidoMock(documento: string | undefined, atual?: mock.LicencaMock): string | undefined {
+function documentoConferidoMock(
+  documento: string | undefined,
+  atual?: mock.LicencaMock,
+): string | undefined {
   const limpo = limparDocumento(documento)
   if (!limpo) return undefined
   if (atual?.documento && limparDocumento(atual.documento) === limpo) return atual.documento
@@ -1192,7 +1230,8 @@ function atualizarLicencaMock(id: string, d: LicencaParaEditar): Licenca {
     throw new ErroApi(400, 'A licença principal não pode ser suspensa.')
   }
   const cadastro = cadastroConferidoMock(d)
-  const documento = 'documento' in d ? documentoConferidoMock(d.documento, licenca) : licenca.documento
+  const documento =
+    'documento' in d ? documentoConferidoMock(d.documento, licenca) : licenca.documento
   if (d.nome !== undefined) {
     const nome = d.nome.trim()
     if (nome.length < 2) throw new ErroApi(422, 'Informe o nome da empresa.')
@@ -1207,6 +1246,32 @@ function atualizarLicencaMock(id: string, d: LicencaParaEditar): Licenca {
   if (d.ativa !== undefined) licenca.ativa = d.ativa
   if (d.ativa === true) licenca.aguardandoAprovacao = false
   return licencaMockComoApi(licenca)
+}
+
+function aprovarLicencaMock(id: string, d: AprovacaoDeCadastro): void {
+  exigirTitularMock()
+  const licenca = licencaMockExistente(id)
+  if (!licenca.aguardandoAprovacao) {
+    throw new ErroApi(409, 'Este cadastro não está aguardando aprovação.')
+  }
+  if (d.como === 'empresa') {
+    licenca.ativa = true
+    licenca.aguardandoAprovacao = false
+    return
+  }
+  const destino = mock.EQUIPES.find((e) => e.id === d.equipeId)
+  const equipes = new Set(equipesDaLicencaMock(id).map((e) => e.id))
+  if (!destino || equipes.has(destino.id)) throw new ErroApi(404, 'Equipe não encontrada.')
+  for (const u of mock.USUARIOS) {
+    if (equipes.has(u.organizacaoId ?? '')) {
+      u.organizacaoId = destino.id
+      u.perfil = d.perfil
+    }
+  }
+  for (let i = mock.EQUIPES.length - 1; i >= 0; i--) {
+    if (equipes.has(mock.EQUIPES[i]!.id)) mock.EQUIPES.splice(i, 1)
+  }
+  mock.LICENCAS.splice(mock.LICENCAS.indexOf(licenca), 1)
 }
 
 function excluirLicencaMock(id: string): void {
@@ -1245,7 +1310,9 @@ export const empresas = {
    */
   limpar: (comRascunhos = false) =>
     ehRest
-      ? http<LimpezaEmpresas>(`/empresas${comRascunhos ? '?rascunhos=1' : ''}`, { method: 'DELETE' })
+      ? http<LimpezaEmpresas>(`/empresas${comRascunhos ? '?rascunhos=1' : ''}`, {
+          method: 'DELETE',
+        })
       : delay({ excluidas: 0, rascunhosExcluidos: 0, mantidas: [] }),
 }
 
@@ -1374,7 +1441,9 @@ export const consultas = {
       await delay(null, 200)
       throw new ErroApi(503, CONSULTA_SEM_BACKEND)
     }
-    return http<DadosProcesso>(`/consultas/processo/${encodeURIComponent(numero.replace(/\D/g, ''))}`)
+    return http<DadosProcesso>(
+      `/consultas/processo/${encodeURIComponent(numero.replace(/\D/g, ''))}`,
+    )
   },
 }
 
@@ -1433,7 +1502,9 @@ export const fotos = {
 export const biblioteca = {
   listar: () => (ehRest ? http<TextoBiblioteca[]>('/textos') : delay(mock.TEXTOS)),
   salvar: (t: TextoBiblioteca) =>
-    ehRest ? http<TextoBiblioteca>('/textos', { method: 'POST', body: JSON.stringify(t) }) : delay(t),
+    ehRest
+      ? http<TextoBiblioteca>('/textos', { method: 'POST', body: JSON.stringify(t) })
+      : delay(t),
   remover: (id: string) =>
     ehRest ? http<void>(`/textos/${id}`, { method: 'DELETE' }) : delay(undefined),
   /** Contabiliza o reaproveitamento do texto (alimenta os Relatórios). */
@@ -1453,9 +1524,7 @@ export const quesitos = {
 // ---------------- Módulos G/H/I/J — Documentos ----------------
 export const documentos = {
   listar: () =>
-    ehRest
-      ? http<DocumentoGerado[]>('/documentos')
-      : delay(conteudoDaEquipeMock(mock.DOCUMENTOS)),
+    ehRest ? http<DocumentoGerado[]>('/documentos') : delay(conteudoDaEquipeMock(mock.DOCUMENTOS)),
   obter: (id: string) =>
     ehRest
       ? http<DocumentoGerado>(`/documentos/${id}`)

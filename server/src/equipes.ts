@@ -11,7 +11,13 @@ import { alcanca, idsDaSubarvore } from './tenancy.js'
 /** Todas as equipes, só o necessário para navegar a hierarquia. */
 export function carregarEquipes() {
   return prisma.organizacao.findMany({
-    select: { id: true, paiId: true, nome: true, licencaId: true, licenca: { select: { nome: true } } },
+    select: {
+      id: true,
+      paiId: true,
+      nome: true,
+      licencaId: true,
+      licenca: { select: { nome: true, aguardandoAprovacao: true } },
+    },
   })
 }
 

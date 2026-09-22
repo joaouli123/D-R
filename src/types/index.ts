@@ -98,6 +98,8 @@ export interface Equipe {
   /** Licença a que a equipe pertence; as equipes de uma licença dividem o trabalho. */
   licencaId: UUID
   licencaNome: string
+  /** A licença veio do cadastro público e ainda não foi aprovada: ninguém dela consegue entrar. */
+  licencaAguardando?: boolean
   /**
    * A equipe abre uma licença diferente da equipe de cima — é a porta de
    * entrada de uma empresa cliente. Só sai pela página Licenças.
@@ -142,12 +144,7 @@ export interface Empresa {
 // ---------- Módulo C — Cadastro de Processo e Perícia ----------
 export type ModalidadePericia = 'insalubridade' | 'periculosidade' | 'ambas'
 export type TipoDocumento =
-  | 'parecer'
-  | 'laudo'
-  | 'quesitos'
-  | 'manifestacao'
-  | 'impugnacao'
-  | 'esclarecimento'
+  'parecer' | 'laudo' | 'quesitos' | 'manifestacao' | 'impugnacao' | 'esclarecimento'
 
 export type StatusPericia = 'rascunho' | 'em_andamento' | 'concluida' | 'entregue'
 
@@ -277,7 +274,8 @@ export type ExposicaoPericulosidade =
   | 'tempo_extremamente_reduzido'
   | 'eventual'
   | 'nao_constatada'
-export type ResultadoPericulosidade = 'caracterizada' | 'caracterizada_parcial' | 'nao_caracterizada' | 'prejudicada'
+export type ResultadoPericulosidade =
+  'caracterizada' | 'caracterizada_parcial' | 'nao_caracterizada' | 'prejudicada'
 /** Onde o trabalhador estava em relação à área de risco delimitada pela norma. */
 export type SituacaoAreaRisco = 'dentro' | 'parcialmente_dentro' | 'fora' | 'nao_caracterizada'
 /**
@@ -310,7 +308,8 @@ export interface DetalheNr16 {
   valor: string
 }
 
-export type StatusVarredura = 'nao_avaliado' | 'sem_exposicao' | 'exposicao_identificada' | 'nao_aplicavel'
+export type StatusVarredura =
+  'nao_avaliado' | 'sem_exposicao' | 'exposicao_identificada' | 'nao_aplicavel'
 
 export interface ItemVarreduraNormativa {
   anexoId: string
@@ -485,12 +484,7 @@ export interface PreenchimentoTecnico {
 
 // ---------- Módulo E — Fotografias ----------
 export type SecaoFoto =
-  | 'ambiente'
-  | 'atividades'
-  | 'equipamentos'
-  | 'epi'
-  | 'produtos'
-  | 'documentos'
+  'ambiente' | 'atividades' | 'equipamentos' | 'epi' | 'produtos' | 'documentos'
 
 export interface Foto {
   id: UUID
@@ -552,14 +546,15 @@ export interface ConteudoEsclarecimento {
   agente: AgenteManifestacao
   referencia?: string
   introducao: string
-  pontos: { origem: 'juizo' | 'reclamante' | 'reclamada'; questionamento: string; resposta: string }[]
+  pontos: {
+    origem: 'juizo' | 'reclamante' | 'reclamada'
+    questionamento: string
+    resposta: string
+  }[]
   conclusao: string
 }
 
-export type ConteudoDocumento =
-  | ConteudoQuesitos
-  | ConteudoManifestacao
-  | ConteudoEsclarecimento
+export type ConteudoDocumento = ConteudoQuesitos | ConteudoManifestacao | ConteudoEsclarecimento
 
 export interface DocumentoGerado {
   id: UUID

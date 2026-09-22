@@ -136,9 +136,9 @@ export default function Usuarios() {
         <ShieldCheck size={18} className="mt-0.5 shrink-0 text-navy-600" />
         <p>
           <strong>Cada licença trabalha isolada.</strong> Empresas, perícias e documentos são da
-          licença — as equipes de dentro dela compartilham esse trabalho, e nenhuma outra licença
-          o enxerga. Aqui você gere apenas os <strong>acessos</strong>: cria, edita, troca a
-          senha, desativa e exclui usuários da sua equipe e das equipes abaixo dela.
+          licença — as equipes de dentro dela compartilham esse trabalho, e nenhuma outra licença o
+          enxerga. Aqui você gere apenas os <strong>acessos</strong>: cria, edita, troca a senha,
+          desativa e exclui usuários da sua equipe e das equipes abaixo dela.
         </p>
       </div>
 
@@ -275,6 +275,11 @@ function CartaoEquipe({
                   <Badge tone="amber">Licença {equipe.licencaNome}</Badge>
                 </span>
               )}
+              {equipe.licencaAguardando && (
+                <span title="Cadastro feito pela página pública. Ninguém desta licença entra até o titular aprovar na página Licenças.">
+                  <Badge tone="red">Aguardando aprovação</Badge>
+                </span>
+              )}
             </div>
             <p className="mt-0.5 text-[13px] text-ink-500">
               {equipe.usuarios.length} {equipe.usuarios.length === 1 ? 'usuário' : 'usuários'}
@@ -316,7 +321,9 @@ function CartaoEquipe({
                 <th className="hidden px-3 py-2.5 font-semibold md:table-cell">Perfil</th>
                 <th className="hidden px-3 py-2.5 font-semibold xl:table-cell">Último acesso</th>
                 <th className="hidden px-3 py-2.5 font-semibold md:table-cell">Status</th>
-                <th className="w-px whitespace-nowrap px-3 py-2.5 text-right font-semibold sm:px-5">Ações</th>
+                <th className="w-px whitespace-nowrap px-3 py-2.5 text-right font-semibold sm:px-5">
+                  Ações
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-100">
@@ -361,7 +368,9 @@ function CartaoEquipe({
                       {formatDateTime(u.ultimoAcesso)}
                     </td>
                     <td className="hidden px-3 py-3 md:table-cell">
-                      <Badge tone={u.ativo ? 'green' : 'gray'}>{u.ativo ? 'Ativo' : 'Inativo'}</Badge>
+                      <Badge tone={u.ativo ? 'green' : 'gray'}>
+                        {u.ativo ? 'Ativo' : 'Inativo'}
+                      </Badge>
                     </td>
                     <td className="w-px whitespace-nowrap px-3 py-3 sm:px-5">
                       <div className="flex items-center justify-end gap-0.5">
@@ -613,7 +622,9 @@ function ModalUsuario({
           inputMode="tel"
           placeholder="(00) 00000-0000"
           value={form.telefone}
-          onChange={(e) => setForm((atual) => ({ ...atual, telefone: mascararTelefone(e.target.value) }))}
+          onChange={(e) =>
+            setForm((atual) => ({ ...atual, telefone: mascararTelefone(e.target.value) }))
+          }
         />
       </div>
       <AvisoDeErro mensagem={erro} />

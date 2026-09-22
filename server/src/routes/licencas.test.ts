@@ -95,17 +95,33 @@ vi.mock('../prisma.js', () => {
             }),
           })),
       create: async ({ data }: { data: Partial<Licenca> }) => {
-        const l: Licenca = { id: `lic-${++banco.seq}`, documento: null, ativa: true, criadoEm: new Date(), nome: '', ...data }
+        const l: Licenca = {
+          id: `lic-${++banco.seq}`,
+          documento: null,
+          ativa: true,
+          criadoEm: new Date(),
+          nome: '',
+          ...data,
+        }
         banco.licencas.push(l)
         return l
       },
       update: async ({ where, data }: { where: { id: string }; data: Partial<Licenca> }) =>
-        Object.assign(banco.licencas.find((l) => l.id === where.id)!, data),
+        Object.assign(
+          banco.licencas.find((l) => l.id === where.id)!,
+          data,
+        ),
       delete: async ({ where }: { where: { id: string } }) => {
         banco.licencas = banco.licencas.filter((l) => l.id !== where.id)
       },
     },
     organizacao: {
+      findUnique: async ({ where }: { where: { id: string } }) => {
+        const e = banco.equipes.find((x) => x.id === where.id)
+        return e
+          ? { ...e, licenca: { ativa: banco.licencas.find((l) => l.id === e.licencaId)!.ativa } }
+          : null
+      },
       create: async ({ data }: { data: Omit<Equipe, 'id'> }) => {
         const e = { id: `eq-${++banco.seq}`, ...data }
         banco.equipes.push(e)
@@ -119,7 +135,11 @@ vi.mock('../prisma.js', () => {
         return { count: alvo.length }
       },
       deleteMany: async ({ where }: { where: { licencaId: string } }) => {
-        if (banco.equipes.some((e) => e.licencaId === where.licencaId && banco.equipes.some((f) => f.paiId === e.id))) {
+        if (
+          banco.equipes.some(
+            (e) => e.licencaId === where.licencaId && banco.equipes.some((f) => f.paiId === e.id),
+          )
+        ) {
           throw new Error('FK: equipe com filhas')
         }
         banco.equipes = banco.equipes.filter((e) => e.licencaId !== where.licencaId)
@@ -134,6 +154,15 @@ vi.mock('../prisma.js', () => {
         const u = { id: `u-${++banco.seq}`, ...data }
         banco.usuarios.push(u)
         return u
+      },
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: { organizacao: { licencaId: string } }
+        data: Partial<Usuario>
+      }) => {
+        daLicenca(where.organizacao.licencaId).forEach((u) => Object.assign(u, data))
       },
       deleteMany: async ({ where }: { where: { organizacao: { licencaId: string } } }) => {
         const sai = new Set(daLicenca(where.organizacao.licencaId).map((u) => u.id))
@@ -169,12 +198,20 @@ app.use(tratarErros)
 const servidor = app.listen(0)
 afterAll(() => new Promise((ok) => servidor.close(ok)))
 
-async function chamar(metodo: string, caminho: string, corpo?: unknown, cabecalhos: Record<string, string> = {}) {
-  const resposta = await fetch(`http://127.0.0.1:${(servidor.address() as AddressInfo).port}${caminho}`, {
-    method: metodo,
-    headers: { 'content-type': 'application/json', ...cabecalhos },
-    body: corpo === undefined ? undefined : JSON.stringify(corpo),
-  })
+async function chamar(
+  metodo: string,
+  caminho: string,
+  corpo?: unknown,
+  cabecalhos: Record<string, string> = {},
+) {
+  const resposta = await fetch(
+    `http://127.0.0.1:${(servidor.address() as AddressInfo).port}${caminho}`,
+    {
+      method: metodo,
+      headers: { 'content-type': 'application/json', ...cabecalhos },
+      body: corpo === undefined ? undefined : JSON.stringify(corpo),
+    },
+  )
   const texto = await resposta.text()
   return { status: resposta.status, corpo: texto ? JSON.parse(texto) : undefined }
 }
@@ -189,10 +226,25 @@ beforeEach(() => {
   banco.seq = 0
   banco.apagados = []
   banco.conteudo = {}
-  banco.licencas = [{ id: PRINCIPAL, nome: 'DR Perícias Trabalhista', documento: null, ativa: true, criadoEm: new Date(0) }]
+  banco.licencas = [
+    {
+      id: PRINCIPAL,
+      nome: 'DR Perícias Trabalhista',
+      documento: null,
+      ativa: true,
+      criadoEm: new Date(0),
+    },
+  ]
   banco.equipes = [{ id: RAIZ, nome: 'DR Perícias Trabalhista', paiId: null, licencaId: PRINCIPAL }]
   banco.usuarios = [
-    { id: 'dinoel', nome: 'Dinoel', email: 'dinoel@dr.test', perfil: 'admin', ativo: true, organizacaoId: RAIZ },
+    {
+      id: 'dinoel',
+      nome: 'Dinoel',
+      email: 'dinoel@dr.test',
+      perfil: 'admin',
+      ativo: true,
+      organizacaoId: RAIZ,
+    },
   ]
 })
 
@@ -246,7 +298,10 @@ describe('rota de licenças — criar', () => {
   })
 
   it('senha curta é recusada', async () => {
-    const r = await chamar('POST', '/licencas', { ...novaLicenca, admin: { ...novaLicenca.admin, senha: '123' } })
+    const r = await chamar('POST', '/licencas', {
+      ...novaLicenca,
+      admin: { ...novaLicenca.admin, senha: '123' },
+    })
     expect(r.status).toBe(422)
   })
 })
@@ -255,17 +310,25 @@ describe('rota de licenças — editar', () => {
   it('suspende e reativa uma licença cliente', async () => {
     const { corpo } = await chamar('POST', '/licencas', novaLicenca)
 
-    expect((await chamar('PATCH', `/licencas/${corpo.id}`, { ativa: false })).corpo.ativa).toBe(false)
+    expect((await chamar('PATCH', `/licencas/${corpo.id}`, { ativa: false })).corpo.ativa).toBe(
+      false,
+    )
     expect((await chamar('PATCH', `/licencas/${corpo.id}`, { ativa: true })).corpo.ativa).toBe(true)
   })
 
   it('ativar um cadastro público é aprová-lo', async () => {
     const { criarLicenca } = await import('./licencas.js')
     const criada = await criarLicenca(
-      { ...novaLicenca, documento: null, admin: { ...novaLicenca.admin, email: 'bia@beta.test' } } as never,
+      {
+        ...novaLicenca,
+        documento: null,
+        admin: { ...novaLicenca.admin, email: 'bia@beta.test' },
+      } as never,
       { aguardando: true },
     )
-    const [antes] = (await chamar('GET', '/licencas')).corpo.filter((l: { id: string }) => l.id === criada.id)
+    const [antes] = (await chamar('GET', '/licencas')).corpo.filter(
+      (l: { id: string }) => l.id === criada.id,
+    )
     expect(antes).toMatchObject({ ativa: false, aguardandoAprovacao: true })
 
     const r = await chamar('PATCH', `/licencas/${criada.id}`, { ativa: true })
@@ -282,7 +345,9 @@ describe('rota de licenças — editar', () => {
     const { corpo } = await chamar('POST', '/licencas', novaLicenca)
 
     await chamar('PATCH', `/licencas/${corpo.id}`, { nome: 'Alfa Engenharia' })
-    expect(banco.equipes.find((e) => e.id === corpo.equipePrincipalId)!.nome).toBe('Alfa Engenharia')
+    expect(banco.equipes.find((e) => e.id === corpo.equipePrincipalId)!.nome).toBe(
+      'Alfa Engenharia',
+    )
 
     banco.equipes.find((e) => e.id === corpo.equipePrincipalId)!.nome = 'Matriz'
     await chamar('PATCH', `/licencas/${corpo.id}`, { nome: 'Alfa S.A.' })
@@ -317,7 +382,11 @@ describe('rota de licenças — cadastro da empresa cliente', () => {
     const r = await chamar('PATCH', `/licencas/${corpo.id}`, { telefone: '', numero: '1001' })
     expect(r.status).toBe(200)
     expect(r.corpo.telefone).toBeUndefined()
-    expect(r.corpo).toMatchObject({ numero: '1001', cidade: 'São Paulo', documento: '12.345.678/0001-95' })
+    expect(r.corpo).toMatchObject({
+      numero: '1001',
+      cidade: 'São Paulo',
+      documento: '12.345.678/0001-95',
+    })
   })
 
   it('o documento vai para o banco com a máscara, seja CNPJ, CNPJ alfanumérico ou CPF', async () => {
@@ -376,23 +445,44 @@ describe('rota de licenças — cadastro da empresa cliente', () => {
       })
     ).corpo
 
-    expect((await chamar('PATCH', `/licencas/${alfa.id}`, { documento: '12345678000195' })).status).toBe(200)
-    expect((await chamar('PATCH', `/licencas/${beta.id}`, { documento: '12.345.678/0001-95' })).status).toBe(409)
-    expect((await chamar('PATCH', `/licencas/${beta.id}`, { documento: '' })).corpo.documento).toBeUndefined()
+    expect(
+      (await chamar('PATCH', `/licencas/${alfa.id}`, { documento: '12345678000195' })).status,
+    ).toBe(200)
+    expect(
+      (await chamar('PATCH', `/licencas/${beta.id}`, { documento: '12.345.678/0001-95' })).status,
+    ).toBe(409)
+    expect(
+      (await chamar('PATCH', `/licencas/${beta.id}`, { documento: '' })).corpo.documento,
+    ).toBeUndefined()
   })
 
   it('licença antiga com documento que não confere continua editável', async () => {
-    banco.licencas.push({ id: 'lic-velha', nome: 'Velha', documento: '12.345.678/0001-90', ativa: true, criadoEm: new Date(0) })
+    banco.licencas.push({
+      id: 'lic-velha',
+      nome: 'Velha',
+      documento: '12.345.678/0001-90',
+      ativa: true,
+      criadoEm: new Date(0),
+    })
 
-    expect((await chamar('PATCH', '/licencas/lic-velha', { telefone: '(11) 2222-3333' })).status).toBe(200)
-    const r = await chamar('PATCH', '/licencas/lic-velha', { nome: 'Velha Ltda', documento: '12.345.678/0001-90' })
+    expect(
+      (await chamar('PATCH', '/licencas/lic-velha', { telefone: '(11) 2222-3333' })).status,
+    ).toBe(200)
+    const r = await chamar('PATCH', '/licencas/lic-velha', {
+      nome: 'Velha Ltda',
+      documento: '12.345.678/0001-90',
+    })
     expect(r.status).toBe(200)
     expect(r.corpo.documento).toBe('12.345.678/0001-90')
   })
 
   it('UF que não tem 2 letras e e-mail inválido são recusados', async () => {
-    expect((await chamar('POST', '/licencas', { ...novaLicenca, uf: 'São Paulo' })).status).toBe(422)
-    expect((await chamar('POST', '/licencas', { ...novaLicenca, email: 'sem-arroba' })).status).toBe(422)
+    expect((await chamar('POST', '/licencas', { ...novaLicenca, uf: 'São Paulo' })).status).toBe(
+      422,
+    )
+    expect(
+      (await chamar('POST', '/licencas', { ...novaLicenca, email: 'sem-arroba' })).status,
+    ).toBe(422)
   })
 })
 
@@ -400,10 +490,20 @@ describe('rota de licenças — excluir', () => {
   it('sem trabalho dentro, sai com as equipes, os usuários e os arquivos deles', async () => {
     const { corpo } = await chamar('POST', '/licencas', novaLicenca)
     // Uma equipe filha e um perito com assinatura, para exercitar a hierarquia.
-    banco.equipes.push({ id: 'eq-filha', nome: 'Campinas', paiId: corpo.equipePrincipalId, licencaId: corpo.id })
+    banco.equipes.push({
+      id: 'eq-filha',
+      nome: 'Campinas',
+      paiId: corpo.equipePrincipalId,
+      licencaId: corpo.id,
+    })
     banco.usuarios.push({
-      id: 'u-caio', nome: 'Caio', email: 'caio@alfa.test', perfil: 'perito', ativo: true,
-      organizacaoId: 'eq-filha', assinaturaArquivo: 'assinatura-caio.png',
+      id: 'u-caio',
+      nome: 'Caio',
+      email: 'caio@alfa.test',
+      perfil: 'perito',
+      ativo: true,
+      organizacaoId: 'eq-filha',
+      assinaturaArquivo: 'assinatura-caio.png',
     })
 
     expect((await chamar('DELETE', `/licencas/${corpo.id}`)).status).toBe(204)
@@ -429,5 +529,44 @@ describe('rota de licenças — excluir', () => {
   it('a licença principal não pode ser excluída', async () => {
     expect((await chamar('DELETE', `/licencas/${PRINCIPAL}`)).status).toBe(400)
     expect(banco.licencas).toHaveLength(1)
+  })
+})
+
+describe('rota de licenças — aprovar cadastro público', () => {
+  async function pendente() {
+    await chamar('POST', '/licencas', novaLicenca)
+    const l = banco.licencas.find((x) => x.nome === 'Laboratório Alfa')!
+    Object.assign(l, { ativa: false, aguardandoAprovacao: true })
+    return l
+  }
+
+  it('como empresa dedicada, ativa a licença', async () => {
+    const l = await pendente()
+    const r = await chamar('POST', `/licencas/${l.id}/aprovar`, { como: 'empresa' })
+    expect(r.status).toBe(200)
+    expect(l).toMatchObject({ ativa: true, aguardandoAprovacao: false })
+  })
+
+  it('como funcionário, entra na equipe escolhida e o cadastro some', async () => {
+    const l = await pendente()
+    const r = await chamar('POST', `/licencas/${l.id}/aprovar`, {
+      como: 'equipe',
+      equipeId: RAIZ,
+      perfil: 'assistente',
+    })
+    expect(r.status).toBe(200)
+    expect(banco.usuarios.find((u) => u.email === 'ana@alfa.test')).toMatchObject({
+      organizacaoId: RAIZ,
+      perfil: 'assistente',
+    })
+    expect(banco.licencas.some((x) => x.id === l.id)).toBe(false)
+    expect(banco.equipes.some((e) => e.licencaId === l.id)).toBe(false)
+  })
+
+  it('licença já aprovada não passa de novo', async () => {
+    await chamar('POST', '/licencas', novaLicenca)
+    const l = banco.licencas.find((x) => x.nome === 'Laboratório Alfa')!
+    const r = await chamar('POST', `/licencas/${l.id}/aprovar`, { como: 'empresa' })
+    expect(r.status).toBe(409)
   })
 })

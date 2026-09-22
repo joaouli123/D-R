@@ -63,6 +63,7 @@ async function montarArvore(organizacaoId: string) {
       nome: equipe.nome,
       licencaId: equipe.licencaId,
       licencaNome: equipe.licenca.nome,
+      licencaAguardando: equipe.licenca.aguardandoAprovacao,
       // A equipe principal de uma licença cliente — a que nasceu com ela.
       inicioDaLicenca: !!mae && mae.licencaId !== equipe.licencaId,
       // A mãe da equipe da própria sessão fica fora do alcance: não a revelamos.
@@ -73,7 +74,8 @@ async function montarArvore(organizacaoId: string) {
       // Uma equipe só sai do sistema vazia (sem gente, sem trabalho e sem
       // equipes filhas) e nunca a própria — senão quem exclui perderia o acesso.
       // A principal de uma licença sai com a licença, na tela de Licenças.
-      podeExcluir: equipe.id !== organizacaoId && vazia && (!mae || mae.licencaId === equipe.licencaId),
+      podeExcluir:
+        equipe.id !== organizacaoId && vazia && (!mae || mae.licencaId === equipe.licencaId),
       usuarios: usuarios.filter((u) => u.organizacaoId === equipe.id).map(usuarioParaApi),
     }
   })
@@ -157,7 +159,9 @@ equipesRouter.delete(
       prisma.organizacao.count({ where: { paiId: equipe.id } }),
       prisma.organizacao.findUniqueOrThrow({
         where: { id: equipe.id },
-        select: { _count: { select: { usuarios: true, empresas: true, pericias: true, documentos: true } } },
+        select: {
+          _count: { select: { usuarios: true, empresas: true, pericias: true, documentos: true } },
+        },
       }),
     ])
 

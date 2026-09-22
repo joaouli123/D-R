@@ -96,10 +96,22 @@ describe('equipes.listar — a árvore que cada um enxerga', () => {
       [CAMPINAS, 2],
     ])
     const [principal, alfa, campinas] = arvore
-    expect(principal).toMatchObject({ propria: true, principal: true, podeExcluir: false, paiId: null })
-    expect(alfa).toMatchObject({ propria: false, principal: false, podeExcluir: false, paiId: PRINCIPAL })
+    expect(principal).toMatchObject({
+      propria: true,
+      principal: true,
+      podeExcluir: false,
+      paiId: null,
+    })
+    expect(alfa).toMatchObject({
+      propria: false,
+      principal: false,
+      podeExcluir: false,
+      paiId: PRINCIPAL,
+    })
     expect(campinas).toMatchObject({ propria: false, podeExcluir: true, paiId: ALFA })
-    expect(principal.usuarios.map((u) => u.id).sort()).toEqual([DINOEL, RENATA, MARCOS, PAULA].sort())
+    expect(principal.usuarios.map((u) => u.id).sort()).toEqual(
+      [DINOEL, RENATA, MARCOS, PAULA].sort(),
+    )
     expect(alfa.usuarios.map((u) => u.id).sort()).toEqual([CARLOS, FERNANDA].sort())
   })
 
@@ -193,7 +205,10 @@ describe('usuarios.salvar — cadastrar', () => {
       api.usuarios.salvar(cadastro({ email: 'carlos@alfaseguranca.com.br' })),
     )
 
-    expect(naMesmaEquipe).toMatchObject({ status: 409, message: 'Já existe um usuário com este e-mail.' })
+    expect(naMesmaEquipe).toMatchObject({
+      status: 409,
+      message: 'Já existe um usuário com este e-mail.',
+    })
     expect(emOutraEquipe.status).toBe(409)
   })
 
@@ -227,7 +242,11 @@ describe('usuarios.salvar — editar, desativar e reativar', () => {
     await esperar(api.usuarios.salvar(daRenata({ nome: 'Renata A. Prado', perfil: 'assistente' })))
 
     const renata = (await usuariosDe(PRINCIPAL)).find((u) => u.id === RENATA)
-    expect(renata).toMatchObject({ nome: 'Renata A. Prado', perfil: 'assistente', organizacaoId: PRINCIPAL })
+    expect(renata).toMatchObject({
+      nome: 'Renata A. Prado',
+      perfil: 'assistente',
+      organizacaoId: PRINCIPAL,
+    })
   })
 
   it('permite salvar mantendo o próprio e-mail', async () => {
@@ -240,11 +259,15 @@ describe('usuarios.salvar — editar, desativar e reativar', () => {
     const salvo = await esperar(api.usuarios.salvar(daRenata()))
     salvo.nome = 'Adulterado'
 
-    expect((await usuariosDe(PRINCIPAL)).find((u) => u.id === RENATA)?.nome).toBe('Renata Alves Prado')
+    expect((await usuariosDe(PRINCIPAL)).find((u) => u.id === RENATA)?.nome).toBe(
+      'Renata Alves Prado',
+    )
   })
 
   it('recusa trocar o e-mail por um que já é de outra pessoa', async () => {
-    const erro = await falha(api.usuarios.salvar(daRenata({ email: 'marcos@drpericiaelite.com.br' })))
+    const erro = await falha(
+      api.usuarios.salvar(daRenata({ email: 'marcos@drpericiaelite.com.br' })),
+    )
 
     expect(erro.status).toBe(409)
   })
@@ -252,7 +275,10 @@ describe('usuarios.salvar — editar, desativar e reativar', () => {
   it('o usuário não muda de equipe depois de criado', async () => {
     const erro = await falha(api.usuarios.salvar(daRenata({ organizacaoId: ALFA })))
 
-    expect(erro).toMatchObject({ status: 422, message: 'Um usuário não muda de equipe depois de criado.' })
+    expect(erro).toMatchObject({
+      status: 422,
+      message: 'Um usuário não muda de equipe depois de criado.',
+    })
     expect((await usuariosDe(PRINCIPAL)).some((u) => u.id === RENATA)).toBe(true)
   })
 
@@ -313,7 +339,9 @@ describe('usuarios.salvar — editar, desativar e reativar', () => {
 
 describe('usuarios.redefinirSenha', () => {
   it('aceita senha de 8 caracteres para quem está no alcance', async () => {
-    await expect(esperar(api.usuarios.redefinirSenha(FERNANDA, 'novasenha1'))).resolves.toBeUndefined()
+    await expect(
+      esperar(api.usuarios.redefinirSenha(FERNANDA, 'novasenha1')),
+    ).resolves.toBeUndefined()
   })
 
   it('recusa senha curta', async () => {
@@ -422,7 +450,10 @@ describe('equipes — criar, renomear e excluir', () => {
     expect(criada).toMatchObject({ nivel: 2, paiId: ALFA })
     const arvore = await esperar(api.equipes.listar())
     // A nova fica junto da família da Alfa, não no fim da lista solta.
-    expect(arvore.map((e) => e.nome).slice(0, 2)).toEqual(['DR Perícias Trabalhista', 'Laboratório Alfa Segurança'])
+    expect(arvore.map((e) => e.nome).slice(0, 2)).toEqual([
+      'DR Perícias Trabalhista',
+      'Laboratório Alfa Segurança',
+    ])
   })
 
   it('as respostas de criar e renomear são cópias: mexer nelas não altera o que está guardado', async () => {
@@ -588,7 +619,12 @@ describe('licenças — as empresas clientes, só para o perito titular', () => 
 
     expect(licencas.map((l) => l.id)).toEqual([LIC_PRINCIPAL, LIC_ALFA])
     const alfa = licencas.find((l) => l.id === LIC_ALFA)!
-    expect(alfa).toMatchObject({ principal: false, ativa: true, equipes: 2, equipePrincipalId: ALFA })
+    expect(alfa).toMatchObject({
+      principal: false,
+      ativa: true,
+      equipes: 2,
+      equipePrincipalId: ALFA,
+    })
     expect(alfa.administradores.map((a) => a.id)).toEqual([CARLOS])
     expect(licencas.find((l) => l.id === LIC_PRINCIPAL)!.principal).toBe(true)
   })
@@ -640,6 +676,43 @@ describe('licenças — as empresas clientes, só para o perito titular', () => 
     await entrarComoCarlos()
   })
 
+  async function cadastroPendente() {
+    await esperar(
+      api.cadastroPublico.enviar({
+        nome: 'Delta Perícias',
+        admin: { nome: 'Rui Delta', email: 'rui@delta.com.br', senha: 'senhaforte1' },
+      }),
+    )
+    const pendente = (await esperar(api.licencas.listar())).find(
+      (l) => l.nome === 'Delta Perícias',
+    )!
+    expect(pendente.aguardandoAprovacao).toBe(true)
+    expect((await falha(api.auth.login('rui@delta.com.br', 'senhaforte1'))).status).toBe(403)
+    return pendente
+  }
+
+  it('aprovar como empresa dedicada libera a licença do próprio cadastro', async () => {
+    const pendente = await cadastroPendente()
+
+    await esperar(api.licencas.aprovar(pendente.id, { como: 'empresa' }))
+
+    const lic = (await esperar(api.licencas.listar())).find((l) => l.id === pendente.id)!
+    expect(lic).toMatchObject({ ativa: true, aguardandoAprovacao: false })
+    await esperar(api.auth.login('rui@delta.com.br', 'senhaforte1'))
+  })
+
+  it('aprovar como funcionário leva a pessoa para a equipe escolhida e descarta a licença', async () => {
+    const pendente = await cadastroPendente()
+
+    await esperar(
+      api.licencas.aprovar(pendente.id, { como: 'equipe', equipeId: ALFA, perfil: 'perito' }),
+    )
+
+    expect((await esperar(api.licencas.listar())).some((l) => l.id === pendente.id)).toBe(false)
+    const sessao = await esperar(api.auth.login('rui@delta.com.br', 'senhaforte1'))
+    expect(sessao).toMatchObject({ perfil: 'perito', organizacaoId: ALFA })
+  })
+
   it('a licença principal não pode ser suspensa nem excluída', async () => {
     expect((await falha(api.licencas.atualizar(LIC_PRINCIPAL, { ativa: false }))).status).toBe(400)
     expect((await falha(api.licencas.excluir(LIC_PRINCIPAL))).status).toBe(400)
@@ -657,7 +730,9 @@ describe('licenças — as empresas clientes, só para o perito titular', () => 
   it('renomear leva o nome para a equipe de entrada, e CNPJ vazio apaga o CNPJ', async () => {
     await esperar(api.licencas.atualizar(LIC_ALFA, { documento: '11.222.333/0001-81' }))
 
-    const depois = await esperar(api.licencas.atualizar(LIC_ALFA, { nome: 'Alfa Segurança', documento: '' }))
+    const depois = await esperar(
+      api.licencas.atualizar(LIC_ALFA, { nome: 'Alfa Segurança', documento: '' }),
+    )
 
     expect(depois).toMatchObject({ nome: 'Alfa Segurança', documento: undefined })
     await entrarComoCarlos()
@@ -667,18 +742,26 @@ describe('licenças — as empresas clientes, só para o perito titular', () => 
   })
 
   it('confere o CPF ou CNPJ e guarda o cadastro já formatado', async () => {
-    const invalido = await falha(api.licencas.atualizar(LIC_ALFA, { documento: '11.222.333/0001-80' }))
+    const invalido = await falha(
+      api.licencas.atualizar(LIC_ALFA, { documento: '11.222.333/0001-80' }),
+    )
     expect(invalido.status).toBe(422)
 
     const depois = await esperar(
-      api.licencas.atualizar(LIC_ALFA, { documento: '11222333000181', cidade: ' Campinas ', uf: 'sp' }),
+      api.licencas.atualizar(LIC_ALFA, {
+        documento: '11222333000181',
+        cidade: ' Campinas ',
+        uf: 'sp',
+      }),
     )
     expect(depois).toMatchObject({ documento: '11.222.333/0001-81', cidade: 'Campinas', uf: 'SP' })
 
     const cpf = await esperar(api.licencas.atualizar(LIC_ALFA, { documento: '52998224725' }))
     expect(cpf.documento).toBe('529.982.247-25')
 
-    const alfanumerico = await esperar(api.licencas.atualizar(LIC_ALFA, { documento: '12abc34501de35' }))
+    const alfanumerico = await esperar(
+      api.licencas.atualizar(LIC_ALFA, { documento: '12abc34501de35' }),
+    )
     expect(alfanumerico.documento).toBe('12.ABC.345/01DE-35')
   })
 

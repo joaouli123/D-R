@@ -60,7 +60,13 @@ export const cadastro = {
   bairro: texto(120),
   cidade: texto(120),
   uf: z
-    .union([z.string().trim().regex(/^[A-Za-z]{2}$/, 'UF deve ter 2 letras.'), z.literal('')])
+    .union([
+      z
+        .string()
+        .trim()
+        .regex(/^[A-Za-z]{2}$/, 'UF deve ter 2 letras.'),
+      z.literal(''),
+    ])
     .optional()
     .transform((v) => (v ? v.toUpperCase() : null)),
 }
@@ -121,7 +127,9 @@ export async function documentoConferido(
  * única da licença pendurada direto na raiz.
  */
 const ehEquipeDeEntrada = (licencaId: string, e: { id: string; paiId: string | null }) =>
-  licencaId === LICENCA_PRINCIPAL_ID ? e.id === ORGANIZACAO_RAIZ_ID : e.paiId === ORGANIZACAO_RAIZ_ID
+  licencaId === LICENCA_PRINCIPAL_ID
+    ? e.id === ORGANIZACAO_RAIZ_ID
+    : e.paiId === ORGANIZACAO_RAIZ_ID
 
 async function listar(where: { id?: string } = {}) {
   const licencas = await prisma.licenca.findMany({
@@ -261,9 +269,7 @@ licencasRouter.patch(
         data: {
           ...(d.nome !== undefined ? { nome: d.nome } : {}),
           ...(documentoFinal !== undefined ? { documento: documentoFinal } : {}),
-          ...Object.fromEntries(
-            CAMPOS_DE_CADASTRO.filter(veio).map((campo) => [campo, d[campo]]),
-          ),
+          ...Object.fromEntries(CAMPOS_DE_CADASTRO.filter(veio).map((campo) => [campo, d[campo]])),
           ...(d.ativa !== undefined ? { ativa: d.ativa } : {}),
           // Ativar é também aprovar o cadastro público.
           ...(d.ativa === true ? { aguardandoAprovacao: false } : {}),
@@ -280,6 +286,67 @@ licencasRouter.patch(
     })
 
     res.json(await uma(atual.id))
+  }),
+)
+
+const corpoDeAprovacao = z.discriminatedUnion('como', [
+  z.object({ como: z.literal('empresa') }),
+  z.object({
+    como: z.literal('equipe'),
+    equipeId: z.string().uuid('Escolha a equipe.'),
+    perfil: z.enum(['admin', 'perito', 'assistente']),
+  }),
+])
+
+/**
+ * POST /licencas/:id/aprovar — aprova um cadastro público de um de dois jeitos:
+ *
+ * - `empresa`: vira uma licença dedicada (a empresa com o próprio espaço);
+ * - `equipe`: quem se cadastrou entra como funcionário de uma equipe que já
+ *   existe, com o perfil escolhido, e a licença do cadastro some.
+ *
+ * Mover o usuário é seguro aqui só porque o cadastro ainda não tem trabalho
+ * nenhum dentro (nem pode ter: a licença nasceu suspensa).
+ */
+licencasRouter.post(
+  '/:id/aprovar',
+  rota(async (req, res) => {
+    const d = corpoDeAprovacao.parse(req.body)
+    const licenca = await uma(parametro(req, 'id'))
+    if (!licenca.aguardandoAprovacao) {
+      throw new ErroHttp(409, 'Este cadastro não está aguardando aprovação.')
+    }
+
+    if (d.como === 'empresa') {
+      await prisma.licenca.update({
+        where: { id: licenca.id },
+        data: { ativa: true, aguardandoAprovacao: false },
+      })
+      res.json({ como: 'empresa', licenca: await uma(licenca.id) })
+      return
+    }
+
+    if (licenca.empresas + licenca.pericias + licenca.documentos > 0) {
+      throw new ErroHttp(409, 'Este cadastro já tem trabalho dentro; aprove-o como empresa.')
+    }
+    const equipe = await prisma.organizacao.findUnique({
+      where: { id: d.equipeId },
+      select: { id: true, nome: true, licencaId: true, licenca: { select: { ativa: true } } },
+    })
+    if (!equipe || equipe.licencaId === licenca.id)
+      throw new ErroHttp(404, 'Equipe não encontrada.')
+    if (!equipe.licenca.ativa) throw new ErroHttp(409, 'A licença dessa equipe está suspensa.')
+
+    await prisma.$transaction(async (tx) => {
+      await tx.usuario.updateMany({
+        where: { organizacao: { licencaId: licenca.id } },
+        data: { organizacaoId: equipe.id, perfil: d.perfil },
+      })
+      await tx.organizacao.updateMany({ where: { licencaId: licenca.id }, data: { paiId: null } })
+      await tx.organizacao.deleteMany({ where: { licencaId: licenca.id } })
+      await tx.licenca.delete({ where: { id: licenca.id } })
+    })
+    res.json({ como: 'equipe', equipe: { id: equipe.id, nome: equipe.nome } })
   }),
 )
 
