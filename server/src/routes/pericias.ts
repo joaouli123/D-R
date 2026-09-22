@@ -12,9 +12,11 @@ import { dataIsoSchema, tecnicoSchema, texto } from './esquemas-pericia.js'
 // extração; continua lendo.
 export { agenteSchema, dataIsoSchema, tecnicoSchema } from './esquemas-pericia.js'
 
-// Multi-tenant: a perícia pertence à EQUIPE do usuário. Toda leitura e escrita
-// leva `organizacaoId` da sessão (nunca `undefined`, que o Prisma leria como
-// "sem filtro"); um id de outra equipe responde 404, como se não existisse.
+// Multi-tenant: a perícia pertence à LICENÇA do usuário — as equipes dela
+// compartilham os processos. Toda leitura e escrita leva `licencaId` da sessão
+// (nunca `undefined`, que o Prisma leria como "sem filtro"); um id de outra
+// licença responde 404, como se não existisse. `organizacaoId` só registra a
+// equipe que criou.
 
 export const periciasRouter = Router()
 periciasRouter.use(exigirSessao)
@@ -104,7 +106,7 @@ periciasRouter.get(
   '/',
   rota(async (req, res) => {
     const pericias = await prisma.pericia.findMany({
-      where: { organizacaoId: sessaoDe(req).organizacaoId },
+      where: { licencaId: sessaoDe(req).licencaId },
       include: incluirTudo,
       orderBy: { atualizadoEm: 'desc' },
     })
@@ -117,7 +119,7 @@ periciasRouter.get(
   '/:id',
   rota(async (req, res) => {
     const pericia = await prisma.pericia.findFirst({
-      where: { id: parametro(req, 'id'), organizacaoId: sessaoDe(req).organizacaoId },
+      where: { id: parametro(req, 'id'), licencaId: sessaoDe(req).licencaId },
       include: incluirTudo,
     })
     if (!pericia) throw naoEncontrado('Perícia')
@@ -195,30 +197,30 @@ periciasRouter.post(
       },
     }
 
-    // O que a perícia referencia tem de ser da MESMA equipe: senão bastaria
-    // colar o id de uma empresa (ou de um usuário) de outra equipe para puxar
+    // O que a perícia referencia tem de ser da MESMA licença: senão bastaria
+    // colar o id de uma empresa (ou de um usuário) de outra licença para puxar
     // os dados dela para dentro do laudo.
     if (d.responsavelId) {
       const responsavel = await prisma.usuario.findFirst({
-        where: { id: d.responsavelId, organizacaoId: sessao.organizacaoId },
+        where: { id: d.responsavelId, organizacao: { licencaId: sessao.licencaId } },
         select: { id: true },
       })
-      if (!responsavel) throw new ErroHttp(422, 'O perito responsável precisa ser da sua equipe.')
+      if (!responsavel) throw new ErroHttp(422, 'O perito responsável precisa ser da sua licença.')
     }
     if (empresasReclamadas.size > 0) {
-      const daEquipe = await prisma.empresa.count({
-        where: { id: { in: [...empresasReclamadas] }, organizacaoId: sessao.organizacaoId },
+      const daLicenca = await prisma.empresa.count({
+        where: { id: { in: [...empresasReclamadas] }, licencaId: sessao.licencaId },
       })
-      if (daEquipe !== empresasReclamadas.size) {
-        throw new ErroHttp(422, 'Uma das empresas reclamadas não existe no cadastro da sua equipe.')
+      if (daLicenca !== empresasReclamadas.size) {
+        throw new ErroHttp(422, 'Uma das empresas reclamadas não existe no cadastro da sua licença.')
       }
     }
 
-    // Só enxerga como "existente" o que é da própria equipe. Um id de outra
-    // equipe vira uma perícia nova (com id gerado), nunca uma edição da alheia.
+    // Só enxerga como "existente" o que é da própria licença. Um id de outra
+    // licença vira uma perícia nova (com id gerado), nunca uma edição da alheia.
     const existente = d.id
       ? await prisma.pericia.findFirst({
-          where: { id: d.id, organizacaoId: sessao.organizacaoId },
+          where: { id: d.id, licencaId: sessao.licencaId },
         })
       : null
     const idSugerido =
@@ -233,6 +235,7 @@ periciasRouter.post(
             ...(idSugerido ? { id: idSugerido } : {}),
             ...escalares,
             organizacaoId: sessao.organizacaoId,
+            licencaId: sessao.licencaId,
             responsavelId: d.responsavelId || sessao.id,
             ...filhos,
           },
@@ -277,7 +280,7 @@ periciasRouter.delete(
   '/:id',
   rota(async (req, res) => {
     const pericia = await prisma.pericia.findFirst({
-      where: { id: parametro(req, 'id'), organizacaoId: sessaoDe(req).organizacaoId },
+      where: { id: parametro(req, 'id'), licencaId: sessaoDe(req).licencaId },
       select: { id: true },
     })
     if (!pericia) throw naoEncontrado('Perícia')

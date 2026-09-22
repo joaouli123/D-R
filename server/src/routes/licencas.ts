@@ -1,0 +1,226 @@
+import bcrypt from 'bcryptjs'
+import { Router } from 'express'
+import { z } from 'zod'
+import { exigirEquipePrincipal, exigirPerfil, exigirSessao } from '../auth.js'
+import { ErroHttp, parametro, rota } from '../erros.js'
+import { prisma } from '../prisma.js'
+import { apagarUpload } from '../services/armazenamento.js'
+import { LICENCA_PRINCIPAL_ID, ORGANIZACAO_RAIZ_ID } from '../tenancy.js'
+
+// ============================================================
+// Licenças — as empresas clientes da plataforma.
+//
+// Só o perito titular (administrador da equipe raiz) chega aqui. Ele cria a
+// licença junto com o primeiro administrador dela, renomeia, suspende e, se
+// ainda não houver trabalho dentro, exclui. Daí em diante quem cuida das
+// equipes e dos usuários da licença é o administrador dela.
+//
+// Esta tela mostra QUANTO há em cada licença, nunca O QUE há: empresas,
+// perícias e documentos continuam só de quem é da licença.
+// ============================================================
+
+export const licencasRouter = Router()
+licencasRouter.use(exigirSessao, exigirPerfil('admin'), exigirEquipePrincipal)
+
+const nomeDaLicenca = z.string().trim().min(2, 'Informe o nome da empresa.').max(160)
+const documento = z
+  .string()
+  .trim()
+  .max(30)
+  .optional()
+  .transform((v) => v || null)
+
+const corpoDeCriacao = z.object({
+  nome: nomeDaLicenca,
+  documento,
+  admin: z.object({
+    nome: z.string().trim().min(1, 'Informe o nome do administrador.'),
+    email: z.string().email('E-mail do administrador inválido.'),
+    senha: z.string().min(8, 'A senha do administrador deve ter pelo menos 8 caracteres.'),
+  }),
+})
+
+const corpoDeEdicao = z.object({
+  nome: nomeDaLicenca.optional(),
+  documento,
+  ativa: z.boolean().optional(),
+})
+
+/**
+ * A equipe que nasceu com a licença. Na principal é a raiz; nas clientes é a
+ * única da licença pendurada direto na raiz.
+ */
+const ehEquipeDeEntrada = (licencaId: string, e: { id: string; paiId: string | null }) =>
+  licencaId === LICENCA_PRINCIPAL_ID ? e.id === ORGANIZACAO_RAIZ_ID : e.paiId === ORGANIZACAO_RAIZ_ID
+
+async function listar(where: { id?: string } = {}) {
+  const licencas = await prisma.licenca.findMany({
+    where,
+    orderBy: { criadoEm: 'asc' },
+    include: {
+      _count: { select: { organizacoes: true, empresas: true, pericias: true, documentos: true } },
+      organizacoes: {
+        select: {
+          id: true,
+          paiId: true,
+          nome: true,
+          _count: { select: { usuarios: true } },
+          usuarios: {
+            where: { perfil: 'admin' },
+            select: { id: true, nome: true, email: true, ativo: true },
+            orderBy: { nome: 'asc' },
+          },
+        },
+      },
+    },
+  })
+
+  return licencas.map((l) => {
+    const entrada = l.organizacoes.find((e) => ehEquipeDeEntrada(l.id, e))
+    return {
+      id: l.id,
+      nome: l.nome,
+      documento: l.documento ?? undefined,
+      ativa: l.ativa,
+      principal: l.id === LICENCA_PRINCIPAL_ID,
+      criadoEm: l.criadoEm.toISOString(),
+      equipePrincipalId: entrada?.id,
+      equipes: l._count.organizacoes,
+      usuarios: l.organizacoes.reduce((soma, e) => soma + e._count.usuarios, 0),
+      empresas: l._count.empresas,
+      pericias: l._count.pericias,
+      documentos: l._count.documentos,
+      administradores: l.organizacoes.flatMap((e) => e.usuarios),
+    }
+  })
+}
+
+async function uma(id: string) {
+  const [licenca] = await listar({ id })
+  if (!licenca) throw new ErroHttp(404, 'Licença não encontrada.')
+  return licenca
+}
+
+/** GET /licencas — todas, com o tamanho de cada uma e quem as administra. */
+licencasRouter.get(
+  '/',
+  rota(async (_req, res) => {
+    res.json(await listar())
+  }),
+)
+
+/**
+ * POST /licencas — cria a licença, a equipe principal dela (logo abaixo da
+ * raiz, para o perito titular seguir gerindo os acessos) e o primeiro
+ * administrador. Tudo ou nada.
+ */
+licencasRouter.post(
+  '/',
+  rota(async (req, res) => {
+    const d = corpoDeCriacao.parse(req.body)
+    const email = d.admin.email.toLowerCase()
+
+    if (await prisma.usuario.findUnique({ where: { email }, select: { id: true } })) {
+      throw new ErroHttp(409, 'Já existe um usuário com este e-mail. Use outro para o administrador.')
+    }
+
+    const senhaHash = await bcrypt.hash(d.admin.senha, 12)
+    const licenca = await prisma.$transaction(async (tx) => {
+      const criada = await tx.licenca.create({ data: { nome: d.nome, documento: d.documento } })
+      const equipe = await tx.organizacao.create({
+        data: { nome: d.nome, paiId: ORGANIZACAO_RAIZ_ID, licencaId: criada.id },
+      })
+      await tx.usuario.create({
+        data: {
+          nome: d.admin.nome,
+          email,
+          senhaHash,
+          perfil: 'admin',
+          ativo: true,
+          organizacaoId: equipe.id,
+        },
+      })
+      return criada
+    })
+
+    res.status(201).json(await uma(licenca.id))
+  }),
+)
+
+/** PATCH /licencas/:id — renomeia, troca o documento, suspende ou reativa. */
+licencasRouter.patch(
+  '/:id',
+  rota(async (req, res) => {
+    const d = corpoDeEdicao.parse(req.body)
+    const atual = await uma(parametro(req, 'id'))
+
+    if (atual.principal && d.ativa === false) {
+      throw new ErroHttp(400, 'A licença principal não pode ser suspensa.')
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.licenca.update({
+        where: { id: atual.id },
+        data: {
+          ...(d.nome !== undefined ? { nome: d.nome } : {}),
+          ...('documento' in req.body ? { documento: d.documento } : {}),
+          ...(d.ativa !== undefined ? { ativa: d.ativa } : {}),
+        },
+      })
+      // A equipe de entrada acompanha o nome da licença — mas só se ainda tiver
+      // o nome antigo: um nome que o administrador dela escolheu fica.
+      if (d.nome !== undefined && atual.equipePrincipalId) {
+        await tx.organizacao.updateMany({
+          where: { id: atual.equipePrincipalId, nome: atual.nome },
+          data: { nome: d.nome },
+        })
+      }
+    })
+
+    res.json(await uma(atual.id))
+  }),
+)
+
+/**
+ * DELETE /licencas/:id — só sem trabalho dentro (empresas, perícias,
+ * documentos). As equipes e os usuários da licença saem junto; para só tirar o
+ * acesso, o caminho é suspender.
+ */
+licencasRouter.delete(
+  '/:id',
+  rota(async (req, res) => {
+    const licenca = await uma(parametro(req, 'id'))
+
+    if (licenca.principal) {
+      throw new ErroHttp(400, 'A licença principal não pode ser excluída.')
+    }
+    if (licenca.empresas + licenca.pericias + licenca.documentos > 0) {
+      throw new ErroHttp(
+        409,
+        `A licença "${licenca.nome}" tem ${licenca.empresas} empresa(s), ${licenca.pericias} ` +
+          `perícia(s) e ${licenca.documentos} documento(s) cadastrados e não pode ser excluída. ` +
+          'Para tirar o acesso sem perder nada, suspenda a licença.',
+      )
+    }
+
+    const arquivos = await prisma.usuario.findMany({
+      where: { organizacao: { licencaId: licenca.id } },
+      select: { logoArquivo: true, assinaturaArquivo: true },
+    })
+
+    await prisma.$transaction(async (tx) => {
+      await tx.usuario.deleteMany({ where: { organizacao: { licencaId: licenca.id } } })
+      // A hierarquia recusa apagar uma equipe com filhas: solta os laços antes.
+      await tx.organizacao.updateMany({ where: { licencaId: licenca.id }, data: { paiId: null } })
+      await tx.organizacao.deleteMany({ where: { licencaId: licenca.id } })
+      await tx.licenca.delete({ where: { id: licenca.id } })
+    })
+
+    // Só depois de o banco confirmar, como nas demais rotas com arquivo.
+    await Promise.all(
+      arquivos.flatMap((u) => [apagarUpload(u.logoArquivo), apagarUpload(u.assinaturaArquivo)]),
+    )
+
+    res.status(204).end()
+  }),
+)

@@ -22,10 +22,11 @@ import { cn, formatDateTime } from '@/lib/utils'
 // ============================================================
 // Usuários e equipes — só o administrador
 //
-// Cada equipe (empresa, laboratório parceiro) trabalha isolada: empresas,
-// perícias e documentos ficam com quem os criou. O administrador gere os
-// ACESSOS da própria equipe e das que estão abaixo dela na hierarquia — cria,
-// edita, troca a senha, desativa e exclui —, mas não lê o trabalho delas.
+// Cada licença (empresa cliente) trabalha isolada: empresas, perícias e
+// documentos são dela. Dentro da licença, as equipes são só uma divisão de
+// pessoas e compartilham esse trabalho. O administrador gere os ACESSOS da
+// própria equipe e das que estão abaixo dela na hierarquia — cria, edita, troca
+// a senha, desativa e exclui —, mas não lê o trabalho de outra licença.
 // ============================================================
 
 /** O que está aberto na tela; `null` = nenhum diálogo. */
@@ -132,10 +133,10 @@ export default function Usuarios() {
       <div className="mb-5 flex items-start gap-3 rounded-xl border border-navy-100 bg-navy-50 px-4 py-3.5 text-[13px] leading-relaxed text-navy-800">
         <ShieldCheck size={18} className="mt-0.5 shrink-0 text-navy-600" />
         <p>
-          <strong>Cada equipe trabalha isolada.</strong> Empresas, perícias e documentos ficam só
-          com a equipe que os criou — nem a equipe acima enxerga. Aqui você gere apenas os{' '}
-          <strong>acessos</strong>: cria, edita, troca a senha, desativa e exclui usuários da sua
-          equipe e das equipes abaixo dela.
+          <strong>Cada licença trabalha isolada.</strong> Empresas, perícias e documentos são da
+          licença — as equipes de dentro dela compartilham esse trabalho, e nenhuma outra licença
+          o enxerga. Aqui você gere apenas os <strong>acessos</strong>: cria, edita, troca a
+          senha, desativa e exclui usuários da sua equipe e das equipes abaixo dela.
         </p>
       </div>
 
@@ -193,6 +194,7 @@ export default function Usuarios() {
       )}
       {dialogo?.tipo === 'excluir-usuario' && (
         <ModalExcluirUsuario
+          arvore={arvore ?? []}
           equipe={dialogo.equipe}
           alvo={dialogo.alvo}
           onFechar={fechar}
@@ -204,6 +206,7 @@ export default function Usuarios() {
           arvore={arvore}
           editando={dialogo.editando}
           paiInicial={dialogo.paiInicial}
+          titular={Boolean(usuario?.equipePrincipal)}
           onFechar={fechar}
           onConcluido={concluir}
         />
@@ -263,6 +266,11 @@ function CartaoEquipe({
               {equipe.principal && (
                 <span title="Única equipe que altera as bases compartilhadas (CAEPI e quesitos globais).">
                   <Badge tone="navy">Equipe principal</Badge>
+                </span>
+              )}
+              {equipe.inicioDaLicenca && (
+                <span title="Primeira equipe desta licença. Empresas, perícias e documentos são da licença e não se misturam com os das outras.">
+                  <Badge tone="amber">Licença {equipe.licencaNome}</Badge>
                 </span>
               )}
             </div>
@@ -525,7 +533,7 @@ function ModalUsuario({
       subtitle={
         editando
           ? `Equipe ${equipe.nome}. O usuário não muda de equipe depois de criado.`
-          : `Será criado na equipe ${equipe.nome} e só enxerga o trabalho dela.`
+          : `Será criado na equipe ${equipe.nome} e só enxerga o trabalho da licença ${equipe.licencaNome}.`
       }
       footer={
         <>
@@ -692,11 +700,13 @@ function ModalSenha({
  * passa a perguntar quem assume. Para só tirar o acesso, o caminho é desativar.
  */
 function ModalExcluirUsuario({
+  arvore,
   equipe,
   alvo,
   onFechar,
   onConcluido,
 }: {
+  arvore: Equipe[]
   equipe: Equipe
   alvo: Usuario
   onFechar: () => void
@@ -708,8 +718,15 @@ function ModalExcluirUsuario({
   const [ocupado, setOcupado] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
-  // Só quem está ativo, é da mesma equipe e não é o próprio alvo pode herdar.
-  const candidatos = equipe.usuarios.filter((u) => u.ativo && u.id !== alvo.id)
+  // Só quem está ativo, é da mesma licença e não é o próprio alvo pode herdar —
+  // o trabalho é da licença, não da equipe. Os da equipe dele vêm primeiro.
+  const nomeDaEquipe = new Map(arvore.map((e) => [e.id, e.nome]))
+  const candidatos = [
+    ...equipe.usuarios,
+    ...arvore
+      .filter((e) => e.id !== equipe.id && e.licencaId === equipe.licencaId)
+      .flatMap((e) => e.usuarios),
+  ].filter((u) => u.ativo && u.id !== alvo.id)
   const repassando = etapa === 'repassar'
 
   async function excluir() {
@@ -791,13 +808,16 @@ function ModalExcluirUsuario({
               {candidatos.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.nome} ({PERFIL[u.perfil].label})
+                  {u.organizacaoId && u.organizacaoId !== equipe.id
+                    ? ` · ${nomeDaEquipe.get(u.organizacaoId) ?? 'outra equipe'}`
+                    : ''}
                 </option>
               ))}
             </Select>
           ) : (
             <p className="text-[13px] text-ink-600">
-              Não há outro usuário ativo nesta equipe para assumir o trabalho. Cadastre alguém antes
-              ou, se só quer tirar o acesso, desative este usuário.
+              Não há outro usuário ativo nesta licença para assumir o trabalho. Cadastre alguém
+              antes ou, se só quer tirar o acesso, desative este usuário.
             </p>
           )}
         </div>
@@ -823,17 +843,21 @@ function ModalEquipe({
   arvore,
   editando,
   paiInicial,
+  titular,
   onFechar,
   onConcluido,
 }: {
   arvore: Equipe[]
   editando?: Equipe
   paiInicial?: string
+  /** O perito titular, que abre empresas clientes pela tela de Licenças. */
+  titular: boolean
   onFechar: () => void
   onConcluido: (mensagem: string) => Promise<void>
 }) {
   const [nome, setNome] = useState(editando?.nome ?? '')
   const [paiId, setPaiId] = useState(paiInicial ?? arvore[0]?.id ?? '')
+  const licencaDoPai = arvore.find((e) => e.id === paiId)?.licencaNome
   const [ocupado, setOcupado] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -865,7 +889,9 @@ function ModalEquipe({
       subtitle={
         editando
           ? undefined
-          : 'Uma empresa ou laboratório com acesso próprio, isolado das demais equipes.'
+          : titular
+            ? 'Uma divisão de pessoas dentro de uma licença. Para abrir uma empresa cliente, isolada das demais, use a tela Licenças.'
+            : 'Uma divisão de pessoas dentro da sua licença.'
       }
       footer={
         <>
@@ -890,7 +916,11 @@ function ModalEquipe({
             label="Fica abaixo de"
             value={paiId}
             onChange={(e) => setPaiId(e.target.value)}
-            hint="Quem está acima gere os acessos da nova equipe, mas não lê o trabalho dela."
+            hint={
+              licencaDoPai
+                ? `A nova equipe entra na licença ${licencaDoPai} e compartilha as empresas, perícias e documentos dela.`
+                : undefined
+            }
           >
             {arvore.map((e) => (
               <option key={e.id} value={e.id}>

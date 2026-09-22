@@ -16,7 +16,7 @@ const {
 const { criarEpisRouter } = await import('../src/routes/epis.js')
 const { tratarErros } = await import('../src/erros.js')
 const { definirBuscaDeUsuarioDaSessao } = await import('../src/auth.js')
-const { ORGANIZACAO_RAIZ_ID } = await import('../src/tenancy.js')
+const { LICENCA_PRINCIPAL_ID, ORGANIZACAO_RAIZ_ID } = await import('../src/tenancy.js')
 // A sessão é conferida no banco a cada requisição; aqui, sem PostgreSQL,
 // a consulta devolve um administrador fixo.
 definirBuscaDeUsuarioDaSessao(async (id) =>
@@ -27,6 +27,7 @@ definirBuscaDeUsuarioDaSessao(async (id) =>
         perfil: 'admin',
         organizacaoId: ORGANIZACAO_RAIZ_ID,
         ativo: true,
+        organizacao: { licencaId: LICENCA_PRINCIPAL_ID, licenca: { ativa: true } },
       }
     : null,
 )

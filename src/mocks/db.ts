@@ -15,20 +15,48 @@ import type {
 /** A equipe principal — a raiz da árvore, a mesma que o servidor cria no seed. */
 export const EQUIPE_PRINCIPAL_ID = 'eqp-1'
 
+/** A licença do perito titular — o dono da plataforma. */
+export const LICENCA_PRINCIPAL_ID = 'lic-1'
+
+export interface LicencaMock {
+  id: string
+  nome: string
+  documento?: string
+  ativa: boolean
+  criadoEm: string
+}
+
+/**
+ * As licenças de demonstração: a do Dinoel e a de uma empresa cliente. O
+ * conteúdo de exemplo (empresas, perícias, documentos) é da principal.
+ */
+export const LICENCAS: LicencaMock[] = [
+  { id: LICENCA_PRINCIPAL_ID, nome: 'D&R Perícia Elite', ativa: true, criadoEm: '2026-01-05T10:00:00' },
+  {
+    id: 'lic-2',
+    nome: 'Laboratório Alfa Segurança',
+    documento: '12.345.678/0001-90',
+    ativa: true,
+    criadoEm: '2026-09-21T09:00:00',
+  },
+]
+
 export interface EquipeMock {
   id: string
   nome: string
   paiId: string | null
+  licencaId: string
 }
 
 /**
- * A hierarquia de demonstração: a equipe do Dinoel, uma equipe cliente abaixo
- * dela e uma filial ainda vazia (que dá para excluir).
+ * A hierarquia de demonstração: a equipe do Dinoel, a equipe de entrada da
+ * licença cliente logo abaixo dela e uma filial dessa licença ainda vazia (que
+ * dá para excluir).
  */
 export const EQUIPES: EquipeMock[] = [
-  { id: EQUIPE_PRINCIPAL_ID, nome: 'D&R Perícia Elite', paiId: null },
-  { id: 'eqp-2', nome: 'Laboratório Alfa Segurança', paiId: EQUIPE_PRINCIPAL_ID },
-  { id: 'eqp-3', nome: 'Alfa · Filial Campinas', paiId: 'eqp-2' },
+  { id: EQUIPE_PRINCIPAL_ID, nome: 'D&R Perícia Elite', paiId: null, licencaId: LICENCA_PRINCIPAL_ID },
+  { id: 'eqp-2', nome: 'Laboratório Alfa Segurança', paiId: EQUIPE_PRINCIPAL_ID, licencaId: 'lic-2' },
+  { id: 'eqp-3', nome: 'Alfa · Filial Campinas', paiId: 'eqp-2', licencaId: 'lic-2' },
 ]
 
 export const USUARIOS: Usuario[] = [

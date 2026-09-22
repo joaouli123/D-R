@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
+  BadgeCheck,
   Building2,
   ChartColumn,
   ChevronDown,
@@ -60,6 +61,11 @@ const NAV: ItemMenu[] = [
 /** Só o administrador vê: cadastro de usuários e da hierarquia de equipes. */
 const NAV_ADMIN: ItemMenu[] = [
   { to: '/usuarios', label: 'Usuários e Equipes', icone: UsersRound, cor: 'bg-lime-400/15 text-lime-300' },
+]
+
+/** Só o perito titular (administrador da equipe principal): as empresas clientes. */
+const NAV_TITULAR: ItemMenu[] = [
+  { to: '/licencas', label: 'Licenças', icone: BadgeCheck, cor: 'bg-fuchsia-400/15 text-fuchsia-300' },
 ]
 
 const NAV_FOOTER: ItemMenu[] = [
@@ -150,7 +156,11 @@ export function AppLayout() {
 
           <div className="my-3 border-t border-white/10" />
 
-          {[...(usuario?.perfil === 'admin' ? NAV_ADMIN : []), ...NAV_FOOTER].map(({ to, label, icone, cor }) => (
+          {[
+            ...(usuario?.perfil === 'admin' && usuario.equipePrincipal ? NAV_TITULAR : []),
+            ...(usuario?.perfil === 'admin' ? NAV_ADMIN : []),
+            ...NAV_FOOTER,
+          ].map(({ to, label, icone, cor }) => (
             <NavLink key={to} to={to} className={linkClass(to)} onClick={() => setMenuAberto(false)}>
               <IconeMenu icone={icone} className={cor} />
               <span>{label}</span>

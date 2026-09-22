@@ -13,11 +13,11 @@ import { processarAssinatura } from '../services/assinatura-perito.js'
 // ============================================================
 // Usuários — multi-tenant.
 //
-// Cada usuário pertence a uma equipe (ver tenancy.ts). O administrador
-// gere os usuários da PRÓPRIA equipe e os das equipes abaixo dela; nunca
-// os da mãe, das irmãs ou de outra árvore. O que fica fora do alcance
-// responde 404, não 403: quem não tem acesso não fica sabendo que o
-// usuário existe.
+// Cada usuário pertence a uma equipe, e a equipe a uma licença (ver
+// tenancy.ts). O administrador gere os usuários da PRÓPRIA equipe e os das
+// equipes abaixo dela; nunca os da mãe, das irmãs ou de outra árvore. O que
+// fica fora do alcance responde 404, não 403: quem não tem acesso não fica
+// sabendo que o usuário existe.
 // ============================================================
 
 export const usuariosRouter = Router()
@@ -61,12 +61,16 @@ async function carregarAlvo(sessao: Sessao, id: string) {
   return alvo
 }
 
-/** GET /usuarios — a equipe da sessão. A árvore inteira está em GET /equipes. */
+/**
+ * GET /usuarios — os da licença da sessão, que é quem divide os processos (o
+ * responsável de uma perícia pode ser de outra equipe da mesma licença). A
+ * árvore de gestão está em GET /equipes.
+ */
 usuariosRouter.get(
   '/',
   rota(async (req, res) => {
     const usuarios = await prisma.usuario.findMany({
-      where: { organizacaoId: sessaoDe(req).organizacaoId },
+      where: { organizacao: { licencaId: sessaoDe(req).licencaId } },
       orderBy: { nome: 'asc' },
     })
     res.json(usuarios.map(usuarioParaApi))
@@ -193,7 +197,7 @@ usuariosRouter.post(
  *
  * Perícias e documentos apontam para o usuário (responsável e autor) e o banco
  * recusa apagá-lo enquanto houver algum. Nesse caso é preciso dizer quem
- * assume o trabalho (`?transferirPara=<id>`, alguém ATIVO da mesma equipe):
+ * assume o trabalho (`?transferirPara=<id>`, alguém ATIVO da mesma licença):
  * o documento passa a sair com a identidade de quem assumiu. Para só tirar o
  * acesso sem mexer em nada, o caminho é desativar, não excluir.
  *
@@ -235,10 +239,15 @@ usuariosRouter.delete(
         )
       }
 
+      // O trabalho é da licença, então quem assume é de qualquer equipe dela.
+      const { licencaId } = await prisma.organizacao.findUniqueOrThrow({
+        where: { id: alvo.organizacaoId },
+        select: { licencaId: true },
+      })
       const herdeiro = await prisma.usuario.findFirst({
         where: {
           id: transferirPara,
-          organizacaoId: alvo.organizacaoId,
+          organizacao: { licencaId },
           ativo: true,
           NOT: { id: alvo.id },
         },
@@ -247,7 +256,7 @@ usuariosRouter.delete(
       if (!herdeiro) {
         throw new ErroHttp(
           422,
-          'Escolha, para assumir o trabalho, outro usuário ATIVO da mesma equipe.',
+          'Escolha, para assumir o trabalho, outro usuário ATIVO da mesma licença.',
         )
       }
       herdeiroId = herdeiro.id

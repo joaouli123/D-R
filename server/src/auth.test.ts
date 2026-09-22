@@ -12,7 +12,7 @@ vi.mock('./prisma.js', () => ({ prisma: { usuario: { findUnique: buscarNoBanco }
 
 const { definirBuscaDeUsuarioDaSessao, exigirEquipePrincipal, exigirPerfil, exigirSessao, sessaoDe } =
   await import('./auth.js')
-const { ORGANIZACAO_RAIZ_ID } = await import('./tenancy.js')
+const { LICENCA_PRINCIPAL_ID, ORGANIZACAO_RAIZ_ID } = await import('./tenancy.js')
 
 afterEach(() => {
   buscarNoBanco.mockReset()
@@ -25,6 +25,7 @@ const usuarioNoBanco = (extra: Record<string, unknown> = {}) => ({
   perfil: 'perito',
   organizacaoId: 'equipe-a',
   ativo: true,
+  organizacao: { licencaId: 'licenca-a', licenca: { ativa: true } },
   ...extra,
 })
 
@@ -83,11 +84,41 @@ describe('exigirSessao', () => {
       email: 'ana@equipe.test',
       perfil: 'perito',
       organizacaoId: 'equipe-a',
+      licencaId: 'licenca-a',
     })
     expect(buscarNoBanco).toHaveBeenCalledWith({
       where: { id: 'u1' },
-      select: { id: true, email: true, perfil: true, organizacaoId: true, ativo: true },
+      select: {
+        id: true,
+        email: true,
+        perfil: true,
+        organizacaoId: true,
+        ativo: true,
+        organizacao: { select: { licencaId: true, licenca: { select: { ativa: true } } } },
+      },
     })
+  })
+
+  it('a licença vem do banco: um token que declara outra não muda o escopo', async () => {
+    buscarNoBanco.mockResolvedValue(usuarioNoBanco())
+    const { req, res } = pedir(tokenDe({ id: 'u1', licencaId: 'licenca-alheia' }))
+
+    expect(await executar(req, res)).toBeUndefined()
+    expect(req.usuario?.licencaId).toBe('licenca-a')
+  })
+
+  it('licença suspensa derruba a sessão na hora e o cookie é limpo', async () => {
+    buscarNoBanco.mockResolvedValue(
+      usuarioNoBanco({ organizacao: { licencaId: 'licenca-a', licenca: { ativa: false } } }),
+    )
+    const { req, res, clearCookie } = pedir(tokenDe({ id: 'u1' }))
+
+    const erro = await executar(req, res)
+
+    expect(erro).toMatchObject({ status: 401 })
+    expect((erro as Error).message).toMatch(/licença desta conta está suspensa/i)
+    expect(clearCookie).toHaveBeenCalledWith('dr_sessao', expect.any(Object))
+    expect(req.usuario).toBeUndefined()
   })
 
   it('token emitido antes do multi-tenant (sem organizacaoId) continua valendo', async () => {
@@ -135,6 +166,7 @@ describe('exigirSessao', () => {
       perfil: 'admin',
       organizacaoId: ORGANIZACAO_RAIZ_ID,
       ativo: true,
+      organizacao: { licencaId: LICENCA_PRINCIPAL_ID, licenca: { ativa: true } },
     }))
     const { req, res } = pedir(tokenDe({ id: 'qualquer' }))
 
@@ -148,7 +180,7 @@ describe('sessaoDe', () => {
   it('sem sessão é 401, com sessão devolve o usuário', () => {
     expect(() => sessaoDe({} as Request)).toThrow(/expirada/i)
 
-    const usuario = { id: 'u1', email: 'a@b.c', perfil: 'perito', organizacaoId: 'x' }
+    const usuario = { id: 'u1', email: 'a@b.c', perfil: 'perito', organizacaoId: 'x', licencaId: 'y' }
     expect(sessaoDe({ usuario } as unknown as Request)).toBe(usuario)
   })
 })

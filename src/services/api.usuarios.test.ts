@@ -480,14 +480,24 @@ describe('equipes — criar, renomear e excluir', () => {
   })
 
   it('não exclui equipe que tem equipes abaixo, nem equipe com usuários', async () => {
-    const comFilha = await falha(api.equipes.excluir(ALFA))
+    const sorocaba = await esperar(api.equipes.criar('Sorocaba', CAMPINAS))
+    const comFilha = await falha(api.equipes.excluir(CAMPINAS))
     expect(comFilha).toMatchObject({ status: 409 })
     expect(comFilha.message).toMatch(/equipes abaixo/)
 
-    await esperar(api.equipes.excluir(CAMPINAS)) // esvazia a família da Alfa
-    const comGente = await falha(api.equipes.excluir(ALFA))
+    await esperar(api.equipes.excluir(sorocaba.id)) // esvazia a família de Campinas
+    await esperar(api.usuarios.salvar(cadastro({ organizacaoId: CAMPINAS })))
+    const comGente = await falha(api.equipes.excluir(CAMPINAS))
     expect(comGente.status).toBe(409)
     expect(comGente.message).toMatch(/ainda tem usuários/)
+  })
+
+  it('não exclui a equipe de entrada de uma licença — ela sai só com a licença', async () => {
+    await esperar(api.equipes.excluir(CAMPINAS)) // nem com a família vazia
+    const entrada = await falha(api.equipes.excluir(ALFA))
+
+    expect(entrada.status).toBe(409)
+    expect(entrada.message).toMatch(/página Licenças/)
   })
 
   it('podeExcluir acompanha o conteúdo: vira falso quando entra o primeiro usuário', async () => {
@@ -566,5 +576,99 @@ describe('retomarSessaoDemo — recarregar a página não troca quem está logad
 
     const arvore = await esperar(api.equipes.listar())
     expect(arvore[0]?.id).toBe(ALFA)
+  })
+})
+
+describe('licenças — as empresas clientes, só para o perito titular', () => {
+  const LIC_PRINCIPAL = 'lic-1'
+  const LIC_ALFA = 'lic-2'
+
+  it('o titular vê todas as licenças, com os números de cada uma e nenhum conteúdo', async () => {
+    const licencas = await esperar(api.licencas.listar())
+
+    expect(licencas.map((l) => l.id)).toEqual([LIC_PRINCIPAL, LIC_ALFA])
+    const alfa = licencas.find((l) => l.id === LIC_ALFA)!
+    expect(alfa).toMatchObject({ principal: false, ativa: true, equipes: 2, equipePrincipalId: ALFA })
+    expect(alfa.administradores.map((a) => a.id)).toEqual([CARLOS])
+    expect(licencas.find((l) => l.id === LIC_PRINCIPAL)!.principal).toBe(true)
+  })
+
+  it('o administrador de outra licença não abre a página', async () => {
+    await entrarComoCarlos()
+
+    const erro = await falha(api.licencas.listar())
+
+    expect(erro.status).toBe(403)
+  })
+
+  it('a licença nova nasce isolada: o administrador dela entra e não vê nada de ninguém', async () => {
+    const nova = await esperar(
+      api.licencas.criar({
+        nome: 'Beta Engenharia',
+        documento: '11.222.333/0001-81',
+        admin: { nome: 'Joana Lima', email: 'joana@beta.com.br', senha: 'senhaforte1' },
+      }),
+    )
+    expect(nova).toMatchObject({ nome: 'Beta Engenharia', equipes: 1, usuarios: 1, empresas: 0 })
+
+    await esperar(api.auth.login('joana@beta.com.br', 'senhaforte1'))
+
+    const arvore = await esperar(api.equipes.listar())
+    expect(arvore.map((e) => e.id)).toEqual([nova.equipePrincipalId])
+    expect(await esperar(api.empresas.listar())).toEqual([])
+    expect(await esperar(api.pericias.listar())).toEqual([])
+  })
+
+  it('não repete o e-mail de quem já tem cadastro em qualquer licença', async () => {
+    const erro = await falha(
+      api.licencas.criar({
+        nome: 'Gama',
+        admin: { nome: 'Outro Carlos', email: 'CARLOS@alfaseguranca.com.br', senha: 'senhaforte1' },
+      }),
+    )
+
+    expect(erro.status).toBe(409)
+  })
+
+  it('suspender tira o acesso de todos da licença; reativar devolve', async () => {
+    await esperar(api.licencas.atualizar(LIC_ALFA, { ativa: false }))
+
+    const erro = await falha(api.auth.login('carlos@alfaseguranca.com.br', 'qualquer-senha'))
+    expect(erro.status).toBe(403)
+
+    await esperar(api.licencas.atualizar(LIC_ALFA, { ativa: true }))
+    await entrarComoCarlos()
+  })
+
+  it('a licença principal não pode ser suspensa nem excluída', async () => {
+    expect((await falha(api.licencas.atualizar(LIC_PRINCIPAL, { ativa: false }))).status).toBe(400)
+    expect((await falha(api.licencas.excluir(LIC_PRINCIPAL))).status).toBe(400)
+  })
+
+  it('excluir leva as equipes e os usuários da licença junto', async () => {
+    await esperar(api.licencas.excluir(LIC_ALFA))
+
+    const licencas = await esperar(api.licencas.listar())
+    expect(licencas.map((l) => l.id)).toEqual([LIC_PRINCIPAL])
+    const erro = await falha(api.auth.login('carlos@alfaseguranca.com.br', 'qualquer-senha'))
+    expect(erro.status).toBe(401)
+  })
+
+  it('renomear leva o nome para a equipe de entrada, e CNPJ vazio apaga o CNPJ', async () => {
+    await esperar(api.licencas.atualizar(LIC_ALFA, { documento: '12.345.678/0001-90' }))
+
+    const depois = await esperar(api.licencas.atualizar(LIC_ALFA, { nome: 'Alfa Segurança', documento: '' }))
+
+    expect(depois).toMatchObject({ nome: 'Alfa Segurança', documento: undefined })
+    await entrarComoCarlos()
+    const arvore = await esperar(api.equipes.listar())
+    // A equipe de entrada tinha o mesmo nome da licença, então acompanha; a filial não muda.
+    expect(arvore.map((e) => e.nome)).toEqual(['Alfa Segurança', 'Alfa · Filial Campinas'])
+  })
+
+  it('licença que não existe dá 404 com a mensagem certa', async () => {
+    const erro = await falha(api.licencas.excluir('lic-nao-existe'))
+
+    expect(erro).toMatchObject({ status: 404, message: 'Licença não encontrada.' })
   })
 })

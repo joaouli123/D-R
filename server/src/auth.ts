@@ -25,12 +25,19 @@ export interface Sessao {
   id: string
   email: string
   perfil: Perfil
-  /** Equipe do usuário — o escopo de tudo o que ele lê e grava. */
+  /** Equipe do usuário — o alcance da gestão de acessos. */
   organizacaoId: string
+  /** Licença da equipe — o escopo de tudo o que ele lê e grava. */
+  licencaId: string
 }
 
-export interface UsuarioDaSessao extends Sessao {
+export interface UsuarioDaSessao {
+  id: string
+  email: string
+  perfil: Perfil
+  organizacaoId: string
   ativo: boolean
+  organizacao: { licencaId: string; licenca: { ativa: boolean } }
 }
 
 export type BuscarUsuarioDaSessao = (id: string) => Promise<UsuarioDaSessao | null>
@@ -44,10 +51,31 @@ declare global {
   }
 }
 
+/** O que a sessão lê do usuário a cada requisição (e o login, na entrada). */
+export const SELECAO_DA_SESSAO = {
+  id: true,
+  email: true,
+  perfil: true,
+  organizacaoId: true,
+  ativo: true,
+  organizacao: { select: { licencaId: true, licenca: { select: { ativa: true } } } },
+} as const
+
+export const LICENCA_SUSPENSA = 'A licença desta conta está suspensa. Procure o administrador.'
+
+/** A sessão que o usuário lido do banco recebe. */
+export const sessaoDoUsuario = (u: UsuarioDaSessao): Sessao => ({
+  id: u.id,
+  email: u.email,
+  perfil: u.perfil,
+  organizacaoId: u.organizacaoId,
+  licencaId: u.organizacao.licencaId,
+})
+
 const buscarNoBanco: BuscarUsuarioDaSessao = (id) =>
   prisma.usuario.findUnique({
     where: { id },
-    select: { id: true, email: true, perfil: true, organizacaoId: true, ativo: true },
+    select: SELECAO_DA_SESSAO,
   })
 
 let buscarUsuario: BuscarUsuarioDaSessao = buscarNoBanco
@@ -86,9 +114,9 @@ export function encerrarSessao(res: Response): void {
 /**
  * Exige sessão válida. Popula req.usuario com os dados ATUAIS do banco.
  *
- * Responde 401 — e limpa o cookie — quando o usuário não existe mais ou foi
- * desativado, para o frontend cair na tela de login em vez de continuar
- * mostrando erros de permissão.
+ * Responde 401 — e limpa o cookie — quando o usuário não existe mais, foi
+ * desativado ou a licença dele foi suspensa, para o frontend cair na tela de
+ * login em vez de continuar mostrando erros de permissão.
  */
 export function exigirSessao(req: Request, res: Response, next: NextFunction): void {
   const token = req.cookies?.[COOKIE] as string | undefined
@@ -108,17 +136,20 @@ export function exigirSessao(req: Request, res: Response, next: NextFunction): v
   }
 
   buscarUsuario(id).then((usuario) => {
-    if (!usuario || !usuario.ativo) {
+    if (!usuario || !usuario.ativo || !usuario.organizacao.licenca.ativa) {
       encerrarSessao(res)
-      next(naoAutorizado(usuario ? 'Este usuário foi desativado. Procure o administrador.' : undefined))
+      next(
+        naoAutorizado(
+          !usuario
+            ? undefined
+            : !usuario.ativo
+              ? 'Este usuário foi desativado. Procure o administrador.'
+              : LICENCA_SUSPENSA,
+        ),
+      )
       return
     }
-    req.usuario = {
-      id: usuario.id,
-      email: usuario.email,
-      perfil: usuario.perfil,
-      organizacaoId: usuario.organizacaoId,
-    }
+    req.usuario = sessaoDoUsuario(usuario)
     next()
   }, next)
 }

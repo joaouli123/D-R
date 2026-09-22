@@ -13,7 +13,12 @@ import jwt from 'jsonwebtoken'
 process.env.DATABASE_URL ??= 'postgresql://smoke:smoke@127.0.0.1:5432/smoke'
 process.env.JWT_SECRET ??= 'smoke-test-secret-with-at-least-32-characters'
 
-const [{ criarApp }, { env }, { definirBuscaDeUsuarioDaSessao }, { ORGANIZACAO_RAIZ_ID }] =
+const [
+  { criarApp },
+  { env },
+  { definirBuscaDeUsuarioDaSessao },
+  { LICENCA_PRINCIPAL_ID, ORGANIZACAO_RAIZ_ID },
+] =
   await Promise.all([
     import('../src/app.js'),
     import('../src/env.js'),
@@ -32,6 +37,7 @@ definirBuscaDeUsuarioDaSessao(async (id) =>
         perfil: 'perito',
         organizacaoId: ORGANIZACAO_RAIZ_ID,
         ativo: true,
+        organizacao: { licencaId: LICENCA_PRINCIPAL_ID, licenca: { ativa: true } },
       }
     : null,
 )
@@ -73,6 +79,7 @@ const CASOS: Caso[] = [
   { nome: 'textos exigem sessão', caminho: '/textos', statusEsperado: 401 },
   { nome: 'usuários exigem sessão', caminho: '/usuarios', statusEsperado: 401 },
   { nome: 'equipes exigem sessão', caminho: '/equipes', statusEsperado: 401 },
+  { nome: 'licenças exigem sessão', caminho: '/licencas', statusEsperado: 401 },
   { nome: 'quem sou eu sem sessão', caminho: '/auth/eu', statusEsperado: 401 },
   {
     nome: 'upload de fotos exige sessão',
@@ -135,6 +142,12 @@ const CASOS: Caso[] = [
     metodo: 'POST',
     cookie: sessaoTeste,
     corpo: { nome: 'Equipe qualquer' },
+    statusEsperado: 403,
+  },
+  {
+    nome: 'licenças são só do administrador titular',
+    caminho: '/licencas',
+    cookie: sessaoTeste,
     statusEsperado: 403,
   },
   {

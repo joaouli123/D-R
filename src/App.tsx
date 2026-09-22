@@ -14,6 +14,7 @@ import Clientes from '@/pages/Clientes'
 import Biblioteca from '@/pages/Biblioteca'
 import Configuracoes from '@/pages/Configuracoes'
 import Usuarios from '@/pages/Usuarios'
+import Licencas from '@/pages/Licencas'
 import Ajuda from '@/pages/Ajuda'
 import Quesitos from '@/pages/Quesitos'
 import Manifestacao from '@/pages/Manifestacao'
@@ -80,6 +81,17 @@ export default function App() {
         <Route
           path="/usuarios"
           element={usuario.perfil === 'admin' ? <Usuarios /> : <Navigate to="/" replace />}
+        />
+        {/* Só o perito titular: o administrador da equipe principal. O servidor confere de novo. */}
+        <Route
+          path="/licencas"
+          element={
+            usuario.perfil === 'admin' && usuario.equipePrincipal ? (
+              <Licencas />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
         />
         <Route path="/ajuda" element={<Ajuda />} />
 

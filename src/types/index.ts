@@ -44,14 +44,49 @@ export interface Usuario {
 }
 
 /**
+ * Uma licença: a empresa cliente que assina a plataforma. É ela que isola o
+ * trabalho — empresas, perícias e documentos são da licença, compartilhados
+ * pelas equipes dela e invisíveis para as demais. Só o perito titular (a
+ * licença principal) cria e gere licenças; a tela mostra QUANTO há em cada
+ * uma, nunca O QUE há.
+ */
+export interface Licenca {
+  id: UUID
+  nome: string
+  /** CNPJ ou CPF de quem contratou, como o titular digitou. */
+  documento?: string
+  /** Suspensa = ninguém da licença entra (e quem estava dentro cai). */
+  ativa: boolean
+  /** A do perito titular: não é suspensa nem excluída. */
+  principal: boolean
+  criadoEm: string
+  /** A equipe que nasceu com a licença — a porta de entrada dela. */
+  equipePrincipalId?: UUID
+  equipes: number
+  usuarios: number
+  empresas: number
+  pericias: number
+  documentos: number
+  administradores: Array<Pick<Usuario, 'id' | 'nome' | 'email' | 'ativo'>>
+}
+
+/**
  * Uma equipe (organização) na hierarquia. O administrador enxerga a própria e
  * as que estão abaixo dela, sempre em ordem de exibição (a mãe antes das
- * filhas), com os usuários de cada uma. Gere ACESSOS — não lê o trabalho
- * (empresas, perícias, documentos) das equipes de baixo.
+ * filhas), com os usuários de cada uma. Gere ACESSOS — o trabalho (empresas,
+ * perícias, documentos) é da LICENÇA e só quem é dela o lê.
  */
 export interface Equipe {
   id: UUID
   nome: string
+  /** Licença a que a equipe pertence; as equipes de uma licença dividem o trabalho. */
+  licencaId: UUID
+  licencaNome: string
+  /**
+   * A equipe abre uma licença diferente da equipe de cima — é a porta de
+   * entrada de uma empresa cliente. Só sai pela página Licenças.
+   */
+  inicioDaLicenca: boolean
   /** Mãe da equipe; `null` na raiz da árvore visível para quem consulta. */
   paiId: UUID | null
   /** Profundidade a partir da equipe de quem consulta (0 = a própria). */
@@ -60,7 +95,7 @@ export interface Equipe {
   propria: boolean
   /** É a equipe principal do sistema (dona das bases compartilhadas). */
   principal: boolean
-  /** Vazia (sem gente, sem trabalho, sem equipes filhas) e não é a própria. */
+  /** Vazia (sem gente, sem trabalho, sem equipes filhas), não é a própria nem abre licença. */
   podeExcluir: boolean
   usuarios: Usuario[]
 }

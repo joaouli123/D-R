@@ -1,7 +1,15 @@
 import bcrypt from 'bcryptjs'
 import { Router } from 'express'
 import { z } from 'zod'
-import { emitirSessao, encerrarSessao, exigirSessao, sessaoDe } from '../auth.js'
+import {
+  emitirSessao,
+  encerrarSessao,
+  exigirSessao,
+  LICENCA_SUSPENSA,
+  SELECAO_DA_SESSAO,
+  sessaoDe,
+  sessaoDoUsuario,
+} from '../auth.js'
 import { ErroHttp, naoAutorizado, rota } from '../erros.js'
 import { usuarioParaApi } from '../mappers.js'
 import { prisma } from '../prisma.js'
@@ -26,6 +34,7 @@ authRouter.post(
 
     const usuario = await prisma.usuario.findUnique({
       where: { email: email.toLowerCase() },
+      include: { organizacao: SELECAO_DA_SESSAO.organizacao },
     })
 
     const invalido = naoAutorizado('E-mail ou senha inválidos.')
@@ -39,18 +48,14 @@ authRouter.post(
     if (!usuario.ativo) {
       throw new ErroHttp(403, 'Este usuário está inativo. Procure o administrador.')
     }
+    if (!usuario.organizacao.licenca.ativa) throw new ErroHttp(403, LICENCA_SUSPENSA)
 
     const atualizado = await prisma.usuario.update({
       where: { id: usuario.id },
       data: { ultimoAcesso: new Date() },
     })
 
-    emitirSessao(res, {
-      id: usuario.id,
-      email: usuario.email,
-      perfil: usuario.perfil,
-      organizacaoId: usuario.organizacaoId,
-    })
+    emitirSessao(res, sessaoDoUsuario(usuario))
     res.json(usuarioParaApi(atualizado))
   }),
 )

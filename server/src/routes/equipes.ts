@@ -11,9 +11,12 @@ import { arvoreOrdenada, ehEquipePrincipal, idsDaSubarvore } from '../tenancy.js
 // Equipes — a hierarquia de organizações.
 //
 // O administrador enxerga a própria equipe e as que estão abaixo dela, com os
-// usuários de cada uma, e pode criar, renomear e excluir equipes abaixo. O que
-// ele NÃO faz é ler o trabalho (empresas, perícias, documentos) das equipes de
-// baixo: a gestão é de acessos, não de conteúdo.
+// usuários de cada uma, e pode criar, renomear e excluir equipes abaixo. Uma
+// equipe nova nasce na licença da mãe e compartilha o trabalho dela.
+//
+// O perito titular, na equipe raiz, alcança também a equipe principal de cada
+// licença cliente — para gerir os ACESSOS delas, nunca o conteúdo: empresas,
+// perícias e documentos seguem a licença de quem lê.
 //
 // O que está fora do alcance responde 404 — quem não tem acesso não fica
 // sabendo que existe.
@@ -54,9 +57,14 @@ async function montarArvore(organizacaoId: string) {
       conta.usuarios + conta.empresas + conta.pericias + conta.documentos === 0 &&
       !temFilhas.has(equipe.id)
 
+    const mae = equipe.paiId ? todas.find((e) => e.id === equipe.paiId) : undefined
     return {
       id: equipe.id,
       nome: equipe.nome,
+      licencaId: equipe.licencaId,
+      licencaNome: equipe.licenca.nome,
+      // A equipe principal de uma licença cliente — a que nasceu com ela.
+      inicioDaLicenca: !!mae && mae.licencaId !== equipe.licencaId,
       // A mãe da equipe da própria sessão fica fora do alcance: não a revelamos.
       paiId: equipe.nivel === 0 ? null : equipe.paiId,
       nivel: equipe.nivel,
@@ -64,7 +72,8 @@ async function montarArvore(organizacaoId: string) {
       principal: ehEquipePrincipal(equipe.id),
       // Uma equipe só sai do sistema vazia (sem gente, sem trabalho e sem
       // equipes filhas) e nunca a própria — senão quem exclui perderia o acesso.
-      podeExcluir: equipe.id !== organizacaoId && vazia,
+      // A principal de uma licença sai com a licença, na tela de Licenças.
+      podeExcluir: equipe.id !== organizacaoId && vazia && (!mae || mae.licencaId === equipe.licencaId),
       usuarios: usuarios.filter((u) => u.organizacaoId === equipe.id).map(usuarioParaApi),
     }
   })
@@ -97,7 +106,9 @@ equipesRouter.post(
     const { organizacaoId } = sessaoDe(req)
 
     const pai = await equipeDoAlcance(organizacaoId, paiId ?? organizacaoId)
-    const criada = await prisma.organizacao.create({ data: { nome, paiId: pai.id } })
+    const criada = await prisma.organizacao.create({
+      data: { nome, paiId: pai.id, licencaId: pai.licencaId },
+    })
 
     const arvore = await montarArvore(organizacaoId)
     res.status(201).json(arvore.find((e) => e.id === criada.id))
@@ -133,6 +144,13 @@ equipesRouter.delete(
 
     if (equipe.id === organizacaoId) {
       throw new ErroHttp(400, 'Você não pode excluir a própria equipe.')
+    }
+    const mae = (await carregarEquipes()).find((e) => e.id === equipe.paiId)
+    if (mae && mae.licencaId !== equipe.licencaId) {
+      throw new ErroHttp(
+        409,
+        'Esta é a equipe principal de uma licença. Para removê-la, exclua a licença na página Licenças.',
+      )
     }
 
     const [filhas, contagem] = await Promise.all([

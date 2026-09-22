@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import 'dotenv/config'
 import { QUESITOS_BASE } from './quesitos-base.js'
-import { ORGANIZACAO_RAIZ_ID } from './tenancy.js'
+import { LICENCA_PRINCIPAL_ID, ORGANIZACAO_RAIZ_ID } from './tenancy.js'
 
 const prisma = new PrismaClient()
 
@@ -116,13 +116,18 @@ async function main() {
     throw new Error('ADMIN_SENHA deve ter pelo menos 8 caracteres.')
   }
 
-  // ---------- Equipe principal ----------
-  // A migração multitenant_equipes já insere esta linha; o upsert cobre o banco
-  // criado por outro caminho (db push) e nunca renomeia uma equipe existente.
+  // ---------- Licença e equipe principais ----------
+  // As migrações já inserem estas linhas; o upsert cobre o banco criado por
+  // outro caminho (db push) e nunca renomeia o que já existe.
+  await prisma.licenca.upsert({
+    where: { id: LICENCA_PRINCIPAL_ID },
+    update: {},
+    create: { id: LICENCA_PRINCIPAL_ID, nome: 'D&R Perícia Elite' },
+  })
   await prisma.organizacao.upsert({
     where: { id: ORGANIZACAO_RAIZ_ID },
     update: {},
-    create: { id: ORGANIZACAO_RAIZ_ID, nome: 'D&R Perícia Elite' },
+    create: { id: ORGANIZACAO_RAIZ_ID, nome: 'D&R Perícia Elite', licencaId: LICENCA_PRINCIPAL_ID },
   })
 
   // ---------- Administrador ----------
@@ -184,7 +189,8 @@ async function main() {
 }
 
 async function seedDemo(responsavelId: string, organizacaoId: string) {
-  if ((await prisma.empresa.count({ where: { organizacaoId } })) > 0) {
+  const licencaId = LICENCA_PRINCIPAL_ID
+  if ((await prisma.empresa.count({ where: { licencaId } })) > 0) {
     console.log('· dados de demonstração já existem — nada a fazer')
     return
   }
@@ -192,6 +198,7 @@ async function seedDemo(responsavelId: string, organizacaoId: string) {
   const ferrante = await prisma.empresa.create({
     data: {
       organizacaoId,
+      licencaId,
       razaoSocial: 'Metalúrgica Ferrante Indústria e Comércio Ltda.',
       nomeFantasia: 'Ferrante Metais',
       cnpj: '12.345.678/0001-90',
@@ -213,6 +220,7 @@ async function seedDemo(responsavelId: string, organizacaoId: string) {
   await prisma.pericia.create({
     data: {
       organizacaoId,
+      licencaId,
       numeroProcesso: '1001234-56.2025.5.02.0071',
       vara: '71ª Vara do Trabalho de São Paulo',
       comarca: 'São Paulo/SP',

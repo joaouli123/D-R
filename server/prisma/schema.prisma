@@ -26,17 +26,44 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ---------------- Equipes (multi-tenant) ----------------
+// ---------------- Licenças e equipes (multi-tenant) ----------------
 
-/// Uma equipe é um inquilino: empresas, perícias e documentos pertencem a uma
-/// equipe e só quem é dela os enxerga.
+/// Uma licença é uma empresa cliente do sistema — o inquilino. Empresas,
+/// perícias e documentos pertencem a uma licença e só quem é dela os enxerga;
+/// uma licença nunca lê o conteúdo de outra.
 ///
-/// A hierarquia (`paiId`) NÃO abre dados para cima. O administrador da equipe-mãe
-/// cria e administra os ACESSOS das equipes filhas (usuários, senhas, ativação),
-/// mas não lê o conteúdo delas — o isolamento entre equipes é total.
+/// Dentro da licença há equipes (e usuários nelas) que COMPARTILHAM esse
+/// conteúdo: a equipe organiza as pessoas, não isola o trabalho.
+///
+/// A licença de id fixo LICENCA_PRINCIPAL_ID (src/tenancy.ts) é a do perito
+/// titular, dono da plataforma: é de lá que as outras são criadas e geridas.
+model Licenca {
+  id           String   @id @default(uuid())
+  nome         String
+  /// CNPJ ou CPF da empresa cliente, só para identificação.
+  documento    String?
+  /// Suspensa (`false`), ninguém da licença entra — os dados ficam intactos.
+  ativa        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  organizacoes Organizacao[]
+  empresas     Empresa[]
+  pericias     Pericia[]
+  documentos   DocumentoGerado[]
+
+  @@map("licencas")
+}
+
+/// Uma equipe organiza os usuários dentro de uma licença.
+///
+/// A hierarquia (`paiId`) dá a gestão de ACESSOS: o administrador cria e
+/// administra usuários, senhas e ativação da própria equipe e das de baixo. O
+/// conteúdo não segue a árvore, segue a licença (`licencaId`).
 ///
 /// Existe uma equipe raiz de id fixo (ORGANIZACAO_RAIZ_ID em src/tenancy.ts): é
-/// a do perito titular do sistema e onde a migração colocou tudo o que já existia.
+/// a do perito titular. A equipe principal de cada licença cliente fica logo
+/// abaixo dela — é assim que o titular gere os acessos de todas.
 model Organizacao {
   id           String   @id @default(uuid())
   nome         String
@@ -48,12 +75,17 @@ model Organizacao {
   pai    Organizacao?  @relation("HierarquiaDeEquipes", fields: [paiId], references: [id], onDelete: Restrict)
   filhas Organizacao[] @relation("HierarquiaDeEquipes")
 
+  /// Fixa: a equipe herda a licença da mãe e não troca.
+  licencaId String
+  licenca   Licenca @relation(fields: [licencaId], references: [id], onDelete: Restrict)
+
   usuarios   Usuario[]
   empresas   Empresa[]
   pericias   Pericia[]
   documentos DocumentoGerado[]
 
   @@index([paiId])
+  @@index([licencaId])
   @@map("organizacoes")
 }
 
@@ -122,14 +154,19 @@ model Empresa {
   criadoEm        DateTime @default(now())
   atualizadoEm    DateTime @updatedAt
 
+  /// Equipe de quem cadastrou. Quem enxerga é a licença inteira.
   organizacaoId String
   organizacao   Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Restrict)
+
+  licencaId String
+  licenca   Licenca @relation(fields: [licencaId], references: [id], onDelete: Restrict)
 
   reclamadas    Reclamada[]
   participantes Participante[]
 
-  // O mesmo CNPJ pode ser cliente de duas equipes: cada uma tem o seu cadastro.
-  @@unique([organizacaoId, cnpj])
+  // O mesmo CNPJ pode ser cliente de duas licenças: cada uma tem o seu cadastro.
+  @@unique([licencaId, cnpj])
+  @@index([organizacaoId])
   @@map("empresas")
 }
 
@@ -178,8 +215,12 @@ model Pericia {
   responsavelId String
   responsavel   Usuario @relation(fields: [responsavelId], references: [id], onDelete: Restrict)
 
+  /// Equipe de quem abriu. Quem enxerga é a licença inteira.
   organizacaoId String
   organizacao   Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Restrict)
+
+  licencaId String
+  licenca   Licenca @relation(fields: [licencaId], references: [id], onDelete: Restrict)
 
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
@@ -191,6 +232,7 @@ model Pericia {
 
   @@index([responsavelId])
   @@index([organizacaoId])
+  @@index([licencaId])
   @@index([numeroProcesso])
   @@map("pericias")
 }
@@ -401,8 +443,12 @@ model DocumentoGerado {
   criadoPor   Usuario  @relation(fields: [criadoPorId], references: [id], onDelete: Restrict)
   pericia     Pericia? @relation(fields: [periciaId], references: [id], onDelete: SetNull)
 
+  /// Equipe de quem gerou. Quem enxerga é a licença inteira.
   organizacaoId String
   organizacao   Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Restrict)
+
+  licencaId String
+  licenca   Licenca @relation(fields: [licencaId], references: [id], onDelete: Restrict)
 
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
@@ -410,6 +456,7 @@ model DocumentoGerado {
   @@index([periciaId])
   @@index([criadoPorId])
   @@index([organizacaoId])
+  @@index([licencaId])
   @@map("documentos")
 }
 

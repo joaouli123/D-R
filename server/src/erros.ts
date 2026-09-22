@@ -47,14 +47,16 @@ export function rota<T extends Request>(
 const NOME_DO_CAMPO: Record<string, string> = { cnpj: 'CNPJ', email: 'e-mail' }
 
 /**
- * Traduz o `target` de um P2002 para a mensagem. `organizacaoId` participa de
- * índices únicos por equipe (o CNPJ só é único DENTRO da equipe) e é detalhe
- * interno: não pode aparecer na tela. Se o Prisma mandar o nome da restrição em
- * vez da lista de campos, cai no genérico.
+ * Traduz o `target` de um P2002 para a mensagem. `licencaId` (e, antes dele,
+ * `organizacaoId`) participa de índices únicos por inquilino (o CNPJ só é único
+ * DENTRO da licença) e é detalhe interno: não pode aparecer na tela. Se o Prisma
+ * mandar o nome da restrição em vez da lista de campos, cai no genérico.
  */
+const CAMPOS_INTERNOS = new Set(['licencaId', 'organizacaoId'])
+
 export function camposDaDuplicidade(alvo: unknown): string {
   const campos = (Array.isArray(alvo) ? alvo : [])
-    .filter((c): c is string => typeof c === 'string' && c !== 'organizacaoId')
+    .filter((c): c is string => typeof c === 'string' && !CAMPOS_INTERNOS.has(c))
     .map((c) => NOME_DO_CAMPO[c] ?? c)
   return campos.length > 0 ? campos.join(', ') : 'registro'
 }

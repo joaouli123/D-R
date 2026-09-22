@@ -11,6 +11,7 @@ import { episRouter } from './routes/epis.js'
 import { empresasRouter } from './routes/empresas.js'
 import { equipesRouter } from './routes/equipes.js'
 import { fotosRouter } from './routes/fotos.js'
+import { licencasRouter } from './routes/licencas.js'
 import { periciasRouter } from './routes/pericias.js'
 import { quesitosRouter } from './routes/quesitos.js'
 import { textosRouter } from './routes/textos.js'
@@ -71,6 +72,7 @@ export function criarApp(): Express {
   app.use('/auth', authRouter)
   app.use('/usuarios', usuariosRouter)
   app.use('/equipes', equipesRouter)
+  app.use('/licencas', licencasRouter)
   app.use('/empresas', empresasRouter)
   app.use('/pericias/:periciaId/fotos', fotosRouter)
   app.use('/pericias', periciasRouter)

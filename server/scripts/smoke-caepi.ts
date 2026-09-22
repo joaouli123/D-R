@@ -43,16 +43,18 @@ const { criarColheita } = await import('../src/services/caepi/colheita.js')
 const { criarCaepiRouter } = await import('../src/routes/caepi.js')
 const { tratarErros } = await import('../src/erros.js')
 const { definirBuscaDeUsuarioDaSessao } = await import('../src/auth.js')
-const { ORGANIZACAO_RAIZ_ID } = await import('../src/tenancy.js')
+const { LICENCA_PRINCIPAL_ID, ORGANIZACAO_RAIZ_ID } = await import('../src/tenancy.js')
 
 // A sessão é conferida no banco a cada requisição; sem PostgreSQL, a consulta
 // devolve estes três usuários: admin e perito da equipe principal, e um admin
-// de uma equipe cliente (que lê o CAEPI, mas não pode alterá-lo).
+// de uma licença cliente (que lê o CAEPI, mas não pode alterá-lo).
 const EQUIPE_CLIENTE_ID = '00000000-0000-4000-8000-0000000000c1'
+const principal = { licencaId: LICENCA_PRINCIPAL_ID, licenca: { ativa: true } }
+const cliente = { licencaId: EQUIPE_CLIENTE_ID, licenca: { ativa: true } }
 const usuariosDoSmoke = {
-  'smoke-user': { email: 'smoke@example.test', perfil: 'admin', organizacaoId: ORGANIZACAO_RAIZ_ID },
-  'smoke-perito': { email: 'perito@example.test', perfil: 'perito', organizacaoId: ORGANIZACAO_RAIZ_ID },
-  'smoke-cliente': { email: 'cliente@example.test', perfil: 'admin', organizacaoId: EQUIPE_CLIENTE_ID },
+  'smoke-user': { email: 'smoke@example.test', perfil: 'admin', organizacaoId: ORGANIZACAO_RAIZ_ID, organizacao: principal },
+  'smoke-perito': { email: 'perito@example.test', perfil: 'perito', organizacaoId: ORGANIZACAO_RAIZ_ID, organizacao: principal },
+  'smoke-cliente': { email: 'cliente@example.test', perfil: 'admin', organizacaoId: EQUIPE_CLIENTE_ID, organizacao: cliente },
 } as const
 definirBuscaDeUsuarioDaSessao(async (id) => {
   const usuario = usuariosDoSmoke[id as keyof typeof usuariosDoSmoke]

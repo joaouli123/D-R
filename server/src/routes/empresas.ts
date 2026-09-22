@@ -6,10 +6,10 @@ import { empresaParaApi } from '../mappers.js'
 import { prisma } from '../prisma.js'
 import { apagarUpload } from '../services/armazenamento.js'
 
-// Multi-tenant: as empresas pertencem à EQUIPE do usuário. Toda consulta leva
-// `organizacaoId` da sessão — que nunca é `undefined` (o Prisma trataria como
-// "sem filtro" e devolveria as empresas de todo mundo). Um id de outra equipe
-// responde 404, como se não existisse.
+// Multi-tenant: as empresas pertencem à LICENÇA do usuário e todas as equipes
+// dela as compartilham. Toda consulta leva `licencaId` da sessão — que nunca é
+// `undefined` (o Prisma trataria como "sem filtro" e devolveria as empresas de
+// todo mundo). Um id de outra licença responde 404, como se não existisse.
 
 export const empresasRouter = Router()
 empresasRouter.use(exigirSessao)
@@ -42,12 +42,12 @@ const corpo = z.object({
 
 const vazioParaNulo = (v?: string) => (v?.trim() ? v.trim() : null)
 
-/** GET /empresas — as da equipe do usuário. */
+/** GET /empresas — as da licença do usuário. */
 empresasRouter.get(
   '/',
   rota(async (req, res) => {
     const empresas = await prisma.empresa.findMany({
-      where: { organizacaoId: sessaoDe(req).organizacaoId },
+      where: { licencaId: sessaoDe(req).licencaId },
       orderBy: { razaoSocial: 'asc' },
     })
     res.json(empresas.map(empresaParaApi))
@@ -59,7 +59,7 @@ empresasRouter.post(
   '/',
   rota(async (req, res) => {
     const d = corpo.parse(req.body)
-    const { organizacaoId } = sessaoDe(req)
+    const { organizacaoId, licencaId } = sessaoDe(req)
 
     const dados = {
       razaoSocial: d.razaoSocial,
@@ -80,21 +80,21 @@ empresasRouter.post(
       ramoAtividade: vazioParaNulo(d.ramoAtividade),
     }
 
-    // Só enxerga como "existente" o que é da própria equipe. Se o id do corpo
-    // existir em outra equipe, vira uma criação nova (o id do cliente é
+    // Só enxerga como "existente" o que é da própria licença. Se o id do corpo
+    // existir em outra licença, vira uma criação nova (o id do cliente é
     // ignorado nesse caso) — nunca uma edição da empresa alheia.
     const existente = d.id
-      ? await prisma.empresa.findFirst({ where: { id: d.id, organizacaoId } })
+      ? await prisma.empresa.findFirst({ where: { id: d.id, licencaId } })
       : null
 
-    // O CNPJ é único POR EQUIPE: duas equipes podem cadastrar a mesma empresa.
+    // O CNPJ é único POR LICENÇA: duas licenças podem cadastrar a mesma empresa.
     const repetida = await prisma.empresa.findFirst({
-      where: { organizacaoId, cnpj: d.cnpj, ...(existente ? { NOT: { id: existente.id } } : {}) },
+      where: { licencaId, cnpj: d.cnpj, ...(existente ? { NOT: { id: existente.id } } : {}) },
       select: { id: true },
     })
     if (repetida) throw new ErroHttp(409, 'Já existe uma empresa cadastrada com este CNPJ.')
 
-    // O id sugerido pelo cliente só vale se ninguém, em nenhuma equipe, já o usa.
+    // O id sugerido pelo cliente só vale se ninguém, em nenhuma licença, já o usa.
     const idSugerido =
       !existente && d.id && (await prisma.empresa.count({ where: { id: d.id } })) === 0
         ? d.id
@@ -103,7 +103,7 @@ empresasRouter.post(
     const empresa = existente
       ? await prisma.empresa.update({ where: { id: existente.id }, data: dados })
       : await prisma.empresa.create({
-          data: { ...dados, organizacaoId, ...(idSugerido ? { id: idSugerido } : {}) },
+          data: { ...dados, organizacaoId, licencaId, ...(idSugerido ? { id: idSugerido } : {}) },
         })
 
     res.status(existente ? 200 : 201).json(empresaParaApi(empresa))
@@ -132,25 +132,25 @@ empresasRouter.post(
  * Rascunho sem nenhuma reclamada não entra: não prende ninguém, e
  * apagá-lo seria ir além do que a tela ofereceu.
  *
- * Tudo isso vale só para a EQUIPE do usuário: a limpeza de uma nunca
+ * Tudo isso vale só para a LICENÇA do usuário: a limpeza de uma nunca
  * alcança os cadastros de outra.
  */
 empresasRouter.delete(
   '/',
   rota(async (req, res) => {
-    const { organizacaoId } = sessaoDe(req)
+    const { licencaId } = sessaoDe(req)
     let rascunhosExcluidos = 0
 
     if (req.query.rascunhos === '1') {
       const presos = await prisma.pericia.findMany({
-        where: { organizacaoId, status: 'rascunho', reclamadas: { some: {} } },
+        where: { licencaId, status: 'rascunho', reclamadas: { some: {} } },
         select: { id: true, fotos: { select: { arquivo: true } } },
       })
 
       if (presos.length > 0) {
         const ids = presos.map((p) => p.id)
         const { count } = await prisma.pericia.deleteMany({
-          where: { id: { in: ids }, organizacaoId },
+          where: { id: { in: ids }, licencaId },
         })
         rascunhosExcluidos = count
         // Os arquivos só saem depois que o banco confirmou: o registro
@@ -161,7 +161,7 @@ empresasRouter.delete(
     }
 
     const empresas = await prisma.empresa.findMany({
-      where: { organizacaoId },
+      where: { licencaId },
       orderBy: { razaoSocial: 'asc' },
       select: {
         id: true,
@@ -175,7 +175,7 @@ empresasRouter.delete(
     const emUso = empresas.filter((e) => e._count.reclamadas > 0)
 
     const { count } = await prisma.empresa.deleteMany({
-      where: { id: { in: livres.map((e) => e.id) }, organizacaoId },
+      where: { id: { in: livres.map((e) => e.id) }, licencaId },
     })
 
     res.json({
@@ -199,10 +199,10 @@ empresasRouter.delete(
 empresasRouter.delete(
   '/:id',
   rota(async (req, res) => {
-    const { organizacaoId } = sessaoDe(req)
+    const { licencaId } = sessaoDe(req)
     const id = parametro(req, 'id')
 
-    const empresa = await prisma.empresa.findFirst({ where: { id, organizacaoId }, select: { id: true } })
+    const empresa = await prisma.empresa.findFirst({ where: { id, licencaId }, select: { id: true } })
     if (!empresa) throw naoEncontrado('Empresa')
 
     const vinculos = await prisma.reclamada.count({ where: { empresaId: empresa.id } })

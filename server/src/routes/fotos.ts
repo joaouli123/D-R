@@ -63,9 +63,9 @@ fotosRouter.post(
 
     if (!arquivos.length) throw new ErroHttp(400, 'Nenhuma imagem enviada.')
 
-    // Só a perícia da própria equipe: subir foto na de outra equipe é 404.
+    // Só a perícia da própria licença: subir foto na de outra licença é 404.
     const pericia = await prisma.pericia.findFirst({
-      where: { id: periciaId, organizacaoId: sessaoDe(req).organizacaoId },
+      where: { id: periciaId, licencaId: sessaoDe(req).licencaId },
     })
     if (!pericia) {
       await Promise.all(arquivos.map((a) => apagarUpload(a.filename)))
@@ -143,7 +143,7 @@ fotosRouter.delete(
       where: {
         id: parametro(req, 'id'),
         periciaId: parametro(req, 'periciaId'),
-        pericia: { organizacaoId: sessaoDe(req).organizacaoId },
+        pericia: { licencaId: sessaoDe(req).licencaId },
       },
     })
     if (!foto) throw naoEncontrado('Foto')

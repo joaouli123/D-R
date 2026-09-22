@@ -80,6 +80,9 @@ const arvore = (): Equipe[] => [
     propria: true,
     principal: true,
     podeExcluir: false,
+    licencaId: 'lic-1',
+    licencaNome: 'D&R Perícia Elite',
+    inicioDaLicenca: false,
     usuarios: [DINOEL, HENRIQUE],
   },
   {
@@ -90,6 +93,9 @@ const arvore = (): Equipe[] => [
     propria: false,
     principal: false,
     podeExcluir: false,
+    licencaId: 'lic-2',
+    licencaNome: 'Laboratório Alfa',
+    inicioDaLicenca: true,
     usuarios: [CARLOS, FERNANDA, RAFAEL],
   },
   {
@@ -100,6 +106,9 @@ const arvore = (): Equipe[] => [
     propria: false,
     principal: false,
     podeExcluir: true,
+    licencaId: 'lic-2',
+    licencaNome: 'Laboratório Alfa',
+    inicioDaLicenca: false,
     usuarios: [],
   },
 ]
@@ -467,7 +476,7 @@ describe('Usuários e equipes — excluir usuário', () => {
 
     const escolha = d.getByRole('combobox', { name: /^Quem assume/ }) as HTMLSelectElement
     const opcoes = Array.from(escolha.options).map((o) => o.textContent)
-    // Nem ela mesma, nem o inativo (Rafael), nem gente de outra equipe (Dinoel).
+    // Nem ela mesma, nem o inativo (Rafael), nem gente de outra licença (Dinoel).
     expect(opcoes).toEqual(['Escolha…', 'Carlos Tavares (Administrador)'])
 
     // Sem escolher ninguém não dá para confirmar.
@@ -499,7 +508,7 @@ describe('Usuários e equipes — excluir usuário', () => {
 
     const d = within(dialogo())
     expect(await d.findByText('Carlos Tavares é responsável por 1 perícia.')).toBeTruthy()
-    expect(d.getByText(/Não há outro usuário ativo nesta equipe/)).toBeTruthy()
+    expect(d.getByText(/Não há outro usuário ativo nesta licença/)).toBeTruthy()
     // Nada para escolher e nada para confirmar — só o caminho de desativar.
     expect(d.queryByRole('combobox')).toBeNull()
     expect(d.queryByRole('button', { name: 'Excluir' })).toBeNull()

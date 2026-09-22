@@ -1,11 +1,14 @@
 // ============================================================
-// Equipes (organizações) hierárquicas — a base do multi-tenant.
+// Licenças e equipes — a base do multi-tenant.
 //
-// Cada usuário pertence a UMA equipe. O trabalho (empresas, perícias,
-// documentos) pertence à equipe e só é lido por quem está nela: uma
-// equipe-mãe NÃO enxerga o conteúdo das filhas. O que a mãe faz nas
-// filhas é gerir os ACESSOS — criar equipes e usuários, editar,
-// desativar, trocar senha, excluir.
+// A LICENÇA é o inquilino: uma empresa cliente. O trabalho (empresas,
+// perícias, documentos) pertence à licença e só é lido por quem é dela;
+// uma licença nunca enxerga o conteúdo de outra.
+//
+// Dentro da licença, cada usuário pertence a UMA equipe. As equipes
+// compartilham o trabalho da licença; a árvore entre elas serve para
+// gerir os ACESSOS — a mãe cria equipes e usuários abaixo, edita,
+// desativa, troca senha, exclui.
 //
 // Este módulo é puro (sem banco, sem Express) para que a regra de
 // quem-alcança-quem seja testável sozinha. As consultas ficam em
@@ -16,8 +19,16 @@
  * Equipe raiz: a do perito titular. Todo dado que já existia antes do
  * multi-tenant foi atribuído a ela pela migração
  * 20260921180000_multitenant_equipes, que insere a linha com este mesmo id.
+ * A equipe principal de cada licença cliente fica logo abaixo dela.
  */
 export const ORGANIZACAO_RAIZ_ID = '00000000-0000-4000-8000-000000000001'
+
+/**
+ * Licença principal: a do perito titular, dono da plataforma — é de lá que as
+ * licenças clientes são criadas e geridas. Inserida com este mesmo id pela
+ * migração 20260921200000_licencas.
+ */
+export const LICENCA_PRINCIPAL_ID = '00000000-0000-4000-8000-000000000002'
 
 /** O mínimo que a hierarquia precisa saber de uma equipe. */
 export interface NoDeEquipe {

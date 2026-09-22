@@ -85,9 +85,9 @@ describe('tratarErros — envio de arquivos', () => {
 })
 
 // ============================================================
-// Duplicidade (P2002). O CNPJ da empresa é único POR EQUIPE, então o índice é
-// (organizacaoId, cnpj) e o `target` do Prisma traz os dois. A mensagem não
-// pode entregar o nome interno "organizacaoId" ao usuário.
+// Duplicidade (P2002). O CNPJ da empresa é único POR LICENÇA, então o índice é
+// (licencaId, cnpj) e o `target` do Prisma traz os dois. A mensagem não pode
+// entregar o nome interno "licencaId" (nem o antigo "organizacaoId") ao usuário.
 // ============================================================
 
 function duplicidade(target: unknown) {
@@ -101,11 +101,17 @@ function duplicidade(target: unknown) {
 }
 
 describe('tratarErros — duplicidade (P2002)', () => {
-  it('CNPJ repetido na mesma equipe diz "CNPJ" e não vaza organizacaoId', () => {
-    const visto = duplicidade(['organizacaoId', 'cnpj'])
+  it('CNPJ repetido na mesma licença diz "CNPJ" e não vaza licencaId', () => {
+    const visto = duplicidade(['licencaId', 'cnpj'])
 
     expect(visto.status).toBe(409)
     expect(visto.corpo?.erro).toBe('Já existe um cadastro com este CNPJ.')
+  })
+
+  it('o índice antigo, por equipe, também não vaza organizacaoId', () => {
+    expect(duplicidade(['organizacaoId', 'cnpj']).corpo?.erro).toBe(
+      'Já existe um cadastro com este CNPJ.',
+    )
   })
 
   it('e-mail repetido diz "e-mail"', () => {
@@ -117,10 +123,10 @@ describe('tratarErros — duplicidade (P2002)', () => {
   })
 
   it('sem lista de campos (nome da restrição, ou nada) cai no genérico', () => {
-    expect(duplicidade('Empresa_organizacaoId_cnpj_key').corpo?.erro).toBe(
+    expect(duplicidade('empresas_licencaId_cnpj_key').corpo?.erro).toBe(
       'Já existe um cadastro com este registro.',
     )
     expect(duplicidade(undefined).corpo?.erro).toBe('Já existe um cadastro com este registro.')
-    expect(duplicidade(['organizacaoId']).corpo?.erro).toBe('Já existe um cadastro com este registro.')
+    expect(duplicidade(['licencaId']).corpo?.erro).toBe('Já existe um cadastro com este registro.')
   })
 })

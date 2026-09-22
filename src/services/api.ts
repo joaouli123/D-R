@@ -5,6 +5,7 @@ import type {
   Empresa,
   Equipe,
   Foto,
+  Licenca,
   Pericia,
   Quesito,
   SecaoFoto,
@@ -557,6 +558,10 @@ export const auth = {
       await delay(null, 400)
       throw new ErroApi(401, 'E-mail ou senha inválidos.')
     }
+    if (!licencaMockDaEquipe(usuario.organizacaoId ?? mock.EQUIPE_PRINCIPAL_ID).ativa) {
+      await delay(null, 400)
+      throw new ErroApi(403, 'A licença desta conta está suspensa. Procure o administrador.')
+    }
     sessaoMock = {
       usuarioId: usuario.id,
       equipeId: usuario.organizacaoId ?? mock.EQUIPE_PRINCIPAL_ID,
@@ -599,11 +604,15 @@ export const auth = {
 export type UsuarioParaSalvar = Omit<Usuario, 'id'> & { id?: string; senha?: string }
 
 export const usuarios = {
-  /** Os usuários da PRÓPRIA equipe. A árvore inteira, com todas as equipes, é `equipes.listar`. */
+  /**
+   * Os usuários da PRÓPRIA licença — todas as equipes dela dividem o trabalho,
+   * então o responsável de uma perícia pode vir de qualquer uma. A árvore que o
+   * administrador gere é `equipes.listar`.
+   */
   listar: () =>
     ehRest
       ? http<Usuario[]>('/usuarios').then((l) => l.map(comLogoResolvida))
-      : delay(usuariosDaEquipeMock(sessaoMock.equipeId)),
+      : delay(usuariosDaLicencaMock(licencaDaSessaoMock().id)),
   salvar: (u: UsuarioParaSalvar) =>
     ehRest
       ? http<Usuario>('/usuarios', { method: 'POST', body: JSON.stringify(u) }).then(comLogoResolvida)
@@ -615,7 +624,7 @@ export const usuarios = {
       : delay(null).then(() => redefinirSenhaMock(id, nova)),
   /**
    * Exclui de vez. Quem é responsável por perícias ou documentos só sai se o
-   * trabalho for repassado (`transferirPara`, alguém ATIVO da mesma equipe);
+   * trabalho for repassado (`transferirPara`, alguém ATIVO da mesma licença);
    * sem isso o servidor responde 409 com a contagem — é o sinal de a tela
    * perguntar quem assume. Para só tirar o acesso, o caminho é desativar.
    */
@@ -675,7 +684,8 @@ export const usuarios = {
  * `listar` devolve a árvore visível para quem consulta — a própria equipe e as
  * de baixo, já em ordem de exibição, cada uma com seus usuários. O
  * administrador gere os ACESSOS delas (criar, editar, desativar, trocar senha,
- * excluir), mas não lê o trabalho (empresas, perícias, documentos).
+ * excluir); o trabalho (empresas, perícias, documentos) é da licença e só quem
+ * é dela o lê — mesmo que a equipe de outra licença esteja na árvore.
  */
 export const equipes = {
   listar: (): Promise<Equipe[]> =>
@@ -696,11 +706,47 @@ export const equipes = {
           comUsuariosResolvidos,
         )
       : delay(null).then(() => renomearEquipeMock(id, nome)),
-  /** Só uma equipe VAZIA (sem gente, sem trabalho, sem equipes filhas) e nunca a própria. */
+  /**
+   * Só uma equipe VAZIA (sem gente, sem trabalho, sem equipes filhas), nunca a
+   * própria e nunca a que abre uma licença — essa sai pela página Licenças.
+   */
   excluir: (id: string): Promise<void> =>
     ehRest
       ? http<void>(`/equipes/${id}`, { method: 'DELETE' })
       : delay(null).then(() => excluirEquipeMock(id)),
+}
+
+/** O que a tela manda ao criar uma licença: a empresa e o primeiro administrador dela. */
+export interface LicencaParaCriar {
+  nome: string
+  documento?: string
+  admin: { nome: string; email: string; senha: string }
+}
+
+export type LicencaParaEditar = Partial<Pick<Licenca, 'nome' | 'documento' | 'ativa'>>
+
+/**
+ * Licenças — as empresas clientes da plataforma. Só o administrador da equipe
+ * principal (o perito titular); o servidor confere de novo.
+ */
+export const licencas = {
+  listar: (): Promise<Licenca[]> =>
+    ehRest ? http<Licenca[]>('/licencas') : delay(null).then(() => licencasMock()),
+  /** Cria a licença, a equipe de entrada dela e o primeiro administrador — tudo ou nada. */
+  criar: (dados: LicencaParaCriar): Promise<Licenca> =>
+    ehRest
+      ? http<Licenca>('/licencas', { method: 'POST', body: JSON.stringify(dados) })
+      : delay(null).then(() => criarLicencaMock(dados)),
+  /** Renomeia, troca o documento, suspende ou reativa. */
+  atualizar: (id: string, dados: LicencaParaEditar): Promise<Licenca> =>
+    ehRest
+      ? http<Licenca>(`/licencas/${id}`, { method: 'PATCH', body: JSON.stringify(dados) })
+      : delay(null).then(() => atualizarLicencaMock(id, dados)),
+  /** Só sem empresas, perícias ou documentos; equipes e usuários saem junto. */
+  excluir: (id: string): Promise<void> =>
+    ehRest
+      ? http<void>(`/licencas/${id}`, { method: 'DELETE' })
+      : delay(null).then(() => excluirLicencaMock(id)),
 }
 
 function comUsuariosResolvidos(e: Equipe): Equipe {
@@ -732,19 +778,38 @@ export function retomarSessaoDemo(u: Pick<Usuario, 'id'>): boolean {
   return true
 }
 
+function licencaMockDaEquipe(equipeId: string): mock.LicencaMock {
+  const equipe = mock.EQUIPES.find((e) => e.id === equipeId)
+  return (
+    mock.LICENCAS.find((l) => l.id === equipe?.licencaId) ??
+    mock.LICENCAS.find((l) => l.id === mock.LICENCA_PRINCIPAL_ID)!
+  )
+}
+
+const licencaDaSessaoMock = () => licencaMockDaEquipe(sessaoMock.equipeId)
+
 /**
- * O conteúdo de exemplo (empresas, perícias e documentos) pertence à equipe
- * principal. Quem entra por outra equipe começa com a casa vazia — o mesmo
- * isolamento que o servidor aplica por `organizacaoId`.
+ * O conteúdo de exemplo (empresas, perícias e documentos) pertence à licença
+ * principal. Quem entra por outra licença começa com a casa vazia — o mesmo
+ * isolamento que o servidor aplica por `licencaId`.
  */
 function conteudoDaEquipeMock<T>(itens: T[]): T[] {
-  return sessaoMock.equipeId === mock.EQUIPE_PRINCIPAL_ID ? itens : []
+  return licencaDaSessaoMock().id === mock.LICENCA_PRINCIPAL_ID ? itens : []
 }
 
 const porNome = (a: { nome: string }, b: { nome: string }) => a.nome.localeCompare(b.nome, 'pt-BR')
 
 function usuariosDaEquipeMock(equipeId: string): Usuario[] {
   return mock.USUARIOS.filter((u) => u.organizacaoId === equipeId).sort(porNome)
+}
+
+function equipesDaLicencaMock(licencaId: string): mock.EquipeMock[] {
+  return mock.EQUIPES.filter((e) => e.licencaId === licencaId)
+}
+
+function usuariosDaLicencaMock(licencaId: string): Usuario[] {
+  const ids = new Set(equipesDaLicencaMock(licencaId).map((e) => e.id))
+  return mock.USUARIOS.filter((u) => ids.has(u.organizacaoId ?? '')).sort(porNome)
 }
 
 /** A equipe da sessão e todas as de baixo. */
@@ -764,16 +829,22 @@ function arvoreMock(): Equipe[] {
     if (!equipe) return
     const filhas = mock.EQUIPES.filter((e) => e.paiId === id).sort(porNome)
     const usuarios = usuariosDaEquipeMock(id)
+    const mae = mock.EQUIPES.find((e) => e.id === equipe.paiId)
+    const inicioDaLicenca = !!mae && mae.licencaId !== equipe.licencaId
 
     saida.push({
       id,
       nome: equipe.nome,
+      licencaId: equipe.licencaId,
+      licencaNome: licencaMockDaEquipe(id).nome,
+      inicioDaLicenca,
       // A mãe da equipe da sessão fica fora do alcance: não a revelamos.
       paiId: nivel === 0 ? null : equipe.paiId,
       nivel,
       propria: id === sessaoMock.equipeId,
       principal: id === mock.EQUIPE_PRINCIPAL_ID,
-      podeExcluir: id !== sessaoMock.equipeId && filhas.length === 0 && usuarios.length === 0,
+      podeExcluir:
+        id !== sessaoMock.equipeId && !inicioDaLicenca && filhas.length === 0 && usuarios.length === 0,
       usuarios,
     })
     filhas.forEach((f) => visitar(f.id, nivel + 1))
@@ -807,7 +878,7 @@ function nomeDeEquipeValido(nome: string): string {
 function criarEquipeMock(nome: string, paiId?: string): Equipe {
   const limpo = nomeDeEquipeValido(nome)
   const pai = equipeMockDoAlcance(paiId ?? sessaoMock.equipeId)
-  const criada = { id: uid('eqp'), nome: limpo, paiId: pai.id }
+  const criada = { id: uid('eqp'), nome: limpo, paiId: pai.id, licencaId: pai.licencaId }
   mock.EQUIPES.push(criada)
   return equipeMockComoNo(criada.id)
 }
@@ -822,6 +893,13 @@ function excluirEquipeMock(id: string): void {
   const equipe = equipeMockDoAlcance(id)
   if (equipe.id === sessaoMock.equipeId) {
     throw new ErroApi(400, 'Você não pode excluir a própria equipe.')
+  }
+  const mae = mock.EQUIPES.find((e) => e.id === equipe.paiId)
+  if (mae && mae.licencaId !== equipe.licencaId) {
+    throw new ErroApi(
+      409,
+      'Esta é a equipe principal de uma licença. Para removê-la, exclua a licença na página Licenças.',
+    )
   }
   if (mock.EQUIPES.some((e) => e.paiId === id)) {
     throw new ErroApi(409, 'Esta equipe tem equipes abaixo dela. Exclua-as primeiro.')
@@ -914,19 +992,143 @@ function excluirUsuarioMock(id: string, transferirPara?: string): void {
           'e 0 documentos. Escolha quem assume esse trabalho ou, se só quer tirar o acesso, desative o usuário.',
       )
     }
-    const herdeiro = mock.USUARIOS.find(
-      (u) => u.id === transferirPara && u.ativo && u.organizacaoId === alvo.organizacaoId && u.id !== alvo.id,
-    )
+    const daLicenca = usuariosDaLicencaMock(licencaMockDaEquipe(alvo.organizacaoId ?? '').id)
+    const herdeiro = daLicenca.find((u) => u.id === transferirPara && u.ativo && u.id !== alvo.id)
     if (!herdeiro) {
       throw new ErroApi(
         422,
-        'Escolha, para assumir o trabalho, outro usuário ATIVO da mesma equipe.',
+        'Escolha, para assumir o trabalho, outro usuário ATIVO da mesma licença.',
       )
     }
     for (const p of pericias) p.responsavelId = herdeiro.id
   }
 
   mock.USUARIOS.splice(mock.USUARIOS.indexOf(alvo), 1)
+}
+
+// ---------------- Licenças: demonstração sem backend ----------------
+
+function licencaMockComoApi(l: mock.LicencaMock): Licenca {
+  const equipes = equipesDaLicencaMock(l.id)
+  const usuarios = usuariosDaLicencaMock(l.id)
+  const principal = l.id === mock.LICENCA_PRINCIPAL_ID
+  const entrada = principal
+    ? equipes.find((e) => e.id === mock.EQUIPE_PRINCIPAL_ID)
+    : equipes.find((e) => e.paiId === mock.EQUIPE_PRINCIPAL_ID)
+  return structuredClone({
+    id: l.id,
+    nome: l.nome,
+    documento: l.documento,
+    ativa: l.ativa,
+    principal,
+    criadoEm: l.criadoEm,
+    equipePrincipalId: entrada?.id,
+    equipes: equipes.length,
+    usuarios: usuarios.length,
+    // O conteúdo de exemplo é todo da licença principal.
+    empresas: principal ? mock.EMPRESAS.length : 0,
+    pericias: principal ? mock.PERICIAS.length : 0,
+    documentos: principal ? mock.DOCUMENTOS.length : 0,
+    administradores: usuarios
+      .filter((u) => u.perfil === 'admin')
+      .map(({ id, nome, email, ativo }) => ({ id, nome, email, ativo })),
+  })
+}
+
+function exigirTitularMock(): void {
+  const eu = mock.USUARIOS.find((u) => u.id === sessaoMock.usuarioId)
+  if (sessaoMock.equipeId !== mock.EQUIPE_PRINCIPAL_ID || eu?.perfil !== 'admin') {
+    throw new ErroApi(403, 'Esta ação é restrita à equipe principal.')
+  }
+}
+
+function licencaMockExistente(id: string): mock.LicencaMock {
+  const licenca = mock.LICENCAS.find((l) => l.id === id)
+  if (!licenca) throw new ErroApi(404, 'Licença não encontrada.')
+  return licenca
+}
+
+function licencasMock(): Licenca[] {
+  exigirTitularMock()
+  return mock.LICENCAS.map(licencaMockComoApi)
+}
+
+function criarLicencaMock(d: LicencaParaCriar): Licenca {
+  exigirTitularMock()
+  const nome = d.nome.trim()
+  const email = d.admin.email.trim().toLowerCase()
+  if (nome.length < 2) throw new ErroApi(422, 'Informe o nome da empresa.')
+  if (!d.admin.nome.trim()) throw new ErroApi(422, 'Informe o nome do administrador.')
+  if (!/^\S+@\S+\.\S+$/.test(email)) throw new ErroApi(422, 'E-mail do administrador inválido.')
+  if (d.admin.senha.length < 8) {
+    throw new ErroApi(422, 'A senha do administrador deve ter pelo menos 8 caracteres.')
+  }
+  if (mock.USUARIOS.some((u) => u.email.toLowerCase() === email)) {
+    throw new ErroApi(409, 'Já existe um usuário com este e-mail. Use outro para o administrador.')
+  }
+
+  const licenca: mock.LicencaMock = {
+    id: uid('lic'),
+    nome,
+    documento: d.documento?.trim() || undefined,
+    ativa: true,
+    criadoEm: new Date().toISOString(),
+  }
+  const equipe = { id: uid('eqp'), nome, paiId: mock.EQUIPE_PRINCIPAL_ID, licencaId: licenca.id }
+  mock.LICENCAS.push(licenca)
+  mock.EQUIPES.push(equipe)
+  mock.USUARIOS.push({
+    id: uid('usr'),
+    nome: d.admin.nome.trim(),
+    email,
+    perfil: 'admin',
+    ativo: true,
+    organizacaoId: equipe.id,
+    equipePrincipal: false,
+  })
+  return licencaMockComoApi(licenca)
+}
+
+function atualizarLicencaMock(id: string, d: LicencaParaEditar): Licenca {
+  exigirTitularMock()
+  const licenca = licencaMockExistente(id)
+  if (licenca.id === mock.LICENCA_PRINCIPAL_ID && d.ativa === false) {
+    throw new ErroApi(400, 'A licença principal não pode ser suspensa.')
+  }
+  if (d.nome !== undefined) {
+    const nome = d.nome.trim()
+    if (nome.length < 2) throw new ErroApi(422, 'Informe o nome da empresa.')
+    // A equipe de entrada acompanha o nome, se ainda tiver o antigo.
+    const entradaId = licencaMockComoApi(licenca).equipePrincipalId
+    const entrada = mock.EQUIPES.find((e) => e.id === entradaId)
+    if (entrada && entrada.nome === licenca.nome) entrada.nome = nome
+    licenca.nome = nome
+  }
+  if ('documento' in d) licenca.documento = d.documento?.trim() || undefined
+  if (d.ativa !== undefined) licenca.ativa = d.ativa
+  return licencaMockComoApi(licenca)
+}
+
+function excluirLicencaMock(id: string): void {
+  exigirTitularMock()
+  const licenca = licencaMockExistente(id)
+  const atual = licencaMockComoApi(licenca)
+  if (atual.principal) throw new ErroApi(400, 'A licença principal não pode ser excluída.')
+  if (atual.empresas + atual.pericias + atual.documentos > 0) {
+    throw new ErroApi(
+      409,
+      `A licença "${licenca.nome}" tem trabalho cadastrado e não pode ser excluída. ` +
+        'Para tirar o acesso sem perder nada, suspenda a licença.',
+    )
+  }
+  const equipes = new Set(equipesDaLicencaMock(id).map((e) => e.id))
+  for (let i = mock.USUARIOS.length - 1; i >= 0; i--) {
+    if (equipes.has(mock.USUARIOS[i]!.organizacaoId ?? '')) mock.USUARIOS.splice(i, 1)
+  }
+  for (let i = mock.EQUIPES.length - 1; i >= 0; i--) {
+    if (equipes.has(mock.EQUIPES[i]!.id)) mock.EQUIPES.splice(i, 1)
+  }
+  mock.LICENCAS.splice(mock.LICENCAS.indexOf(licenca), 1)
 }
 
 // ---------------- Módulo B — Empresas ----------------
