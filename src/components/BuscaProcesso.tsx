@@ -102,9 +102,6 @@ export function BuscaProcesso({
             value={valor}
             onChange={(e) => mudar(e.target.value)}
             placeholder="0000000-00.0000.0.00.0000"
-            {...(autoBuscar
-              ? { hint: 'Ao completar o número, vara e comarca vêm da base pública do CNJ.' }
-              : {})}
           />
         </div>
         <Button
@@ -119,6 +116,12 @@ export function BuscaProcesso({
           Buscar no CNJ
         </Button>
       </div>
+
+      {/* A dica fica fora da linha: dentro do campo ela empurrava a base da
+          coluna para baixo e o botão descolava do input. */}
+      {autoBuscar && (
+        <p className="hint">Ao completar o número, vara e comarca vêm da base pública do CNJ.</p>
+      )}
 
       {erro && (
         <p role="alert" className="mt-2 flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
