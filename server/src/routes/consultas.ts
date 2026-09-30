@@ -43,9 +43,18 @@ export function criarConsultasRouter() {
   consultasRouter.get(
     '/processo/:numero',
     rota(async (req, res) => {
-      res.json(
-        await consultarProcesso(parametro(req, 'numero'), { chave: env.DATAJUD_API_KEY }),
-      )
+      const resultado = await consultarProcesso(parametro(req, 'numero'), {
+        chave: env.DATAJUD_API_KEY,
+      })
+
+      // 202: a busca continua correndo no servidor. A tela volta para
+      // perguntar; o corpo diz que ainda não é o dado final.
+      if (resultado.estado === 'buscando') {
+        res.status(202).json(resultado)
+        return
+      }
+
+      res.json(resultado.dados)
     }),
   )
 

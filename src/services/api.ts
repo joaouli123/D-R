@@ -1410,6 +1410,27 @@ export interface DadosProcesso {
   aviso: string
 }
 
+/**
+ * A base do CNJ demora 30s e mais em dia ruim. Em vez de segurar a
+ * requisição até o proxy cortá-la, o servidor devolve este aviso e
+ * segue buscando por conta própria; a tela volta para perguntar.
+ */
+export interface ProcessoBuscando {
+  estado: 'buscando'
+  numeroProcesso: string
+  numeroFormatado: string
+  desde: string
+  aviso: string
+}
+
+export type RespostaProcesso = DadosProcesso | ProcessoBuscando
+
+export function aindaBuscando(
+  resposta: RespostaProcesso,
+): resposta is ProcessoBuscando {
+  return 'estado' in resposta && resposta.estado === 'buscando'
+}
+
 const CONSULTA_SEM_BACKEND =
   'O preenchimento automático exige o backend ativo. Digite os dados normalmente.'
 
@@ -1436,12 +1457,12 @@ export const consultas = {
     return http<DadosCnpj>(`/consultas/cnpj/${encodeURIComponent(limparDocumento(numero))}`)
   },
 
-  async processo(numero: string): Promise<DadosProcesso> {
+  async processo(numero: string): Promise<RespostaProcesso> {
     if (!ehRest) {
       await delay(null, 200)
       throw new ErroApi(503, CONSULTA_SEM_BACKEND)
     }
-    return http<DadosProcesso>(
+    return http<RespostaProcesso>(
       `/consultas/processo/${encodeURIComponent(numero.replace(/\D/g, ''))}`,
     )
   },

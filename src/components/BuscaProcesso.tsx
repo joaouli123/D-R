@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react'
-import { AlertTriangle, Gavel, Search } from 'lucide-react'
-import { Button, Input } from '@/components/ui'
+import { useEffect, useRef, useState } from 'react'
+import { AlertTriangle, Clock, Gavel, Search } from 'lucide-react'
+import { Button, Input, useToast } from '@/components/ui'
 import * as api from '@/services/api'
 import type { DadosProcesso } from '@/services/api'
 import {
@@ -18,11 +18,23 @@ import type { OrigemConsulta } from '@/components/BuscaCnpj'
 // Mesma regra do CNPJ: perícia nova, o número fechou, a consulta sai
 // sozinha; perícia já preenchida, só pelo botão — e aí atualiza.
 //
+// A base do CNJ anda respondendo em 30 segundos ou mais, e devolvendo
+// 429 quando se insiste. Por isso a consulta não é mais "vai e volta":
+// o servidor assume a busca e a tela pergunta de tempos em tempos se
+// já chegou. Enquanto isso o perito preenche o resto — quando o dado
+// vem, os campos se completam sozinhos e um aviso diz que veio.
+//
 // O que a base pública do CNJ não tem são os nomes das partes. Isso
 // aparece escrito na tela junto do resultado, porque a expectativa
 // natural de quem vê "puxou os dados do processo" é que reclamante e
 // reclamada venham também.
 // ============================================================
+
+/** De quanto em quanto tempo a tela volta a perguntar ao servidor. */
+const INTERVALO_MS = 4_000
+
+/** Teto da espera. Acima disso não é lentidão, é pane. */
+const PACIENCIA_MS = 3 * 60_000
 
 export interface BuscaProcessoProps {
   valor: string
@@ -41,12 +53,24 @@ export function BuscaProcesso({
   className,
 }: BuscaProcessoProps) {
   const [buscando, setBuscando] = useState(false)
+  const [esperando, setEsperando] = useState<string | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [dados, setDados] = useState<DadosProcesso | null>(null)
   const [consultado, setConsultado] = useState<string | null>(null)
   const pedido = useRef(0)
+  const toast = useToast()
 
   const completo = numeroProcessoCompleto(valor)
+
+  // Sai de cena junto com o componente: sem isso a espera continuaria
+  // perguntando depois que o perito trocou de perícia.
+  const vivo = useRef(true)
+  useEffect(() => {
+    vivo.current = true
+    return () => {
+      vivo.current = false
+    }
+  }, [])
 
   async function consultar(numero: string, origem: OrigemConsulta) {
     const limpo = digitos(numero)
@@ -58,17 +82,48 @@ export function BuscaProcesso({
     const meu = ++pedido.current
     setBuscando(true)
     setErro(null)
+    setEsperando(null)
+
+    const comecou = Date.now()
+    let avisado = false
 
     try {
-      const encontrados = await api.consultas.processo(limpo)
-      if (pedido.current !== meu) return
-      setDados(encontrados)
-      setConsultado(limpo)
-      onDados(encontrados, origem)
+      for (;;) {
+        const resposta = await api.consultas.processo(limpo)
+        if (pedido.current !== meu || !vivo.current) return
+
+        if (!api.aindaBuscando(resposta)) {
+          setDados(resposta)
+          setConsultado(limpo)
+          setEsperando(null)
+          onDados(resposta, origem)
+          // Só avisa quem chegou a esperar: para a consulta que volta
+          // na hora, o campo preenchido já é o aviso.
+          if (avisado) toast('Os dados do processo chegaram do CNJ.', 'success')
+          return
+        }
+
+        avisado = true
+        setEsperando(resposta.aviso)
+        setBuscando(false)
+
+        if (Date.now() - comecou > PACIENCIA_MS) {
+          setConsultado(limpo)
+          setEsperando(null)
+          setErro(
+            'A base pública do CNJ não respondeu dentro de três minutos. A busca continua no servidor — clique em "Buscar no CNJ" daqui a pouco para ver se chegou.',
+          )
+          return
+        }
+
+        await new Promise((resolver) => setTimeout(resolver, INTERVALO_MS))
+        if (pedido.current !== meu || !vivo.current) return
+      }
     } catch (e) {
-      if (pedido.current !== meu) return
+      if (pedido.current !== meu || !vivo.current) return
       setDados(null)
       setConsultado(limpo)
+      setEsperando(null)
       setErro(e instanceof Error ? e.message : 'Não foi possível consultar o processo agora.')
     } finally {
       if (pedido.current === meu) setBuscando(false)
@@ -83,6 +138,7 @@ export function BuscaProcesso({
     if (limpo !== consultado) {
       setErro(null)
       setDados(null)
+      setEsperando(null)
     }
     if (autoBuscar && !buscando && numeroProcessoCompleto(limpo) && limpo !== consultado) {
       void consultar(limpo, 'automatica')
@@ -109,8 +165,8 @@ export function BuscaProcesso({
           variant="outline"
           className="mb-[1px] shrink-0"
           icon={<Search size={15} />}
-          loading={buscando}
-          disabled={!completo}
+          loading={buscando || !!esperando}
+          disabled={!completo || !!esperando}
           onClick={() => void consultar(valor, 'manual')}
         >
           Buscar no CNJ
@@ -121,6 +177,16 @@ export function BuscaProcesso({
           coluna para baixo e o botão descolava do input. */}
       {autoBuscar && (
         <p className="hint">Ao completar o número, vara e comarca vêm da base pública do CNJ.</p>
+      )}
+
+      {esperando && !erro && (
+        <p
+          role="status"
+          className="mt-2 flex gap-2 rounded-lg border border-navy-200 bg-navy-50 px-3 py-2 text-[13px] text-navy-800"
+        >
+          <Clock size={15} className="mt-0.5 shrink-0 animate-pulse" />
+          <span>{esperando}</span>
+        </p>
       )}
 
       {erro && (

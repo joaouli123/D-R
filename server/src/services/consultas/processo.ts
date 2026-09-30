@@ -272,42 +272,93 @@ export function mapearProcesso(
 
 const cache = criarCache<DadosProcesso>(60 * 60 * 1000)
 
+// ============================================================
+// Espera longa sem prender o navegador.
+//
+// A base do CNJ passou a responder em 20, 30, às vezes 40 segundos,
+// e a devolver 429 quando insiste. Uma requisição HTTP presa todo
+// esse tempo não sobrevive: o proxy na frente corta antes e o perito
+// recebe um 504 cru, sem nem a explicação do que houve.
+//
+// Então a busca virou trabalho de fundo. A requisição espera alguns
+// segundos; se o CNJ não respondeu até lá, ela devolve "ainda
+// buscando" e vai embora — mas a busca continua correndo aqui no
+// servidor, insistindo por até dois minutos. A tela volta para
+// perguntar de tempos em tempos e, quando o dado chega, avisa o
+// perito. Ninguém fica olhando spinner, e ninguém perde a consulta.
+// ============================================================
+
+/** Pausa antes de cada tentativa. A primeira sai na hora. */
+const PAUSAS_ENTRE_TENTATIVAS = [0, 3_000, 8_000, 15_000]
+
+/** Teto de cada ida ao CNJ. Generoso: quem espera é o servidor. */
+const TEMPO_POR_TENTATIVA_MS = 30_000
+
+/** Quanto a requisição HTTP espera antes de dizer "ainda buscando". */
+const ESPERA_HTTP_MS = 8_000
+
+/** Por quanto tempo a falha fica guardada para a tela vir buscá-la. */
+const VALIDADE_DA_FALHA_MS = 30_000
+
+interface Trabalho {
+  promessa: Promise<DadosProcesso>
+  desde: number
+  terminou: boolean
+  falha?: unknown
+}
+
+const trabalhos = new Map<string, Trabalho>()
+
+const dormir = (ms: number): Promise<void> =>
+  new Promise((resolver) => {
+    const relogio = setTimeout(resolver, ms)
+    relogio.unref?.()
+  })
+
+/** Só faz sentido insistir em lentidão e limite de requisições. */
+function valeOutraTentativa(erro: unknown): boolean {
+  return erro instanceof ErroHttp && (erro.status === 504 || erro.status === 503)
+}
+
+export interface ResultadoPronto {
+  estado: 'pronto'
+  dados: DadosProcesso
+}
+
+export interface ResultadoBuscando {
+  estado: 'buscando'
+  numeroProcesso: string
+  numeroFormatado: string
+  desde: string
+  aviso: string
+}
+
+export type ResultadoProcesso = ResultadoPronto | ResultadoBuscando
+
+export const AVISO_BUSCANDO =
+  'A base pública do CNJ está lenta agora. Continuamos consultando aqui no servidor e avisamos assim que os dados chegarem — pode seguir preenchendo o resto.'
+
 export interface OpcoesConsultaProcesso extends Pick<OpcoesBusca, 'buscar' | 'tempoLimiteMs'> {
   chave: string
   agora?: () => Date
+  /** Quanto a requisição espera antes de devolver "ainda buscando". */
+  esperaMs?: number
+  /** Só para os testes: substitui a pausa entre tentativas. */
+  dormir?: (ms: number) => Promise<void>
 }
 
-export async function consultarProcesso(
-  bruto: string,
+/** Uma ida ao CNJ. Traduz o que vier em erro com endereço certo. */
+async function buscarNoCnj(
+  numero: string,
+  indice: IndiceDataJud,
   opcoes: OpcoesConsultaProcesso,
 ): Promise<DadosProcesso> {
-  const numero = normalizarNumeroProcesso(bruto)
-  if (!numero) throw new ErroHttp(422, 'Informe os 20 dígitos do número do processo.')
-
-  if (!numeroCnjValido(numero)) {
-    throw new ErroHttp(
-      422,
-      `O número ${formatarNumeroCnj(numero)} não passa na checagem do dígito verificador do CNJ. Confira os números digitados.`,
-    )
-  }
-
-  const indice = indiceDataJud(numero)
-  if (!indice) {
-    throw new ErroHttp(
-      422,
-      'A consulta automática cobre a Justiça do Trabalho (TRTs e TST) e a Justiça Federal (TRFs). Para os demais tribunais, preencha vara e comarca à mão.',
-    )
-  }
-
-  const emCache = cache.ler(numero)
-  if (emCache) return emCache
-
   const { status, corpo } = await buscarJson(`${URL_BASE}/${indice.alias}/_search`, {
     metodo: 'POST',
     corpo: { size: 10, query: { match: { numeroProcesso: numero } } },
     cabecalhos: { Authorization: `APIKey ${opcoes.chave}` },
     fonte: 'A consulta pública de processos do CNJ',
-    tempoLimiteMs: opcoes.tempoLimiteMs ?? 15_000,
+    tempoLimiteMs: opcoes.tempoLimiteMs ?? TEMPO_POR_TENTATIVA_MS,
     ...(opcoes.buscar ? { buscar: opcoes.buscar } : {}),
   }).catch((erro: unknown) => {
     if (erro instanceof FonteIndisponivel) {
@@ -335,6 +386,7 @@ export async function consultarProcesso(
     )
   }
   if (status === 429) {
+    // 503 e não 502: é passageiro, e é o status que manda insistir.
     throw new ErroHttp(
       503,
       'A consulta pública do CNJ está limitando as buscas neste momento. Tente de novo em alguns instantes.',
@@ -370,11 +422,133 @@ export async function consultarProcesso(
     )
   }
 
-  cache.gravar(numero, dados)
   return dados
+}
+
+/**
+ * A busca de fundo: tenta, e tenta de novo enquanto o motivo da falha
+ * for lentidão ou limite de requisições. "Não encontrado" e chave
+ * recusada saem na primeira — insistir neles só gastaria a cota.
+ */
+async function insistir(
+  numero: string,
+  indice: IndiceDataJud,
+  opcoes: OpcoesConsultaProcesso,
+): Promise<DadosProcesso> {
+  const pausar = opcoes.dormir ?? dormir
+  let ultima: unknown = new ErroHttp(504, 'A consulta pública do CNJ não respondeu.')
+
+  for (const pausa of PAUSAS_ENTRE_TENTATIVAS) {
+    if (pausa) await pausar(pausa)
+    try {
+      return await buscarNoCnj(numero, indice, opcoes)
+    } catch (erro) {
+      ultima = erro
+      if (!valeOutraTentativa(erro)) throw erro
+    }
+  }
+
+  throw ultima
+}
+
+/** Põe a busca para correr e cuida do que fazer quando ela terminar. */
+function iniciar(numero: string, indice: IndiceDataJud, opcoes: OpcoesConsultaProcesso): Trabalho {
+  const trabalho: Trabalho = {
+    promessa: insistir(numero, indice, opcoes),
+    desde: Date.now(),
+    terminou: false,
+  }
+  trabalhos.set(numero, trabalho)
+
+  // Este par de handlers existe também para que uma falha que chegue
+  // depois de a requisição ter ido embora não vire rejeição sem dono
+  // — o que derruba o processo do Node.
+  trabalho.promessa.then(
+    (dados) => {
+      trabalho.terminou = true
+      cache.gravar(numero, dados)
+      if (trabalhos.get(numero) === trabalho) trabalhos.delete(numero)
+    },
+    (erro: unknown) => {
+      trabalho.terminou = true
+      trabalho.falha = erro
+      // A falha espera um pouco pela tela, que volta para perguntar.
+      const relogio = setTimeout(() => {
+        if (trabalhos.get(numero) === trabalho) trabalhos.delete(numero)
+      }, VALIDADE_DA_FALHA_MS)
+      relogio.unref?.()
+    },
+  )
+
+  return trabalho
+}
+
+/**
+ * Dados do processo, ou o aviso de que a busca continua correndo.
+ *
+ * Chamar de novo com o mesmo número não abre uma segunda busca: a
+ * tela que volta para perguntar cai no mesmo trabalho já em curso.
+ */
+export async function consultarProcesso(
+  bruto: string,
+  opcoes: OpcoesConsultaProcesso,
+): Promise<ResultadoProcesso> {
+  const numero = normalizarNumeroProcesso(bruto)
+  if (!numero) throw new ErroHttp(422, 'Informe os 20 dígitos do número do processo.')
+
+  if (!numeroCnjValido(numero)) {
+    throw new ErroHttp(
+      422,
+      `O número ${formatarNumeroCnj(numero)} não passa na checagem do dígito verificador do CNJ. Confira os números digitados.`,
+    )
+  }
+
+  const indice = indiceDataJud(numero)
+  if (!indice) {
+    throw new ErroHttp(
+      422,
+      'A consulta automática cobre a Justiça do Trabalho (TRTs e TST) e a Justiça Federal (TRFs). Para os demais tribunais, preencha vara e comarca à mão.',
+    )
+  }
+
+  const emCache = cache.ler(numero)
+  if (emCache) return { estado: 'pronto', dados: emCache }
+
+  const existente = trabalhos.get(numero)
+
+  // Busca que já terminou mal: a tela veio buscar o motivo. Entrega
+  // o erro uma vez e limpa, para que a próxima tentativa seja nova.
+  if (existente?.terminou && existente.falha) {
+    trabalhos.delete(numero)
+    throw existente.falha
+  }
+
+  const trabalho = existente ?? iniciar(numero, indice, opcoes)
+
+  let relogio: ReturnType<typeof setTimeout> | undefined
+  const espera = new Promise<null>((resolver) => {
+    relogio = setTimeout(() => resolver(null), opcoes.esperaMs ?? ESPERA_HTTP_MS)
+    relogio.unref?.()
+  })
+
+  try {
+    const dados = await Promise.race([trabalho.promessa, espera])
+    if (dados) return { estado: 'pronto', dados }
+  } finally {
+    clearTimeout(relogio)
+  }
+
+  return {
+    estado: 'buscando',
+    numeroProcesso: numero,
+    numeroFormatado: formatarNumeroCnj(numero),
+    desde: new Date(trabalho.desde).toISOString(),
+    aviso: AVISO_BUSCANDO,
+  }
 }
 
 /** Só para os testes. */
 export function limparCacheDeProcessos(): void {
   cache.limpar()
+  trabalhos.clear()
 }

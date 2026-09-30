@@ -57,12 +57,19 @@ const confere = (feito: () => void) => {
 
 /** fetch de mentira: responde conforme a URL pedida. */
 function rede(
-  responder: (url: string, opcoes: RequestInit | undefined) => { status: number; corpo?: unknown },
+  responder: (
+    url: string,
+    opcoes: RequestInit | undefined,
+  ) =>
+    | { status: number; corpo?: unknown }
+    // Assíncrono para os casos em que a resposta é segurada de
+    // propósito, simulando o CNJ lento.
+    | Promise<{ status: number; corpo?: unknown }>,
 ) {
   const chamadas: string[] = []
   const buscar = (async (url: unknown, opcoes: unknown) => {
     chamadas.push(String(url))
-    const { status, corpo } = responder(String(url), opcoes as RequestInit | undefined)
+    const { status, corpo } = await responder(String(url), opcoes as RequestInit | undefined)
     return {
       status,
       text: async () => (corpo === undefined ? '' : JSON.stringify(corpo)),
@@ -260,7 +267,7 @@ limparCaches()
 {
   const erro = await erroDe(() => consultarCnpj('123', { buscar: rede(() => ({ status: 200 })).buscar }))
   confere(() => assert.equal(erro.status, 422))
-  confere(() => assert.match(erro.message, /14 dígitos/))
+  confere(() => assert.match(erro.message, /14 caracteres/))
 }
 
 limparCaches()
@@ -418,6 +425,22 @@ const IBGE_SAO_PAULO = {
   microrregiao: { mesorregiao: { UF: { sigla: 'SP' } } },
 }
 
+/** Nos testes as tentativas saem sem intervalo. */
+const semPausa = async () => {}
+
+/**
+ * A consulta agora pode voltar "ainda buscando": estes testes tratam
+ * do caminho em que o CNJ respondeu dentro da espera.
+ */
+async function processoPronto(
+  numero: string,
+  opcoes: Parameters<typeof consultarProcesso>[1],
+) {
+  const resultado = await consultarProcesso(numero, opcoes)
+  if (resultado.estado !== 'pronto') throw new Error('esperava o dado pronto')
+  return resultado.dados
+}
+
 limparCaches()
 {
   const { buscar, chamadas } = rede((url, opcoes) => {
@@ -428,7 +451,7 @@ limparCaches()
     return { status: 200, corpo: RESPOSTA_DATAJUD }
   })
 
-  const dados = await consultarProcesso('1000890-38.2022.5.02.0011', {
+  const dados = await processoPronto('1000890-38.2022.5.02.0011', {
     chave: 'chave-de-teste',
     buscar,
   })
@@ -438,7 +461,7 @@ limparCaches()
   confere(() => assert.match(chamadas[0] ?? '', /api_publica_trt2\/_search$/))
 
   const idas = chamadas.length
-  await consultarProcesso('10008903820225020011', { chave: 'chave-de-teste', buscar })
+  await processoPronto('10008903820225020011', { chave: 'chave-de-teste', buscar })
   confere(() => assert.equal(chamadas.length, idas))
 }
 
@@ -490,7 +513,7 @@ limparCaches()
 {
   const { buscar } = rede(() => ({ status: 429 }))
   const erro = await erroDe(() =>
-    consultarProcesso('10008903820225020011', { chave: 'x', buscar }),
+    consultarProcesso('10008903820225020011', { chave: 'x', buscar, dormir: semPausa }),
   )
   confere(() => assert.equal(erro.status, 503))
 }
@@ -501,10 +524,77 @@ limparCaches()
     throw Object.assign(new Error('The operation was aborted'), { name: 'AbortError' })
   }) as typeof fetch
   const erro = await erroDe(() =>
-    consultarProcesso('10008903820225020011', { chave: 'x', buscar }),
+    consultarProcesso('10008903820225020011', { chave: 'x', buscar, dormir: semPausa }),
   )
   confere(() => assert.equal(erro.status, 504))
   confere(() => assert.match(erro.message, /à mão/))
+}
+
+// A busca que passa da espera nao morre: vira trabalho de fundo, e a
+// tela que volta para perguntar cai no mesmo trabalho, sem abrir
+// outra ida ao CNJ.
+limparCaches()
+{
+  let liberar: (() => void) | undefined
+  const travada = new Promise<void>((resolver) => {
+    liberar = resolver
+  })
+  const { buscar, chamadas } = rede(async (url) => {
+    if (url.includes('ibge')) return { status: 200, corpo: IBGE_SAO_PAULO }
+    await travada
+    return { status: 200, corpo: RESPOSTA_DATAJUD }
+  })
+
+  const primeira = await consultarProcesso('10008903820225020011', {
+    chave: 'x',
+    buscar,
+    esperaMs: 5,
+  })
+  confere(() => assert.equal(primeira.estado, 'buscando'))
+
+  const segunda = await consultarProcesso('10008903820225020011', {
+    chave: 'x',
+    buscar,
+    esperaMs: 5,
+  })
+  confere(() => assert.equal(segunda.estado, 'buscando'))
+  confere(() => assert.equal(chamadas.length, 1))
+
+  liberar?.()
+  await new Promise((resolver) => setTimeout(resolver, 20))
+
+  const terceira = await consultarProcesso('10008903820225020011', {
+    chave: 'x',
+    buscar,
+    esperaMs: 5,
+  })
+  confere(() => assert.equal(terceira.estado, 'pronto'))
+  confere(() =>
+    assert.equal(
+      terceira.estado === 'pronto' ? terceira.dados.vara : null,
+      '11ª Vara do Trabalho de São Paulo',
+    ),
+  )
+}
+
+// Lentidao passageira: a primeira ida estoura, a segunda traz o dado.
+limparCaches()
+{
+  let ida = 0
+  const { buscar, chamadas } = rede((url) => {
+    if (url.includes('ibge')) return { status: 200, corpo: IBGE_SAO_PAULO }
+    ida += 1
+    if (ida === 1) return { status: 429 }
+    return { status: 200, corpo: RESPOSTA_DATAJUD }
+  })
+
+  const dados = await processoPronto('10008903820225020011', {
+    chave: 'x',
+    buscar,
+    dormir: semPausa,
+  })
+  confere(() => assert.equal(dados.tribunal, 'TRT2'))
+  confere(() => assert.equal(chamadas.filter((c) => !c.includes('ibge')).length, 2))
 }
 
 // ---------------- Cache ----------------

@@ -9,7 +9,13 @@ import { BuscaProcesso } from './BuscaProcesso'
 import type { DadosProcesso } from '@/services/api'
 
 const { consultarProcesso } = vi.hoisted(() => ({ consultarProcesso: vi.fn() }))
-vi.mock('@/services/api', () => ({ consultas: { processo: consultarProcesso } }))
+vi.mock('@/services/api', () => ({
+  consultas: { processo: consultarProcesso },
+  // Mesma regra do módulo de verdade: o corpo que traz `estado` é o
+  // aviso de que a busca continua correndo no servidor.
+  aindaBuscando: (r: unknown) =>
+    !!r && typeof r === 'object' && (r as { estado?: string }).estado === 'buscando',
+}))
 
 afterEach(cleanup)
 // Corpo em bloco de propósito: `mockReset()` devolve o próprio mock, e o
@@ -136,4 +142,32 @@ describe('BuscaProcesso', () => {
     expect(aviso.textContent).toContain('preenchimento manual')
     expect(onDados).not.toHaveBeenCalled()
   })
+
+  it('CNJ lento: avisa que continua buscando e preenche quando chega', async () => {
+    const user = userEvent.setup()
+    const onDados = vi.fn()
+    consultarProcesso
+      .mockResolvedValueOnce({
+        estado: 'buscando',
+        numeroProcesso: '10008903820225020011',
+        numeroFormatado: '1000890-38.2022.5.02.0011',
+        desde: '2026-09-30T12:00:00.000Z',
+        aviso: 'A base pública do CNJ está lenta agora. Continuamos consultando no servidor.',
+      })
+      .mockResolvedValue(PROCESSO)
+    render(<Campo onDados={onDados} />)
+
+    await user.type(campo(), '10008903820225020011')
+
+    // Primeira resposta: nada de erro, e a tela diz que a busca segue.
+    expect(await screen.findByText(/está lenta agora/)).toBeDefined()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(onDados).not.toHaveBeenCalled()
+
+    // Passado o intervalo, a tela volta a perguntar e o dado chega.
+    // A espera é de verdade: é o mesmo relógio que o perito vê.
+    expect(await screen.findByText(/TRT2 · 1º grau/, {}, { timeout: 10_000 })).toBeDefined()
+    expect(onDados).toHaveBeenCalledWith(PROCESSO, 'automatica')
+    expect(screen.queryByText(/está lenta agora/)).toBeNull()
+  }, 20_000)
 })
