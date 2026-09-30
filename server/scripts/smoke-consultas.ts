@@ -511,6 +511,35 @@ limparCaches()
 
 limparCaches()
 {
+  // Busca parcial e sem resultado: o CNJ responde 200, mas parte do
+  // índice não foi consultada. Não é "não encontrado" — é "não sei".
+  const { buscar } = rede((url) =>
+    url.includes('ibge')
+      ? { status: 200, corpo: IBGE_SAO_PAULO }
+      : { status: 200, corpo: { _shards: { total: 5, failed: 2 }, hits: { hits: [] } } },
+  )
+  const erro = await erroDe(() =>
+    consultarProcesso('10008903820225020011', { chave: 'x', buscar, dormir: semPausa }),
+  )
+  confere(() => assert.equal(erro.status, 503))
+  confere(() => assert.match(erro.message, /pela metade/))
+  confere(() => assert.doesNotMatch(erro.message, /não foi encontrado/))
+}
+
+limparCaches()
+{
+  // Parcial, mas o processo veio: aí o dado é bom e deve passar.
+  const { buscar } = rede((url) =>
+    url.includes('ibge')
+      ? { status: 200, corpo: IBGE_SAO_PAULO }
+      : { status: 200, corpo: { _shards: { total: 5, failed: 2 }, hits: { hits: [HIT_G1] } } },
+  )
+  const dados = await processoPronto('10008903820225020011', { chave: 'x', buscar })
+  confere(() => assert.equal(dados.tribunal, 'TRT2'))
+}
+
+limparCaches()
+{
   const { buscar } = rede(() => ({ status: 429 }))
   const erro = await erroDe(() =>
     consultarProcesso('10008903820225020011', { chave: 'x', buscar, dormir: semPausa }),

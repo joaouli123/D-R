@@ -399,7 +399,20 @@ async function buscarNoCnj(
     )
   }
 
-  const hits = ((corpo as { hits?: { hits?: unknown[] } }).hits?.hits ?? []) as unknown[]
+  // O Elasticsearch do CNJ responde 200 mesmo quando parte dos
+  // fragmentos do índice não foi consultada (fila de busca cheia, o
+  // tal "es_rejected_execution_exception"). Nesses 200 a lista de
+  // resultados é incompleta — e um processo que morava no fragmento
+  // que falhou simplesmente não aparece. Sem olhar para isto, a tela
+  // diria com toda a confiança "processo não encontrado" para um
+  // processo que existe. Num laudo, errado com convicção é pior do
+  // que indisponível.
+  const busca = corpo as {
+    hits?: { hits?: unknown[] }
+    _shards?: { failed?: number; total?: number }
+  }
+  const fragmentosFalhos = busca._shards?.failed ?? 0
+  const hits = (busca.hits?.hits ?? []) as unknown[]
   const primeiroOrgao = (hits[0] as { _source?: FonteHit } | undefined)?._source?.orgaoJulgador
 
   const municipio = await municipioPorCodigo(primeiroOrgao?.codigoMunicipioIBGE as number | undefined, {
@@ -416,6 +429,15 @@ async function buscarNoCnj(
   })
 
   if (!dados) {
+    // Veio vazio e a busca foi parcial: não dá para afirmar que o
+    // processo não existe. 503 porque é passageiro — é o status que
+    // faz `insistir()` tentar de novo.
+    if (fragmentosFalhos > 0) {
+      throw new ErroHttp(
+        503,
+        `A base pública do ${indice.tribunal} respondeu pela metade — parte do índice não foi consultada. Tente de novo em alguns instantes.`,
+      )
+    }
     throw new ErroHttp(
       404,
       `O processo ${formatarNumeroCnj(numero)} não foi encontrado na base pública do ${indice.tribunal}. Pode estar em segredo de justiça, ter sido distribuído há poucos dias ou tramitar em outro tribunal.`,
